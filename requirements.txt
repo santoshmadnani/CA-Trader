@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+starlette
+python-dotenv
+numpy
+pandas
+requests
+itsdangerous
+beautifulsoup4
+websocket-client
+upstox-python-sdk>=2.23,<3
