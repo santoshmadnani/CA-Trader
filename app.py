@@ -10658,8 +10658,21 @@ async def reports_pnl(
 
     daily_chart = [{"date": k, "pnl": round(v, 2)} for k, v in sorted(daily_map.items())]
 
+    summary_dict = {
+        "net_pnl": net_pnl,
+        "win_rate": win_rate,
+        "total_trades": total_trades,
+        "win_trades": len(wins),
+        "loss_trades": len(losses),
+        "total_turnover": round(turnover, 2),
+        "total_charges": charges,
+        "profit_factor": profit_factor,
+        "return_pct": round((net_pnl / 100000.0) * 100, 2)
+    }
+
     return {
         "timeframe": timeframe,
+        "summary": summary_dict,
         "total_trades": total_trades,
         "winning_trades": len(wins),
         "losing_trades": len(losses),
@@ -10675,7 +10688,8 @@ async def reports_pnl(
         "max_profit": max_win,
         "max_loss": max_loss,
         "daily_pnl": daily_chart,
-        "trades": records[:100]
+        "trades": records[:100],
+        "items": records[:100]
     }
 
 
@@ -10695,8 +10709,53 @@ async def reports_trades(
 
     orders = db_exec(query, params, "all")
     positions = db_exec("SELECT * FROM positions WHERE user_id=? ORDER BY updated_at DESC LIMIT 100", [uid], "all")
+    
+    trade_items = []
+    for p in positions:
+        pnl = float(p.get("final_pnl") if p.get("final_pnl") is not None else (p.get("realized_pnl") or 0))
+        qty = int(p.get("closed_quantity") or p.get("quantity") or 1)
+        if "CRUDEOIL" in str(p.get("symbol") or "").upper() and qty == 1:
+            qty = 100
+        avg_p = float(p.get("avg_price") or 0)
+        exit_p = float(p.get("exit_price") or avg_p)
+        trade_items.append({
+            "id": p.get("id"),
+            "created_at": p.get("created_at") or p.get("opened_at"),
+            "symbol": p.get("symbol"),
+            "side": p.get("side") or "BUY",
+            "quantity": qty,
+            "qty": qty,
+            "price": avg_p,
+            "entry_price": avg_p,
+            "exit_price": exit_p,
+            "turnover": round((avg_p + exit_p) * qty, 2),
+            "pnl": pnl,
+            "status": p.get("status") or "CLOSED"
+        })
+
+    for o in orders:
+        if not any(t["id"] == o.get("id") for t in trade_items):
+            qty = int(o.get("quantity") or 1)
+            pr = float(o.get("price") or 0)
+            trade_items.append({
+                "id": o.get("id"),
+                "created_at": o.get("created_at"),
+                "symbol": o.get("symbol"),
+                "side": o.get("side") or "BUY",
+                "quantity": qty,
+                "qty": qty,
+                "price": pr,
+                "entry_price": pr,
+                "exit_price": pr,
+                "turnover": round(pr * qty, 2),
+                "pnl": 0.0,
+                "status": o.get("status") or "FILLED"
+            })
+
     return {
         "orders_count": len(orders),
+        "items": trade_items,
+        "trades": trade_items,
         "orders": orders,
         "positions": positions
     }

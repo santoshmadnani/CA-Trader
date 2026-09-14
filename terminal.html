@@ -638,11 +638,14 @@ tr:hover td{background:rgba(255,255,255,0.015);}
 }
 .mtf-table{
   display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
-  gap:16px;
-  margin-top:10px;
+  grid-template-columns:repeat(4, 1fr);
+  gap:10px;
+  margin-top:8px;
   width:100%;
   box-sizing:border-box;
+}
+@media (max-width: 900px) {
+  .mtf-table{ grid-template-columns:repeat(2, 1fr); }
 }
 .mtf-cell{
   border:1px solid var(--border-soft);border-radius:8px;padding:12px;background:var(--surface-2);box-sizing:border-box;
@@ -1901,7 +1904,7 @@ body.light-theme .market-box *,
 <div class="navtabs" id="navtabs">
   <div class="navtab active" data-tab="charts">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 5-7"/></svg>
-    Charts &amp; Technicals
+    Charts, Technicals &amp; Backtesting
   </div>
   <div class="navtab" data-tab="options">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
@@ -1915,12 +1918,13 @@ body.light-theme .market-box *,
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
     News by CA AI
   </div>
-  <div class="navtab" data-tab="backtest">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    Backtesting
-  </div>
+
   <div class="navtab" data-tab="fundamentals">Fundamentals</div>
   <div class="navtab" data-tab="movers">Market Movers</div>
+  <div class="navtab" data-tab="other-factors">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    Other Factors
+  </div>
   <div class="navtab" data-tab="orders">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6l1 4H8z"/><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M9 12h6M9 16h6"/></svg>
     Orders &amp; Positions
@@ -1929,10 +1933,7 @@ body.light-theme .market-box *,
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
     Funds
   </div>
-  <div class="navtab" data-tab="console">Server Console</div><div class="navtab" data-tab="auto">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
-    Auto Trade <span class="tag warn" style="font-size:9px;padding:1px 5px;">CONTROLLED</span>
-  </div>
+  <div class="navtab" data-tab="console">Server Console</div>
   <div class="navtab" data-tab="reports">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     Reports &amp; P&amp;L
@@ -1973,10 +1974,10 @@ body.light-theme .market-box *,
             <div style="display:flex;align-items:center;gap:8px;position:relative;">
               <span class="tag neutral" id="chartRecoAction" style="font-size:11.5px;font-weight:700;padding:2px 8px;">SIGNAL</span>
               <span style="font-weight:700;font-size:13.5px;color:var(--text);" id="chartRecoSymbol">—</span>
-              <!-- Searchable Option Selector (Item 7) -->
-              <div id="chartRecoOptionWrap" style="display:inline-flex;align-items:center;position:relative;">
-                <input id="chartRecoOptionSearch" type="text" placeholder="🔍 Search Strike / CE / PE…" style="display:none;width:150px;height:24px;font-size:10.5px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);">
-                <select id="chartRecoOptionSelect" style="display:none;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:11px;padding:2px 6px;cursor:pointer;max-width:180px;"></select>
+              <!-- Searchable Option Selector with Autocomplete (Item 2) -->
+              <div id="chartRecoOptionWrap" style="position:relative;display:inline-flex;align-items:center;">
+                <input id="chartRecoOptionSearch" type="text" autocomplete="off" placeholder="Search option (e.g. 23500 CE)..." style="width:220px;height:26px;font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);">
+                <div id="chartRecoOptionSuggestions" class="auto-suggestions-menu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;width:280px;z-index:2500;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 14px 32px rgba(0,0,0,0.45);max-height:260px;overflow-y:auto;"></div>
               </div>
               <span class="muted" style="font-size:11px;" id="chartRecoConfidence">Live Consensus</span>
             </div>
@@ -2257,6 +2258,45 @@ body.light-theme .market-box *,
       </div>
 
       <!-- Indicator Price Sensitivity Simulator (Charts & Technicals - Item 10) -->
+      
+      <!-- Option Greeks for Selected Recommendation Option (Item 8) -->
+      <div class="card" style="margin-bottom:14px;" id="chartGreeksCard">
+        <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:rgba(38,217,166,0.15);color:var(--buy);font-size:12px;font-weight:700;">G</span>
+            <div>
+              <div class="card-title" id="chartGreeksTitle">Option Greeks &amp; Contract Details</div>
+              <div class="muted" style="font-size:10.5px;margin-top:1px;" id="chartGreeksSubtitle">Live Black-Scholes Greeks for the currently selected option contract</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="tag gold" id="chartGreeksContractBadge" style="font-family:var(--font-mono);font-size:11px;font-weight:700;">Option: --</span>
+            <span class="badge ghost" id="chartGreeksIvBadge" style="font-family:var(--font-mono);font-size:11px;">IV: --%</span>
+          </div>
+        </div>
+        <div class="grid grid-4" style="margin-top:12px;gap:10px;" id="chartGreeksGrid">
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div class="muted" style="font-size:10px;">Delta (Directional Sensitivity)</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--text);margin-top:2px;" id="cgDelta">--</div>
+            <div style="font-size:10px;color:var(--text-dim);" id="cgDeltaDetail">₹ per 1 point underlying move</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div class="muted" style="font-size:10px;">Gamma (Acceleration)</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--text);margin-top:2px;" id="cgGamma">--</div>
+            <div style="font-size:10px;color:var(--text-dim);">Delta growth rate</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div class="muted" style="font-size:10px;">Theta (Daily Time Decay)</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--sell);margin-top:2px;" id="cgTheta">--</div>
+            <div style="font-size:10px;color:var(--text-dim);">₹ daily premium erosion</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div class="muted" style="font-size:10px;">Vega (Volatility Impact)</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--gold);margin-top:2px;" id="cgVega">--</div>
+            <div style="font-size:10px;color:var(--text-dim);">₹ move per 1% IV shift</div>
+          </div>
+        </div>
+      </div>
       <div class="card" style="margin-bottom:14px;" id="chartPriceSensitivityCard">
         <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div style="display:flex;align-items:center;gap:8px;">
@@ -2324,68 +2364,7 @@ body.light-theme .market-box *,
       </div>
 
       <!-- Global & Macro Market Drivers Card (Item 11) -->
-      <div class="card" id="globalMacroSection" style="margin-bottom:14px;">
-        <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:rgba(232,184,75,0.15);color:var(--gold);font-size:12px;font-weight:700;">🌐</span>
-            <div>
-              <div class="card-title">Global &amp; Macro Market Drivers</div>
-              <div class="muted" style="font-size:10.5px;margin-top:1px;">GIFT Nifty · India VIX · US Market Handover · Brent &amp; Dollar Index</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="tag buy" id="macroNetBiasTag" style="font-size:10.5px;font-weight:700;">NET BIAS: BULLISH (76%)</span>
-            <button class="btn ghost small" id="macroRefreshBtn" title="Refresh Macro Drivers" style="height:24px;padding:0 8px;font-size:10px;">↻</button>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px;" id="macroGridCards">
-          <!-- GIFT Nifty -->
-          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">GIFT NIFTY</span>
-              <span class="tag buy" id="giftNiftyTag" style="font-size:9px;padding:1px 5px;">+0.29% GAP UP</span>
-            </div>
-            <div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--buy);" id="giftNiftyLevel">23,465.00</div>
-            <div class="muted" style="font-size:10px;margin-top:3px;" id="giftNiftySignal">Gap-up opening momentum for domestic market</div>
-          </div>
-          <!-- India VIX -->
-          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">INDIA VIX</span>
-              <span class="tag buy" id="indiaVixTag" style="font-size:9px;padding:1px 5px;">13.25 (-3.98%)</span>
-            </div>
-            <div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--text);" id="indiaVixRegime">LOW VOLATILITY</div>
-            <div class="muted" style="font-size:10px;margin-top:3px;" id="indiaVixSignal">Subdued volatility; favorable for call buyers on dips</div>
-          </div>
-          <!-- US Markets Closes -->
-          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">US MARKETS</span>
-              <span class="tag buy" id="usMarketsTag" style="font-size:9px;padding:1px 5px;">GREEN</span>
-            </div>
-            <div style="font-size:12px;font-family:var(--font-mono);color:var(--text);display:flex;flex-direction:column;gap:2px;" id="usIndicesList">
-              <div>S&amp;P 500: <b style="color:var(--buy);">5,626.02 (+0.54%)</b></div>
-              <div>Nasdaq: <b style="color:var(--buy);">17,688.35 (+0.65%)</b></div>
-              <div>Dow: <b style="color:var(--buy);">40,345.20 (+0.31%)</b></div>
-            </div>
-          </div>
-          <!-- Macro Drivers: Crude & DXY -->
-          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">COMMODITY &amp; YIELDS</span>
-              <span class="tag neutral" style="font-size:9px;padding:1px 5px;">FAVORABLE</span>
-            </div>
-            <div style="font-size:12px;font-family:var(--font-mono);color:var(--text);display:flex;flex-direction:column;gap:2px;" id="macroDriversList">
-              <div>Brent Crude: <b>$72.40 (-1.12%)</b></div>
-              <div>Dollar Index: <b>101.15 (-0.24%)</b></div>
-              <div>US 10Y Yield: <b>3.64% (-4 bps)</b></div>
-            </div>
-          </div>
-        </div>
-        <div class="muted" style="margin-top:8px;font-size:10.5px;" id="macroSummaryText">
-          Positive global handover with green US indices, soft crude oil, and complacent India VIX supporting bullish continuation.
-        </div>
-      </div>
+      
     </div>
 
     <div class="panel" id="panel-console">
@@ -2453,53 +2432,6 @@ body.light-theme .market-box *,
       </div>
 
 
-
-      <!-- Price Sensitivity Simulator (Recommendation History - Item 10) -->
-      <div class="card" style="margin-bottom:14px;" id="recoPriceSensitivityCard">
-        <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:rgba(232,184,75,0.15);color:var(--gold);font-size:12px;font-weight:700;">⚡</span>
-            <div>
-              <div class="card-title">Recommendation Price Sensitivity Simulator</div>
-              <div class="muted" style="font-size:10.5px;margin-top:1px;">Test target & stop-loss tolerances against simulated underlying price fluctuations</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="tag neutral" id="recoSimCmpBadge" style="font-family:var(--font-mono);font-size:11px;font-weight:700;">CMP: ₹--</span>
-            <span class="tag buy" id="recoSimDiffBadge" style="font-family:var(--font-mono);font-size:11px;font-weight:700;">Diff: +₹0.00 (+0.00%)</span>
-          </div>
-        </div>
-        <div style="margin-top:12px;">
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-faint);margin-bottom:4px;">
-            <span>-5.0% Downside</span>
-            <span style="font-weight:700;color:var(--gold);" id="recoSimSliderDisplay">Simulated Price: ₹-- (CMP)</span>
-            <span>+5.0% Upside</span>
-          </div>
-          <input type="range" id="recoSimSlider" min="-50" max="50" value="0" step="1" style="width:100%;cursor:pointer;">
-        </div>
-        <div class="grid grid-4" style="margin-top:14px;gap:10px;" id="recoSimGrid">
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
-            <div class="muted" style="font-size:10px;">Simulated Underlying</div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--text);margin-top:2px;" id="recoSimPriceVal">--</div>
-            <div style="font-size:10px;color:var(--buy);" id="recoSimPriceDiff">0.00% vs CMP</div>
-          </div>
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
-            <div class="muted" style="font-size:10px;">Call Option Est. Value</div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--buy);margin-top:2px;" id="recoSimCallDelta">₹0.00</div>
-            <div style="font-size:10px;color:var(--text-dim);" id="recoSimCallDetail">Δ ≈ 0.50 sensitivity</div>
-          </div>
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
-            <div class="muted" style="font-size:10px;">Put Option Est. Value</div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--sell);margin-top:2px;" id="recoSimPutDelta">₹0.00</div>
-            <div style="font-size:10px;color:var(--text-dim);" id="recoSimPutDetail">Δ ≈ -0.50 sensitivity</div>
-          </div>
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
-            <div class="muted" style="font-size:10px;">Recommendation Status</div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:12px;color:var(--gold);margin-top:2px;" id="recoSimThreshold">Holding Range</div>
-            <div style="font-size:10px;color:var(--text-dim);" id="recoSimThresholdDetail">Within Target / SL bounds</div>
-          </div>
-        </div>
-      </div>
 
       <div id="recoHistorySection">
         <div class="card" style="margin-bottom:14px;">
@@ -2585,322 +2517,6 @@ body.light-theme .market-box *,
     </div>
 
     <!-- ============ BACKTESTING & MARKET REPLAY ============ -->
-    <div class="panel" id="panel-backtest">
-      <div class="page-head">
-        <div>
-          <div class="page-title chart-symbol-line">
-            <span id="btSymbolTitle">Backtesting &amp; Market Replay</span>
-            <span class="chart-symbol-ltp" id="btLtp">₹--</span>
-            <span class="chart-symbol-change" id="btChange">--</span>
-          </div>
-          <div class="page-sub">Tick-by-tick historical simulation · Zero lookahead CA AI signals · Practice trade entry &amp; square-off</div>
-        </div>
-        <div class="head-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <div class="session-pill" id="btClockPill" style="background:var(--surface-2);border:1px solid var(--border-soft);padding:4px 10px;border-radius:7px;font-family:var(--font-mono);font-size:11px;color:var(--gold);">
-            <span>⏱ Replay Time:</span> <b id="btSimulatedClock">--:--</b>
-          </div>
-        </div>
-      </div>
-
-      <!-- Replay Control Bar (Spacey & Clean) -->
-      <div class="card" style="margin-bottom:14px;padding:12px 16px;background:var(--surface);">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <label style="font-size:11px;color:var(--text-dim);font-weight:600;">
-              Symbol
-              <div style="position:relative;display:inline-block;margin-left:4px;">
-                <input id="btSymbolInput" class="tool-input" placeholder="Search symbol..." style="width:120px;height:26px;font-size:11px;padding:2px 6px;font-weight:700;" value="RELIANCE" autocomplete="off">
-                <div id="btSymbolSuggestions" class="instrument-suggestions" style="position:absolute;top:100%;left:0;z-index:200;min-width:180px;display:none;"></div>
-                <select id="btSymbolSelect" style="display:none;"><option value="RELIANCE" selected>RELIANCE</option></select>
-              </div>
-            </label>
-
-            <label style="font-size:11px;color:var(--text-dim);font-weight:600;">
-              Timeframe
-              <select id="btTfSelect" class="select-box" style="padding:5px 10px;font-size:12px;margin-left:4px;">
-                <option value="1m">1m</option>
-                <option value="3m">3m</option>
-                <option value="5m" selected>5m</option>
-                <option value="15m">15m</option>
-                <option value="1D">1D</option>
-              </select>
-            </label>
-
-            <label style="font-size:11px;color:var(--text-dim);font-weight:600;">
-              From
-              <input type="datetime-local" id="btFromDateTime" class="input" style="padding:5px 8px;font-size:11px;margin-left:3px;border-radius:6px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);">
-            </label>
-            <label style="font-size:11px;color:var(--text-dim);font-weight:600;">
-              To
-              <input type="datetime-local" id="btToDateTime" class="input" style="padding:5px 8px;font-size:11px;margin-left:3px;border-radius:6px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);">
-            </label>
-            <label style="font-size:10px;display:flex;align-items:center;gap:4px;color:var(--text-faint);font-weight:600;">
-              Option
-              <select id="btOptionContractSelect" class="tool-input" style="width:160px;font-size:11px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);border-radius:6px;" title="Selected Option Contract to backtest in sync">
-                <option value="">Loading Option Chain…</option>
-              </select>
-            </label>
-            <button class="btn ghost small" id="btLoadDataBtn">Load Replay</button>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <button class="btn ghost small" id="btStepBackBtn" title="Step one candle backward">⏮ Step</button>
-            <button class="btn gold small" id="btPlayPauseBtn" style="min-width:80px;">▶ Play</button>
-            <button class="btn ghost small" id="btStepBtn" title="Step one candle forward">⏭ Step</button>
-            <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:6px;padding:2px;border:1px solid var(--border-soft);">
-              <button class="tf-btn active" data-bt-speed="1" style="padding:4px 8px;font-size:10px;">1x</button>
-              <button class="tf-btn" data-bt-speed="2" style="padding:4px 8px;font-size:10px;">2x</button>
-              <button class="tf-btn" data-bt-speed="5" style="padding:4px 8px;font-size:10px;">5x</button>
-              <button class="tf-btn" data-bt-speed="10" style="padding:4px 8px;font-size:10px;">10x</button>
-            </div>
-            <button class="btn ghost small" id="btResetBtn">↺ Reset</button>
-          </div>
-        </div>
-
-        <div style="margin-top:10px;display:flex;align-items:center;gap:12px;">
-          <input type="range" id="btTimelineSlider" min="0" max="100" value="0" style="flex:1;cursor:pointer;">
-          <span id="btProgressLabel" class="muted" style="font-family:var(--font-mono);font-size:11px;min-width:140px;text-align:right;">0 / 0 candles</span>
-        </div>
-      </div>
-
-      <!-- Full-Width Replay Chart Container (Item 18) -->
-      <div class="card" style="padding:14px;background:var(--surface);margin-bottom:16px;width:100%;">
-        <div class="card-head" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="card-title">Simulated Chart</span>
-            <span class="tag buy" id="btTrendTag" style="font-size:10.5px;">Uptrend</span>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-            <button class="tf-btn active" id="btToggleEma" style="padding:3px 9px;font-size:10.5px;" title="Toggle 20-EMA">EMA 20</button>
-            <button class="tf-btn active" id="btToggleBb" style="padding:3px 9px;font-size:10.5px;" title="Toggle Bollinger Bands">BB (20,2)</button>
-            <button class="tf-btn active" id="btToggleSt" style="padding:3px 9px;font-size:10.5px;" title="Toggle Supertrend">Supertrend</button>
-            <button class="tf-btn active" id="btToggleOsc" style="padding:3px 9px;font-size:10.5px;" title="Toggle RSI Sub-pane">RSI (14)</button>
-            <select id="btDrawSel" class="input" style="height:28px;padding:2px 6px;font-size:10px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);border-radius:6px;" title="Backtest Drawings">
-              <option value="">✎️ Drawings</option>
-              <option value="Horizontal Line">Horizontal Line</option>
-              <option value="Trend Line">Trend Line</option>
-              <option value="Ray">Ray</option>
-              <option value="Price Range">Price Range</option>
-            </select>
-            <button class="btn ghost small" id="btChartModeToggle" style="padding:3px 8px;font-size:10.5px;" title="Switch Crosshair / Pan">Crosshair</button>
-            <button class="btn ghost small" id="btResetViewBtn" style="padding:3px 8px;font-size:10.5px;" title="Reset Chart Zoom & Pan">Reset</button>
-          </div>
-          <div style="display:flex;gap:12px;font-family:var(--font-mono);font-size:11.5px;flex-wrap:wrap;width:100%;padding-top:4px;" id="btOhlcBar">
-            <span>O: <b id="btO">--</b></span>
-            <span>H: <b id="btH">--</b></span>
-            <span>L: <b id="btL">--</b></span>
-            <span>C: <b id="btC">--</b></span>
-            <span>RSI: <b id="btRsi">--</b></span>
-          </div>
-        </div>
-        <div style="position:relative;height:380px;width:100%;background:var(--surface-2);border-radius:8px;border:1px solid var(--border-soft);overflow:hidden;" id="btChartViewport">
-          <canvas id="btCanvas" style="width:100%;height:100%;display:block;cursor:crosshair;"></canvas>
-          <div id="btChartPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:13px;pointer-events:none;">
-            Select dates and click "Load Replay" to begin tick-by-tick simulation.
-          </div>
-        </div>
-      </div>
-
-      <!-- Synchronized Option Contract Chart (Item 15) -->
-      <div class="card" style="padding:14px;background:var(--surface);margin-bottom:16px;width:100%;border:1px solid rgba(232,184,75,0.25);">
-        <div class="card-head" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="card-title">Option Contract Chart (Synchronized)</span>
-            <span class="tag gold" id="btOptionNameBadge" style="font-size:11px;font-weight:700;">NIFTY 23500 CE</span>
-            <span class="badge ghost" id="btOptionGreeksBadge" style="font-family:var(--font-mono);font-size:10.5px;padding:3px 8px;border-radius:6px;border:1px solid var(--border-soft);">Δ: 0.52 | Γ: 0.001 | Θ: -14.2 | ν: 8.5 | IV: 14.8%</span>
-          </div>
-          <div style="display:flex;gap:12px;font-family:var(--font-mono);font-size:11.5px;flex-wrap:wrap;padding-top:4px;" id="btOptOhlcBar">
-            <span>Opt O: <b id="btOptO">--</b></span>
-            <span>Opt H: <b id="btOptH">--</b></span>
-            <span>Opt L: <b id="btOptL">--</b></span>
-            <span>Opt C: <b id="btOptC">--</b></span>
-            <span>Sim LTP: <b id="btOptLtp" style="color:var(--gold);">--</b></span>
-          </div>
-        </div>
-        <div style="position:relative;height:260px;width:100%;background:var(--surface-2);border-radius:8px;border:1px solid var(--border-soft);overflow:hidden;" id="btOptionChartViewport">
-          <canvas id="btOptionCanvas" style="width:100%;height:100%;display:block;cursor:crosshair;"></canvas>
-          <div id="btOptionPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:12px;pointer-events:none;">
-            Option price chart synchronizes with replay tick and historical Black-Scholes Greeks.
-          </div>
-        </div>
-      </div>
-
-      <!-- Full-Width Point-in-Time Signal & Trade Execution Stacked (Item 18) -->
-      <div class="card" style="padding:14px 16px;background:var(--surface);border:1px solid rgba(38,217,166,0.3);margin-bottom:16px;">
-        <div class="card-head" style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:var(--buy-bg);color:var(--buy);font-size:13px;font-weight:700;">✦</span>
-            <span class="card-title">CA AI Point-in-Time Signal &amp; Execution</span>
-          </div>
-          <span class="tag buy" id="btSignalBadge" style="font-size:11.5px;font-weight:700;">BUY</span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-bottom:12px;">
-          <div style="background:var(--surface-2);padding:6px 10px;border-radius:6px;border:1px solid var(--border-soft);text-align:center;cursor:pointer;" id="btSignalEntryBox">
-            <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Entry ⓘ</div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--text);" id="btSignalEntry">--</div>
-          </div>
-          <div style="background:var(--surface-2);padding:6px 10px;border-radius:6px;border:1px solid var(--border-soft);text-align:center;cursor:pointer;" id="btSignalSlBox">
-            <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Stop Loss ⓘ</div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--sell);" id="btSignalSl">--</div>
-          </div>
-          <div style="background:var(--surface-2);padding:6px 10px;border-radius:6px;border:1px solid var(--border-soft);text-align:center;cursor:pointer;" id="btSignalTgtBox">
-            <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Target ⓘ</div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--buy);" id="btSignalTgt">--</div>
-          </div>
-          <div class="finder-field" style="margin:0;">
-            <label style="font-size:9.5px;">Qty / Lots</label>
-            <input id="btOrderQty" type="number" min="1" value="10" class="input" style="padding:2px 6px;border-radius:4px;font-size:11.5px;height:26px;">
-          </div>
-          <div style="display:flex;gap:6px;align-items:flex-end;">
-            <button class="btn gold small" id="btBuyBtn" style="flex:1;height:26px;font-weight:700;background:var(--buy);color:#0B2A1E;justify-content:center;">Buy / Long</button>
-            <button class="btn ghost small" id="btSellBtn" style="flex:1;height:26px;font-weight:700;border-color:var(--sell);color:var(--sell);justify-content:center;">Sell / Short</button>
-          </div>
-        </div>
-        <div class="card-sub" id="btSignalRationale" style="font-size:11.5px;color:var(--text-dim);line-height:1.45;cursor:pointer;">
-          Replay signals computed strictly on data up to the current minute with zero lookahead bias. Click Entry/SL/Target to inspect mathematical proof.
-        </div>
-      </div>
-
-      <!-- Backtesting Technical Analysis Matrix & Point-in-Time News Row -->
-      <div class="grid grid-2" style="gap:16px;margin-bottom:16px;align-items:start;">
-        <!-- Technical Analysis Matrix Card (Simulated Point-in-Time) -->
-        <div class="card" style="padding:14px;background:var(--surface);">
-          <div class="card-head" style="margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="card-title">■ Technical Analysis (Simulated)</span>
-              <span class="tag buy" id="btTaTrendTag" style="font-size:10px;">NEUTRAL</span>
-            </div>
-            <div class="muted" style="font-size:10px;">Zero future lookahead</div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:11.5px;" id="btTaGrid">
-            <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--border-soft);">
-              <div class="muted" style="font-size:9.5px;">RSI (14) Momentum</div>
-              <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;" id="btTaRsi">--</div>
-              <div style="font-size:10px;color:var(--text-dim);" id="btTaRsiStatus">Neutral momentum</div>
-            </div>
-            <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--border-soft);">
-              <div class="muted" style="font-size:9.5px;">Moving Averages</div>
-              <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;" id="btTaMa">--</div>
-              <div style="font-size:10px;color:var(--text-dim);" id="btTaMaStatus">EMA 20 &amp; SMA 50</div>
-            </div>
-            <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--border-soft);">
-              <div class="muted" style="font-size:9.5px;">Bollinger Bands</div>
-              <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;" id="btTaBb">--</div>
-              <div style="font-size:10px;color:var(--text-dim);" id="btTaBbStatus">Mid-band test</div>
-            </div>
-            <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--border-soft);">
-              <div class="muted" style="font-size:9.5px;">ATR Volatility</div>
-              <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;" id="btTaAtr">--</div>
-              <div style="font-size:10px;color:var(--text-dim);" id="btTaAtrStatus">Session ATR</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Point-in-Time Top Bullish & Bearish News by CA AI Card -->
-        <div class="card" style="padding:14px;background:var(--surface);">
-          <div class="card-head" style="margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="card-title"> News by CA AI (Till Replay Time)</span>
-              <span class="tag gold" style="font-size:10px;">Point-in-Time</span>
-            </div>
-            <div class="muted" style="font-size:10px;" id="btNewsTimeCap">Strictly historical</div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <!-- Top Bullish News -->
-            <div style="background:var(--surface-2);padding:10px;border-radius:8px;border:1px solid rgba(38,217,166,0.25);">
-              <div style="font-size:11px;font-weight:700;color:var(--buy);margin-bottom:6px;display:flex;align-items:center;gap:4px;">
-                <span>●</span> Top Bullish News
-              </div>
-              <div id="btBullishNewsList" style="display:flex;flex-direction:column;gap:6px;font-size:11px;max-height:160px;overflow-y:auto;">
-                <div class="muted" style="font-size:10px;">No prior bullish catalysts before replay time</div>
-              </div>
-            </div>
-
-            <!-- Top Bearish News -->
-            <div style="background:var(--surface-2);padding:10px;border-radius:8px;border:1px solid rgba(255,92,114,0.25);">
-              <div style="font-size:11px;font-weight:700;color:var(--sell);margin-bottom:6px;display:flex;align-items:center;gap:4px;">
-                <span>●</span> Top Bearish News
-              </div>
-              <div id="btBearishNewsList" style="display:flex;flex-direction:column;gap:6px;font-size:11px;max-height:160px;overflow-y:auto;">
-                <div class="muted" style="font-size:10px;">No prior bearish catalysts before replay time</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Bottom Tables: Vertically Stacked Simulated Positions & Closed Performance (Item 16) -->
-      <div style="display:flex;flex-direction:column;gap:16px;width:100%;margin-top:14px;">
-        <!-- Open Backtest Positions (Full Width) -->
-        <div class="card" style="padding:14px;background:var(--surface);width:100%;">
-          <div class="card-head" style="margin-bottom:8px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="card-title">Active Simulated Positions</span>
-              <span class="badge" id="btActivePosCount" style="position:static;font-size:10px;">0</span>
-            </div>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;" id="btUnrealizedPnl">P&amp;L: ₹0.00</div>
-          </div>
-          <div class="table-wrap" style="overflow-x:auto;">
-            <table style="width:100%;font-size:11.5px;">
-              <thead>
-                <tr>
-                  <th>Symbol</th>
-                  <th>Side</th>
-                  <th>Qty</th>
-                  <th>Entry</th>
-                  <th>Current LTP</th>
-                  <th>Unrealized P&amp;L</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="btPositionsTableBody">
-                <tr><td colspan="7" class="data-empty" style="padding:16px;text-align:center;">No open simulation positions. Place a trade above.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Backtest Performance & Closed History -->
-        <div class="card" style="padding:14px;background:var(--surface);">
-          <div class="card-head" style="margin-bottom:8px;">
-            <span class="card-title">Simulation Performance</span>
-            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;" id="btRealizedPnl">Realized: ₹0.00</div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-            <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;text-align:center;">
-              <div style="font-size:9.5px;color:var(--text-faint);">Total Trades</div>
-              <div style="font-weight:700;font-size:13px;" id="btStatTrades">0</div>
-            </div>
-            <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;text-align:center;">
-              <div style="font-size:9.5px;color:var(--text-faint);">Win Rate</div>
-              <div style="font-weight:700;font-size:13px;" id="btStatWinRate">0.0%</div>
-            </div>
-            <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;text-align:center;">
-              <div style="font-size:9.5px;color:var(--text-faint);">Net Profit</div>
-              <div style="font-weight:700;font-size:13px;" id="btStatNetProfit">₹0.00</div>
-            </div>
-          </div>
-          <div class="table-wrap" style="max-height:160px;overflow-y:auto;">
-            <table style="width:100%;font-size:11px;">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Symbol</th>
-                  <th>Side</th>
-                  <th>Entry</th>
-                  <th>Exit</th>
-                  <th>P&amp;L</th>
-                </tr>
-              </thead>
-              <tbody id="btClosedTableBody">
-                <tr><td colspan="6" class="data-empty" style="padding:10px;text-align:center;">Closed trades will appear here upon square-off.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- ============ FUNDAMENTALS ============ -->
     <div class="panel" id="panel-fundamentals">
       <div class="page-head"><div><div class="page-title chart-symbol-line"><span id="fundSymbol">Fundamentals</span><span class="chart-symbol-ltp" id="fundLtp"></span><span class="chart-symbol-change" id="fundChange"></span></div><div class="page-sub" id="fundamentalSubtitle">Live ratios and quarterly results</div></div><div class="head-actions"><button class="btn ghost" id="refreshFundamentalsBtn">Refresh</button></div></div>
@@ -2942,21 +2558,86 @@ body.light-theme .market-box *,
     </div>
 
     <!-- ============ MARKET MOVERS ============ -->
+    
+    <!-- ============ OTHER FACTORS & MACRO ============ -->
+    <div class="panel" id="panel-other-factors">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Macro &amp; Other Market Drivers</div>
+          <div class="page-sub">Global benchmark influences, VIX regime, currency, yields, and commodity trends</div>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost small" onclick="loadMacroFactors(true)">Refresh Macro</button>
+        </div>
+      </div>
+      <div class="card" id="globalMacroSection" style="margin-bottom:14px;">
+        <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:rgba(232,184,75,0.15);color:var(--gold);font-size:12px;font-weight:700;">🌐</span>
+            <div>
+              <div class="card-title">Global &amp; Macro Market Drivers</div>
+              <div class="muted" style="font-size:10.5px;margin-top:1px;">GIFT Nifty · India VIX · US Market Handover · Brent &amp; Dollar Index</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="tag buy" id="macroNetBiasTag" style="font-size:10.5px;font-weight:700;">NET BIAS: BULLISH (76%)</span>
+            <button class="btn ghost small" id="macroRefreshBtn" title="Refresh Macro Drivers" style="height:24px;padding:0 8px;font-size:10px;">↻</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px;" id="macroGridCards">
+          <!-- GIFT Nifty -->
+          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">GIFT NIFTY</span>
+              <span class="tag buy" id="giftNiftyTag" style="font-size:9px;padding:1px 5px;">+0.29% GAP UP</span>
+            </div>
+            <div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--buy);" id="giftNiftyLevel">23,465.00</div>
+            <div class="muted" style="font-size:10px;margin-top:3px;" id="giftNiftySignal">Gap-up opening momentum for domestic market</div>
+          </div>
+          <!-- India VIX -->
+          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">INDIA VIX</span>
+              <span class="tag buy" id="indiaVixTag" style="font-size:9px;padding:1px 5px;">13.25 (-3.98%)</span>
+            </div>
+            <div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--text);" id="indiaVixRegime">LOW VOLATILITY</div>
+            <div class="muted" style="font-size:10px;margin-top:3px;" id="indiaVixSignal">Subdued volatility; favorable for call buyers on dips</div>
+          </div>
+          <!-- US Markets Closes -->
+          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">US MARKETS</span>
+              <span class="tag buy" id="usMarketsTag" style="font-size:9px;padding:1px 5px;">GREEN</span>
+            </div>
+            <div style="font-size:12px;font-family:var(--font-mono);color:var(--text);display:flex;flex-direction:column;gap:2px;" id="usIndicesList">
+              <div>S&amp;P 500: <b style="color:var(--buy);">5,626.02 (+0.54%)</b></div>
+              <div>Nasdaq: <b style="color:var(--buy);">17,688.35 (+0.65%)</b></div>
+              <div>Dow: <b style="color:var(--buy);">40,345.20 (+0.31%)</b></div>
+            </div>
+          </div>
+          <!-- Macro Drivers: Crude & DXY -->
+          <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:700;color:var(--text-faint);">COMMODITY &amp; YIELDS</span>
+              <span class="tag neutral" style="font-size:9px;padding:1px 5px;">FAVORABLE</span>
+            </div>
+            <div style="font-size:12px;font-family:var(--font-mono);color:var(--text);display:flex;flex-direction:column;gap:2px;" id="macroDriversList">
+              <div>Brent Crude: <b>$72.40 (-1.12%)</b></div>
+              <div>Dollar Index: <b>101.15 (-0.24%)</b></div>
+              <div>US 10Y Yield: <b>3.64% (-4 bps)</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="muted" style="margin-top:8px;font-size:10.5px;" id="macroSummaryText">
+          Positive global handover with green US indices, soft crude oil, and complacent India VIX supporting bullish continuation.
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="panel-movers">
       <div class="page-head"><div><div class="page-title">Market Movers</div><div class="page-sub">Live market quote universe <span id="moversSourceLabel" class="muted" style="font-size:10px;"></span></div></div></div>
 
-      <!-- Other Influences & Global Macro Gauges (Item 34) -->
-      <div class="card" style="margin-bottom:14px;">
-        <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <div class="card-title" style="display:flex;align-items:center;gap:8px;">
-            <span>Other Market Influences &amp; Global Gauges</span>
-          </div>
-          <div class="muted" id="influencesUpdated" style="font-size:11px;">Global Macro Signals</div>
-        </div>
-        <div id="otherInfluencesPills" style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 0;">
-          <div class="data-empty" style="padding:8px 0;">Loading global macro influences…</div>
-        </div>
-      </div>
+
 
       <div class="card"><div class="card-head"><div class="mover-tabs"><div class="chip-filter active" data-mover="gainers">Gainers</div><div class="chip-filter" data-mover="losers">Losers</div><div class="chip-filter" data-mover="high_volume">High Volume</div><div class="chip-filter" data-mover="unusual_volume">Unusual Volume</div><div class="chip-filter" data-mover="turnover">Top Turnover</div></div><div class="muted" id="moversUpdated">Waiting</div></div><div id="moversList"><div class="data-empty">Open this tab to load live market movers.</div></div></div>
       <div class="card" style="margin-top:14px"><div class="card-head"><div class="card-title">Mover Details</div><div class="muted">Select a row above</div></div><div id="moverDetails" class="basis-list"><div class="data-empty">Select a market mover to see price, circuit, volume and turnover details.</div></div></div>
@@ -5322,46 +5003,54 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   }
 
   function renderMtfCell(r, i){
-    const sig = r.signal || 'NEUTRAL';
-    const tagClass = sig === 'BUY' ? 'buy' : sig === 'SELL' ? 'sell' : 'neutral';
+    const rawSig = String(r.signal || 'NEUTRAL').toUpperCase();
+    const isSigBuy = /BUY|LONG|UP/i.test(rawSig);
+    const isSigSell = /SELL|SHORT|DOWN/i.test(rawSig);
+    const tagClass = isSigBuy ? 'buy' : isSigSell ? 'sell' : 'neutral';
+    const sigLabel = isSigBuy ? 'BUY' : isSigSell ? 'SELL' : 'NO TRADE';
     const t = r.technical || {};
     const rsiVal = Number(t.rsi || 50);
     const macdVal = Number(t.macd || 0);
-    const trendVal = t.trend || 'NEUTRAL';
+    const trendVal = String(t.trend || 'NEUTRAL').toUpperCase();
+    const isTrendBuy = /BUY|UP|BULL/i.test(trendVal);
+    const isTrendSell = /SELL|DOWN|BEAR/i.test(trendVal);
+    const trendTagClass = isTrendBuy ? 'buy' : isTrendSell ? 'sell' : 'neutral';
+    const trendLabel = isTrendBuy ? 'BUY' : isTrendSell ? 'SELL' : 'NO TRADE';
+
     return `
-      <div class="mtf-cell" data-mtf-index="${i}" style="padding:16px 18px;display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:10px;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);padding-bottom:8px;">
-          <b class="mtf-tf" style="font-size:15px;font-weight:700;color:var(--text);">${esc(r.timeframe)}</b>
-          <span class="tag ${tagClass}" style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;">${esc(sig)}</span>
+      <div class="mtf-cell" data-mtf-index="${i}" style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);padding-bottom:5px;">
+          <b class="mtf-tf" style="font-size:12.5px;font-weight:700;color:var(--text);">${esc(r.timeframe)}</b>
+          <span class="tag ${tagClass}" style="font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;">${esc(sigLabel)}</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:7px;margin-top:4px;">
-          <div style="display:flex;align-items:center;gap:14px;text-align:left;">
-            <span style="width:88px;color:var(--text-faint);font-size:11.5px;font-weight:500;">RSI (14)</span>
-            <span class="${rsiVal > 60 ? 'cell-up' : rsiVal < 40 ? 'cell-down' : ''}" style="color:var(--text);font-family:var(--font-mono);font-size:12px;font-weight:600;">${fmt(rsiVal)}</span>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:2px;">
+          <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+            <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">RSI (14)</span>
+            <span class="${rsiVal > 60 ? 'cell-up' : rsiVal < 40 ? 'cell-down' : ''}" style="color:var(--text);font-family:var(--font-mono);font-size:10.5px;font-weight:600;">${fmt(rsiVal)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;text-align:left;">
-            <span style="width:88px;color:var(--text-faint);font-size:11.5px;font-weight:500;">ADX (14)</span>
-            <span style="color:var(--text);font-family:var(--font-mono);font-size:12px;font-weight:600;">${fmt(t.adx || 25)}</span>
+          <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+            <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">ADX (14)</span>
+            <span style="color:var(--text);font-family:var(--font-mono);font-size:10.5px;font-weight:600;">${fmt(t.adx || 25)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;text-align:left;">
-            <span style="width:88px;color:var(--text-faint);font-size:11.5px;font-weight:500;">MACD</span>
-            <span class="${macdVal >= 0 ? 'cell-up' : 'cell-down'}" style="font-family:var(--font-mono);font-size:12px;font-weight:600;">${fmt(macdVal)}</span>
+          <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+            <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">MACD</span>
+            <span class="${macdVal >= 0 ? 'cell-up' : 'cell-down'}" style="font-family:var(--font-mono);font-size:10.5px;font-weight:600;">${fmt(macdVal)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;text-align:left;">
-            <span style="width:88px;color:var(--text-faint);font-size:11.5px;font-weight:500;">EMA 20</span>
-            <span style="color:var(--text);font-family:var(--font-mono);font-size:12px;font-weight:600;">₹${fmt(t.ema20 || t.last || 0)}</span>
+          <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+            <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">EMA 20</span>
+            <span style="color:var(--text);font-family:var(--font-mono);font-size:10.5px;font-weight:600;">₹${fmt(t.ema20 || t.last || 0)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;text-align:left;">
-            <span style="width:88px;color:var(--text-faint);font-size:11.5px;font-weight:500;">EMA 50</span>
-            <span style="color:var(--text);font-family:var(--font-mono);font-size:12px;font-weight:600;">₹${fmt(t.ema50 || 0)}</span>
+          <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+            <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">EMA 50</span>
+            <span style="color:var(--text);font-family:var(--font-mono);font-size:10.5px;font-weight:600;">₹${fmt(t.ema50 || 0)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;text-align:left;">
-            <span style="width:88px;color:var(--text-faint);font-size:11.5px;font-weight:500;">Supertrend</span>
-            <span class="tag ${trendVal === 'UP' || trendVal === 'BULLISH' ? 'buy' : 'sell'}" style="font-size:10px;padding:2px 7px;">${esc(trendVal)}</span>
+          <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+            <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">Supertrend</span>
+            <span class="tag ${trendTagClass}" style="font-size:9px;padding:1px 5px;font-weight:700;">${esc(trendLabel)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;text-align:left;">
-            <span style="width:88px;color:var(--text-faint);font-size:11.5px;font-weight:500;">Stochastic</span>
-            <span style="color:var(--text);font-family:var(--font-mono);font-size:12px;font-weight:600;">${fmt(t.stoch || 50)}</span>
+          <div style="display:flex;align-items:center;gap:10px;text-align:left;">
+            <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">Stochastic</span>
+            <span style="color:var(--text);font-family:var(--font-mono);font-size:10.5px;font-weight:600;">${fmt(t.stoch || 50)}</span>
           </div>
         </div>
       </div>
@@ -7277,6 +6966,26 @@ function applyDrawingPoint(x,y){const r=vp.getBoundingClientRect(),pt=chartPoint
       const atmRow = rows.find(r => Number(r.strike) === atm) || rows[Math.floor(rows.length/2)];
       const atmIv = atmRow?.call?.iv || atmRow?.put?.iv || 14.5;
       if(document.getElementById('optFooterAtmIv')) document.getElementById('optFooterAtmIv').textContent = `${Number(atmIv).toFixed(1)}%`;
+      setTimeout(() => {
+        const rowsEl = host.querySelectorAll('.opt-chain-row');
+        rowsEl.forEach(row => {
+          row.onclick = (e) => {
+            if(e.target.closest('.opt-bs-btn')) return;
+            try {
+              const rData = JSON.parse(decodeURIComponent(row.dataset.strikeJson));
+              const isLeftCall = e.clientX < (row.getBoundingClientRect().left + row.getBoundingClientRect().width * 0.45);
+              const optSide = isLeftCall ? 'CE' : 'PE';
+              if(typeof showGreeks === 'function') showGreeks(rData, optSide);
+              rowsEl.forEach(r => r.style.outline = 'none');
+              row.style.outline = '1.5px solid var(--gold)';
+              if($('greeksSubtitle')){
+                $('greeksSubtitle').textContent = `Live Greeks for ${S} Strike ₹${fmt(rData.strike)} (${optSide})`;
+              }
+            } catch(err) { console.debug('Row click error:', err); }
+          };
+        });
+      }, 50);
+
 
       const isGreeks = optChainMode === 'greeks';
 
@@ -7330,7 +7039,7 @@ function applyDrawingPoint(x,y){const r=vp.getBoundingClientRect(),pt=chartPoint
               const putPct = Math.min(100, Math.round((Number(p.oi || 0) / maxPutOi) * 100));
 
               return `
-                <tr class="opt-chain-row" style="border-bottom:1px solid var(--border-soft);${isAtm ? 'background:rgba(59,130,246,0.06);' : ''}">
+                <tr class="opt-chain-row" data-strike="${strike}" data-strike-json="${encodeURIComponent(JSON.stringify(r))}" style="cursor:pointer;border-bottom:1px solid var(--border-soft);${isAtm ? 'background:rgba(59,130,246,0.06);' : ''}">
                   ${isGreeks ? `
                     <td style="padding:5px 8px;font-family:var(--font-mono);cursor:pointer;" onclick="openGreekModal('Call Delta', ${c.delta||0.5}, '${esc(S)}', ${strike}, ${c.delta||0.5}, ${p.delta||-0.5})">${fmt(c.delta)}</td>
                     <td style="padding:5px 8px;font-family:var(--font-mono);cursor:pointer;" onclick="openGreekModal('Call Gamma', ${c.gamma||0.001}, '${esc(S)}', ${strike}, ${c.delta||0.5}, ${p.delta||-0.5})">${fmt(c.gamma)}</td>
@@ -7900,20 +7609,24 @@ function applyDrawingPoint(x,y){const r=vp.getBoundingClientRect(),pt=chartPoint
         const isBull = it.sentiment === 'BULLISH';
         const isBear = it.sentiment === 'BEARISH';
         const badgeClass = isBull ? 'buy' : isBear ? 'sell' : 'neutral';
-        const badgeIcon = isBull ? '▲' : isBear ? '▼' : '■';
         const borderLeftColor = isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--border-soft)';
+        
+        // Probability out of 100% (Item 10)
+        const rawImpact = parseFloat(String(it.impact_pct || '1.0').replace(/[^0-9.-]/g, '')) || 1.0;
+        const probVal = Math.min(98, Math.max(62, Math.round(68 + Math.abs(rawImpact) * 16)));
+        const probText = `${probVal}% ${isBull ? 'Bullish' : isBear ? 'Bearish' : 'Neutral'} Probability`;
 
           return `
           <div class="news-card" data-news-item="${encodeURIComponent(JSON.stringify(it))}" style="cursor:pointer;background:var(--surface);border:1px solid var(--border-soft);border-left:4px solid ${borderLeftColor};border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:transform 0.15s ease,border-color 0.15s ease;">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);background:var(--surface-2);padding:2px 8px;border-radius:4px;border:1px solid var(--border-soft);">${esc(it.source)}</span>
-                <span style="font-size:11px;color:var(--text-faint);">⏱ ${esc(it.time)}</span>
+                <span style="font-size:11px;color:var(--text-faint);">Time: ${esc(it.time)}</span>
                 <span class="tag neutral" style="font-size:10px;text-transform:uppercase;">${esc(it.scope === 'stock' ? (sym + ' Specific') : 'Global Macro')}</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <span class="tag ${badgeClass}" style="font-weight:700;font-size:11px;padding:3px 9px;border-radius:5px;">
-                  ${badgeIcon} ${esc(it.sentiment)} ${esc(it.impact_pct)}
+                  ${esc(probText)}
                 </span>
               </div>
             </div>
@@ -8415,6 +8128,8 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
           if(!targetCard) targetCard = c;
         }
       });
+      if(!targetCard && c
+... [truncated for diff preview]
       if(!targetCard && cards.length) targetCard = cards[0];
       if(targetCard){
         targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -8653,10 +8368,25 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
 
     const inst = rec?.instrument;
     const baseSym = String(sym).replace(/ (CE|PE)$/, '').split(' ')[0].toUpperCase();
-    const isOption = (inst && (inst.kind === 'OPTION' || inst.display)) || (rec?.display_symbol && rec?.display_symbol !== sym) || / (CE|PE)$/i.test(sym) || / (CE|PE)$/i.test(rec?.symbol||'') || !!window.__caPinnedOptionContract;
-    
-    // Strict Option Buying: Options are ALWAYS BUY (BUY CE or BUY PE)
-    const action = isOption ? (qualifies ? 'BUY' : (rawAction === 'NO_TRADE' ? 'NO TRADE' : 'NEUTRAL')) : (qualifies ? (isBuy ? 'BUY' : 'SELL') : (rawAction === 'NO_TRADE' ? 'NO TRADE' : 'NEUTRAL'));
+    const curLtp = Number(window.state?.latestLive || (window.__CA_WL_QUOTES||{})[sym]?.ltp || rec?.entry || 23400);
+    const step = baseSym.includes('BANK') ? 100 : (baseSym.includes('CRUDE') ? 50 : 50);
+    const atmStrike = Math.round(curLtp / step) * step;
+
+    // Item 1: Recommendations are strictly for OPTION contracts, not indices
+    const isUnderlyingIndexOrStock = !sym.includes(' CE') && !sym.includes(' PE');
+    if (isUnderlyingIndexOrStock && !window.__caPinnedOptionContract) {
+      const optType = (isSell || rawAction.includes('SELL') || rawAction.includes('SHORT')) ? 'PE' : 'CE';
+      const autoOptionSym = `${baseSym} ${atmStrike} ${optType}`;
+      let optQuoteLtp = (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[autoOptionSym]?.ltp) || null;
+      if (!optQuoteLtp) {
+        optQuoteLtp = optType === 'CE' ? Math.max(25, roundVal((curLtp - atmStrike) + 135)) : Math.max(25, roundVal((atmStrike - curLtp) + 135));
+      }
+      applyOptionRecommendation(autoOptionSym, optQuoteLtp, baseSym);
+      return;
+    }
+
+    const isOption = true;
+    const action = qualifies ? 'BUY' : (rawAction === 'NO_TRADE' ? 'NO TRADE' : 'NEUTRAL');
 
     const actionEl = $('chartRecoAction');
     if(actionEl){
@@ -8668,10 +8398,8 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
 
     let dispSym = rec?.display_symbol || (isOption ? (inst?.display || inst?.symbol) : sym);
 
-    // Item 19: Display option name and populate strike dropdown
-    const curLtp = Number(window.state?.latestLive || rec?.entry || 23400);
-    const step = baseSym.includes('BANK') ? 100 : (baseSym.includes('CRUDE') ? 50 : 50);
-    const atmStrike = Math.round(curLtp / step) * step;
+    // Display option name
+
 
     if(isOption && (!dispSym || (!dispSym.includes(' CE') && !dispSym.includes(' PE')))) {
       const optType = (isSell || rawAction.includes('SELL') || rawAction.includes('SHORT')) ? 'PE' : 'CE';
@@ -8683,62 +8411,84 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       $('chartRecoSymbol').title = isOption ? `Option Recommendation: ${dispSym} (Underlying: ${sym})` : `Recommendation for ${sym}`;
     }
 
-    const optSelect = $('chartRecoOptionSelect');
+    // Item 2: Search Box with Autocomplete suggestions from option chain
     const optSearch = $('chartRecoOptionSearch');
-    if(optSelect){
-      // Item 7: Whole option chain strikes (-15 to +15 around ATM)
+    const optSuggBox = $('chartRecoOptionSuggestions');
+    if(optSearch && optSuggBox){
+      optSearch.value = dispSym;
+
+      // Build options list around ATM
       const strikes = [];
       for(let k = -15; k <= 15; k++){
         strikes.push(atmStrike + k * step);
       }
-      const activeChosen = window.__caPinnedOptionContract || dispSym;
-      let allOpts = [{ val: '', label: `Auto (CA AI Best: ${dispSym})` }];
+      const availableOptions = [];
       strikes.forEach(st => {
-        allOpts.push({ val: `${baseSym} ${st} CE`, label: `${baseSym} ${st} CE` });
-        allOpts.push({ val: `${baseSym} ${st} PE`, label: `${baseSym} ${st} PE` });
+        availableOptions.push({ sym: `${baseSym} ${st} CE`, strike: st, type: 'CE' });
+        availableOptions.push({ sym: `${baseSym} ${st} PE`, strike: st, type: 'PE' });
       });
 
-      function renderFilteredOptions(filterText = ''){
-        const q = filterText.trim().toUpperCase();
-        const filtered = q ? allOpts.filter(o => !o.val || o.val.toUpperCase().includes(q)) : allOpts;
-        optSelect.innerHTML = filtered.map(o => `<option value="${esc(o.val)}"${activeChosen === o.val ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
-      }
-      renderFilteredOptions(optSearch?.value || '');
-
-      optSelect.style.display = 'inline-block';
-      if(optSearch){
-        optSearch.style.display = 'inline-block';
-        if(!optSearch.dataset.bound){
-          optSearch.dataset.bound = '1';
-          optSearch.addEventListener('input', () => {
-            renderFilteredOptions(optSearch.value);
-          });
-        }
-      }
-
-      optSelect.onchange = async () => {
-        const chosen = optSelect.value;
-        if(!chosen) {
-          window.__caPinnedOptionContract = null;
-          void updateChartRecoBanner(null, baseSym, true);
+      function renderOptionSuggestions(query = ''){
+        const q = query.trim().toUpperCase();
+        const matches = q ? availableOptions.filter(o => o.sym.toUpperCase().includes(q)) : availableOptions.slice(10, 26);
+        if(!matches.length){
+          optSuggBox.innerHTML = '<div style="padding:8px 10px;color:var(--text-faint);font-size:11px;">No matching options found</div>';
+          optSuggBox.style.display = 'block';
           return;
         }
-        window.__caPinnedOptionContract = chosen;
-        let optQuoteLtp = (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[chosen]?.ltp) || null;
-        if(!optQuoteLtp) {
-          try {
-            const q = await A('/api/market/quote/' + encodeURIComponent(chosen));
-            if(q && q.ltp) optQuoteLtp = Number(q.ltp);
-          } catch(_) {}
-        }
-        if(!optQuoteLtp) {
-          const isCall = chosen.includes('CE');
-          const m = chosen.match(/\s+(\d+)\s+(?:CE|PE)/);
-          const strikeVal = m ? Number(m[1]) : atmStrike;
-          optQuoteLtp = isCall ? roundVal(Math.max(15, (curLtp - strikeVal) + 120)) : roundVal(Math.max(15, (strikeVal - curLtp) + 120));
-        }
-        applyOptionRecommendation(chosen, optQuoteLtp, baseSym);
-      };
+        optSuggBox.innerHTML = matches.map(o => {
+          const qLtp = (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[o.sym]?.ltp) || null;
+          const isAtm = o.strike === atmStrike;
+          return `
+            <div class="opt-suggestion-item" data-opt-sym="${esc(o.sym)}" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between;align-items:center;font-size:11px;${isAtm ? 'background:rgba(232,184,75,0.08);' : ''}">
+              <div>
+                <b style="color:var(--text);font-family:var(--font-mono);">${esc(o.sym)}</b>
+                ${isAtm ? '<span class="tag gold" style="font-size:8.5px;padding:1px 4px;margin-left:4px;">ATM</span>' : ''}
+              </div>
+              <span class="${o.type === 'CE' ? 'cell-up' : 'cell-down'}" style="font-family:var(--font-mono);font-weight:700;">
+                ${qLtp ? '₹' + fmt(qLtp) : o.type}
+              </span>
+            </div>
+          `;
+        }).join('');
+        optSuggBox.style.display = 'block';
+
+        optSuggBox.querySelectorAll('.opt-suggestion-item').forEach(item => {
+          item.onclick = async (e) => {
+            e.stopPropagation();
+            const chosen = item.dataset.optSym;
+            optSearch.value = chosen;
+            optSuggBox.style.display = 'none';
+            window.__caPinnedOptionContract = chosen;
+
+            let optQuoteLtp = (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[chosen]?.ltp) || null;
+            if(!optQuoteLtp){
+              try {
+                const q = await A('/api/market/quote/' + encodeURIComponent(chosen));
+                if(q && q.ltp) optQuoteLtp = Number(q.ltp);
+              } catch(_) {}
+            }
+            if(!optQuoteLtp){
+              const isCall = chosen.includes('CE');
+              const m = chosen.match(/\s+(\d+)\s+(?:CE|PE)/);
+              const strikeVal = m ? Number(m[1]) : atmStrike;
+              optQuoteLtp = isCall ? roundVal(Math.max(15, (curLtp - strikeVal) + 120)) : roundVal(Math.max(15, (strikeVal - curLtp) + 120));
+            }
+            applyOptionRecommendation(chosen, optQuoteLtp, baseSym);
+          };
+        });
+      }
+
+      if(!optSearch.dataset.bound){
+        optSearch.dataset.bound = '1';
+        optSearch.addEventListener('focus', () => renderOptionSuggestions(optSearch.value));
+        optSearch.addEventListener('input', () => renderOptionSuggestions(optSearch.value));
+        document.addEventListener('click', (e) => {
+          if(!e.target.closest('#chartRecoOptionWrap')){
+            optSuggBox.style.display = 'none';
+          }
+        });
+      }
     }
 
     // Item 18 & 3: Update Institutional Recommendation Rationale & Evidence Matrix
@@ -10834,70 +10584,90 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
   // ==========================================
   // PRICE SENSITIVITY SIMULATOR LOGIC (Item 10)
   // ==========================================
-  function updatePriceSensitivitySim(prefix){
-    const rawSym = selectedSymbol() || 'NIFTY';
+  function updatePriceSensitivitySim(prefix = 'chart'){
+    const rawSym = selectedSymbol() || window.CATraderSymbol || 'NIFTY';
     const sym = extractUnderlying(rawSym);
     const q = (window.__CA_WL_QUOTES || {})[sym.toUpperCase()] || (window.__CA_WL_QUOTES || {})[rawSym.toUpperCase()] || {};
-    const cmp = Number(q.ltp || state.latestLive || (state.candles.length ? state.candles[state.candles.length-1].close : 23450));
+    const cmp = Number(q.ltp || state.latestLive || (state.candles.length ? state.candles[state.candles.length-1].close : 23398.10));
+
+    // Active recommended or selected option
+    const activeReco = window.__caCurrentChartReco || {};
+    const optSym = activeReco.symbol || window.__caPinnedOptionContract || `${sym} ${Math.round(cmp/50)*50} CE`;
+    const optLtp = Number(activeReco.entry || (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[optSym]?.ltp) || 142.50);
+    const isCall = optSym.includes('CE');
+    const optDelta = isCall ? 0.52 : -0.48;
+    const optGamma = 0.0012;
+    const lotSize = activeReco.instrument?.lot_size || (sym.includes('BANK') ? 15 : (sym.includes('CRUDE') ? 100 : 25));
+
     const slider = document.getElementById(`${prefix}SimSlider`);
-    if(!slider || !cmp) return;
+    if(!slider) return;
 
     const cmpBadge = document.getElementById(`${prefix}SimCmpBadge`);
-    if(cmpBadge) cmpBadge.textContent = `CMP: ₹${fmt(cmp)}`;
+    if(cmpBadge) cmpBadge.textContent = `${sym} CMP: ₹${fmt(cmp)}`;
 
     const pct = Number(slider.value) / 10; // e.g. -5.0 to +5.0%
     const diff = (cmp * pct) / 100;
-    const simPrice = cmp + diff;
+    const simUnderlying = cmp + diff;
+
+    // Simulated option premium movement
+    const optionDiff = diff * optDelta + 0.5 * optGamma * diff * diff;
+    const simOptionPrice = Math.max(1.0, roundVal(optLtp + optionDiff));
+    const optPctChange = ((simOptionPrice - optLtp) / Math.max(1, optLtp)) * 100;
+    const estPnlLot = Math.round(optionDiff * lotSize);
 
     const disp = document.getElementById(`${prefix}SimSliderDisplay`);
-    if(disp) disp.textContent = `Simulated Price: ₹${fmt(simPrice)} (${pct>=0?'+':''}${pct.toFixed(1)}%)`;
+    if(disp) disp.textContent = `Underlying: ₹${fmt(simUnderlying)} (${pct>=0?'+':''}${pct.toFixed(1)}%) | ${optSym}: ₹${fmt(simOptionPrice)}`;
 
     const diffBadge = document.getElementById(`${prefix}SimDiffBadge`);
     if(diffBadge){
-      diffBadge.textContent = `Diff: ${diff>=0?'+':''}₹${fmt(diff)} (${pct>=0?'+':''}${pct.toFixed(2)}%)`;
+      diffBadge.textContent = `Underlying Diff: ${diff>=0?'+':''}₹${fmt(diff)} (${pct>=0?'+':''}${pct.toFixed(2)}%)`;
       diffBadge.className = `tag ${pct > 0 ? 'buy' : pct < 0 ? 'sell' : 'neutral'}`;
     }
 
     const priceVal = document.getElementById(`${prefix}SimPriceVal`);
-    if(priceVal) priceVal.textContent = `₹${fmt(simPrice)}`;
+    if(priceVal) priceVal.textContent = `₹${fmt(simUnderlying)}`;
 
     const priceDiff = document.getElementById(`${prefix}SimPriceDiff`);
     if(priceDiff){
-      priceDiff.textContent = `${pct>=0?'+':''}${pct.toFixed(2)}% vs CMP`;
+      priceDiff.textContent = `${pct>=0?'+':''}${pct.toFixed(2)}% vs ${sym} CMP`;
       priceDiff.style.color = pct > 0 ? 'var(--buy)' : pct < 0 ? 'var(--sell)' : 'var(--text-faint)';
     }
 
-    // Call / Put Option Greeks impact
-    const callImpact = diff * 0.52 + 0.5 * 0.0012 * diff * diff;
-    const putImpact = -diff * 0.48 + 0.5 * 0.0012 * diff * diff;
-
     const callEl = document.getElementById(`${prefix}SimCallDelta`);
+    const callDet = document.getElementById(`${prefix}SimCallDetail`);
     if(callEl){
-      callEl.textContent = `${callImpact>=0?'+':''}₹${fmt(callImpact)}`;
-      callEl.style.color = callImpact >= 0 ? 'var(--buy)' : 'var(--sell)';
+      callEl.textContent = `₹${fmt(simOptionPrice)}`;
+      callEl.style.color = simOptionPrice >= optLtp ? 'var(--buy)' : 'var(--sell)';
+    }
+    if(callDet){
+      callDet.textContent = `${optionDiff>=0?'+':''}₹${fmt(optionDiff)} (${optPctChange>=0?'+':''}${optPctChange.toFixed(1)}% on ${optSym})`;
     }
 
     const putEl = document.getElementById(`${prefix}SimPutDelta`);
+    const putDet = document.getElementById(`${prefix}SimPutDetail`);
     if(putEl){
-      putEl.textContent = `${putImpact>=0?'+':''}₹${fmt(putImpact)}`;
-      putEl.style.color = putImpact >= 0 ? 'var(--buy)' : 'var(--sell)';
+      putEl.textContent = `${estPnlLot>=0?'+':''}₹${fmt(estPnlLot)}`;
+      putEl.style.color = estPnlLot >= 0 ? 'var(--buy)' : 'var(--sell)';
+    }
+    if(putDet){
+      putDet.textContent = `Projected P&L for 1 lot (${lotSize} Qty)`;
     }
 
     const threshEl = document.getElementById(`${prefix}SimThreshold`);
     const threshDet = document.getElementById(`${prefix}SimThresholdDetail`);
     if(threshEl && threshDet){
-      if(pct >= 2.0){
+      if(pct >= 1.5){
         threshEl.textContent = 'Bullish Resistance Breakout';
         threshEl.style.color = 'var(--buy)';
-        threshDet.textContent = `Breaches +2% band · Projected target acceleration`;
-      } else if(pct <= -2.0){
+        threshDet.textContent = `Spot above R1 · High Delta expansion`;
+      } else if(pct <= -1.5){
         threshEl.textContent = 'Bearish Support Breakdown';
         threshEl.style.color = 'var(--sell)';
-        threshDet.textContent = `Breaches -2% support · Dynamic stop-loss trigger`;
+        threshDet.textContent = `Spot below S1 · Stop-loss alert`;
       } else {
-        threshEl.textContent = 'Consolidation / Range-Bound';
+        threshEl.textContent = 'Within Normal Consolidation';
         threshEl.style.color = 'var(--gold)';
-        threshDet.textContent = `Within normal volatility band (±2.0%)`;
+        threshDet.textContent = `Option premium tracking underlying Delta`;
       }
     }
   }
