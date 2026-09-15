@@ -9,3 +9,4 @@ while m:
     print(m.group(0))
     text = text[m.end():]
     m = re.search(r'\.main\s*\{[^}]*\}', text)
+

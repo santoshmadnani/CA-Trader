@@ -1,4 +1,36 @@
 
+// Resilient Storage Polyfill for restricted / iframe / file / cross-origin contexts
+(function(){
+  function makeMockStorage(){
+    var mem = {};
+    return {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+      setItem: function(k, v){ mem[k] = String(v); },
+      removeItem: function(k){ delete mem[k]; },
+      clear: function(){ mem = {}; },
+      key: function(i){ return Object.keys(mem)[i] || null; },
+      get length(){ return Object.keys(mem).length; }
+    };
+  }
+  try {
+    var testKey = '__ca_test_storage__';
+    window.localStorage.setItem(testKey, '1');
+    window.localStorage.removeItem(testKey);
+  } catch(e) {
+    try {
+      Object.defineProperty(window, 'localStorage', { value: makeMockStorage(), configurable: true, writable: true });
+    } catch(_) {}
+  }
+  try {
+    var testKey2 = '__ca_test_session__';
+    window.sessionStorage.setItem(testKey2, '1');
+    window.sessionStorage.removeItem(testKey2);
+  } catch(e) {
+    try {
+      Object.defineProperty(window, 'sessionStorage', { value: makeMockStorage(), configurable: true, writable: true });
+    } catch(_) {}
+  }
+})();
 window.$ = window.$ || (id => document.getElementById(id));
 window.esc = window.esc || (v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 window.fmtMoney = window.fmtMoney || (v => '₹' + Number(v||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));

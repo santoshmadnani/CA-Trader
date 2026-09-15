@@ -10,3 +10,4 @@ if pos != -1:
     card_start = text.rfind('<div class="card"', 0, pos)
     print("Card starts at", card_start)
     print(text[card_start:card_start+500])
+

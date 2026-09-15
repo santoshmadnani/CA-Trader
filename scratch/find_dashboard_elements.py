@@ -23,3 +23,4 @@ for target in [
     'panel-auto'
 ]:
     find_block(target)
+

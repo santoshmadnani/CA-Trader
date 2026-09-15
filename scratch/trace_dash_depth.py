@@ -19,3 +19,4 @@ for idx, line in enumerate(lines):
             print(f"Line {idx} (depth={depth}): {line.strip()}")
 
 print("Final depth:", depth)
+

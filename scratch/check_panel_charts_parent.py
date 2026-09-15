@@ -5,3 +5,4 @@ with open('terminal.html', encoding='utf-8') as f:
 
 pos = text.find('id="panel-charts"')
 print(text[max(0, pos-800):pos+300])
+

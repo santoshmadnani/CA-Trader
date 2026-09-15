@@ -8,3 +8,4 @@ matches = list(re.finditer(r'localStorage\.(?:getItem|setItem)\([\'"]ca[^\'"]+[\
 for m in matches:
     pos = m.start()
     print(text[pos:pos+100])
+

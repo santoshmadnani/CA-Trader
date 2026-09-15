@@ -28,3 +28,4 @@ import re
 opens = len(re.findall(r'<div\b[^>]*>', charts_html, re.I))
 closes = len(re.findall(r'</div>', charts_html, re.I))
 print(f"Modified panel-charts: opens={opens}, closes={closes}, diff={opens-closes}")
+

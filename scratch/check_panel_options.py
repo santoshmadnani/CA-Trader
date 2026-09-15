@@ -7,3 +7,4 @@ if pos != -1:
     print(text[pos-50:pos+1500])
 else:
     print("panel-options not found")
+

@@ -1,0 +1,89 @@
+ -->
+      <div class="card" id="chartRecoBanner" style="margin-bottom:12px;padding:12px 16px;background:var(--surface);border:1px solid rgba(38,217,166,0.3);box-shadow:0 6px 20px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;overflow:visible !important;position:relative;z-index:1000;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;background:var(--buy-bg);color:var(--buy);font-size:14px;font-weight:700;">✦</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;position:relative;flex-wrap:wrap;">
+              <span class="tag neutral" id="chartRecoAction" style="font-size:11.5px;font-weight:700;padding:2px 8px;">SIGNAL</span>
+              <span style="font-weight:700;font-size:13.5px;color:var(--text);" id="chartRecoSymbol">—</span>
+              <!-- Searchable Option Selector with Autocomplete (Item 2) -->
+              <!-- Single Option Strike Dropdown Selector (Release 37: removed text search input) -->
+              <select id="chartRecoOptionSelect" style="display:inline-block;height:26px;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);max-width:210px;cursor:pointer;">
+                <option value="">Auto (Best Option)</option>
+              </select>
+              <span class="muted" style="font-size:11px;" id="chartRecoConfidence">Live Consensus</span>
+            </div>
+            <!-- Prominent Dynamic Advisory Callout Box -->
+            <div id="chartRecoAdvisoryBox" style="margin-top:6px;padding:6px 12px;border-radius:6px;font-size:11.5px;line-height:1.45;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);display:flex;align-items:flex-start;gap:8px;max-width:720px;">
+              <span id="chartRecoAdvisoryIcon" style="font-size:13px;line-height:1.2;">💡</span>
+              <div id="chartRecoAdvisoryText" style="flex:1;color:var(--text);">Analyzing technical structure and optimal option contracts…</div>
+            </div>
+            <div class="muted" id="chartRecoRationale" style="display:none;"></div>
+          </div>
+        </div>
+
+        <!-- Entry / SL / Target / R:R pills — flex-wrap + min-width:0 prevents mobile overflow -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;box-sizing:border-box;">
+          <div class="stat-pill clickable-calc" id="chartRecoEntryPill" title="Click to inspect Entry calculation proof" style="cursor:pointer;background:var(--surface-2);border:1px solid var(--border-soft);padding:4px 10px;border-radius:6px;text-align:center;min-width:0;">
+            <div style="font-size:9px;color:var(--text-faint);text-transform:uppercase;">Entry ⓘ</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--text);" id="chartRecoEntry">₹--</div>
+          </div>
+          <div class="stat-pill clickable-calc" id="chartRecoSlPill" title="Click to inspect Stop Loss calculation proof" style="cursor:pointer;background:var(--surface-2);border:1px solid var(--border-soft);padding:4px 10px;border-radius:6px;text-align:center;min-width:0;">
+            <div style="font-size:9px;color:var(--text-faint);text-transform:uppercase;">Stop Loss ⓘ</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--sell);" id="chartRecoSl">₹--</div>
+          </div>
+          <div class="stat-pill clickable-calc" id="chartRecoTgtPill" title="Click to inspect Target calculation proof" style="cursor:pointer;background:var(--surface-2);border:1px solid var(--border-soft);padding:4px 10px;border-radius:6px;text-align:center;min-width:0;">
+            <div style="font-size:9px;color:var(--text-faint);text-transform:uppercase;">Target (≥ ₹500) ⓘ</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--buy);" id="chartRecoTgt">₹--</div>
+          </div>
+          <div class="stat-pill" style="background:var(--surface-2);border:1px solid var(--border-soft);padding:6px 10px;border-radius:6px;text-align:center;min-width:0;">
+            <div style="font-size:9px;color:var(--text-faint);text-transform:uppercase;">R : R</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--gold);" id="chartRecoRr">1 : 2.2</div>
+          </div>
+          <button type="button" class="btn small" id="chartMasterAtToggle" title="Toggle Auto Trade" style="height:32px;display:inline-flex;align-items:center;gap:5px;padding:0 10px;font-weight:700;border-radius:6px;cursor:pointer;background:var(--surface-2);border:1px solid var(--border);">
+            <span>Auto Trade:</span> <b id="chartMasterAtStatus" style="color:var(--sell);">OFF</b>
+          </button>
+          <button type="button" class="icon-btn" id="chartRecoCriteriaBtn" title="Auto Trade &amp; Recommendation Criteria (Profit, Loss, Capital)" style="height:32px;width:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <button type="button" class="btn ghost small" id="chartRecoRefreshBtn" title="Refresh Live Recommendation" style="height:32px;display:inline-flex;align-items:center;gap:5px;padding:0 10px;border-color:var(--border);background:var(--surface-2);cursor:pointer;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span>Refresh</span>
+          </button>
+          <button type="button" class="btn gold small" id="chartRecoQuickOrderBtn" title="Place 1-Click Quick Order" style="height:32px;display:inline-flex;align-items:center;gap:5px;padding:0 12px;font-weight:700;cursor:pointer;">
+            <span>Quick Order</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Criteria Settings Modal for Chart Recommendation -->
+      <div id="chartRecoCriteriaModal" style="display:none;position:fixed;top:120px;right:40px;z-index:9999;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;box-shadow:0 16px 36px rgba(0,0,0,0.4);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border-soft);padding-bottom:8px;">
+          <b style="font-size:13px;color:var(--text);">Recommendation &amp; Risk Criteria</b>
+          <button type="button" class="btn ghost small" id="closeCriteriaModalBtn" style="padding:2px 6px;">✕</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:12px;">
+          <div>
+            <label style="display:block;font-size:11px;color:var(--buy);font-weight:700;margin-bottom:3px;">Desired Profit (₹)</label>
+            <input id="chartCriteriaDesiredProfit" type="number" step="100" min="50" class="tool-input" style="width:100%;font-size:12px;" value="500">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;color:var(--sell);font-weight:700;margin-bottom:3px;">Max Bearable Loss (₹)</label>
+            <input id="chartCriteriaMaxLoss" type="number" step="100" min="100" class="tool-input" style="width:100%;font-size:12px;" value="1000">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;color:var(--text-dim);font-weight:700;margin-bottom:3px;">Capital Allocation (₹)</label>
+            <input id="chartCriteriaCapital" type="number" step="5000" min="5000" class="tool-input" style="width:100%;font-size:12px;" value="50000">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+            <input type="checkbox" id="chartCriteriaOptionsOnly" checked style="accent-color:var(--buy);cursor:pointer;">
+            <label for="chartCriteriaOptionsOnly" style="cursor:pointer;font-size:11.5px;">Prefer Defined-Risk Options</label>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button type="button" class="btn gold small" id="saveCriteriaModalBtn" style="flex:1;justify-content:center;">Apply &amp; Refresh</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommendation Rationale Section (Item 6 - Exactly 1 Section Per Row) -->
+      <div class="card" 

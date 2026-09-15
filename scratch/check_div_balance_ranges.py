@@ -18,3 +18,4 @@ check_range(1962, 2116, "panel-dashboard")
 check_range(2117, 2299, "panel-charts")
 check_range(2300, 2305, "panel-console")
 check_range(2306, 2348, "panel-options")
+

@@ -10,3 +10,4 @@ for m in matches:
     pos = m.start()
     print("--- Match at", pos, "---")
     print(text[max(0, pos-300):pos+300])
+

@@ -9,3 +9,4 @@ chunk = text[pos_dash:pos_charts]
 opens = len(re.findall(r'<div\b[^>]*>', chunk, re.I))
 closes = len(re.findall(r'</div>', chunk, re.I))
 print(f'Dashboard chunk: opens={opens}, closes={closes}, diff={opens-closes}')
+

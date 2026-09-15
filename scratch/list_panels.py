@@ -6,3 +6,4 @@ with open('terminal.html', encoding='utf-8') as f:
 import re
 for m in re.finditer(r'<div[^>]*id=["\'](panel-[^"\']+)["\'][^>]*>', text):
     print(m.group(0))
+

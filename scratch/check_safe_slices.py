@@ -21,3 +21,4 @@ print("\nSlice for panel-auto:", p_auto, "to", p_rep)
 panel_auto_chunk = content[content.rfind('<div class="panel"', 0, p_auto):content.rfind('<div class="panel"', 0, p_rep)]
 print("Starts with:", repr(panel_auto_chunk[:60]))
 print("Ends with:", repr(panel_auto_chunk[-60:]))
+

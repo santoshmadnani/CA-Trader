@@ -7,3 +7,4 @@ with zipfile.ZipFile(r'c:\Users\SantoshMadnani\Documents\CA_Trader\42.zip') as z
 p_sim = text.find('id="chartPriceSensitivityCard"')
 # print 1500 chars after p_sim
 print(text[p_sim+2000:p_sim+3500])
+

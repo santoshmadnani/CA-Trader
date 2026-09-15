@@ -7,3 +7,4 @@ print("Charts panel length:", pos_console - pos_charts)
 print(text[pos_charts:pos_charts+500])
 print("...")
 print(text[pos_console-300:pos_console])
+

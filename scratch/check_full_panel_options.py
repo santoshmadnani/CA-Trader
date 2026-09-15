@@ -8,3 +8,4 @@ end = text.find('<!-- ============', start + 20)
 if end == -1:
     end = text.find('id="panel-', start + 20)
 print(text[start:end])
+

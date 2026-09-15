@@ -6,3 +6,4 @@ with open('terminal.html', encoding='utf-8') as f:
 pos = text.find('id="mainNavtabs"')
 end = text.find('</div>', pos + 300)
 print(text[pos:end+10])
+

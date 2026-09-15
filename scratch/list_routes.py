@@ -1,7 +1,9 @@
-import sys, re
-sys.stdout.reconfigure(encoding='utf-8')
+import re
+
 with open('app.py', 'r', encoding='utf-8') as f:
-    c = f.read()
-routes = re.findall(r'@app\.(get|post)\(["\']([^"\']+)["\']', c)
-for method, path in routes:
-    print(f'{method.upper()}: {path}')
+    text = f.read()
+
+routes = re.findall(r'@app\.[a-z]+\([\'"]([^\'"]+)[\'"]', text)
+print(f'Total routes found: {len(routes)}')
+for r in sorted(routes):
+    print(' ', r)

@@ -6,3 +6,4 @@ with open('terminal.html', encoding='utf-8') as f:
 pos = text.find('id="panel-options"')
 end = text.find('</div>\n    </div>', pos)
 print(text[pos:pos+1600])
+

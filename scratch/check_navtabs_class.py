@@ -5,3 +5,4 @@ with open('terminal.html', encoding='utf-8') as f:
 
 pos = text.find('class="navtab')
 print(text[max(0, pos-100):pos+1200])
+

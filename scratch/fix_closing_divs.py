@@ -9,3 +9,4 @@ with open('terminal.html', 'w', encoding='utf-8') as f:
     f.write(text)
 
 print("Added two closing divs before panel-charts.")
+

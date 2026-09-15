@@ -5,3 +5,4 @@ with open('terminal.html', encoding='utf-8') as f:
 
 pos = text.find("localStorage.getItem('ca_sidebar_width')")
 print(text[pos-300:pos+500])
+

@@ -15,3 +15,4 @@ for m in re.finditer(r'\.panel[^{]*\{[^}]*\}', text):
 print("\nMatches for .content in styles:")
 for m in re.finditer(r'\.content[^{]*\{[^}]*\}', text):
     print(m.group(0))
+

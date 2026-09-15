@@ -21,3 +21,4 @@ for idx, (line_idx, pid, line_text) in enumerate(panel_indices):
         closes = len(re.findall(r'</div>', cleaned, re.IGNORECASE))
         depth += (opens - closes)
     print(f"Panel {pid} (Line {line_idx+1}..{next_line_idx}): net depth = {depth}")
+

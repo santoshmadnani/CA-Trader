@@ -597,3 +597,4 @@ with open(TERM_FILE, 'w', encoding='utf-8') as f:
     f.write(html)
 
 print("terminal.html successfully updated with Dashboard!")
+

@@ -16,3 +16,4 @@ print("card_greeks:", card_greeks)
 print("card_sim:", card_sim)
 print("sim_end:", sim_end)
 print("After sim:", repr(text[sim_end:sim_end+80]))
+

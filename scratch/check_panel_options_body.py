@@ -5,3 +5,4 @@ with open('terminal.html', encoding='utf-8') as f:
 
 pos = text.find('id="panel-options"')
 print(text[pos:pos+3000])
+

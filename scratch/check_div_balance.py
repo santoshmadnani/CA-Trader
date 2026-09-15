@@ -17,3 +17,4 @@ for i in range(len(panels)):
     opens = len(re.findall(r'<div\b[^>]*>', chunk, re.I))
     closes = len(re.findall(r'</div>', chunk, re.I))
     print(f"{panel_id}: opens={opens}, closes={closes}, diff={opens-closes}")
+

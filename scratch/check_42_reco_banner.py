@@ -9,3 +9,4 @@ print("chartRecoBanner starts at", pos)
 end = text.find('id="chartRecoEvidenceSection"')
 print("chartRecoEvidenceSection starts at", end)
 print(text[pos-50:end])
+

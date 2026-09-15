@@ -6,3 +6,4 @@ with open('terminal.html', encoding='utf-8') as f:
 pos = text.find('async function fetchOptionChain')
 if pos != -1:
     print(text[pos:pos+4000])
+

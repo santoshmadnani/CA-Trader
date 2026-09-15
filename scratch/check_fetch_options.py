@@ -8,3 +8,4 @@ else:
     pos2 = text.find('loadOptions')
     print("loadOptions at", pos2)
     print(text[pos2:pos2+2500])
+

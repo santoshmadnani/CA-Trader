@@ -7,3 +7,4 @@ pos = text.find('host.innerHTML = `\n        <table')
 if pos == -1:
     pos = text.find('host.innerHTML = `')
 print(text[pos:pos+1500])
+

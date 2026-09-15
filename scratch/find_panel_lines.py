@@ -11,3 +11,5 @@ for i, line in enumerate(lines):
 
 for p in panels:
     print(f"Line {p[0]}: {p[1]} -> {p[2][:80]}")
+    if 'id="panel-' in line or 'class="panel' in line:
+        print(f'{i+1}: {line.strip()[:80]}')

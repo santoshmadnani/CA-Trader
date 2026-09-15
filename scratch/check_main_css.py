@@ -7,3 +7,4 @@ import re
 print("Matches for .main:")
 for m in re.finditer(r'\.main[^{]*\{[^}]*\}', text):
     print(m.group(0))
+

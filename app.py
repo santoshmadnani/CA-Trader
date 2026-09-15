@@ -40,6 +40,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 from urllib.parse import quote, urlencode
+import urllib.parse
+from urllib.parse import quote, quote_plus, urlencode
 from zoneinfo import ZoneInfo
 from xml.etree import ElementTree as ET
 
@@ -7320,6 +7322,8 @@ async def market_macro_factors(user: dict[str, Any] = Depends(require_user)) -> 
         "nasdaq": {"name": "Nasdaq Composite", "level": 17688.35, "change": +115.40, "pct": +0.65, "status": "GREEN"},
         "dow": {"name": "Dow Jones", "level": 52051.04, "change": +125.00, "pct": +0.31, "status": "GREEN"},
         "overall_sentiment": "BULLISH",
+        "dow": {"name": "Dow Jones", "level": 40920.40, "change": -185.20, "pct": -0.45, "status": "RED"},
+        "overall_sentiment": "MIXED",
         "source": "NYSE / Nasdaq"
     }
 
@@ -7639,6 +7643,10 @@ async def news_ca_ai_feed(
     # If few live items, add high-relevance curated market events
     if len(curated) < 4:
         now_u = datetime.now(timezone.utc)
+        def_t1 = (now_ist - timedelta(minutes=4)).strftime("%d %b, %H:%M IST")
+        def_t2 = (now_ist - timedelta(minutes=14)).strftime("%d %b, %H:%M IST")
+        def_t3 = (now_ist - timedelta(minutes=28)).strftime("%d %b, %H:%M IST")
+        def_t4 = (now_ist - timedelta(minutes=39)).strftime("%d %b, %H:%M IST")
         default_items = [
             {
                 "id": "ca-news-1",
@@ -7646,14 +7654,18 @@ async def news_ca_ai_feed(
                 "source": "NSE Intelligence",
                 "time": "4m ago",
                 "time_ago": "4m ago",
+                "time": def_t1,
+                "time_ago": def_t1,
                 "published_at": (now_u - timedelta(minutes=4)).isoformat(),
                 "scope": "stock",
                 "sentiment": "Bullish",
+                "sentiment": "BULLISH",
                 "impact_pct": "90% Buy Signal",
                 "impact": "90% Buy Signal",
                 "relevance": "High",
                 "ca_ai_insight": f"CA AI Assessment: High delivery volume at support base signals institutional accumulation for {sym}.",
                 "url": "#"
+                "url": f"https://news.google.com/search?q={quote_plus(sym)}+NSE+Institutional+Flow"
             },
             {
                 "id": "ca-news-2",
@@ -7661,14 +7673,20 @@ async def news_ca_ai_feed(
                 "source": "Bloomberg",
                 "time": "14m ago",
                 "time_ago": "14m ago",
+                "time": def_t2,
+                "time_ago": def_t2,
                 "published_at": (now_u - timedelta(minutes=14)).isoformat(),
                 "scope": "global",
                 "sentiment": "Bullish",
                 "impact_pct": "+0.4% to +0.9%",
                 "impact": "+0.4% to +0.9%",
+                "sentiment": "BULLISH",
+                "impact_pct": "85% Buy Signal",
+                "impact": "85% Buy Signal",
                 "relevance": "High",
                 "ca_ai_insight": "CA AI Assessment: Easing crude pressures provide immediate structural margin relief for Indian corporate basket.",
                 "url": "#"
+                "url": "https://news.google.com/search?q=Global+Energy+Crude+Dollar+Index"
             },
             {
                 "id": "ca-news-3",
@@ -7676,6 +7694,8 @@ async def news_ca_ai_feed(
                 "source": "RBI Bulletin",
                 "time": "28m ago",
                 "time_ago": "28m ago",
+                "time": def_t3,
+                "time_ago": def_t3,
                 "published_at": (now_u - timedelta(minutes=28)).isoformat(),
                 "scope": "global",
                 "sentiment": "BEARISH",
@@ -7684,6 +7704,7 @@ async def news_ca_ai_feed(
                 "relevance": "Medium",
                 "ca_ai_insight": "CA AI Assessment: Steady liquidity supports broad index floor; favors range-bound option selling strategies.",
                 "url": "#"
+                "url": "https://news.google.com/search?q=RBI+Liquidity+Domestic+banking+credit+growth"
             },
             {
                 "id": "ca-news-4",
@@ -7691,14 +7712,18 @@ async def news_ca_ai_feed(
                 "source": "CA AI Quantitative",
                 "time": "39m ago",
                 "time_ago": "39m ago",
+                "time": def_t4,
+                "time_ago": def_t4,
                 "published_at": (now_u - timedelta(minutes=39)).isoformat(),
                 "scope": "stock",
                 "sentiment": "Bullish",
+                "sentiment": "BULLISH",
                 "impact_pct": "100% Buy Signal",
                 "impact": "100% Buy Signal",
                 "relevance": "High",
                 "ca_ai_insight": f"CA AI Assessment: Clear momentum alignment across {sym} candlestick structure.",
                 "url": "#"
+                "url": f"https://news.google.com/search?q={quote_plus(sym)}+technical+momentum+breakout"
             }
         ]
         curated.extend([it for it in default_items if mode == "all" or it["scope"] == mode])
@@ -7831,6 +7856,7 @@ async def recommendation_on_demand(payload: RecommendationIn, request: Request, 
 
 
 def _calc_reco_pnl(r: dict[str, Any]) -> tuple[float, str, int]:
+def _calc_reco_pnl(r: dict[str, Any], live_price: float | None = None) -> tuple[float, str, int | None]:
     entry = float(r.get("entry") or 0)
     target = float(r.get("target") or 0)
     sl = float(r.get("stop_loss") or 0)
@@ -7838,6 +7864,20 @@ def _calc_reco_pnl(r: dict[str, Any]) -> tuple[float, str, int]:
     sym = str(r.get("symbol") or "")
     if not entry:
         return (0.0, "EXPIRED", 0)
+        return (0.0, "Pending Setup", 0)
+
+    # Validate market hours in Asia/Kolkata
+    now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+    is_mcx = any(x in sym for x in ("CRUDE", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "MCX"))
+    is_weekend = now_ist.weekday() in (5, 6)
+    if is_mcx:
+        mkt_open = not is_weekend and ((now_ist.hour > 9 or (now_ist.hour == 9 and now_ist.minute >= 0)) and (now_ist.hour < 23 or (now_ist.hour == 23 and now_ist.minute <= 30)))
+    else:
+        mkt_open = not is_weekend and ((now_ist.hour > 9 or (now_ist.hour == 9 and now_ist.minute >= 15)) and (now_ist.hour < 15 or (now_ist.hour == 15 and now_ist.minute <= 30)))
+
+    if not mkt_open:
+        return (0.0, "Next Session Setup", 0)
+
     lot = 25 if "NIFTY" in sym else 15 if "BANK" in sym else 100 if "CRUDE" in sym else 10
     if target and sl:
         risk = abs(entry - sl) * lot
@@ -7847,12 +7887,32 @@ def _calc_reco_pnl(r: dict[str, Any]) -> tuple[float, str, int]:
         if h < 75:
             pnl = round(max(520.0, reward), 2)
             return (pnl, "TARGET_HIT", 1)
+    cur_price = live_price if (live_price and live_price > 0) else entry
+    pnl_per_share = (cur_price - entry) if "BUY" in side else (entry - cur_price)
+    live_pnl = round(pnl_per_share * lot, 2)
+
+    if "BUY" in side:
+        if target > 0 and cur_price >= target:
+            return (round((target - entry) * lot, 2), "Target Hit", 1)
+        elif sl > 0 and cur_price <= sl:
+            return (round((sl - entry) * lot, 2), "SL Hit", 0)
+        elif target == 0 or target is None:
+            return (live_pnl, "Active Trailing", None)
         else:
             pnl = round(-min(max(risk, 200.0), 450.0), 2)
             return (pnl, "SL_HIT", 0)
+            return (live_pnl, "Active Signal", None)
     else:
         gain = round(max(510.0, entry * 0.012 * lot), 2)
         return (gain, "TARGET_HIT", 1)
+        if target > 0 and cur_price <= target:
+            return (round((entry - target) * lot, 2), "Target Hit", 1)
+        elif sl > 0 and cur_price >= sl:
+            return (round((entry - sl) * lot, 2), "SL Hit", 0)
+        elif target == 0 or target is None:
+            return (live_pnl, "Active Trailing", None)
+        else:
+            return (live_pnl, "Active Signal", None)
 
 
 @app.get("/api/recommendations/history")
@@ -7871,8 +7931,10 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
         allowed_symbols = {"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN", "TATAMOTORS", "NIFTY", "BANKNIFTY", "CRUDEOIL"}
 
     # 2. Fetch raw rows - strictly actionable BUY/SELL recommendations
+    # 2. Fetch raw rows - strictly actionable BUY/SELL recommendations with full rationale snapshots
     rows = db_exec(
         "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, outcome, final_pnl, success, exit_reason, created_at, status FROM recommendations WHERE user_id=? AND UPPER(recommendation) IN ('BUY', 'SELL') ORDER BY created_at DESC LIMIT 300",
+        "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, news_basis, option_basis, score, outcome, final_pnl, success, exit_reason, created_at, status FROM recommendations WHERE user_id=? AND UPPER(recommendation) IN ('BUY', 'SELL') ORDER BY created_at DESC LIMIT 300",
         [user["id"]],
         "all"
     )
@@ -7889,6 +7951,9 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
             # Check and compute P&L if null or 0
             if r.get("final_pnl") is None or float(r.get("final_pnl") or 0) == 0.0:
                 pnl_val, outcome_val, success_val = _calc_reco_pnl(r)
+            # Evaluate outcome and P&L accurately
+            pnl_val, outcome_val, success_val = _calc_reco_pnl(r)
+            if r.get("outcome") is None or r.get("outcome") in ("SCRAPPED", "PENDING"):
                 r["final_pnl"] = pnl_val
                 r["outcome"] = outcome_val
                 r["success"] = success_val
@@ -7896,6 +7961,10 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
                     db_exec("UPDATE recommendations SET final_pnl=?, outcome=?, success=? WHERE id=? AND user_id=?", [pnl_val, outcome_val, success_val, r["id"], user["id"]])
                 except Exception:
                     pass
+            else:
+                r["final_pnl"] = r.get("final_pnl") if r.get("final_pnl") is not None else pnl_val
+                r["outcome"] = r.get("outcome") or outcome_val
+                r["success"] = r.get("success") if r.get("success") is not None else success_val
             # Sanitize display symbol to eliminate raw tokens like NSE_FO|69811
             raw_sym = str(r.get("symbol") or "")
             if "|" in raw_sym or "NSE_FO" in raw_sym or "MCX_FO" in raw_sym or raw_sym.isdigit():
@@ -9079,7 +9148,7 @@ def option_trade_candidate(underlying: str, direction: str, max_candidates: int 
                 ta_score=100.0 if opt_signal=="BUY" else 55.0 if opt_signal=="NO_TRADE" else 10.0
             if opt_patterns and any((direction=="BUY" and str(p.get("prediction","" )).lower().startswith("bullish")) or (direction=="SELL" and str(p.get("prediction","" )).lower().startswith("bullish")) for p in opt_patterns[-3:]):
                 ta_score=min(100.0,ta_score+8.0)
-            alignment=100.0 if direction=="BUY" and news_score>=0 or direction=="SELL" and news_score<=0 else 30.0
+            alignment=100.0 if (direction=="BUY" and news_score>=0) or (direction=="SELL" and news_score<=0) else 30.0
             score=round(0.35*greek_score+0.30*ta_score+0.20*alignment+0.15*liquidity,2)
             scored.append({"contract":c,"score":score,"greek_score":round(greek_score,2),"technical_score":round(ta_score,2),"liquidity_score":round(liquidity,2),"news_score":round(alignment,2),"option_technical":opt_ta,"news":news})
         except Exception as exc:
@@ -10654,10 +10723,17 @@ Otherwise, simply provide your expert trader analysis directly. Keep response ac
 
     return {
         "reply": clean_text,
+        "message": clean_text,
         "updated_setup": updated_setup,
         "model": ai_resp.get("model", AVAILABLE_AI_MODELS[0] if AVAILABLE_AI_MODELS else "gemini-3.8-flash-high"),
         "timestamp": now_iso()
     }
+
+
+# Alias: /api/ai/chat → same as /api/ai/dashboard/chat
+@app.post("/api/ai/chat")
+async def ai_chat_alias(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    return await ai_dashboard_chat(request, user)
 
 
 # ---------------------------------------------------------------------------
@@ -10798,6 +10874,7 @@ async def reports_trades(
     orders = db_exec(query, params, "all")
     positions = db_exec("SELECT * FROM positions WHERE user_id=? ORDER BY updated_at DESC LIMIT 100", [uid], "all")
     
+... [truncated for diff preview]
     trade_items = []
     for p in positions:
         pnl = float(p.get("final_pnl") if p.get("final_pnl") is not None else (p.get("realized_pnl") or 0))
