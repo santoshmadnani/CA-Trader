@@ -600,6 +600,50 @@ document.querySelectorAll('.tab').forEach(t=>{
   t.addEventListener('click', ()=>switchTab(t.dataset.pane));
 });
 
+/* ---------- Sign In handler ---------- */
+async function doSignIn(){
+  const emailInput = document.getElementById('signinEmail');
+  const passInput = document.getElementById('signinPass');
+  const btn = document.getElementById('signinButton');
+  const email = (emailInput?.value || '').trim();
+  const password = passInput?.value || '';
+  if(!email || !password){
+    alert('Please enter your email and password');
+    return;
+  }
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+  }
+  try{
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(res.ok && data.authenticated){
+      window.location.href = data.redirect || window.__CA_POST_LOGIN__ || '/terminal';
+    } else {
+      alert(data.detail?.message || data.detail || 'Invalid email or password');
+      if(btn){
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+      }
+    }
+  }catch(err){
+    alert('Connection error. Please try again.');
+    if(btn){
+      btn.disabled = false;
+      btn.innerHTML = 'Sign In <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    }
+  }
+}
+document.getElementById('signinButton')?.addEventListener('click', doSignIn);
+document.getElementById('signinPass')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSignIn(); });
+document.getElementById('signinEmail')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSignIn(); });
+
 /* ---------- password visibility ---------- */
 function toggleEye(id, btn){
   const inp = document.getElementById(id);

@@ -1,0 +1,35 @@
+3890 (file 7950): 
+3891 (file 7951):     document.getElementById('greekModalTitle').textContent = title;
+3892 (file 7952):     body.innerHTML = `
+3893 (file 7953):       <div style="font-size:12px;color:var(--text);line-height:1.45;">${explanation}</div>
+3894 (file 7954):       ${realLifeExample}
+3895 (file 7955):       <div class="card" style="padding:12px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;">
+3896 (file 7956):         <div style="font-weight:700;font-size:11.5px;margin-bottom:8px;display:flex;justify-content:space-between;">
+3897 (file 7957):           <span>Interactive Price Sensitivity Simulator</span>
+3898 (file 7958):           <span class="muted">${sym} Strike: ${strike || 'ATM'}</span>
+3899 (file 7959):         </div>
+3900 (file 7960):         <div style="display:flex;align-items:center;gap:10px;">
+3901 (file 7961):           <label style="font-size:11px;min-width:110px;">Move in ${sym}:</label>
+3902 (file 7962):           <input type="range" id="greekSimSlider" min="-${simDefaultMove*2}" max="${simDefaultMove*2}" step="${Math.max(1, Math.round(simDefaultMove/10))}" value="${Math.round(simDefaultMove/2)}" style="flex:1;">
+3903 (file 7963):           <span id="greekSimMoveDisplay" style="font-family:var(--font-mono);font-weight:700;min-width:70px;text-align:right;">+₹${Math.round(simDefaultMove/2)}</span>
+3904 (file 7964):         </div>
+3905 (file 7965):         <div id="greekSimResult" style="margin-top:10px;padding:8px 10px;background:var(--surface);border-radius:6px;font-family:var(--font-mono);font-size:11px;color:var(--text);display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+3906 (file 7966):         </div>
+3907 (file 7967):       </div>
+3908 (file 7968):     `;
+3909 (file 7969): 
+3910 (file 7970):     function updateSim(move){
+3911 (file 7971):       const res = document.getElementById('greekSimResult');
+3912 (file 7972):       if(!res) return;
+3913 (file 7973):       if(greekName.includes('Gamma')){
+3914 (file 7974):         const deltaChg = move * val;
+3915 (file 7975):         const newDelta = delta + deltaChg;
+3916 (file 7976):         const optGain = move * delta + 0.5 * val * move * move;
+3917 (file 7977):         res.innerHTML = `
+3918 (file 7978):           <div>Delta Change: <b style="color:${deltaChg>=0?'var(--buy)':'var(--sell)'}">${deltaChg>=0?'+':''}${deltaChg.toFixed(3)}</b></div>
+3919 (file 7979):           <div>New Delta: <b>${newDelta.toFixed(3)}</b></div>
+3920 (file 7980):           <div style="grid-column:span 2">Estimated Option Gain: <b style="color:${optGain>=0?'var(--buy)':'var(--sell)'}">${optGain>=0?'+':''}₹${optGain.toFixed(2)}</b></div>
+3921 (file 7981):         `;
+3922 (file 7982):       } else if(greekName.includes('Delta')){
+3923 (file 7983):         const optGain = move * val;
+3924 (file 7984):         res.innerHTML = `
