@@ -11,6 +11,12 @@ signer = TimestampSigner(str(app.AUTH_SECRET))
 session_dict = {'user_id': 1, 'last_seen': time.time(), 'remember_me': True}
 data = base64.b64encode(json.dumps(session_dict).encode('utf-8'))
 cookie_val = signer.sign(data).decode('utf-8')
+def verify_all():
+    print("=== Verification Suite ===")
+    
+    # 1. Check app.py compilation & import
+    import app
+    print("app.py imported successfully!")
 
 # Wait for server ready
 for _ in range(10):
@@ -22,6 +28,11 @@ for _ in range(10):
                 break
     except Exception:
         time.sleep(0.5)
+    # 2. Check global market quotes
+    quotes = app.fetch_global_market_quotes()
+    print(f"Global quotes fetched: {len(quotes)} symbols")
+    for k, v in quotes.items():
+        print(f"  {k:10s} : Price={v.get('price')} Prev={v.get('prev_close')} Chg={v.get('change')} ({v.get('pct')}%)")
 
 # Test 1: CA AI News feed
 req_news = urllib.request.Request('http://127.0.0.1:8000/api/news/ca-ai-feed?symbol=RELIANCE&mode=all')
@@ -33,6 +44,9 @@ with urllib.request.urlopen(req_news, timeout=10) as r:
     for i, it in enumerate(items[:4]):
         hl = (it.get('headline') or '')[:60]
         print(f"   [{i+1}] {it.get('sentiment')} | {it.get('time')} | pub: {it.get('published_at')} | {hl}...")
+    # 3. Check terminal.html
+    with open('terminal.html', 'r', encoding='utf-8', errors='ignore') as f:
+        html = f.read()
 
 # Test 2: Backtest Candles
 req_c = urllib.request.Request('http://127.0.0.1:8000/api/backtest/candles/RELIANCE?timeframe=5m')
@@ -41,6 +55,12 @@ with urllib.request.urlopen(req_c, timeout=10) as r:
     cd = json.loads(r.read().decode('utf-8'))
     candles = cd.get('candles', [])
     print(f'2. Backtest Candles Test: {len(candles)} candles returned')
+    assert 'id="panel-reco"' in html, "panel-reco missing"
+    assert 'id="panel-dashboard"' in html, "panel-dashboard missing"
+    assert 'chartAiSuggestBtnMobile' in html, "chartAiSuggestBtnMobile missing"
+    assert 'calcPureBsGreeks' in html, "calcPureBsGreeks missing"
+    assert 'LOCAL FALLBACK' not in html, "LOCAL FALLBACK still present in html"
+    print("terminal.html verification passed cleanly!")
 
 # Test 3: Backtest Evaluate
 if candles:
@@ -74,3 +94,5 @@ with urllib.request.urlopen(req_term, timeout=10) as r:
     print('   - chartAiPanel mobile styles in HTML:', '#chartAiPanel.ca-chart-ai-panel' in html)
     print('   - computeBacktestIndicators in HTML:', 'computeBacktestIndicators' in html)
     print('   - updateChartRecoBanner in HTML:', 'updateChartRecoBanner' in html)
+if __name__ == '__main__':
+    verify_all()

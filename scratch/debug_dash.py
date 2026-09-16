@@ -15,3 +15,4 @@ for i in range(225, min(265, len(lines))):
     closes = len(re.findall(r'</div', lines[i]))
     diff = opens - closes
     print(f'L{i+1:3d} ({diff:+d}): {lines[i][:100]}')
+

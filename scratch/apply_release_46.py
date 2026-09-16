@@ -595,3 +595,4 @@ for i, c in enumerate(changes, 1):
 # Write output
 src.write_text(code, encoding='utf-8')
 print(f"\n✓ terminal.html written ({len(code):,} bytes)")
+

@@ -1,12 +1,21 @@
-import re
-
-with open('terminal.html', 'r', encoding='utf-8') as f:
+with open('terminal.html', 'r', encoding='utf-8', errors='ignore') as f:
     text = f.read()
 
-navtabs = re.findall(r'<button\b[^>]*\bclass=[\'"][^\'"]*navtab[^\'"]*[\'"][^>]*>([\s\S]*?)</button>', text)
-for t in navtabs:
-    m = re.search(r'data-tab=[\'"]([^\'"]+)[\'"]', t)
-    tab = m.group(1) if m else 'NO_DATA_TAB'
-    label = re.sub(r'<[^>]+>', '', t).strip()
-    print(f"data-tab: '{tab}' -> Label: '{label}'")
+import re
 
+# find navtabs HTML
+m = re.search(r'id=["\']navtabs["\'][^>]*>(.*?)</(?:div|ul|nav)', text, re.DOTALL | re.I)
+if m:
+    print("navtabs HTML snippet:", m.group(0)[:600])
+
+# find showTab definition
+m2 = re.search(r'function\s+showTab\s*\([^)]*\)\s*\{', text)
+if m2:
+    start = m2.start()
+    print("showTab function snippet:\n", text[start:start+1200])
+
+# find event listeners on navtabs or tab buttons
+m3 = re.findall(r'navtabs.*', text)
+print("navtabs references count:", len(m3))
+for x in m3[:5]:
+    print(" ->", x[:120])

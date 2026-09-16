@@ -42,3 +42,4 @@ for r in results[-10:]:
 print('\nLast 10 lines of chunk:')
 for l in lines[-10:]:
     print(repr(l))
+

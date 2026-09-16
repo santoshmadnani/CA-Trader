@@ -27,3 +27,4 @@ print(f'Total lines in panel-dashboard chunk: {total_lines}')
 print('Last 5 lines:')
 for l in lines[-5:]:
     print(repr(l))
+

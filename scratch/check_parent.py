@@ -1,5 +1,9 @@
+import sys, re
+sys.stdout.reconfigure(encoding='utf-8')
+
 with open('terminal.html', 'r', encoding='utf-8', errors='ignore') as f:
     text = f.read()
+    html = f.read()
 
 import re
 
@@ -15,3 +19,5 @@ for pid in ['panel-charts', 'panel-news', 'panel-options', 'panel-movers', 'pane
         for l in lines:
             print("  ", l.strip()[:100])
 
+idx = html.find('id="chartAiSuggestBtn"')
+print(html[max(0, idx-600):min(len(html), idx+400)])

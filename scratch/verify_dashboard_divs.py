@@ -19,3 +19,4 @@ for i, line in enumerate(lines):
     if opens != closes:
         print(f'L{i+1:3d} d={depth:+3d} ({opens-closes:+2d}): {line[:90]}')
 print(f'\nFinal depth: {depth}')
+

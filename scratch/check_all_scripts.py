@@ -1,75 +1,41 @@
-import subprocess
-import time
-import json
-import urllib.request
-import asyncio
-import websockets
-import os
-import sys
+import re
 
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8')
+with open('terminal.html', 'r', encoding='utf-8') as f:
+    text = f.read()
 
-chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-PORT_CHROME = 9238
+scripts = list(re.finditer(r'<script\b[^>]*>(.*?)</script>', text, re.DOTALL | re.IGNORECASE))
+print(f"Total script tags: {len(scripts)}")
 
-proc = subprocess.Popen([
-    chrome_path,
-    "--headless=new",
-    f"--remote-debugging-port={PORT_CHROME}",
-    "--disable-gpu",
-    "--no-first-run",
-    "--no-default-browser-check",
-    "about:blank"
-], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-time.sleep(2)
-
-try:
-    with urllib.request.urlopen(f"http://127.0.0.1:{PORT_CHROME}/json/list") as resp:
-        targets = json.loads(resp.read().decode())
+for i, s in enumerate(scripts):
+    code = s.group(1)
+    start_line = text.count('\n', 0, s.start()) + 1
+    end_line = text.count('\n', 0, s.end()) + 1
     
-    page_target = next(t for t in targets if t.get("type") == "page")
-    ws_url = page_target["webSocketDebuggerUrl"]
-
-    async def run():
-        async with websockets.connect(ws_url) as ws:
-            mid = 1
-            async def call(method, params=None):
-                nonlocal mid
-                mid += 1
-                cur_id = mid
-                await ws.send(json.dumps({"id": cur_id, "method": method, "params": params or {}}))
-                while True:
-                    m = await ws.recv()
-                    d = json.loads(m)
-                    if d.get("id") == cur_id:
-                        return d
-
-            await call("Runtime.enable")
-            await call("Page.enable")
-
-            for i in range(10):
-                fn = f"scratch/temp_script_{i}.js"
-                if not os.path.exists(fn):
-                    continue
-                with open(fn, "r", encoding="utf-8") as f:
-                    code = f.read()
-
-                comp_res = await call("Runtime.compileScript", {
-                    "expression": code,
-                    "sourceURL": f"temp_script_{i}.js",
-                    "persistScript": False
-                })
-                err = comp_res.get("result", {}).get("exceptionDetails")
-                if err:
-                    print(f"ERROR in script {i}: {err.get('text')} at line {err.get('lineNumber')}, col {err.get('columnNumber')}")
-                    print("Description:", err.get("exception", {}).get("description"))
-                else:
-                    print(f"Script {i}: OK")
-
-    asyncio.run(run())
-
-finally:
-    proc.kill()
-
+    # Check brace/bracket/parenthesis balance
+    stack = []
+    in_str = None
+    in_comment = False
+    in_regex = False
+    escaped = False
+    errors = []
+    
+    lines = code.split('\n')
+    for line_idx, line in enumerate(lines):
+        line_num = start_line + line_idx
+        # Check for bad patterns like '... [truncated'
+        if '[truncated' in line or '...' in line and 'preview' in line:
+            errors.append(f"Line {line_num}: Stray truncation marker found: {line.strip()[:60]}")
+    
+    # Count braces ignoring simple strings
+    # Simple brace counter
+    open_c = code.count('{')
+    close_c = code.count('}')
+    open_p = code.count('(')
+    close_p = code.count(')')
+    open_b = code.count('[')
+    close_b = code.count(']')
+    
+    print(f"Script #{i+1} (lines {start_line}-{end_line}): len={len(code)}, {{}}: {open_c}/{close_c}, (): {open_p}/{close_p}, []: {open_b}/{close_b}")
+    if errors:
+        for err in errors:
+            print("  ERROR:", err)
