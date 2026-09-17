@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.log
 *.sqlite3
+*.db
 scratch/
 *.bak
 terminal_modular.html

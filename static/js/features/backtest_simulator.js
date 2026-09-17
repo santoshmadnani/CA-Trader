@@ -1203,5 +1203,3 @@ document.getElementById('btClearTradesBtn')?.addEventListener('click', clearBack
 setTimeout(() => {
   if(typeof loadChartDrawingsAndIndicators === 'function') loadChartDrawingsAndIndicators();
 }, 2000);
-
-</script>

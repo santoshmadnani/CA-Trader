@@ -951,4 +951,3 @@
     if(typeof updateBacktestSymbols === 'function') updateBacktestSymbols();
   }, 1500);
 })();
-</script>

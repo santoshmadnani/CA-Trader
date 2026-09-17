@@ -713,4 +713,3 @@
     if (loss && document.getElementById('recoMaxLoss')) document.getElementById('recoMaxLoss').value = loss;
     if (profit && document.getElementById('recoMaxProfit')) document.getElementById('recoMaxProfit').value = profit;
   })();
-</script>

@@ -1623,10 +1623,27 @@ class UpstoxAdapter:
         # liquid/common cash/index segment over derivatives. This prevents a symbol
         # such as NIFTY or RELIANCE from resolving to an option/future accidentally.
         ident_u = identifier.upper().strip()
+        is_opt_query = bool(re.search(r'\b(CE|PE)\b', ident_u) or ident_u.endswith("CE") or ident_u.endswith("PE"))
         exact_symbol = [r for r in rows if str(r.get("trading_symbol", "")).upper().strip() == ident_u]
         exact_name = [r for r in rows if str(r.get("name", "")).upper().strip() == ident_u]
         candidates = exact_symbol or exact_name or rows
         preferred = next((r for r in candidates if str(r.get("segment","")).upper() in {"NSE_INDEX","BSE_INDEX","NSE_EQ","BSE_EQ","MCX_FO"} and str(r.get("instrument_type","")).upper() not in {"CE","PE"}), candidates[0])
+        
+        if is_opt_query:
+            opt_type_match = "CE" if (re.search(r'\bCE\b', ident_u) or ident_u.endswith("CE")) else "PE"
+            strike_m = re.search(r'\b(\d{4,6}(?:\.\d+)?)\b', ident_u)
+            target_strike = float(strike_m.group(1)) if strike_m else None
+            
+            opt_candidates = [r for r in (exact_symbol or rows) if str(r.get("instrument_type","")).upper() == opt_type_match]
+            if target_strike and opt_candidates:
+                strike_matches = [r for r in opt_candidates if abs(float(r.get("strike_price") or 0) - target_strike) < 0.1]
+                if strike_matches:
+                    opt_candidates = strike_matches
+            candidates = opt_candidates or exact_symbol or exact_name or rows
+            preferred = candidates[0]
+        else:
+            candidates = exact_symbol or exact_name or rows
+            preferred = next((r for r in candidates if str(r.get("segment","")).upper() in {"NSE_INDEX","BSE_INDEX","NSE_EQ","BSE_EQ","MCX_FO"} and str(r.get("instrument_type","")).upper() not in {"CE","PE"}), candidates[0])
         row = preferred
         key = row.get("instrument_key") or row.get("instrument_token")
         if not key:
@@ -2476,12 +2493,55 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
     """Find the optimal option contract for a futures symbol with STRICT directional consensus.
     If Bullish (BUY), strictly selects Call (CE). If Bearish (SELL), strictly selects Put (PE).
     Selects the best near-ATM strike with high liquidity from the real option chain.
+    Selects the best near-ATM strike with high liquidity from real watchlist / live option chain.
     """
     root = extract_root_symbol(future_sym).upper()
     is_bull = str(opt_bias).upper() in {"BUY", "LONG", "ACCUMULATE", "BULLISH"}
     bias_tag = "CE" if is_bull else "PE"
 
     # Step 1: Select optimal contract from the live option chain engine
+    # Step 1: Check user's watchlist with strict bias matching (REAL CONTRACTS WITH LIVE QUOTES)
+    if user_id:
+        wl = user_watchlist_option_contracts(user_id, future_sym, opt_bias)
+        if not wl:
+            wl = user_watchlist_option_contracts(user_id, root, opt_bias)
+        if wl:
+            for item in wl:
+                s_u = str(item.get("symbol") or item.get("display_name") or "").upper()
+                if bias_tag in s_u:
+                    try:
+                        q = UPSTOX.quote(item.get("symbol") or item.get("instrument_key"))
+                        if q and q.get("ltp"):
+                            item["entry"] = float(q["ltp"])
+                    except Exception:
+                        pass
+                    return item
+
+    # Step 2: Check database watchlist_members strictly matching root AND bias_tag
+    try:
+        rows = db_exec(
+            "SELECT symbol, instrument_key, display_name FROM watchlist_members "
+            "WHERE (UPPER(symbol) LIKE ? OR UPPER(display_name) LIKE ?) "
+            "ORDER BY id DESC",
+            [f"%{root}%{bias_tag}%", f"%{root}%{bias_tag}%"],
+            "all"
+        )
+        for r in rows:
+            sym = str(r.get("symbol") or "").upper()
+            disp = str(r.get("display_name") or sym).upper()
+            if bias_tag in sym or bias_tag in disp:
+                item = dict(r)
+                try:
+                    q = UPSTOX.quote(item.get("symbol") or item.get("instrument_key"))
+                    if q and q.get("ltp"):
+                        item["entry"] = float(q["ltp"])
+                except Exception:
+                    pass
+                return item
+    except Exception:
+        pass
+
+    # Step 3: Select optimal contract from the live option chain engine
     try:
         chain = generate_option_chain_engine(root)
         spot = float(chain.get("spot") or 6000.0)
@@ -2504,6 +2564,9 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
                 opt_node = best_row.get("call" if is_bull else "put") or {}
                 exp = str(chain.get("expiry") or "17 SEP 2026").replace(" 2026", "").strip()
                 opt_sym = f"{root} {exp} {int(best_row['strike'])} {bias_tag}".strip()
+                exp = str(chain.get("expiry") or "").replace(" 2026", "").strip()
+                real_sym = opt_node.get("trading_symbol")
+                opt_sym = real_sym or (f"{root} {exp} {int(best_row['strike'])} {bias_tag}".strip() if exp else f"{root} {int(best_row['strike'])} {bias_tag}".strip())
                 return {
                     "symbol": opt_sym,
                     "display_name": opt_sym,
@@ -4717,6 +4780,24 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         opt_type = "CE" if (" CE" in c_sym or "CE " in c_sym or c_sym.endswith("CE")) else "PE"
         strike_val = float(opt_parsed.get("strike") or c_node.get("strike") or 0.0) if opt_parsed else float(c_node.get("strike") or 0.0)
         expiry_val = (opt_parsed.get("expiry") if opt_parsed else None) or c_node.get("expiry")
+        if opt_entry <= 0:
+            try:
+                wl_m = db_exec(
+                    "SELECT symbol, instrument_key FROM watchlist_members "
+                    "WHERE UPPER(symbol) LIKE ? AND UPPER(symbol) LIKE ? "
+                    "ORDER BY id DESC LIMIT 1",
+                    [f"%{root}%", f"%{int(strike_val)}%{opt_type}%"],
+                    "one"
+                )
+                if wl_m and wl_m.get("symbol"):
+                    real_s = wl_m["symbol"]
+                    c_sym = real_s
+                    c_disp = real_s
+                    q_wl = UPSTOX.quote(real_s)
+                    if q_wl and q_wl.get("ltp"):
+                        opt_entry = float(q_wl["ltp"])
+            except Exception:
+                pass
         if opt_entry <= 0 and strike_val:
             opt_entry = bs_price(last_price, strike_val, opt_type=opt_type)
         if opt_entry <= 0:
@@ -9033,21 +9114,52 @@ async def order_create(payload: OrderIn, request: Request, user: dict[str, Any] 
         raise HTTPException(422,"AMO is only valid after the regular market session closes")
     if payload.live and not payload.paper and not session.get("active") and not payload.amo:
         raise HTTPException(422,"Live orders are blocked after market hours unless AMO is selected")
-    ltp=None
-    try: ltp=UPSTOX.quote(payload.symbol).get("ltp")
-    except Exception: pass
+    ltp = None
+    try:
+        ltp = UPSTOX.quote(payload.symbol).get("ltp")
+    except Exception:
+        pass
+
+    is_opt = bool(re.search(r'\b(CE|PE)\b', str(payload.symbol).upper()) or str(payload.symbol).upper().endswith("CE") or str(payload.symbol).upper().endswith("PE"))
+
+    # Determine execution reference price:
+    # For LIMIT orders (or when explicit price is specified), the order reference price is payload.price.
+    # If LTP is for an underlying index (e.g. > 5000) while option price is small, always use payload.price.
+    ref = 0.0
+    if payload.order_type in {"LIMIT", "SL"} and payload.price and float(payload.price) > 0:
+        ref = float(payload.price)
+    elif payload.price and float(payload.price) > 0 and (not ltp or (is_opt and float(ltp) > 5000 and float(payload.price) < 3000)):
+        ref = float(payload.price)
+    else:
+        ref = float(ltp or payload.price or 0)
+
     if payload.stop_loss is not None or payload.target is not None:
         ref=float(ltp or payload.price or 0)
         if ref<=0: raise HTTPException(422,"A live LTP is required to validate stop-loss/target")
         if payload.side=="BUY":
             if payload.stop_loss is not None and payload.stop_loss >= ref: raise HTTPException(422,"For BUY, stop-loss must be below LTP")
             if payload.target is not None and payload.target <= ref: raise HTTPException(422,"For BUY, target must be above LTP")
+        if ref <= 0: raise HTTPException(422, "A valid reference price or LTP is required to validate stop-loss/target")
+        ref_label = "Limit Price" if (payload.order_type == "LIMIT" and payload.price) else "LTP"
+        if payload.side == "BUY":
+            if payload.stop_loss is not None and payload.stop_loss >= ref:
+                raise HTTPException(422, f"For BUY, stop-loss must be below {ref_label} (₹{ref:,.2f})")
+            if payload.target is not None and payload.target <= ref:
+                raise HTTPException(422, f"For BUY, target must be above {ref_label} (₹{ref:,.2f})")
         else:
             if payload.stop_loss is not None and payload.stop_loss <= ref: raise HTTPException(422,"For SELL, stop-loss must be above LTP")
             if payload.target is not None and payload.target >= ref: raise HTTPException(422,"For SELL, target must be below LTP")
+            if payload.stop_loss is not None and payload.stop_loss <= ref:
+                raise HTTPException(422, f"For SELL, stop-loss must be above {ref_label} (₹{ref:,.2f})")
+            if payload.target is not None and payload.target >= ref:
+                raise HTTPException(422, f"For SELL, target must be below {ref_label} (₹{ref:,.2f})")
     if payload.stop_loss is not None and payload.target is not None:
         if payload.side=="BUY" and not (payload.stop_loss < (ltp or payload.price) < payload.target): raise HTTPException(422,"BUY risk geometry invalid")
         if payload.side=="SELL" and not (payload.target < (ltp or payload.price) < payload.stop_loss): raise HTTPException(422,"SELL risk geometry invalid")
+        if payload.side == "BUY" and not (payload.stop_loss < ref < payload.target):
+            raise HTTPException(422, "BUY risk geometry invalid: Stop-loss must be below entry/limit price and Target must be above.")
+        if payload.side == "SELL" and not (payload.target < ref < payload.stop_loss):
+            raise HTTPException(422, "SELL risk geometry invalid: Target must be below entry/limit price and Stop-loss must be above.")
     if payload.order_type in {"LIMIT","SL","SL-M"} and payload.price is None and payload.order_type != "SL-M":
         raise HTTPException(422,"Price is required for this order type")
     if payload.live and not payload.paper:

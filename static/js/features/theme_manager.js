@@ -417,4 +417,3 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     btn.disabled = false;
   }
 });
-</script>

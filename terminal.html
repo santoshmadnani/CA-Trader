@@ -2434,8 +2434,13 @@ select#watchlistSelect, select.watchlist-select {
               <div id="chartRecoDualContainer" style="display:inline-flex;align-items:center;gap:6px;margin:0 2px;">
                 <button type="button" id="chartRecoCeBtn" style="display:none;border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono);font-weight:700;cursor:pointer;transition:all .2s;"></button>
                 <button type="button" id="chartRecoPeBtn" style="display:none;border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono);font-weight:700;cursor:pointer;transition:all .2s;"></button>
+              <!-- Dual CE / PE buttons hidden - single optimum recommendation per user direction -->
+              <div id="chartRecoDualContainer" style="display:none !important;">
+                <button type="button" id="chartRecoCeBtn" style="display:none !important;"></button>
+                <button type="button" id="chartRecoPeBtn" style="display:none !important;"></button>
               </div>
               <select id="chartRecoOptionSelect" style="display:inline-block;height:26px;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);max-width:180px;cursor:pointer;">
+              <select id="chartRecoOptionSelect" style="display:inline-block;height:26px;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);min-width:170px;max-width:320px;cursor:pointer;">
                 <option value="">Auto (Best Option)</option>
               </select>
               <span class="muted" style="font-size:11px;" id="chartRecoConfidence">Live Consensus</span>
@@ -8497,8 +8502,6 @@ function moveDrawing(q, dx, dy, view) {
   } else if (q.type === 'rr') {
     q.i = Math.max(0, (q.i || 0) + di);
     if (q.entry != null) q.entry += dp;
-    if (q.stop != null) q.stop += dp
-... [truncated for diff preview]
     if (q.stop != null) q.stop += dp;
     if (q.target != null) q.target += dp;
   } else {
@@ -10527,54 +10530,205 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
   window.updateRecommendationRationale = updateRecommendationRationale;
 
 
-  // Populate option strikes dropdown in recommendation box (Release 36)
-  function populateRecoOptionDropdown(baseSym, atmStrike, step, selectedOpt){
+  // Smart Live Option Quote & Symbol Matcher
+  function findLiveOptionQuote(optSym, baseSym) {
+    if (!optSym) return null;
+    const sUpper = String(optSym).toUpperCase().trim();
+    const wlQuotes = window.__CA_WL_QUOTES || {};
+
+    // 1. Direct exact match in watchlist quotes
+    if (wlQuotes[sUpper]?.ltp != null && Number(wlQuotes[sUpper].ltp) > 0) {
+      return { symbol: sUpper, ltp: Number(wlQuotes[sUpper].ltp), quote: wlQuotes[sUpper] };
+    }
+    const sNorm = sUpper.replace(/\s+/g, ' ');
+    if (wlQuotes[sNorm]?.ltp != null && Number(wlQuotes[sNorm].ltp) > 0) {
+      return { symbol: sNorm, ltp: Number(wlQuotes[sNorm].ltp), quote: wlQuotes[sNorm] };
+    }
+
+    // 2. Parse strike and option type (CE or PE)
+    const isCe = /\bCE\b/i.test(sUpper) || sUpper.endsWith('CE');
+    const isPe = /\bPE\b/i.test(sUpper) || sUpper.endsWith('PE');
+    const typeTag = isCe ? 'CE' : (isPe ? 'PE' : '');
+    const m = sUpper.match(/\b(\d{3,6})\b/);
+    const strike = m ? m[1] : null;
+    const root = (baseSym || sUpper.split(' ')[0] || '').toUpperCase().replace(/ (CE|PE)$/, '').replace(/^(NSE_|MCX_)/, '');
+
+    // 3. Match in window.__CA_WL_QUOTES by root + strike + type
+    for (const [k, v] of Object.entries(wlQuotes)) {
+      const ku = k.toUpperCase();
+      const matchRoot = !root || ku.includes(root);
+      const matchType = !typeTag || (typeTag === 'CE' ? (ku.includes(' CE') || ku.endsWith('CE')) : (ku.includes(' PE') || ku.endsWith('PE')));
+      const matchStrike = !strike || ku.includes(strike);
+      if (matchRoot && matchType && matchStrike && v && v.ltp != null && Number(v.ltp) > 0) {
+        return { symbol: k, ltp: Number(v.ltp), quote: v };
+      }
+    }
+
+    // 4. Check DOM watchlist items (live rendered elements)
+    const wlEls = document.querySelectorAll('.wl-item, .watchlist-item, [data-symbol]');
+    for (const el of wlEls) {
+      const itemSym = (el.dataset?.symbol || el.querySelector('.symbol, .name')?.textContent || el.textContent || '').toUpperCase().trim();
+      const matchRoot = !root || itemSym.includes(root);
+      const matchType = !typeTag || (typeTag === 'CE' ? (itemSym.includes(' CE') || itemSym.endsWith('CE')) : (itemSym.includes(' PE') || itemSym.endsWith('PE')));
+      const matchStrike = !strike || itemSym.includes(strike);
+      if (matchRoot && matchType && matchStrike) {
+        const pEl = el.querySelector('.price, .ltp, [data-field="ltp"], .cell-up, .cell-down');
+        const pNum = pEl ? parseFloat(pEl.textContent.replace(/[^\d.]/g, '')) : 0;
+        if (pNum > 0) {
+          return { symbol: el.dataset?.symbol || itemSym, ltp: pNum };
+        }
+      }
+    }
+
+    // 5. Check cached option chain
+    if (root && window.APP_CACHE && window.APP_CACHE.optionChain && window.APP_CACHE.optionChain[root]) {
+      const oc = window.APP_CACHE.optionChain[root];
+      if (oc.strikes && strike) {
+        const stkNum = parseFloat(strike);
+        const row = oc.strikes.find(r => Math.abs(parseFloat(r.strike) - stkNum) < 1);
+        if (row) {
+          const sideObj = isCe ? row.call : row.put;
+          if (sideObj && sideObj.ltp && Number(sideObj.ltp) > 0) {
+            return { symbol: sideObj.trading_symbol || optSym, ltp: Number(sideObj.ltp) };
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+  window.findLiveOptionQuote = findLiveOptionQuote;
+
+
+  // Populate dynamic option strikes dropdown with LIVE contracts (Release 37)
+  async function populateRecoOptionDropdown(baseSym, atmStrike, step, selectedOpt){
     const recoSelect = document.getElementById('chartRecoOptionSelect');
     if(!recoSelect) return;
     const currentVal = selectedOpt || recoSelect.value || window.__caPinnedOptionContract || '';
-    const isCrude = /CRUDE/i.test(baseSym);
-    const expTag = isCrude ? '17 SEP' : (window.__caOptionExpiry || '25 SEP');
-    const strikes = [];
-    for(let k = -8; k <= 8; k++){
-      strikes.push(atmStrike + k * step);
+    const root = String(baseSym || 'BANKNIFTY').replace(/ (CE|PE)$/, '').split(' ')[0].toUpperCase();
+
+    // 1. Gather all live watchlist option contracts matching root
+    const wlContracts = [];
+    const wlQuotes = window.__CA_WL_QUOTES || {};
+    for (const [k, v] of Object.entries(wlQuotes)) {
+      const ku = k.toUpperCase();
+      if ((ku.startsWith(root + ' ') || ku.startsWith(root)) && (ku.includes(' CE') || ku.includes(' PE') || ku.endsWith('CE') || ku.endsWith('PE'))) {
+        wlContracts.push({
+          symbol: k,
+          display: k,
+          ltp: Number(v?.ltp || 0),
+          isCe: ku.includes(' CE') || ku.endsWith('CE')
+        });
+      }
     }
 
-    let optHtml = `<option value="">Auto (Best Option)</option>`;
+    // 2. Check cached option chain for root
+    let ocStrikes = [];
+    let ocExpiry = '';
+    if (window.APP_CACHE && window.APP_CACHE.optionChain && window.APP_CACHE.optionChain[root]) {
+      const oc = window.APP_CACHE.optionChain[root];
+      ocStrikes = oc.strikes || [];
+      ocExpiry = oc.expiry || '';
+    }
+
+    // 3. Build Dropdown HTML
+    let optHtml = `<option value="">Auto (CA AI Best Recommendation)</option>`;
     let foundCurrent = false;
 
-    strikes.forEach(stk => {
-      const cSym = isCrude ? `CRUDEOIL FUT ${expTag} ${stk}CE` : `${baseSym} ${stk} CE`;
-      const pSym = isCrude ? `CRUDEOIL FUT ${expTag} ${stk}PE` : `${baseSym} ${stk} PE`;
-      const cSel = currentVal === cSym ? ' selected' : '';
-      const pSel = currentVal === pSym ? ' selected' : '';
-      if(cSel || pSel) foundCurrent = true;
-      optHtml += `<option value="${esc(cSym)}"${cSel}>${esc(cSym)} (Call)</option>`;
-      optHtml += `<option value="${esc(pSym)}"${pSel}>${esc(pSym)} (Put)</option>`;
-    });
+    // Group 1: Live Watchlist Contracts (Active streaming in user's watchlist)
+    if (wlContracts.length > 0) {
+      optHtml += `<optgroup label="Live Watchlist Contracts">`;
+      wlContracts.forEach(c => {
+        const isSel = currentVal === c.symbol || currentVal.includes(c.symbol) || c.symbol.includes(currentVal);
+        if (isSel) foundCurrent = true;
+        const ltpTxt = c.ltp > 0 ? ` — ₹${fmt(c.ltp)}` : '';
+        optHtml += `<option value="${esc(c.symbol)}"${isSel ? ' selected' : ''}>${esc(c.symbol)}${ltpTxt}</option>`;
+      });
+      optHtml += `</optgroup>`;
+    }
 
-    if(currentVal && !foundCurrent){
+    // Group 2: Option Chain Strikes (Live listed strikes)
+    if (ocStrikes.length > 0) {
+      optHtml += `<optgroup label="Option Chain (${esc(ocExpiry || 'Nearest Expiry')})">`;
+      const nearStrikes = ocStrikes.filter(r => Math.abs(parseFloat(r.strike) - atmStrike) <= step * 8);
+      nearStrikes.forEach(r => {
+        const stk = parseFloat(r.strike);
+        const ceNode = r.call || {};
+        const peNode = r.put || {};
+        const ceSym = ceNode.trading_symbol || `${root} ${stk} CE`;
+        const peSym = peNode.trading_symbol || `${root} ${stk} PE`;
+        const ceLtp = ceNode.ltp ? ` — ₹${fmt(ceNode.ltp)}` : '';
+        const peLtp = peNode.ltp ? ` — ₹${fmt(peNode.ltp)}` : '';
+
+        const ceSel = currentVal === ceSym ? ' selected' : '';
+        const peSel = currentVal === peSym ? ' selected' : '';
+        if (ceSel || peSel) foundCurrent = true;
+
+        optHtml += `<option value="${esc(ceSym)}"${ceSel}>${esc(ceSym)}${ceLtp}</option>`;
+        optHtml += `<option value="${esc(peSym)}"${peSel}>${esc(peSym)}${peLtp}</option>`;
+      });
+      optHtml += `</optgroup>`;
+    } else {
+      // Dynamic Near-ATM Strikes while option chain loads
+      optHtml += `<optgroup label="Live Strikes (Near ATM)">`;
+      for (let k = -6; k <= 6; k++) {
+        const stk = atmStrike + k * step;
+        const cSym = `${root} ${stk} CE`;
+        const pSym = `${root} ${stk} PE`;
+        const cSel = currentVal === cSym ? ' selected' : '';
+        const pSel = currentVal === pSym ? ' selected' : '';
+        if (cSel || pSel) foundCurrent = true;
+        optHtml += `<option value="${esc(cSym)}"${cSel}>${esc(cSym)}</option>`;
+        optHtml += `<option value="${esc(pSym)}"${pSel}>${esc(pSym)}</option>`;
+      }
+      optHtml += `</optgroup>`;
+    }
+
+    if (currentVal && !foundCurrent) {
       optHtml = `<option value="${esc(currentVal)}" selected>${esc(currentVal)} (Selected)</option>` + optHtml;
     }
 
     recoSelect.innerHTML = optHtml;
 
-    if(!recoSelect.dataset.bound){
+    // Asynchronously fetch real option chain if not yet cached
+    if (!window.APP_CACHE) window.APP_CACHE = {};
+    if (!window.APP_CACHE.optionChain) window.APP_CACHE.optionChain = {};
+    if (!window.APP_CACHE.optionChain[root] && !window.__caOptionChainLoading) {
+      window.__caOptionChainLoading = true;
+      try {
+        const apiFn = window.A || window.api || (async(u,o={})=>fetch(u,{credentials:'include',...o}).then(r=>r.json()));
+        apiFn('/api/options/' + encodeURIComponent(root)).then(data => {
+          window.__caOptionChainLoading = false;
+          if (data && data.strikes && data.strikes.length > 0) {
+            window.APP_CACHE.optionChain[root] = data;
+            populateRecoOptionDropdown(root, atmStrike, step, currentVal);
+          }
+        }).catch(() => { window.__caOptionChainLoading = false; });
+      } catch(_) { window.__caOptionChainLoading = false; }
+    }
+
+    if (!recoSelect.dataset.bound) {
       recoSelect.dataset.bound = '1';
       recoSelect.addEventListener('change', (e) => {
         const chosen = e.target.value;
-        if(!chosen) return;
+        if (!chosen) {
+          window.__caPinnedOptionContract = null;
+          window.__caCurrentChartReco = null;
+          if (typeof updateChartRecoBanner === 'function') updateChartRecoBanner(null, root, true);
+          toast(`Switched to Auto (CA AI Best) recommendation for ${root}`);
+          return;
+        }
         window.__caPinnedOptionContract = chosen;
-        const optSearch = document.getElementById('chartRecoOptionSearch');
-        if(optSearch) optSearch.value = chosen; // no-op if element removed
-        let chosenLtp = (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[chosen]?.ltp) || null;
-        applyOptionRecommendation(chosen, chosenLtp, baseSym);
+        const liveQ = findLiveOptionQuote(chosen, root);
+        const chosenLtp = (liveQ && liveQ.ltp) || null;
+        applyOptionRecommendation(chosen, chosenLtp, root);
 
-        if(!chosenLtp){
+        if (!chosenLtp) {
           try {
             const apiFn = window.A || window.api || (async(u,o={})=>fetch(u,{credentials:'include',...o}).then(r=>r.json()));
             apiFn('/api/market/quote/' + encodeURIComponent(chosen)).then(qr => {
-              if(qr && qr.ltp && Number(qr.ltp) > 0){
-                applyOptionRecommendation(chosen, Number(qr.ltp), baseSym, null, false);
+              if (qr && qr.ltp && Number(qr.ltp) > 0) {
+                applyOptionRecommendation(chosen, Number(qr.ltp), root, null, false);
               }
             }).catch(()=>{});
           } catch(_) {}
@@ -10658,8 +10812,15 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       }
     }
 
-    // Price and Levels Calculation
+    // Price and Levels Calculation (Live Quote Priority)
     let entry = Number(ltp) || 0;
+    if(entry <= 0){
+      const liveQ = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(optSym, baseSym) : null;
+      if(liveQ && liveQ.ltp > 0){
+        entry = liveQ.ltp;
+        optSym = liveQ.symbol || optSym;
+      }
+    }
     if(entry <= 0){
       const dist = Math.abs(curLtp - strike);
       if(moneyness === 'ATM') entry = Math.max(15, roundVal(curLtp * 0.007 + 85));
@@ -10718,21 +10879,21 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         rationale = `ATM Put Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)} (R:R 1:${rr}). High conviction trade.`;
       }
     } else if(isUnderlyingBull && isPut){
-      // Counter-Trend Selection: Bullish market, but user selected Put
-      recoAction = 'CAUTION (COUNTER-TREND)';
-      qualifies = false;
+      // User selected Put in Bullish market: Provide actionable Put scalp levels with advisory warning
+      recoAction = 'BUY PUT (HEDGE)';
+      qualifies = true;
       advisoryIcon = '⚠️';
       suggestedContract = isCrude ? `CRUDEOIL FUT ${expTag} ${atmStrike}CE` : `${baseSym} ${atmStrike} CE`;
-      advisoryComment = `⚠️ Counter-Trend Advisory: Market structure for ${baseSym} is strongly Bullish. The algorithm recommends buying a CALL option (${suggestedContract}). You have selected a PUT option (${optSym}). Buying puts against prevailing upward momentum carries elevated risk of rapid capital loss. 💡 Suggestion: Switch to a Call option (${suggestedContract}) to trade in sync with institutional momentum.`;
-      rationale = `Counter-Trend Warning: ${baseSym} technical structure is Bullish. Recommended: ${suggestedContract}. You selected Put (${optSym}). Risk elevated against trend momentum.`;
+      advisoryComment = `⚠️ Counter-Trend / Hedge Put Selected: ${baseSym} trend momentum is Bullish. Scalp tightly with strict SL. 💡 Institutional alternative: ${suggestedContract}.`;
+      rationale = `Put Hedge / Scalp Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)}. Counter-trend scalp layout.`;
     } else if(isUnderlyingBear && isCall){
-      // Counter-Trend Selection: Bearish market, but user selected Call
-      recoAction = 'CAUTION (COUNTER-TREND)';
-      qualifies = false;
+      // User selected Call in Bearish market: Provide actionable Call bounce levels with advisory warning
+      recoAction = 'BUY CALL (BOUNCE)';
+      qualifies = true;
       advisoryIcon = '⚠️';
       suggestedContract = isCrude ? `CRUDEOIL FUT ${expTag} ${atmStrike}PE` : `${baseSym} ${atmStrike} PE`;
-      advisoryComment = `⚠️ Counter-Trend Advisory: Market structure for ${baseSym} is Bearish. The algorithm recommends buying a PUT option (${suggestedContract}). You have selected a CALL option (${optSym}). Buying calls against downward momentum carries significant risk. 💡 Suggestion: Switch to a Put option (${suggestedContract}) to trade in sync with market direction.`;
-      rationale = `Counter-Trend Warning: ${baseSym} technical structure is Bearish. Recommended: ${suggestedContract}. You selected Call (${optSym}). Risk elevated against trend momentum.`;
+      advisoryComment = `⚠️ Counter-Trend / Relief Bounce Call Selected: ${baseSym} trend momentum is Bearish. Scalp tightly with strict SL. 💡 Institutional alternative: ${suggestedContract}.`;
+      rationale = `Call Relief Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)}. Counter-trend scalp layout.`;
     } else if(isChop){
       // Rangebound / Sideways Chop
       recoAction = 'NO TRADE';
@@ -11051,56 +11212,27 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       lotEl.textContent = `Lot: ${activeOpt.lot_size}`;
     }
 
-    // 2. Dual CE & PE Switcher: Both visible, ONE active consensus
+    // 2. Dual CE / PE Buttons Hidden (Single Consensus Active Recommendation)
     const ceBtn = document.getElementById('chartRecoCeBtn');
     const peBtn = document.getElementById('chartRecoPeBtn');
+    if(ceBtn) ceBtn.style.display = 'none';
+    if(peBtn) peBtn.style.display = 'none';
+    const dualCont = document.getElementById('chartRecoDualContainer');
+    if(dualCont) dualCont.style.display = 'none';
 
-    if(ceBtn && ceOpt){
-      const ceSym = String(ceOpt.display || ceOpt.symbol || '').replace(/\s+FUT(?:\s+EXP)?\s+/gi, ' ').replace(/(\d+)(CE|PE)$/i, '$1 $2').trim();
-      ceBtn.style.display = 'inline-flex';
-      ceBtn.style.alignItems = 'center';
-      ceBtn.style.gap = '4px';
-      if(isCallConsensus){
-        ceBtn.innerHTML = `★ CALL: ${ceSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:var(--buy);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px;">Consensus</span>`;
-        ceBtn.style.background = 'rgba(38,217,166,0.2)';
-        ceBtn.style.color = 'var(--buy)';
-        ceBtn.style.border = '1px solid var(--buy)';
-      } else {
-        ceBtn.innerHTML = `CALL: ${ceSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:rgba(255,255,255,0.08);color:var(--text-faint);padding:1px 4px;border-radius:3px;margin-left:2px;">Inactive</span>`;
-        ceBtn.style.background = 'var(--surface-2)';
-        ceBtn.style.color = 'var(--text-dim)';
-        ceBtn.style.border = '1px solid var(--border-soft)';
+    // 3. Resolve Real Live Market LTP from Watchlist / Option Quotes
+    const liveQ = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanSym, baseSym) : null;
+    let entryPrice = Number((liveQ && liveQ.ltp) || activeOpt.entry || rec.entry || 0);
+    if(liveQ && liveQ.symbol) {
+      cleanSym = liveQ.symbol;
+      if(symEl) {
+        symEl.textContent = cleanSym;
+        symEl.title = `Algorithmic Consensus: ${actionText} (${cleanSym})`;
       }
-      ceBtn.onclick = () => selectDashboardRecoOption(ceOpt, rec, 'CE', isCallConsensus);
-    } else if(ceBtn) {
-      ceBtn.style.display = 'none';
     }
 
-    if(peBtn && peOpt){
-      const peSym = String(peOpt.display || peOpt.symbol || '').replace(/\s+FUT(?:\s+EXP)?\s+/gi, ' ').replace(/(\d+)(CE|PE)$/i, '$1 $2').trim();
-      peBtn.style.display = 'inline-flex';
-      peBtn.style.alignItems = 'center';
-      peBtn.style.gap = '4px';
-      if(!isCallConsensus){
-        peBtn.innerHTML = `★ PUT: ${peSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:var(--sell);color:#fff;padding:1px 4px;border-radius:3px;margin-left:2px;">Consensus</span>`;
-        peBtn.style.background = 'rgba(255,92,114,0.2)';
-        peBtn.style.color = 'var(--sell)';
-        peBtn.style.border = '1px solid var(--sell)';
-      } else {
-        peBtn.innerHTML = `PUT: ${peSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:rgba(255,255,255,0.08);color:var(--text-faint);padding:1px 4px;border-radius:3px;margin-left:2px;">Inactive</span>`;
-        peBtn.style.background = 'var(--surface-2)';
-        peBtn.style.color = 'var(--text-dim)';
-        peBtn.style.border = '1px solid var(--border-soft)';
-      }
-      peBtn.onclick = () => selectDashboardRecoOption(peOpt, rec, 'PE', !isCallConsensus);
-    } else if(peBtn) {
-      peBtn.style.display = 'none';
-    }
-
-    // 3. Update Entry, SL, Target Pills
-    const entryPrice = Number(activeOpt.entry || rec.entry || 0);
-    const slPrice = Number(activeOpt.stop_loss || rec.stop_loss || (isCallConsensus ? entryPrice * 0.82 : entryPrice * 0.80));
-    const tgtPrice = Number(activeOpt.target || rec.target || (isCallConsensus ? entryPrice * 1.35 : entryPrice * 1.38));
+    const slPrice = Number((liveQ && liveQ.ltp) ? (isCallConsensus ? entryPrice * 0.82 : entryPrice * 0.80) : (activeOpt.stop_loss || rec.stop_loss || (isCallConsensus ? entryPrice * 0.82 : entryPrice * 0.80)));
+    const tgtPrice = Number((liveQ && liveQ.ltp) ? (isCallConsensus ? entryPrice * 1.35 : entryPrice * 1.38) : (activeOpt.target || rec.target || (isCallConsensus ? entryPrice * 1.35 : entryPrice * 1.38)));
 
     if(document.getElementById('chartRecoEntry')) document.getElementById('chartRecoEntry').textContent = entryPrice ? '₹' + fmt(entryPrice) : '—';
     if(document.getElementById('chartRecoSl')) document.getElementById('chartRecoSl').textContent = slPrice ? '₹' + fmt(slPrice) : '—';
@@ -11110,6 +11242,20 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     if(document.getElementById('dashEntryPriceDisplay')) document.getElementById('dashEntryPriceDisplay').textContent = entryPrice ? '₹' + fmt(entryPrice) : '—';
     if(document.getElementById('dashSlPriceDisplay')) document.getElementById('dashSlPriceDisplay').textContent = slPrice ? '₹' + fmt(slPrice) : '—';
     if(document.getElementById('dashTargetPriceDisplay')) document.getElementById('dashTargetPriceDisplay').textContent = tgtPrice > 0 ? '₹' + fmt(tgtPrice) : 'Dynamic Trailing SL';
+
+    // Keep active recommendation synchronized with real live entry
+    if(window.__caCurrentChartReco){
+      window.__caCurrentChartReco.symbol = cleanSym;
+      window.__caCurrentChartReco.display_symbol = cleanSym;
+      if(entryPrice > 0) window.__caCurrentChartReco.entry = entryPrice;
+      if(slPrice > 0) window.__caCurrentChartReco.stop_loss = slPrice;
+      if(tgtPrice > 0) window.__caCurrentChartReco.target = tgtPrice;
+      if(window.__caCurrentChartReco.instrument){
+        window.__caCurrentChartReco.instrument.symbol = cleanSym;
+        window.__caCurrentChartReco.instrument.display = cleanSym;
+        if(entryPrice > 0) window.__caCurrentChartReco.instrument.entry = entryPrice;
+      }
+    }
   }
 
   window.selectDashboardRecoOption = selectDashboardRecoOption;
@@ -11251,8 +11397,10 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       // If user has pinned an option contract, or backend provided an option setup, use it
       const targetOpt = window.__caPinnedOptionContract;
       const optType = (isSell || rawAction.includes('SELL') || rawAction.includes('SHORT')) ? 'PE' : 'CE';
-      const autoOptionSym = targetOpt || `${baseSym} ${atmStrike} ${optType}`;
-      let optQuoteLtp = (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[autoOptionSym]?.ltp) || null;
+      let autoOptionSym = targetOpt || `${baseSym} ${atmStrike} ${optType}`;
+      const liveQ = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(autoOptionSym, baseSym) : null;
+      let optQuoteLtp = (liveQ && liveQ.ltp) || (window.__CA_WL_QUOTES && window.__CA_WL_QUOTES[autoOptionSym]?.ltp) || null;
+      if (liveQ && liveQ.symbol) autoOptionSym = liveQ.symbol;
       if (!optQuoteLtp) {
         optQuoteLtp = optType === 'CE' ? Math.max(25, roundVal((curLtp - atmStrike) + 135)) : Math.max(25, roundVal((atmStrike - curLtp) + 135));
       }
@@ -11390,18 +11538,18 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     const sl = Number(rec?.stop_loss || 0);
     const tgt = Number(rec?.target || 0);
 
-    if($('chartRecoEntry')) $('chartRecoEntry').textContent = (qualifies && entry) ? `₹${fmt(entry)}` : '₹--';
-    if($('chartRecoSl')) $('chartRecoSl').textContent = (qualifies && sl) ? `₹${fmt(sl)}` : '₹--';
-    if($('chartRecoTgt')) $('chartRecoTgt').textContent = (qualifies && tgt) ? `₹${fmt(tgt)}` : '₹--';
+    if($('chartRecoEntry')) $('chartRecoEntry').textContent = entry > 0 ? `₹${fmt(entry)}` : '₹--';
+    if($('chartRecoSl')) $('chartRecoSl').textContent = sl > 0 ? `₹${fmt(sl)}` : '₹--';
+    if($('chartRecoTgt')) $('chartRecoTgt').textContent = tgt > 0 ? `₹${fmt(tgt)}` : '₹--';
 
     const risk = Math.abs(entry - sl);
     const reward = Math.abs(tgt - entry);
-    const rr = (qualifies && risk > 0 && reward > 0) ? (reward / risk).toFixed(1) : (rec?.risk_reward || '—');
-    if($('chartRecoRr')) $('chartRecoRr').textContent = qualifies ? `1 : ${rr}` : '—';
+    const rr = (risk > 0 && reward > 0) ? (reward / risk).toFixed(1) : (rec?.risk_reward || '—');
+    if($('chartRecoRr')) $('chartRecoRr').textContent = rr !== '—' ? `1 : ${rr}` : '—';
 
     const qoBtn = $('chartRecoQuickOrderBtn');
     if(qoBtn){
-      if(qualifies && entry){
+      if(entry > 0){
         qoBtn.disabled = false;
         qoBtn.style.opacity = '1';
         qoBtn.style.pointerEvents = 'auto';
@@ -11410,7 +11558,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         qoBtn.disabled = true;
         qoBtn.style.opacity = '0.4';
         qoBtn.style.pointerEvents = 'none';
-        qoBtn.title = 'No active recommendation qualifies';
+        qoBtn.title = 'No active recommendation price';
       }
     }
     // Add to watchlist button for recommended option
@@ -11455,13 +11603,36 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     }
     try {
       const sym = selectedSymbol() || 'NIFTY';
-      if(APP_CACHE.recoOverall) delete APP_CACHE.recoOverall[sym];
-      window.__caCurrentChartReco = null;
-      if(typeof loadDashboard === 'function') await loadDashboard();
-      if(typeof updateChartRecoBanner === 'function') await updateChartRecoBanner(null, sym, true);
-      if(typeof loadRecommendations === 'function') await loadRecommendations(false, true);
-      if(typeof loadRecommendationHistory === 'function') await loadRecommendationHistory();
-      toast(`Live recommendation refreshed for ${sym}`);
+      const baseSym = String(sym).replace(/ (CE|PE)$/, '').split(' ')[0].toUpperCase();
+      const recoSelect = document.getElementById('chartRecoOptionSelect');
+      const chosenOpt = (recoSelect && recoSelect.value) ? recoSelect.value : (window.__caPinnedOptionContract || '');
+
+      if(chosenOpt){
+        // User has selected a custom option contract: refresh quote and recalculate for this contract!
+        try {
+          const apiFn = window.A || window.api || (async(u,o={})=>fetch(u,{credentials:'include',...o}).then(r=>r.json()));
+          const qr = await apiFn('/api/market/quote/' + encodeURIComponent(chosenOpt));
+          const freshLtp = (qr && qr.ltp && Number(qr.ltp) > 0) ? Number(qr.ltp) : null;
+          if(typeof applyOptionRecommendation === 'function'){
+            applyOptionRecommendation(chosenOpt, freshLtp, baseSym, null, true);
+          }
+        } catch(e){
+          if(typeof applyOptionRecommendation === 'function'){
+            applyOptionRecommendation(chosenOpt, null, baseSym, null, true);
+          }
+        }
+        toast(`Live quote & recommendation refreshed for ${chosenOpt}`);
+      } else {
+        // "Auto (CA AI Best)" mode: refresh default quantitative consensus
+        if(APP_CACHE.recoOverall) delete APP_CACHE.recoOverall[sym];
+        window.__caCurrentChartReco = null;
+        window.__caPinnedOptionContract = null;
+        if(typeof loadDashboard === 'function') await loadDashboard();
+        if(typeof updateChartRecoBanner === 'function') await updateChartRecoBanner(null, sym, true);
+        if(typeof loadRecommendations === 'function') await loadRecommendations(false, true);
+        if(typeof loadRecommendationHistory === 'function') await loadRecommendationHistory();
+        toast(`Live recommendation refreshed for ${sym}`);
+      }
     } catch(err) {
       console.error(err);
       toast('Failed to refresh recommendation: ' + (err.message || 'Error'));
@@ -17859,12 +18030,12 @@ setTimeout(() => {
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <b id="fpTotalPnlBadge" style="font-family:var(--font-mono);font-size:12px;color:var(--text);">₹0.00</b>
-      <button type="button" class="btn ghost small" style="padding:1px 6px;height:20px;font-size:11px;line-height:1;" id="fpMinBtn" onclick="toggleFloatingPositionsWidget(event)" title="Minimize / Expand Sentinel">_</button>
+      <button type="button" class="btn ghost small" style="padding:1px 6px;height:20px;font-size:11px;line-height:1;" id="fpMinBtn" onclick="toggleFloatingPositionsWidget(event)" title="Minimize / Expand Sentinel">▢</button>
     </div>
   </div>
 
   <!-- Sentinel Body Container -->
-  <div id="floatingPosBodyWrapper" style="display:flex;flex-direction:column;max-height:480px;overflow-y:auto;">
+  <div id="floatingPosBodyWrapper" style="display:none;flex-direction:column;max-height:480px;overflow-y:auto;">
     
     <!-- SECTION 1: CA AI Live Position Advisor (Above Open Positions) -->
     <div id="fpAdvisorSection" style="padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border-soft);">
@@ -18085,10 +18256,17 @@ setTimeout(() => {
   };
 
   // Item 13: Floating Mini-Position Sentinel Widget (Release 51 Fix)
-  let isFloatingPosMinimized = false;
+  let isFloatingPosMinimized = true;
   window.toggleFloatingPositionsWidget = function(e){
     if(e && e.stopPropagation) e.stopPropagation();
     isFloatingPosMinimized = !isFloatingPosMinimized;
+    if(!isFloatingPosMinimized){
+      window.__caUserManuallyOpenedSentinel = true;
+      window.__caUserManuallyClosedSentinel = false;
+    } else {
+      window.__caUserManuallyOpenedSentinel = false;
+      window.__caUserManuallyClosedSentinel = true;
+    }
     const bodyWrapper = document.getElementById('floatingPosBodyWrapper');
     const btn = document.getElementById('fpMinBtn');
     const widget = document.getElementById('floatingPositionWidget');
@@ -18103,59 +18281,6 @@ setTimeout(() => {
       widget.style.boxShadow = isFloatingPosMinimized ? '0 4px 16px rgba(0,0,0,0.4)' : '0 14px 44px rgba(0,0,0,0.55)';
     }
   };
-
-  async function updateFloatingPositionsWidget(){
-    try {
-      const posData = await api('/api/positions?status=OPEN');
-      const positions = posData.positions || [];
-      const badge = document.getElementById('fpCountBadge');
-      const totalPnlBadge = document.getElementById('fpTotalPnlBadge');
-      const body = document.getElementById('floatingPosBody');
-      const widget = document.getElementById('floatingPositionWidget');
-      
-      if(!widget) return;
-      if(badge) badge.textContent = positions.length;
-
-      if(!positions.length){
-        if(totalPnlBadge) { totalPnlBadge.textContent = '₹0.00'; totalPnlBadge.style.color = 'var(--text)'; }
-        if(body) body.innerHTML = '<div class="muted" style="font-size:11px;text-align:center;padding:10px;">No open positions active.</div>';
-        return;
-      }
-
-      let netPnl = 0;
-      body.innerHTML = positions.map(p => {
-        const pnl = Number(p.unrealized_pnl || 0);
-        netPnl += pnl;
-        const sym = esc(p.symbol || '');
-        const side = esc(p.side || 'BUY');
-        const entry = fmt(p.avg_price || 0);
-        const ltp = fmt(p.ltp || p.avg_price || 0);
-        const sl = p.stop_loss ? fmt(p.stop_loss) : '--';
-        const tgt = p.target ? fmt(p.target) : '--';
-        const tsl = p.trailing_sl ? fmt(p.trailing_sl) : '--';
-        const isGreen = pnl >= 0;
-
-        return `
-          <div style="background:var(--surface-2);border-radius:8px;padding:8px 10px;border:1px solid var(--border-soft);font-size:11px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <b>${sym} <span class="tag ${side==='BUY'?'buy':'sell'}" style="font-size:9px;padding:1px 4px;">${side}</span></b>
-              <b style="font-family:var(--font-mono);color:${isGreen?'var(--buy)':'var(--sell)'};">${isGreen?'+':''}${fmtMoney(pnl)}</b>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:4px;color:var(--text-faint);font-size:10px;">
-              <span>Entry: ₹${entry} | LTP: ₹${ltp}</span>
-              <span>SL: ₹${sl} | Tgt: ₹${tgt}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      if(totalPnlBadge){
-        totalPnlBadge.textContent = (netPnl >= 0 ? '+' : '') + fmtMoney(netPnl);
-        totalPnlBadge.style.color = netPnl >= 0 ? 'var(--buy)' : 'var(--sell)';
-      }
-    } catch(_){}
-  }
-  setInterval(updateFloatingPositionsWidget, 6000);
 
   // Item 17: Set Lot size badge in renderChartRecoData
   const oldRenderChartReco = window.renderChartRecoData;
@@ -18722,15 +18847,51 @@ window.updateFloatingPositionsWidget = async function(){
     if(activeCountEl) activeCountEl.textContent = openList.length;
     if(histCountEl) histCountEl.textContent = closedList.length;
 
+    // Auto-minimize sentinel if 0 open positions and user hasn't explicitly opened it
+    const bodyWrapper = document.getElementById('floatingPosBodyWrapper');
+    const minBtn = document.getElementById('fpMinBtn');
+    if(openList.length === 0){
+      if(!window.__caUserManuallyOpenedSentinel && bodyWrapper && bodyWrapper.style.display !== 'none'){
+        isFloatingPosMinimized = true;
+        bodyWrapper.style.display = 'none';
+        if(minBtn){ minBtn.textContent = '▢'; minBtn.title = 'Expand Sentinel'; }
+      }
+    } else {
+      // Open positions active -> auto-expand if user didn't explicitly close it
+      if(bodyWrapper && bodyWrapper.style.display === 'none' && !window.__caUserManuallyClosedSentinel){
+        isFloatingPosMinimized = false;
+        bodyWrapper.style.display = 'flex';
+        if(minBtn){ minBtn.textContent = '_'; minBtn.title = 'Minimize Sentinel'; }
+      }
+    }
+
     // Set active position for advisor
     if(openList.length > 0){
       activeAdvisorPosition = openList[0];
-    } else if(closedList.length > 0){
+      refreshPositionAdvisor();
+    } else if(currentFpSubTab === 'history' && closedList.length > 0){
       activeAdvisorPosition = closedList[0];
+      refreshPositionAdvisor();
+    } else {
+      activeAdvisorPosition = null;
+      const fpVerdictEl = document.getElementById('fpAdvisorVerdict');
+      const fpReasonEl = document.getElementById('fpAdvisorReason');
+      const fpUrgencyEl = document.getElementById('fpAdvisorUrgency');
+      const fpBannerEl = document.getElementById('fpAdvisorBanner');
+      if(fpVerdictEl) fpVerdictEl.textContent = 'STANDBY · NO OPEN TRADES';
+      if(fpReasonEl) fpReasonEl.textContent = 'All positions squared off. Trade Sentinel is monitoring market conditions.';
+      if(fpUrgencyEl){ fpUrgencyEl.textContent = 'IDLE'; fpUrgencyEl.className = 'tag neutral'; }
+      if(fpBannerEl){
+        fpBannerEl.style.background = 'rgba(245, 158, 11, 0.08)';
+        fpBannerEl.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+      }
+      const fpPeakEl = document.getElementById('fpPeakPnl');
+      const fpCurrPnlTag = document.getElementById('fpCurrentPnlTag');
+      const fpThetaBurnEl = document.getElementById('fpThetaBurn');
+      if(fpPeakEl) { fpPeakEl.textContent = '₹0.00'; fpPeakEl.style.color = 'var(--text)'; }
+      if(fpCurrPnlTag) { fpCurrPnlTag.textContent = 'Now: ₹0.00'; fpCurrPnlTag.className = 'tag neutral'; }
+      if(fpThetaBurnEl) { fpThetaBurnEl.textContent = '—'; }
     }
-
-    // Refresh advisor banner data for both views
-    refreshPositionAdvisor();
 
     // Auto-sync schedule: Real-time (2s) during active trades, 5s when idle/closed
     if(window.__caTradeSyncTimer) clearTimeout(window.__caTradeSyncTimer);
@@ -18759,12 +18920,8 @@ window.updateFloatingPositionsWidget = async function(){
 
     // Determine target list to display based on sub-tab
     let displayList = currentFpSubTab === 'active' ? openList : closedList;
-    if(currentFpSubTab === 'active' && openList.length === 0 && closedList.length > 0){
-      // Empty state automatic fallback: If 0 open positions, show Today's Book so window is never blank!
-      displayList = closedList;
-      const statusEl = document.getElementById('fpSubTabStatus');
-      if(statusEl) statusEl.textContent = "Today's Closed Trades";
-    }
+    const statusEl = document.getElementById('fpSubTabStatus');
+    if(statusEl) statusEl.textContent = currentFpSubTab === 'active' ? 'Active Positions' : "Today's Closed Trades";
 
     let netPnl = 0;
     openList.forEach(p => { netPnl += Number(p.unrealized_pnl || 0); });

@@ -67,4 +67,3 @@ function extractUnderlying(sym){
   return s.split(/\s+/)[0].toUpperCase();
 }
 window.extractUnderlying = extractUnderlying;
-</script>
