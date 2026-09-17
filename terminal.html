@@ -2430,16 +2430,11 @@ select#watchlistSelect, select.watchlist-select {
             <div style="display:flex;align-items:center;gap:8px;position:relative;flex-wrap:wrap;">
               <span class="tag neutral" id="chartRecoAction" style="font-size:11.5px;font-weight:700;padding:2px 8px;">SIGNAL</span>
               <span style="font-weight:700;font-size:13.5px;color:var(--text);" id="chartRecoSymbol">—</span>
-              <!-- Dual CE / PE Interactive Switcher (Both Visible, One Active Consensus) -->
-              <div id="chartRecoDualContainer" style="display:inline-flex;align-items:center;gap:6px;margin:0 2px;">
-                <button type="button" id="chartRecoCeBtn" style="display:none;border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono);font-weight:700;cursor:pointer;transition:all .2s;"></button>
-                <button type="button" id="chartRecoPeBtn" style="display:none;border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono);font-weight:700;cursor:pointer;transition:all .2s;"></button>
               <!-- Dual CE / PE buttons hidden - single optimum recommendation per user direction -->
               <div id="chartRecoDualContainer" style="display:none !important;">
                 <button type="button" id="chartRecoCeBtn" style="display:none !important;"></button>
                 <button type="button" id="chartRecoPeBtn" style="display:none !important;"></button>
               </div>
-              <select id="chartRecoOptionSelect" style="display:inline-block;height:26px;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);max-width:180px;cursor:pointer;">
               <select id="chartRecoOptionSelect" style="display:inline-block;height:26px;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);min-width:170px;max-width:320px;cursor:pointer;">
                 <option value="">Auto (Best Option)</option>
               </select>
@@ -8478,6 +8473,8 @@ function showDrawingTooltip(idx,x,y,indicatorIdx=-1){
   el.style.top = Math.max(8, top) + 'px';
   el.style.display = 'block';
 }
+function findDrawingAt(x,y){const view=getView(),pt={x,y,price:priceFromY(y,view)};for(let i=state.drawings.length-1;i>=0;i--)if(drawingHit(state.
+... [truncated for diff preview]
 function findDrawingAt(x,y){const view=getView(),pt={x,y,price:priceFromY(y,view)};for(let i=state.drawings.length-1;i>=0;i--)if(drawingHit(state.drawings[i],pt,view))return i;return -1}
 function moveDrawing(q, dx, dy, view) {
   const pad = { l: 12, r: 72, t: 18, b: 36 };
@@ -10879,21 +10876,21 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         rationale = `ATM Put Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)} (R:R 1:${rr}). High conviction trade.`;
       }
     } else if(isUnderlyingBull && isPut){
-      // User selected Put in Bullish market: Provide actionable Put scalp levels with advisory warning
-      recoAction = 'BUY PUT (HEDGE)';
-      qualifies = true;
+      // Counter-Trend Selection: Bullish market, but user selected Put
+      recoAction = 'CAUTION (COUNTER-TREND)';
+      qualifies = false;
       advisoryIcon = '⚠️';
       suggestedContract = isCrude ? `CRUDEOIL FUT ${expTag} ${atmStrike}CE` : `${baseSym} ${atmStrike} CE`;
-      advisoryComment = `⚠️ Counter-Trend / Hedge Put Selected: ${baseSym} trend momentum is Bullish. Scalp tightly with strict SL. 💡 Institutional alternative: ${suggestedContract}.`;
-      rationale = `Put Hedge / Scalp Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)}. Counter-trend scalp layout.`;
+      advisoryComment = `⚠️ Counter-Trend Advisory: Market structure for ${baseSym} is strongly Bullish. The algorithm recommends buying a CALL option (${suggestedContract}). You have selected a PUT option (${optSym}). Buying puts against prevailing upward momentum carries elevated risk of rapid capital loss. 💡 Suggestion: Switch to a Call option (${suggestedContract}) to trade in sync with institutional momentum.`;
+      rationale = `Counter-Trend Warning: ${baseSym} technical structure is Bullish. Recommended: ${suggestedContract}. You selected Put (${optSym}). Risk elevated against trend momentum.`;
     } else if(isUnderlyingBear && isCall){
-      // User selected Call in Bearish market: Provide actionable Call bounce levels with advisory warning
-      recoAction = 'BUY CALL (BOUNCE)';
-      qualifies = true;
+      // Counter-Trend Selection: Bearish market, but user selected Call
+      recoAction = 'CAUTION (COUNTER-TREND)';
+      qualifies = false;
       advisoryIcon = '⚠️';
       suggestedContract = isCrude ? `CRUDEOIL FUT ${expTag} ${atmStrike}PE` : `${baseSym} ${atmStrike} PE`;
-      advisoryComment = `⚠️ Counter-Trend / Relief Bounce Call Selected: ${baseSym} trend momentum is Bearish. Scalp tightly with strict SL. 💡 Institutional alternative: ${suggestedContract}.`;
-      rationale = `Call Relief Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)}. Counter-trend scalp layout.`;
+      advisoryComment = `⚠️ Counter-Trend Advisory: Market structure for ${baseSym} is Bearish. The algorithm recommends buying a PUT option (${suggestedContract}). You have selected a CALL option (${optSym}). Buying calls against downward momentum carries significant risk. 💡 Suggestion: Switch to a Put option (${suggestedContract}) to trade in sync with market direction.`;
+      rationale = `Counter-Trend Warning: ${baseSym} technical structure is Bearish. Recommended: ${suggestedContract}. You selected Call (${optSym}). Risk elevated against trend momentum.`;
     } else if(isChop){
       // Rangebound / Sideways Chop
       recoAction = 'NO TRADE';
@@ -11538,18 +11535,18 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     const sl = Number(rec?.stop_loss || 0);
     const tgt = Number(rec?.target || 0);
 
-    if($('chartRecoEntry')) $('chartRecoEntry').textContent = entry > 0 ? `₹${fmt(entry)}` : '₹--';
-    if($('chartRecoSl')) $('chartRecoSl').textContent = sl > 0 ? `₹${fmt(sl)}` : '₹--';
-    if($('chartRecoTgt')) $('chartRecoTgt').textContent = tgt > 0 ? `₹${fmt(tgt)}` : '₹--';
+    if($('chartRecoEntry')) $('chartRecoEntry').textContent = (qualifies && entry) ? `₹${fmt(entry)}` : '₹--';
+    if($('chartRecoSl')) $('chartRecoSl').textContent = (qualifies && sl) ? `₹${fmt(sl)}` : '₹--';
+    if($('chartRecoTgt')) $('chartRecoTgt').textContent = (qualifies && tgt) ? `₹${fmt(tgt)}` : '₹--';
 
     const risk = Math.abs(entry - sl);
     const reward = Math.abs(tgt - entry);
-    const rr = (risk > 0 && reward > 0) ? (reward / risk).toFixed(1) : (rec?.risk_reward || '—');
-    if($('chartRecoRr')) $('chartRecoRr').textContent = rr !== '—' ? `1 : ${rr}` : '—';
+    const rr = (qualifies && risk > 0 && reward > 0) ? (reward / risk).toFixed(1) : (rec?.risk_reward || '—');
+    if($('chartRecoRr')) $('chartRecoRr').textContent = qualifies ? `1 : ${rr}` : '—';
 
     const qoBtn = $('chartRecoQuickOrderBtn');
     if(qoBtn){
-      if(entry > 0){
+      if(qualifies && entry){
         qoBtn.disabled = false;
         qoBtn.style.opacity = '1';
         qoBtn.style.pointerEvents = 'auto';
@@ -11558,7 +11555,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         qoBtn.disabled = true;
         qoBtn.style.opacity = '0.4';
         qoBtn.style.pointerEvents = 'none';
-        qoBtn.title = 'No active recommendation price';
+        qoBtn.title = 'No active recommendation qualifies';
       }
     }
     // Add to watchlist button for recommended option
