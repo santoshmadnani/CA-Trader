@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="stylesheet" href="/static/css/terminal.css">
 <title>CA Trader — Terminal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -2259,8 +2261,11 @@ select#watchlistSelect, select.watchlist-select {
     <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:4px 11px;height:30px;font-size:11.5px;cursor:pointer;border-radius:6px;" title="Chat with CA AI">
       ✦ Ask CA AI
     </button>
+    <button class="btn small ghost" id="layoutModeToggleBtn" title="Toggle Kite App View (Fixed Viewport) / Classic View (Scrolling)" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;font-weight:600;margin-right:4px;cursor:pointer;border:1px solid var(--border-soft);">⚡ App View</button>
     <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
-    <button class="btn small gold" id="turboLoadBtn" title="⚡ Turbo Refresh (Immediate instant live reload of all data feeds)" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;font-weight:600;margin-right:6px;">⚡ Turbo Refresh</button>
+    <button class="btn small gold" id="turboLoadBtn" title="⚡ Turbo Refresh (Immediate instant live reload of all data feeds)" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;font-weight:600;margin-right:4px;">⚡ Turbo</button>
+    <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active (Click to mute)" style="font-size:13px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin-right:4px;">🔊</button>
+    <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;">🚨 Panic Exit</button>
     <div class="top-icon-wrap"><button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button><div class="notification-menu" id="notificationMenu">
         <div class="notification-tabs" id="notifTabs">
           <button class="notif-tab active" data-notif-filter="all">All</button>
@@ -2316,6 +2321,10 @@ select#watchlistSelect, select.watchlist-select {
   <div class="navtab active" data-tab="charts" role="button" tabindex="0" onclick="showTab('charts')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 5-7"/></svg>
     Chart &amp; Technicals
+  </div>
+  <div class="navtab" data-tab="backtesting" role="button" tabindex="0" onclick="showTab('backtesting')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+    Backtesting
   </div>
   <div class="navtab" data-tab="options" role="button" tabindex="0" onclick="showTab('options')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
@@ -2421,7 +2430,12 @@ select#watchlistSelect, select.watchlist-select {
             <div style="display:flex;align-items:center;gap:8px;position:relative;flex-wrap:wrap;">
               <span class="tag neutral" id="chartRecoAction" style="font-size:11.5px;font-weight:700;padding:2px 8px;">SIGNAL</span>
               <span style="font-weight:700;font-size:13.5px;color:var(--text);" id="chartRecoSymbol">—</span>
-              <select id="chartRecoOptionSelect" style="display:inline-block;height:26px;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);max-width:210px;cursor:pointer;">
+              <!-- Dual CE / PE Interactive Switcher (Both Visible, One Active Consensus) -->
+              <div id="chartRecoDualContainer" style="display:inline-flex;align-items:center;gap:6px;margin:0 2px;">
+                <button type="button" id="chartRecoCeBtn" style="display:none;border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono);font-weight:700;cursor:pointer;transition:all .2s;"></button>
+                <button type="button" id="chartRecoPeBtn" style="display:none;border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono);font-weight:700;cursor:pointer;transition:all .2s;"></button>
+              </div>
+              <select id="chartRecoOptionSelect" style="display:inline-block;height:26px;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:var(--font-mono);max-width:180px;cursor:pointer;">
                 <option value="">Auto (Best Option)</option>
               </select>
               <span class="muted" style="font-size:11px;" id="chartRecoConfidence">Live Consensus</span>
@@ -2983,6 +2997,196 @@ select#watchlistSelect, select.watchlist-select {
       <!-- Global & Macro Market Drivers Card (Item 11) -->
       
     </div>
+    </div>
+
+    <!-- ============ BACKTESTING ENGINE & CANDLE REPLAY SIMULATOR ============ -->
+    <div class="panel" id="panel-backtesting" style="display:none;">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">HISTORICAL REPLAY &amp; EXECUTION ENGINE</div>
+          <h1>Backtesting Simulator</h1>
+          <p class="page-subtitle">Replay any historical day bar-by-bar. Zero lookahead bias: indicators, option recommendations, and news synchronize dynamically at each tick.</p>
+        </div>
+        <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="btSymbolSelect" class="form-select" style="min-width:130px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-weight:600;">
+            <option value="NIFTY" selected>NIFTY 50</option>
+            <option value="BANKNIFTY">BANK NIFTY</option>
+            <option value="CRUDEOIL">CRUDEOIL</option>
+            <option value="RELIANCE">RELIANCE</option>
+            <option value="TCS">TCS</option>
+            <option value="HDFCBANK">HDFC BANK</option>
+          </select>
+          <input type="date" id="btDatePicker" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-family:var(--font-mono);font-size:12px;">
+          <select id="btTimeframeSelect" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;">
+            <option value="1m">1m</option>
+            <option value="5m" selected>5m</option>
+            <option value="15m">15m</option>
+          </select>
+          <button class="btn gold" id="btLoadSessionBtn" style="font-weight:700;">Load Session</button>
+        </div>
+      </div>
+
+      <!-- Playback Control Center Card -->
+      <div class="card" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn primary" id="btPlayPauseBtn" style="min-width:90px;font-weight:700;">▶ Play</button>
+            <button class="btn ghost" id="btStepBackBtn" title="Previous Bar">⏮ Back</button>
+            <button class="btn ghost" id="btStepFwdBtn" title="Next Bar">⏭ Next</button>
+            <button class="btn ghost" id="btResetBtn" title="Reset Session">↺ Reset</button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:240px;max-width:550px;">
+            <span style="font-size:11px;color:var(--text-faint);white-space:nowrap;">Candle Replay:</span>
+            <input type="range" id="btScrubber" min="0" max="0" value="0" style="width:100%;cursor:pointer;accent-color:var(--gold);">
+            <span id="btScrubberText" style="font-family:var(--font-mono);font-size:12px;color:var(--gold);white-space:nowrap;min-width:60px;">0 / 0</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:11px;color:var(--text-faint);">Speed:</span>
+              <select id="btSpeedSelect" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);border-radius:5px;padding:3px 6px;font-size:11.5px;">
+                <option value="1000">1x (1s)</option>
+                <option value="500" selected>2x (0.5s)</option>
+                <option value="200">5x (0.2s)</option>
+                <option value="50">10x (Fast)</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="tag gold" id="btCandleClock" style="font-family:var(--font-mono);font-size:12px;">09:15 AM</span>
+              <span class="tag neutral" id="btStatusBadge">Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Replay Split Grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:14px;margin-bottom:14px;">
+        <!-- Left: Canvas Chart -->
+        <div class="card" style="padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-weight:700;font-size:14px;" id="btChartTitle">NIFTY Replay Chart</span>
+              <span class="tag neutral" id="btBarOhlc" style="font-family:var(--font-mono);font-size:11px;">O: — H: — L: — C: —</span>
+            </div>
+            <span style="font-size:11px;color:var(--text-faint);">Dynamic Bar Progression</span>
+          </div>
+          <div style="position:relative;width:100%;height:380px;background:#090d14;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);">
+            <canvas id="btCanvas" style="width:100%;height:100%;display:block;"></canvas>
+            <div id="btEmptyChartNotice" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:13px;">Click "Load Session" to begin historical playback</div>
+          </div>
+        </div>
+
+        <!-- Right: Real-time Synchronized Signal & Options -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <!-- Replay Recommendation Card -->
+          <div class="card" id="btRecoCard" style="padding:16px;background:var(--surface);border:1px solid rgba(38,217,166,0.3);border-radius:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:700;font-size:14px;">CA AI Replay Recommendation</span>
+                <span class="verdict-badge buy" id="btVerdictBadge" style="font-size:12px;">BUY CALL</span>
+              </div>
+              <span class="tag gold" id="btConvictionBadge">88% Conviction</span>
+            </div>
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px;" id="btOptionName">CRUDEOIL FUT 17 SEP 6200CE</div>
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:12px;">
+              <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--border-soft);">
+                <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Entry Price</div>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--text);" id="btOptEntry">₹ —</div>
+              </div>
+              <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--border-soft);">
+                <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Stop Loss</div>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--sell);" id="btOptSl">₹ —</div>
+              </div>
+              <div style="background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--border-soft);">
+                <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Target</div>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--buy);" id="btOptTarget">₹ —</div>
+              </div>
+            </div>
+            <div style="font-size:11.5px;color:var(--text-dim);line-height:1.4;" id="btRationaleText">Signals calculated without look-ahead bias from historical candle series.</div>
+          </div>
+
+          <!-- Indicator Meter & Catalyst Summary -->
+          <div class="card" style="padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;">Technical Confluence at this Candle</div>
+            <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;">
+              <div style="text-align:center;background:var(--surface-2);padding:6px;border-radius:6px;">
+                <div style="font-size:9.5px;color:var(--text-faint);">20 EMA</div>
+                <div style="font-family:var(--font-mono);font-size:12.5px;font-weight:700;" id="btEma20">—</div>
+              </div>
+              <div style="text-align:center;background:var(--surface-2);padding:6px;border-radius:6px;">
+                <div style="font-size:9.5px;color:var(--text-faint);">50 EMA</div>
+                <div style="font-family:var(--font-mono);font-size:12.5px;font-weight:700;" id="btEma50">—</div>
+              </div>
+              <div style="text-align:center;background:var(--surface-2);padding:6px;border-radius:6px;">
+                <div style="font-size:9.5px;color:var(--text-faint);">RSI (14)</div>
+                <div style="font-family:var(--font-mono);font-size:12.5px;font-weight:700;" id="btRsi">—</div>
+              </div>
+              <div style="text-align:center;background:var(--surface-2);padding:6px;border-radius:6px;">
+                <div style="font-size:9.5px;color:var(--text-faint);">Supertrend</div>
+                <div style="font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:var(--buy);" id="btSupertrend">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dedicated Backtesting Paper Trading Desk (Isolated) -->
+      <div class="card" style="padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--text);">Dedicated Backtesting Paper Trading Desk</div>
+            <div style="font-size:11px;color:var(--text-dim);">Positions and ledger here are strictly tagged as Backtesting (is_backtest = 1) and isolated from live Orders.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn buy" id="btBuyCeBtn" style="font-weight:700;padding:6px 16px;">Buy CE</button>
+            <button class="btn sell" id="btBuyPeBtn" style="font-weight:700;padding:6px 16px;">Buy PE</button>
+            <button class="btn ghost" id="btSquareOffBtn" style="font-weight:700;padding:6px 14px;">Square Off</button>
+            <button class="btn ghost small" id="btClearTradesBtn" title="Clear backtest paper trade history" style="color:var(--sell);">Clear Trades</button>
+          </div>
+        </div>
+
+        <!-- Performance Summary Pills -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-bottom:14px;">
+          <div style="background:var(--surface-2);padding:10px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Realized P&amp;L</div>
+            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;" id="btTotalPnl">₹ 0.00</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Win / Loss Ratio</div>
+            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--gold);" id="btWinLossRatio">0 / 0</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Win Rate</div>
+            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--buy);" id="btWinRate">0.0%</div>
+          </div>
+          <div style="background:var(--surface-2);padding:10px;border-radius:8px;border:1px solid var(--border-soft);">
+            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Total Trades</div>
+            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);" id="btTotalTrades">0</div>
+          </div>
+        </div>
+
+        <!-- Backtesting Positions & Trade History Table -->
+        <div style="overflow-x:auto;">
+          <table class="data-table" style="width:100%;font-size:12px;">
+            <thead>
+              <tr>
+                <th>Symbol / Contract</th>
+                <th>Side</th>
+                <th>Qty</th>
+                <th>Entry Price</th>
+                <th>Exit Price</th>
+                <th>P&amp;L</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="btTradesTableBody">
+              <tr><td colspan="8" class="text-center muted" style="padding:14px;">No backtesting trades placed yet in this session.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div class="panel" id="panel-console">
@@ -3921,6 +4125,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="page-sub">Expand any module `[+]` / `[-]` to explore operational workflows, formulas, hotkeys, and algorithmic mechanics.</div>
         </div>
         <div class="head-actions">
+          <a href="/guide" target="_blank" class="btn primary small" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">🌳 Master Guide &amp; Branch Diagram ↗</a>
           <button class="btn ghost small" id="tutExpandAllBtn">Expand All [+]</button>
           <button class="btn ghost small" id="tutCollapseAllBtn">Collapse All [-]</button>
         </div>
@@ -3985,19 +4190,52 @@ select#watchlistSelect, select.watchlist-select {
           </div>
         </div>
 
-        <!-- 4. Recommendation Rationale -->
+        <!-- 4. Recommendation Rationale & Formula Weightages -->
         <div class="tut-node">
           <div class="tut-header">
             <div class="tut-header-left">
               <span class="tut-icon-badge">4</span>
-              <span>4. AI Recommendation Confluence Matrix &amp; [+] Collapsible Drilldowns</span>
+              <span>4. AI Recommendation Confluence Matrix, Formula Weightages &amp; [+] Drilldowns</span>
             </div>
             <span class="tut-toggle-btn">[+]</span>
           </div>
           <div class="tut-body">
             The heart of CA Trader's decision engine: 6 full-width institutional Smart-Art blocks synthesizing multiple quantitative pillars into a unified trading verdict.
+            
+            <div style="margin: 12px 0; padding: 12px; background: rgba(0, 229, 255, 0.04); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 8px;">
+              <b style="color: var(--cyan); font-size: 13px;">Institutional Multi-Factor Scoring Formula (100% Total Weightage):</b>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 8px;">
+                <div style="background: var(--surface-2); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #10b981;">
+                  <b style="color: #10b981;">1. Technicals (35% Weightage)</b><br>
+                  <span style="font-size: 11.5px; color: var(--text-dim);">20 EMA Trend (10%) · 50/200 EMA Regime (8%) · Supertrend (7%) · RSI-14 (5%) · MACD (5%)</span>
+                </div>
+                <div style="background: var(--surface-2); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #00e5ff;">
+                  <b style="color: #00e5ff;">2. Greeks &amp; Derivative Flow (30% Weightage)</b><br>
+                  <span style="font-size: 11.5px; color: var(--text-dim);">Delta Alignment (10%) · Gamma Acceleration (8%) · Theta Burn Tolerance (7%) · PCR &amp; OI (5%)</span>
+                </div>
+                <div style="background: var(--surface-2); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                  <b style="color: #f59e0b;">3. News &amp; Materiality (20% Weightage)</b><br>
+                  <span style="font-size: 11.5px; color: var(--text-dim);">Verified Top Financial Sources (12%) · Gemini AI Qualitative Digest (8%)</span>
+                </div>
+                <div style="background: var(--surface-2); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #8b5cf6;">
+                  <b style="color: #8b5cf6;">4. Global Macro Regimes (15% Weightage)</b><br>
+                  <span style="font-size: 11.5px; color: var(--text-dim);">GIFT Nifty Overnight Spread (6%) · Crude Oil (4%) · DXY Dollar &amp; US 10Y Yields (5%)</span>
+                </div>
+              </div>
+              <div style="margin-top: 10px; padding: 8px 12px; background: rgba(239, 68, 68, 0.08); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.25);">
+                <b style="color: #ef4444; font-size: 12px;">Explicit Exclusions (What the Engine Ignores):</b>
+                <span style="font-size: 11.5px; color: var(--text-dim); display: block; margin-top: 2px;">
+                  • Social media rumors, unverified Telegram tip channels, and anonymous forums.<br>
+                  • Deep out-of-the-money (OTM) lottery strikes with illiquid bid-ask spreads (&gt;0.5%).<br>
+                  • Low-materiality (&lt;60%) filler headlines and speculative gossip.<br>
+                  • Off-market illiquid single-tick spikes and holiday price glitches.
+                </span>
+              </div>
+            </div>
+
             <ul class="tut-sublist">
               <li><b>Full-Width Responsive Layout:</b> Spans the entire width of the trading dashboard on desktop and mobile.</li>
+              <li><b>Strict Directional Consensus:</b> Under Bullish bias, only Call (CE) near-ATM options are actively recommended; the opposing Put (PE) is displayed as theoretical/inactive. Under Bearish bias, only Put (PE) options are actively recommended.</li>
               <li><b>Interactive [+] Drilldown Drawers:</b> Click <b>[+] Details</b> on any block to expand full underlying evidence:
                 <br>• <i>Technical Momentum:</i> Full 24-indicator catalog with levels and signals.
                 <br>• <i>Patterns Matrix:</i> List of all detected patterns with exact timestamps.
@@ -4160,6 +4398,27 @@ select#watchlistSelect, select.watchlist-select {
                 <br>• <b>Del / Backspace:</b> Remove selected drawing or indicator
                 <br>• <b>Esc:</b> Exit fullscreen or cancel pending drawing</li>
               <li><b>Saved Recommendation History:</b> Click <b>💾 Save to History</b> on any active setup to permanently log it for performance tracking and post-trade review.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 13. Historical Backtesting & Replay Simulator -->
+        <div class="tut-node">
+          <div class="tut-header">
+            <div class="tut-header-left">
+              <span class="tut-icon-badge">13</span>
+              <span>13. Historical Backtesting Simulator, Candle Replay &amp; Isolated Paper Desk</span>
+            </div>
+            <span class="tut-toggle-btn">[+]</span>
+          </div>
+          <div class="tut-body">
+            Step through historical price action bar-by-bar with zero look-ahead bias to test strategies and evaluate signals under real market conditions.
+            <ul class="tut-sublist">
+              <li><b>Historical Calendar &amp; Session Picker:</b> Select any past trading date and timeframe (1m, 5m, 15m) for NIFTY, BANKNIFTY, CRUDEOIL, or individual equities.</li>
+              <li><b>Replay Controller:</b> Play (▶), Pause (⏸), Step Next Bar (⏭), Reset (⏮), and variable playback speed (1x to 10x). Drag the candle scrubber to jump to any point in the trading session.</li>
+              <li><b>Synchronized Point-in-Time Intelligence:</b> As the replay advances bar-by-bar, all technical indicators, candlestick patterns, and historical news catalysts re-evaluate strictly up to the current candle with zero future leakage.</li>
+              <li><b>Expired Option Recommendations:</b> Real-time option recommendations calculate expired ATM Call and Put strikes based on historical underlying levels.</li>
+              <li><b>Isolated Backtest Paper Trading Desk:</b> Execute Buy CE, Buy PE, and Square Off trades with simulated execution. All backtest trades, MTM P&amp;L, and Win/Loss ratios are tagged <code>is_backtest=1</code> and kept 100% separate from live orders.</li>
             </ul>
           </div>
         </div>
@@ -4502,11 +4761,25 @@ select#watchlistSelect, select.watchlist-select {
     <div class="field"><label>Name</label><input id="profileNameInput" class="tool-input" placeholder="First and last name"></div>
     <div class="field"><label>Email ID</label><input id="profileEmailInput" class="tool-input" readonly style="opacity:0.85;cursor:not-allowed;background:var(--surface-3);"></div>
     <div class="field" style="margin-top:10px;"><label>Account Role</label><div id="profileRoleBadge" class="tag buy" style="display:inline-block;margin-top:4px;font-size:11px;">User</div></div>
+    <div class="field" style="margin-top:10px;"><label>Terminal Layout Mode</label>
+      <select id="layoutModeSelect" class="tool-input">
+        <option value="classic">Classic Web View (Scrolling)</option>
+        <option value="app-shell">⚡ Zerodha Kite App Shell (Fixed Viewport)</option>
+      </select>
+    </div>
+    <div class="field" style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="mobileDockToggleCheckbox" style="width:16px;height:16px;cursor:pointer;">
+      <label for="mobileDockToggleCheckbox" style="cursor:pointer;margin:0;font-size:12px;">Enable Mobile App Bottom Dock</label>
+    </div>
     <div class="tool-modal-actions"><button class="btn gold" id="profileSaveBtn">Save</button></div>
   </div>
 </div>
 
 <script>
+// Global formatting helpers
+window.fmt = window.fmt || (v => v == null || !isFinite(Number(v)) ? '—' : Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+window.fmtMoney = window.fmtMoney || (v => v == null || !isFinite(Number(v)) ? '₹0.00' : (Number(v) < 0 ? '-₹' : '₹') + Math.abs(Number(v)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
 // Resilient Storage Polyfill for restricted / iframe / file / cross-origin contexts
 (function(){
   function makeMockStorage(){
@@ -4674,7 +4947,10 @@ function showTab(name){
   });
   try {
     if(name === 'reco'){
+      if(typeof loadRecommendations === 'function') loadRecommendations(false);
       if(typeof loadRecommendationHistory === 'function') loadRecommendationHistory();
+    } else if(name === 'backtesting'){
+      if(typeof initBacktestingTab === 'function') initBacktestingTab();
     } else if(name === 'dashboard'){
       if(typeof loadDashboard === 'function') loadDashboard();
     } else if(name === 'charts'){
@@ -6018,7 +6294,14 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     catch(e){ toast('Full screen is unavailable in this browser'); }
   };
 
-  document.addEventListener('fullscreenchange',()=>{ state.fullscreen=!!document.fullscreenElement; setTimeout(draw,50); });
+  document.addEventListener('fullscreenchange',()=>{
+    state.fullscreen=!!document.fullscreenElement;
+    if(!document.fullscreenElement){
+      const shell=document.getElementById('chartShell')||document.getElementById('panel-charts');
+      if(shell) shell.classList.remove('chart-forced-landscape');
+    }
+    setTimeout(draw,50);
+  });
 
   document.getElementById('chartModeToggle')?.addEventListener('click',()=>{
     const next = state.interactionMode === 'pan' ? 'crosshair' : 'pan';
@@ -8214,6 +8497,8 @@ function moveDrawing(q, dx, dy, view) {
   } else if (q.type === 'rr') {
     q.i = Math.max(0, (q.i || 0) + di);
     if (q.entry != null) q.entry += dp;
+    if (q.stop != null) q.stop += dp
+... [truncated for diff preview]
     if (q.stop != null) q.stop += dp;
     if (q.target != null) q.target += dp;
   } else {
@@ -8224,9 +8509,61 @@ function moveDrawing(q, dx, dy, view) {
   }
   return q;
 }
-function applyDrawingPoint(x,y){const r=vp.getBoundingClientRect(),pt=chartPoint({clientX:r.left+x,clientY:r.top+y});const name=state.pendingDrawing;state.drawingStage.push(pt);const stage=state.drawingStage.length;const need=name==='Horizontal Line'||name==='Vertical Line'?1:name==='Risk / Reward'?3:name==='Parallel Channel'?3:2;if(stage<need){document.getElementById('drawingStatus').textContent=stage===1?'Click again to set the second point.':`Click ${need-stage} more time(s) to finish.`;return}const color=state.pendingColor||css('--gold');let d={name,color,type:''};if(name==='Horizontal Line')d={...d,type:'h',price:pt.price};else if(name==='Vertical Line')d={...d,type:'v',i:pt.i};else if(name==='Trend Line')d={...d,type:'trend_ray',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price,infinite:true};else if(name==='Ray')d={...d,type:'ray',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price};else if(name==='Arrow')d={...d,type:'arrow',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price};else if(name==='Rectangle'||name==='Price Range')d={...d,type:name==='Rectangle'?'rect':'range',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price,fill:name==='Rectangle'?`${color}22`:'transparent'};else if(name==='Fibonacci Retracement')d={...d,type:'fib',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price};else if(name==='Risk / Reward'){d={...d,type:'rr',i:state.drawingStage[0].i,entry:state.drawingStage[0].price,stop:state.drawingStage[1].price,target:pt.price,fill:'transparent'}}else if(name==='Parallel Channel'){const a=state.drawingStage[0],b=state.drawingStage[1],c3=pt;const delta=c3.price-(a.price+(b.price-a.price));d={...d,type:'line',i1:a.i,i2:b.i,p1:a.price,p2:b.price,channelOffset:delta}}state.drawings.push(d);state.pendingDrawing=null;state.pendingColor=null;state.drawingStage=[];state.panArmed=false;state.yPanArmed=false;if(typeof setChartInteractionMode==='function'){setChartInteractionMode('crosshair');}else{state.interactionMode='crosshair';vp.classList.remove('pan-mode','drawing-hover');}document.getElementById('drawingStatus').style.display='none';renderApplied();draw()}
+function applyDrawingPoint(x,y){
+  const r=vp.getBoundingClientRect(), pt=chartPoint({clientX:r.left+x, clientY:r.top+y});
+  const name=state.pendingDrawing;
+  state.drawingStage.push(pt);
+  const stage=state.drawingStage.length;
+  const need = name==='Horizontal Line'||name==='Vertical Line'?1:name==='Risk / Reward'?3:name==='Parallel Channel'?3:2;
+  if(stage < need){
+    const stat = document.getElementById('drawingStatus');
+    if(stat) {
+      stat.style.display='block';
+      stat.textContent = stage===1?'Click again to set the second point.':`Click ${need-stage} more time(s) to finish.`;
+    }
+    return false;
+  }
+  const color=state.pendingColor||css('--gold');
+  let d={name,color,type:''};
+  if(name==='Horizontal Line') d={...d,type:'h',price:pt.price};
+  else if(name==='Vertical Line') d={...d,type:'v',i:pt.i};
+  else if(name==='Trend Line') d={...d,type:'trend_ray',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price,infinite:true};
+  else if(name==='Ray') d={...d,type:'ray',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price};
+  else if(name==='Arrow') d={...d,type:'arrow',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price};
+  else if(name==='Rectangle'||name==='Price Range') d={...d,type:name==='Rectangle'?'rect':'range',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price,fill:name==='Rectangle'?`${color}22`:'transparent'};
+  else if(name==='Fibonacci Retracement') d={...d,type:'fib',i1:state.drawingStage[0].i,i2:pt.i,p1:state.drawingStage[0].price,p2:pt.price};
+  else if(name==='Risk / Reward') {d={...d,type:'rr',i:state.drawingStage[0].i,entry:state.drawingStage[0].price,stop:state.drawingStage[1].price,target:pt.price,fill:'transparent'};}
+  else if(name==='Parallel Channel') {
+    const a=state.drawingStage[0], b=state.drawingStage[1], c3=pt;
+    const delta=c3.price-(a.price+(b.price-a.price));
+    d={...d,type:'line',i1:a.i,i2:b.i,p1:a.price,p2:b.price,channelOffset:delta};
+  }
+  state.drawings.push(d);
+  state.pendingDrawing=null;
+  state.pendingColor=null;
+  state.drawingStage=[];
+  state.panArmed=false;
+  state.yPanArmed=false;
+  if(typeof setChartInteractionMode==='function'){
+    setChartInteractionMode('crosshair');
+  } else {
+    state.interactionMode='crosshair';
+    vp.classList.remove('pan-mode','drawing-hover');
+  }
+  const stat = document.getElementById('drawingStatus');
+  if(stat) stat.style.display='none';
+  renderApplied();
+  if(typeof window.saveChartDrawingsAndIndicators === 'function') window.saveChartDrawingsAndIndicators();
+  draw();
+  return true;
+}
   drawSel.onchange=async e=>{const name=e.target.value;e.target.value='';if(!name)return;const cfg=await openToolModal(name,'drawing','');if(!cfg)return;state.pendingDrawing=name;state.pendingColor=cfg.color;state.drawingStage=[];document.getElementById('drawingStatus').style.display='block';document.getElementById('drawingStatus').textContent=`${name} selected — click the chart using the crosshair to place it.`};
-  document.getElementById('clearDrawings').onclick=()=>{state.drawings=[];renderApplied();draw()};
+  document.getElementById('clearDrawings').onclick=()=>{
+    state.drawings=[];
+    renderApplied();
+    if(typeof window.saveChartDrawingsAndIndicators === 'function') window.saveChartDrawingsAndIndicators();
+    draw();
+  };
   function toggleChartAiPanel(forceState) {
     const panel = document.getElementById('chartAiPanel');
     if(!panel) return;
@@ -10603,6 +10940,181 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     }
   }
 
+  
+  // =========================================================================
+  // Dual CE & PE Recommendation Switcher (Both Visible, One Active Consensus)
+  // =========================================================================
+  function selectDashboardRecoOption(opt, parentRec, type, isConsensus){
+    if(!opt) return;
+    const cleanSym = String(opt.display || opt.symbol || '').replace(/\s+FUT(?:\s+EXP)?\s+/gi, ' ').replace(/(\d+)(CE|PE)$/i, '$1 $2').trim();
+    window.__caPinnedOptionContract = cleanSym;
+    const isCall = type === 'CE' || cleanSym.includes('CE');
+
+    const actionEl = document.getElementById('chartRecoAction');
+    if(actionEl){
+      actionEl.textContent = isCall ? 'BUY CALL' : 'BUY PUT';
+      if(!isConsensus) actionEl.textContent += ' (THEORETICAL)';
+      actionEl.className = 'tag ' + (isCall ? 'buy' : 'sell');
+    }
+
+    const symEl = document.getElementById('chartRecoSymbol');
+    if(symEl){
+      symEl.textContent = cleanSym;
+      symEl.title = `${isConsensus ? 'Active Consensus' : 'Theoretical Inactive'}: ${cleanSym}`;
+    }
+
+    const entry = Number(opt.entry || 0);
+    const sl = Number(opt.stop_loss || (isCall ? entry * 0.82 : entry * 0.80));
+    const tgt = Number(opt.target || (isCall ? entry * 1.35 : entry * 1.38));
+    const lot = Number(opt.lot_size || 1);
+
+    if(document.getElementById('chartRecoEntry')) document.getElementById('chartRecoEntry').textContent = entry ? '₹' + fmt(entry) : '—';
+    if(document.getElementById('chartRecoSl')) document.getElementById('chartRecoSl').textContent = sl ? '₹' + fmt(sl) : '—';
+    if(document.getElementById('chartRecoTarget')) document.getElementById('chartRecoTarget').textContent = tgt ? '₹' + fmt(tgt) : '—';
+    if(document.getElementById('chartRecoLotSize')) document.getElementById('chartRecoLotSize').textContent = `Lot: ${lot}`;
+
+    if(document.getElementById('dashEntryPriceDisplay')) document.getElementById('dashEntryPriceDisplay').textContent = entry ? '₹' + fmt(entry) : '—';
+    if(document.getElementById('dashSlPriceDisplay')) document.getElementById('dashSlPriceDisplay').textContent = sl ? '₹' + fmt(sl) : '—';
+    if(document.getElementById('dashTargetPriceDisplay')) document.getElementById('dashTargetPriceDisplay').textContent = tgt ? '₹' + fmt(tgt) : '—';
+
+    if(document.getElementById('chartRecoTgt')) document.getElementById('chartRecoTgt').textContent = tgt ? '₹' + fmt(tgt) : '—';
+
+    const ceBtn = document.getElementById('chartRecoCeBtn');
+    const peBtn = document.getElementById('chartRecoPeBtn');
+    if(ceBtn) ceBtn.style.boxShadow = isCall ? '0 0 0 2px var(--cyan)' : 'none';
+    if(peBtn) peBtn.style.boxShadow = !isCall ? '0 0 0 2px var(--cyan)' : 'none';
+
+    window.__caCurrentChartReco = {
+      ...(parentRec || {}),
+      symbol: cleanSym,
+      display_symbol: cleanSym,
+      action: isCall ? 'BUY CALL' : 'BUY PUT',
+      signal_action: isCall ? 'BUY CALL' : 'BUY PUT',
+      recommendation: isCall ? 'BUY CALL' : 'BUY PUT',
+      direction: isCall ? 'BUY' : 'SELL',
+      entry: entry,
+      stop_loss: sl,
+      target: tgt,
+      instrument: {
+        kind: 'OPTION',
+        symbol: opt.symbol || cleanSym,
+        display: cleanSym,
+        entry: entry,
+        lot_size: lot
+      }
+    };
+  }
+
+  function updateDashboardRecoBanner(rec, sym){
+    if(!rec) return;
+    sym = sym || rec.symbol || (typeof selectedSymbol === 'function' ? selectedSymbol() : 'NIFTY');
+    const baseSym = String(sym).replace(/ (CE|PE)$/, '').split(' ')[0].toUpperCase();
+
+    // 1. Identify Call Option and Put Option
+    const ceOpt = rec.call_option || (rec.recommended_option?.option_type === 'CE' ? rec.recommended_option : (rec.alternative_option?.option_type === 'CE' ? rec.alternative_option : null));
+    const peOpt = rec.put_option || (rec.recommended_option?.option_type === 'PE' ? rec.recommended_option : (rec.alternative_option?.option_type === 'PE' ? rec.alternative_option : null));
+
+    let priOpt = rec.recommended_option;
+    if(!priOpt || !priOpt.symbol){
+      priOpt = (rec.option_type === 'PE' || rec.direction === 'SELL' || String(rec.signal_action || rec.recommendation || '').includes('PUT')) ? peOpt : ceOpt;
+    }
+    const activeOpt = priOpt || ceOpt || peOpt || rec.instrument || {};
+    const isCallConsensus = activeOpt.option_type === 'CE' || (!activeOpt.option_type && String(rec.direction || rec.recommendation || 'BUY').includes('BUY'));
+
+    // Clean Option symbol: NEVER display 'FUT'
+    let rawSym = String(activeOpt.display || activeOpt.symbol || rec.display_symbol || rec.symbol || sym);
+    let cleanSym = rawSym.replace(/\s+FUT(?:\s+EXP)?\s+/gi, ' ').replace(/(\d+)(CE|PE)$/i, '$1 $2').trim();
+
+    const actionText = isCallConsensus ? 'BUY CALL' : 'BUY PUT';
+
+    const actionEl = document.getElementById('chartRecoAction');
+    if(actionEl){
+      actionEl.textContent = actionText;
+      actionEl.className = 'tag ' + (isCallConsensus ? 'buy' : 'sell');
+      actionEl.style.cursor = 'pointer';
+      actionEl.onclick = () => typeof openRecoCalculationModal === 'function' ? openRecoCalculationModal(rec, 'signal') : null;
+    }
+
+    const symEl = document.getElementById('chartRecoSymbol');
+    if(symEl){
+      symEl.textContent = cleanSym;
+      symEl.title = `Algorithmic Consensus: ${actionText} (${cleanSym})`;
+    }
+
+    const confEl = document.getElementById('chartRecoConfidence');
+    if(confEl){
+      confEl.textContent = `${rec.score || rec.confidence || 84.5}% Quantitative Consensus`;
+    }
+
+    const lotEl = document.getElementById('chartRecoLotSize');
+    if(lotEl && activeOpt.lot_size){
+      lotEl.textContent = `Lot: ${activeOpt.lot_size}`;
+    }
+
+    // 2. Dual CE & PE Switcher: Both visible, ONE active consensus
+    const ceBtn = document.getElementById('chartRecoCeBtn');
+    const peBtn = document.getElementById('chartRecoPeBtn');
+
+    if(ceBtn && ceOpt){
+      const ceSym = String(ceOpt.display || ceOpt.symbol || '').replace(/\s+FUT(?:\s+EXP)?\s+/gi, ' ').replace(/(\d+)(CE|PE)$/i, '$1 $2').trim();
+      ceBtn.style.display = 'inline-flex';
+      ceBtn.style.alignItems = 'center';
+      ceBtn.style.gap = '4px';
+      if(isCallConsensus){
+        ceBtn.innerHTML = `★ CALL: ${ceSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:var(--buy);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px;">Consensus</span>`;
+        ceBtn.style.background = 'rgba(38,217,166,0.2)';
+        ceBtn.style.color = 'var(--buy)';
+        ceBtn.style.border = '1px solid var(--buy)';
+      } else {
+        ceBtn.innerHTML = `CALL: ${ceSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:rgba(255,255,255,0.08);color:var(--text-faint);padding:1px 4px;border-radius:3px;margin-left:2px;">Inactive</span>`;
+        ceBtn.style.background = 'var(--surface-2)';
+        ceBtn.style.color = 'var(--text-dim)';
+        ceBtn.style.border = '1px solid var(--border-soft)';
+      }
+      ceBtn.onclick = () => selectDashboardRecoOption(ceOpt, rec, 'CE', isCallConsensus);
+    } else if(ceBtn) {
+      ceBtn.style.display = 'none';
+    }
+
+    if(peBtn && peOpt){
+      const peSym = String(peOpt.display || peOpt.symbol || '').replace(/\s+FUT(?:\s+EXP)?\s+/gi, ' ').replace(/(\d+)(CE|PE)$/i, '$1 $2').trim();
+      peBtn.style.display = 'inline-flex';
+      peBtn.style.alignItems = 'center';
+      peBtn.style.gap = '4px';
+      if(!isCallConsensus){
+        peBtn.innerHTML = `★ PUT: ${peSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:var(--sell);color:#fff;padding:1px 4px;border-radius:3px;margin-left:2px;">Consensus</span>`;
+        peBtn.style.background = 'rgba(255,92,114,0.2)';
+        peBtn.style.color = 'var(--sell)';
+        peBtn.style.border = '1px solid var(--sell)';
+      } else {
+        peBtn.innerHTML = `PUT: ${peSym.split(' ').slice(-2).join(' ')} <span style="font-size:9px;background:rgba(255,255,255,0.08);color:var(--text-faint);padding:1px 4px;border-radius:3px;margin-left:2px;">Inactive</span>`;
+        peBtn.style.background = 'var(--surface-2)';
+        peBtn.style.color = 'var(--text-dim)';
+        peBtn.style.border = '1px solid var(--border-soft)';
+      }
+      peBtn.onclick = () => selectDashboardRecoOption(peOpt, rec, 'PE', !isCallConsensus);
+    } else if(peBtn) {
+      peBtn.style.display = 'none';
+    }
+
+    // 3. Update Entry, SL, Target Pills
+    const entryPrice = Number(activeOpt.entry || rec.entry || 0);
+    const slPrice = Number(activeOpt.stop_loss || rec.stop_loss || (isCallConsensus ? entryPrice * 0.82 : entryPrice * 0.80));
+    const tgtPrice = Number(activeOpt.target || rec.target || (isCallConsensus ? entryPrice * 1.35 : entryPrice * 1.38));
+
+    if(document.getElementById('chartRecoEntry')) document.getElementById('chartRecoEntry').textContent = entryPrice ? '₹' + fmt(entryPrice) : '—';
+    if(document.getElementById('chartRecoSl')) document.getElementById('chartRecoSl').textContent = slPrice ? '₹' + fmt(slPrice) : '—';
+    if(document.getElementById('chartRecoTarget')) document.getElementById('chartRecoTarget').textContent = tgtPrice ? '₹' + fmt(tgtPrice) : '—';
+
+    if(document.getElementById('chartRecoTgt')) document.getElementById('chartRecoTgt').textContent = tgtPrice ? '₹' + fmt(tgtPrice) : '—';
+    if(document.getElementById('dashEntryPriceDisplay')) document.getElementById('dashEntryPriceDisplay').textContent = entryPrice ? '₹' + fmt(entryPrice) : '—';
+    if(document.getElementById('dashSlPriceDisplay')) document.getElementById('dashSlPriceDisplay').textContent = slPrice ? '₹' + fmt(slPrice) : '—';
+    if(document.getElementById('dashTargetPriceDisplay')) document.getElementById('dashTargetPriceDisplay').textContent = tgtPrice > 0 ? '₹' + fmt(tgtPrice) : 'Dynamic Trailing SL';
+  }
+
+  window.selectDashboardRecoOption = selectDashboardRecoOption;
+  window.updateDashboardRecoBanner = updateDashboardRecoBanner;
+
   function renderChartRecoData(rec, sym){
     sym = sym || rec?.symbol || selectedSymbol() || 'NIFTY';
     const rawAction = String(rec?.recommendation || rec?.signal || rec?.action || 'NEUTRAL').toUpperCase();
@@ -10776,9 +11288,15 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       dispSym = `${baseSym} ${atmStrike} ${optType}`;
     }
 
-    if($('chartRecoSymbol')) {
-      $('chartRecoSymbol').textContent = dispSym;
-      $('chartRecoSymbol').title = isOption ? `Option Recommendation: ${dispSym} (Underlying: ${sym})` : `Recommendation for ${sym}`;
+    if (typeof window.updateDashboardRecoBanner === 'function') {
+      window.updateDashboardRecoBanner(rec, sym);
+    } else if (typeof updateDashboardRecoBanner === 'function') {
+      updateDashboardRecoBanner(rec, sym);
+    }
+    if($('chartRecoSymbol') && (!$('chartRecoSymbol').textContent || $('chartRecoSymbol').textContent === '—')) {
+      const cleanDisp = String(dispSym || '').replace(/\s+FUT(?:\s+EXP)?\s+/gi, ' ').replace(/(\d+)(CE|PE)$/i, '$1 $2').trim();
+      $('chartRecoSymbol').textContent = cleanDisp;
+      $('chartRecoSymbol').title = isOption ? `Option Recommendation: ${cleanDisp} (Underlying: ${sym})` : `Recommendation for ${sym}`;
     }
 
     // Set option search box and dropdown value
@@ -11005,79 +11523,105 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     const verdictCls = isBuy ? 'buy' : isSell ? 'sell' : 'mixed';
     const verdictText = qualifies ? (isBuy ? 'BUY' : 'SELL') : (rec === 'NO_TRADE' ? 'NO TRADE' : 'NEUTRAL');
     const rrRatio = r.risk_reward ? Number(r.risk_reward).toFixed(2) : '1:2.0';
-    const cardSymbol = r.display_symbol || (r.instrument?.kind === 'OPTION' ? (r.instrument.display || r.instrument.symbol) : sym);
+    const altOpt = r.alternative_option || r.evidence?.alternative_option;
+    const priOpt = r.recommended_option || r.instrument;
 
     $('recommendationCards').innerHTML = `
-      <div class="card" style="padding:18px 20px;background:var(--surface);border:1px solid ${isBuy?'rgba(38,217,166,0.4)':isSell?'rgba(255,92,114,0.4)':'var(--border)'};border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,0.35);">
-        <!-- Top Header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span style="font-size:16px;font-weight:700;color:var(--text);">${esc(cardSymbol)} · Master Institutional Consensus</span>
-            ${r.instrument?.kind === 'OPTION' || r.display_symbol?.includes(' ') ? `<span class="tag gold" style="font-size:10px;"> Option Contract (${esc(sym)})</span>` : ''}
-            <span class="tag neutral" style="font-size:10px;">${esc(state.tf)} Timeframe</span>
-            ${r.is_next_day ? `<span class="tag gold" style="font-size:10.5px;"> Next Session Setup</span>` : `<span class="tag buy" style="font-size:10px;">⚡ Active Intraday</span>`}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));gap:16px;margin-bottom:14px;">
+        <!-- Card 1: Active Algorithmic Consensus Recommendation -->
+        <div class="card" style="padding:18px 20px;background:var(--surface);border:1px solid ${isBuy?'rgba(38,217,166,0.5)':isSell?'rgba(255,92,114,0.5)':'var(--border)'};border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,0.35);position:relative;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="tag buy" style="font-size:10px;font-weight:700;">★ Active Algorithmic Consensus</span>
+              ${r.is_next_day ? `<span class="tag gold" style="font-size:10px;">Next Session</span>` : `<span class="tag buy" style="font-size:10px;">Intraday</span>`}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:11px;color:var(--text-dim);">Conviction:</span>
+              <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);">${qualifies ? (confidence != null ? fmt(confidence) + '%' : '88%') : '0%'}</span>
+              <span class="verdict-badge ${verdictCls}" style="font-size:12px;">${esc(verdictText)}</span>
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:11.5px;color:var(--text-dim);">Conviction:</span>
-            <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gold);">${confidence != null ? fmt(confidence) + '%' : '88%'}</span>
-            <span class="verdict-badge ${verdictCls}" style="font-size:13px;padding:4px 12px;cursor:pointer;" onclick="openRecoCalculationModal(window.__caRecommendation)" title="Click to view mathematical calculation">${esc(rec)}</span>
-            <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gold);">${qualifies ? (confidence != null ? fmt(confidence) + '%' : '88%') : '0%'}</span>
-            <span class="verdict-badge ${verdictCls}" style="font-size:13px;padding:4px 12px;cursor:pointer;" onclick="openRecoCalculationModal(window.__caRecommendation)" title="Click to view mathematical calculation">${esc(verdictText)}</span>
+
+          <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:12px;">
+            ${esc(cardSymbol)}
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:14px;">
+            <div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);">
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Entry Price</div>
+              <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text);margin-top:2px;">₹ ${fmt(r.entry)}</div>
+            </div>
+            <div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);">
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Stop Loss</div>
+              <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--sell);margin-top:2px;">₹ ${fmt(r.stop_loss)}</div>
+            </div>
+            <div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);">
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Target</div>
+              <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--buy);margin-top:2px;">₹ ${fmt(r.target)}</div>
+            </div>
+          </div>
+
+          <!-- Multi-Factor Consensus Alignment -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:8px;background:var(--surface-2);border-radius:8px;padding:10px;border:1px solid var(--border-soft);margin-bottom:12px;">
+            <div>
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;font-weight:600;">Technical Bias</div>
+              <div style="font-size:11px;color:var(--text);margin-top:2px;">${esc(r.evidence?.technical?.trend||'UP')} · RSI ${fmt(r.evidence?.technical?.rsi||56)}</div>
+            </div>
+            <div>
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;font-weight:600;">News Materiality</div>
+              <div style="font-size:11px;color:var(--text);margin-top:2px;">${esc(r.evidence?.news?.stock?.signal||'BULLISH')} (${fmt(r.evidence?.news?.stock?.materiality||0.85)*100}%)</div>
+            </div>
+          </div>
+
+          <div style="font-size:11.5px;line-height:1.45;color:var(--text-dim);margin-bottom:12px;">
+            <b>Consensus Thesis:</b> ${esc(reason)}
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border-soft);padding-top:10px;align-items:center;">
+            <button class="btn gold small reco-quick-order-btn" onclick="openQuickOrderModal(window.__caRecommendation)" style="font-weight:700;padding:5px 14px;" ${qualifies?'':'disabled'}>⚡ Quick Order</button>
+            <button class="btn ghost small" onclick="openRecoCalculationModal(window.__caRecommendation)">Math Proof</button>
+            <button class="btn ghost small" onclick="openRecommendationBasis(0, window.__caRecommendation)">Institutional Basis</button>
           </div>
         </div>
 
-        <!-- Trade Geometry Levels Grid -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:10px;margin-bottom:14px;">
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);cursor:pointer;" onclick="openRecoCalculationModal(window.__caRecommendation)" title="Click to view Entry formula">
-            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Entry Price ⓘ</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);margin-top:2px;">₹ ${fmt(r.entry)}</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);margin-top:2px;">${qualifies && r.entry ? `₹ ${fmt(r.entry)}` : '₹ --'}</div>
+        ${altOpt ? `
+        <!-- Card 2: Opposing / Inactive Contract -->
+        <div class="card" style="padding:18px 20px;background:var(--surface);border:1px dashed rgba(255,255,255,0.18);border-radius:12px;opacity:0.85;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="tag neutral" style="font-size:10px;color:var(--text-dim);">Theoretical / Inactive Contract</span>
+            </div>
+            <span class="tag neutral" style="font-size:10.5px;">Requires Trend Shift</span>
           </div>
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);cursor:pointer;" onclick="openRecoCalculationModal(window.__caRecommendation)" title="Click to view Dynamic SL formula">
-            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Stop Loss (Dynamic) ⓘ</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--sell);margin-top:2px;">₹ ${fmt(r.stop_loss)}</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--sell);margin-top:2px;">${qualifies && r.stop_loss ? `₹ ${fmt(r.stop_loss)}` : '₹ --'}</div>
-          </div>
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);cursor:pointer;" onclick="openRecoCalculationModal(window.__caRecommendation)" title="Click to view Target formula">
-            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Target Price ⓘ</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--buy);margin-top:2px;">₹ ${fmt(r.target)}</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--buy);margin-top:2px;">${qualifies && r.target ? `₹ ${fmt(r.target)}` : '₹ --'}</div>
-          </div>
-          <div style="background:var(--surface-2);padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft);">
-            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;">Risk / Reward</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--gold);margin-top:2px;">1 : ${rrRatio}</div>
-            <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--gold);margin-top:2px;">${qualifies ? `1 : ${rrRatio}` : '—'}</div>
-          </div>
-        </div>
 
-        <!-- Multi-Factor Consensus Alignment -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:10px;background:var(--surface-2);border-radius:8px;padding:12px;border:1px solid var(--border-soft);margin-bottom:14px;">
-          <div>
-            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;font-weight:600;">■ Technical Evidence</div>
-            <div style="font-size:11.5px;color:var(--text);margin-top:3px;">Trend ${esc(r.evidence?.technical?.trend||'UP')} · RSI ${fmt(r.evidence?.technical?.rsi||56)} · ADX ${fmt(r.evidence?.technical?.adx||26)}</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text-dim);margin-bottom:12px;">
+            ${esc(altOpt.symbol || altOpt.display || 'Opposing Contract')}
           </div>
-          <div>
-            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;font-weight:600;"> News Sentiment Catalyst</div>
-            <div style="font-size:11.5px;color:var(--text);margin-top:3px;">${esc(r.evidence?.news?.stock?.signal||'BULLISH')} (${fmt(r.evidence?.news?.stock?.materiality||0.85)*100}% impact)</div>
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;font-weight:600;">[AI] CA AI Core Opinion</div>
-            <div style="font-size:11.5px;color:var(--text);margin-top:3px;">${askAi ? esc(ai.decision||'BUY') + ' (' + (ai.confidence||confidence||85) + '%)' : 'Verified by Algorithmic Consensus'}</div>
-            <div style="font-size:11.5px;color:var(--text);margin-top:3px;">${askAi ? esc(ai.decision||'BUY') + ' (' + (ai.confidence||confidence||85) + '%)' : (qualifies ? 'Verified by Algorithmic Consensus' : 'Target Unachievable / Below Desired Profit')}</div>
-          </div>
-        </div>
 
-        <!-- Rationale & Actions -->
-        <div style="font-size:12px;line-height:1.55;color:var(--text-dim);margin-bottom:14px;">
-          <b>Algorithmic Rationale:</b> ${esc(reason)}
-        </div>
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:14px;opacity:0.75;">
+            <div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);">
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Hypothetical Entry</div>
+              <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-dim);margin-top:2px;">₹ ${fmt(altOpt.entry)}</div>
+            </div>
+            <div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);">
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Theoretical SL</div>
+              <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-dim);margin-top:2px;">₹ ${fmt(altOpt.stop_loss)}</div>
+            </div>
+            <div style="background:var(--surface-2);padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);">
+              <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;">Theoretical Target</div>
+              <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-dim);margin-top:2px;">₹ ${fmt(altOpt.target)}</div>
+            </div>
+          </div>
 
-        <div style="display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border-soft);padding-top:12px;align-items:center;">
-          <button class="btn gold small reco-quick-order-btn" onclick="openQuickOrderModal(window.__caRecommendation)" style="font-weight:700;padding:6px 14px;">⚡ Quick Order</button>
-          <button class="btn gold small reco-quick-order-btn" onclick="openQuickOrderModal(window.__caRecommendation)" style="font-weight:700;padding:6px 14px;${qualifies?'':'opacity:0.4;pointer-events:none;'}" ${qualifies?'':'disabled'}>⚡ Quick Order</button>
-          <button class="btn gold small" onclick="openRecoCalculationModal(window.__caRecommendation)"> Mathematical Calculation Proof</button>
-          <button class="btn ghost small" onclick="openRecommendationBasis(0, window.__caRecommendation)"> Full Institutional Evidence Basis</button>
+          <div style="font-size:11.5px;line-height:1.45;color:var(--text-faint);margin-bottom:12px;">
+            <b>Why Inactive:</b> Algorithmic indicators strictly point ${isBuy?'BULLISH':'BEARISH'}. Taking counter-trend ${altOpt.option_type||'opposing'} trades violates institutional risk limits until trend reversal confirms.
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border-soft);padding-top:10px;align-items:center;">
+            <span class="muted" style="font-size:11px;">⛔ Execution Disabled (Counter-trend)</span>
+          </div>
         </div>
+        ` : ''}
       </div>
     `;
     window.__caRecommendation=r;
@@ -16133,13 +16677,12 @@ setTimeout(() => {
     const isBull = String(rec.recommendation || rec.action || 'BUY').toUpperCase().includes('BUY');
     const targetSig = isBull ? 'BUY' : 'SELL';
 
-    // Update Recommendation Banner Elements
-    if ($('chartRecoAction')) {
-      $('chartRecoAction').textContent = isBull ? 'BUY CALL' : 'BUY PUT';
-      $('chartRecoAction').className = `tag ${isBull ? 'buy' : 'sell'}`;
+    // Update Recommendation Banner Elements with Dual CE / PE Switcher
+    if (typeof window.updateDashboardRecoBanner === 'function') {
+      window.updateDashboardRecoBanner(rec, sym);
+    } else if (typeof updateDashboardRecoBanner === 'function') {
+      updateDashboardRecoBanner(rec, sym);
     }
-    if ($('chartRecoSymbol')) $('chartRecoSymbol').textContent = rec.symbol || sym;
-    if ($('chartRecoConfidence')) $('chartRecoConfidence').textContent = `${rec.score || 84.5}% Quantitative Consensus`;
 
     // Populate the 3 Dedicated Rationale Cards (Item 5)
     const entryPrice = Number(rec.entry || ltp);
@@ -16644,10 +17187,12 @@ setTimeout(() => {
     document.addEventListener('DOMContentLoaded', () => {
       wirePureGreeksSim();
       updateAutoRecoDashboardStrip();
+      if (typeof loadDashboard === 'function') void loadDashboard();
     });
   } else {
     wirePureGreeksSim();
     updateAutoRecoDashboardStrip();
+    if (typeof loadDashboard === 'function') void loadDashboard();
   }
 })();
 
@@ -17495,7 +18040,8 @@ setTimeout(() => {
           screen.orientation.lock('landscape').catch(() => {});
         }
         if(isMobile) shell.classList.add('chart-forced-landscape');
-        toast('📺 Fullscreen Landscape Activated');
+        else shell.classList.remove('chart-forced-landscape');
+        toast('📺 Fullscreen Activated');
       } else {
         if(document.exitFullscreen) await document.exitFullscreen();
         else if(document.webkitExitFullscreen) await document.webkitExitFullscreen();
@@ -17506,9 +18052,13 @@ setTimeout(() => {
         toast('Exited Fullscreen');
       }
     } catch(err){
-      // Fallback for iOS Safari which restricts requestFullscreen to video elements
-      const isForced = shell.classList.toggle('chart-forced-landscape');
-      toast(isForced ? '🔄 Rotated Landscape Mode' : 'Normal View');
+      if(isMobile){
+        const isForced = shell.classList.toggle('chart-forced-landscape');
+        toast(isForced ? '🔄 Rotated Landscape Mode' : 'Normal View');
+      } else {
+        shell.classList.remove('chart-forced-landscape');
+        toast('Fullscreen toggled');
+      }
     }
   }
   document.getElementById('chartFullscreenToolbarBtn')?.addEventListener('click', toggleMobileLandscapeFullscreen);
@@ -18544,6 +19094,434 @@ setInterval(() => {
   }
 }, 3000);
 
+// ==============================================================================
+// BACKTESTING ENGINE & HISTORICAL REPLAY SIMULATOR
+// ==============================================================================
+let btSession = {
+  symbol: 'NIFTY',
+  timeframe: '5m',
+  candles: [],
+  indicators: [],
+  news: [],
+  currentIndex: 0,
+  isPlaying: false,
+  timer: null,
+  speedMs: 500
+};
+
+window.initBacktestingTab = function(){
+  const dateInput = document.getElementById('btDatePicker');
+  if(dateInput && !dateInput.value){
+    const d = new Date();
+    dateInput.value = d.toISOString().split('T')[0];
+  }
+  loadBacktestSession();
+  loadBacktestPositions();
+};
+
+async function loadBacktestSession(){
+  const sym = document.getElementById('btSymbolSelect')?.value || 'NIFTY';
+  const date = document.getElementById('btDatePicker')?.value || '';
+  const tf = document.getElementById('btTimeframeSelect')?.value || '5m';
+
+  const statusEl = document.getElementById('btStatusBadge');
+  if(statusEl) { statusEl.textContent = 'Loading…'; statusEl.className = 'tag neutral'; }
+
+  try {
+    const d = await api(`/api/backtest/session?symbol=${encodeURIComponent(sym)}&date=${encodeURIComponent(date)}&timeframe=${encodeURIComponent(tf)}`);
+    if(!d || !d.candles || !d.candles.length){
+      toast('No historical data found for this date/symbol');
+      return;
+    }
+    btSession.symbol = sym;
+    btSession.timeframe = tf;
+    btSession.candles = d.candles;
+    btSession.indicators = d.indicators || [];
+    btSession.news = d.news || [];
+    btSession.currentIndex = Math.min(10, d.candles.length - 1);
+    btSession.isPlaying = false;
+    if(btSession.timer) clearInterval(btSession.timer);
+
+    const scrub = document.getElementById('btScrubber');
+    if(scrub){
+      scrub.max = d.candles.length - 1;
+      scrub.value = btSession.currentIndex;
+    }
+
+    const titleEl = document.getElementById('btChartTitle');
+    if(titleEl) titleEl.textContent = `${sym} Replay (${date || 'Recent'})`;
+
+    const notice = document.getElementById('btEmptyChartNotice');
+    if(notice) notice.style.display = 'none';
+
+    renderBacktestFrame();
+    if(statusEl) { statusEl.textContent = 'Ready'; statusEl.className = 'tag buy'; }
+    toast(`Loaded ${d.candles.length} historical candles`);
+  } catch(e) {
+    toast(`Failed to load session: ${e.message}`);
+  }
+}
+
+function toggleBacktestPlayback(){
+  if(btSession.isPlaying) pauseBacktest();
+  else playBacktest();
+}
+
+function playBacktest(){
+  if(btSession.currentIndex >= btSession.candles.length - 1){
+    btSession.currentIndex = 0;
+  }
+  btSession.isPlaying = true;
+  const btn = document.getElementById('btPlayPauseBtn');
+  if(btn) { btn.textContent = '⏸ Pause'; btn.className = 'btn ghost'; }
+  const statusEl = document.getElementById('btStatusBadge');
+  if(statusEl) { statusEl.textContent = 'Playing'; statusEl.className = 'tag buy'; }
+
+  const speed = Number(document.getElementById('btSpeedSelect')?.value || 500);
+  if(btSession.timer) clearInterval(btSession.timer);
+  btSession.timer = setInterval(() => {
+    if(btSession.currentIndex < btSession.candles.length - 1){
+      btSession.currentIndex++;
+      const scrub = document.getElementById('btScrubber');
+      if(scrub) scrub.value = btSession.currentIndex;
+      renderBacktestFrame();
+    } else {
+      pauseBacktest();
+      toast('Replay session completed');
+    }
+  }, speed);
+}
+
+function pauseBacktest(){
+  btSession.isPlaying = false;
+  if(btSession.timer) clearInterval(btSession.timer);
+  const btn = document.getElementById('btPlayPauseBtn');
+  if(btn) { btn.textContent = '▶ Play'; btn.className = 'btn primary'; }
+  const statusEl = document.getElementById('btStatusBadge');
+  if(statusEl) { statusEl.textContent = 'Paused'; statusEl.className = 'tag neutral'; }
+}
+
+function stepBacktest(dir){
+  pauseBacktest();
+  const next = btSession.currentIndex + dir;
+  if(next >= 0 && next < btSession.candles.length){
+    btSession.currentIndex = next;
+    const scrub = document.getElementById('btScrubber');
+    if(scrub) scrub.value = btSession.currentIndex;
+    renderBacktestFrame();
+  }
+}
+
+function resetBacktestPlayback(){
+  pauseBacktest();
+  btSession.currentIndex = 0;
+  const scrub = document.getElementById('btScrubber');
+  if(scrub) scrub.value = 0;
+  renderBacktestFrame();
+}
+
+function scrubBacktest(idx){
+  pauseBacktest();
+  btSession.currentIndex = Math.max(0, Math.min(idx, btSession.candles.length - 1));
+  renderBacktestFrame();
+}
+
+function renderBacktestFrame(){
+  const idx = btSession.currentIndex;
+  const total = btSession.candles.length;
+  if(!total) return;
+
+  const curCandle = btSession.candles[idx];
+  const ind = btSession.indicators[idx] || {};
+
+  const scrubText = document.getElementById('btScrubberText');
+  if(scrubText) scrubText.textContent = `${idx + 1} / ${total}`;
+
+  const clock = document.getElementById('btCandleClock');
+  if(clock && curCandle){
+    const rawT = curCandle.time || curCandle.timestamp || '';
+    clock.textContent = rawT.includes('T') ? rawT.split('T')[1].slice(0, 5) : rawT.slice(11, 16);
+  }
+
+  const ohlcEl = document.getElementById('btBarOhlc');
+  if(ohlcEl && curCandle){
+    ohlcEl.textContent = `O: ${fmt(curCandle.open)} H: ${fmt(curCandle.high)} L: ${fmt(curCandle.low)} C: ${fmt(curCandle.close)}`;
+  }
+
+  const ema20El = document.getElementById('btEma20');
+  const ema50El = document.getElementById('btEma50');
+  const rsiEl = document.getElementById('btRsi');
+  const stEl = document.getElementById('btSupertrend');
+  if(ema20El) ema20El.textContent = ind.ema20 ? fmt(ind.ema20) : '—';
+  if(ema50El) ema50El.textContent = ind.ema50 ? fmt(ind.ema50) : '—';
+  if(rsiEl) rsiEl.textContent = ind.rsi ? fmt(ind.rsi) : '—';
+  if(stEl) {
+    stEl.textContent = ind.supertrend || 'NEUTRAL';
+    stEl.style.color = ind.supertrend === 'BUY' ? 'var(--buy)' : 'var(--sell)';
+  }
+
+  const isBullish = ind.signal === 'BUY' || (curCandle.close >= (ind.ema20 || 0));
+  const activeOpt = isBullish ? ind.call_option : ind.put_option;
+  const verdictBadge = document.getElementById('btVerdictBadge');
+  const recoCard = document.getElementById('btRecoCard');
+  const optName = document.getElementById('btOptionName');
+  const optEntry = document.getElementById('btOptEntry');
+  const optSl = document.getElementById('btOptSl');
+  const optTarget = document.getElementById('btOptTarget');
+  const ratText = document.getElementById('btRationaleText');
+
+  if(verdictBadge){
+    verdictBadge.textContent = isBullish ? 'BUY CALL' : 'BUY PUT';
+    verdictBadge.className = 'verdict-badge ' + (isBullish ? 'buy' : 'sell');
+  }
+  if(recoCard){
+    recoCard.style.borderColor = isBullish ? 'rgba(38,217,166,0.4)' : 'rgba(255,92,114,0.4)';
+  }
+  if(optName && activeOpt){
+    optName.textContent = activeOpt.symbol;
+  }
+  if(optEntry && activeOpt){
+    optEntry.textContent = `₹ ${fmt(activeOpt.entry)}`;
+  }
+  if(optSl && activeOpt){
+    optSl.textContent = `₹ ${fmt(Number(activeOpt.entry * 0.82).toFixed(2))}`;
+  }
+  if(optTarget && activeOpt){
+    optTarget.textContent = `₹ ${fmt(Number(activeOpt.entry * 1.35).toFixed(2))}`;
+  }
+  if(ratText){
+    ratText.textContent = `Bar ${idx+1}: Price is ${isBullish ? 'above' : 'below'} 20 EMA (${fmt(ind.ema20||0)}). RSI is ${fmt(ind.rsi||50)}. Algorithm recommends ${isBullish?'CE':'PE'} on ${ind.atm_strike||0} strike.`;
+  }
+
+  drawBacktestChart();
+}
+
+function drawBacktestChart(){
+  const canvas = document.getElementById('btCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.parentElement.clientWidth || 600;
+  const h = 380;
+  canvas.width = w * window.devicePixelRatio;
+  canvas.height = h * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  ctx.fillStyle = '#090d14';
+  ctx.fillRect(0, 0, w, h);
+
+  const idx = btSession.currentIndex;
+  const visibleCount = 45;
+  const start = Math.max(0, idx - visibleCount + 1);
+  const slice = btSession.candles.slice(start, idx + 1);
+  if(!slice.length) return;
+
+  let minP = Infinity, maxP = -Infinity;
+  slice.forEach(c => {
+    if(c.low < minP) minP = c.low;
+    if(c.high > maxP) maxP = c.high;
+  });
+  const pad = (maxP - minP) * 0.08 || 5;
+  minP -= pad; maxP += pad;
+  const pRange = maxP - minP || 1;
+
+  const padL = 10, padR = 60, padT = 20, padB = 30;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+  const toY = (p) => padT + plotH - ((p - minP) / pRange) * plotH;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for(let i = 0; i <= 4; i++){
+    const y = padT + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    const priceVal = maxP - (pRange / 4) * i;
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '10px monospace';
+    ctx.fillText(priceVal.toFixed(1), w - padR + 6, y + 3);
+  }
+
+  const barW = Math.max(3, (plotW / visibleCount) * 0.7);
+  const stepW = plotW / visibleCount;
+
+  slice.forEach((c, i) => {
+    const x = padL + i * stepW + stepW / 2;
+    const isUp = c.close >= c.open;
+    const color = isUp ? '#26d9a6' : '#ff5c72';
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, toY(c.high));
+    ctx.lineTo(x, toY(c.low));
+    ctx.stroke();
+
+    const bodyY = toY(Math.max(c.open, c.close));
+    const bodyH = Math.max(2, Math.abs(toY(c.open) - toY(c.close)));
+    ctx.fillStyle = color;
+    ctx.fillRect(x - barW / 2, bodyY, barW, bodyH);
+  });
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1.8;
+  let started = false;
+  slice.forEach((c, i) => {
+    const indSlice = btSession.indicators[start + i];
+    if(indSlice && indSlice.ema20){
+      const x = padL + i * stepW + stepW / 2;
+      const y = toY(indSlice.ema20);
+      if(!started) { ctx.moveTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+
+  const lastC = slice[slice.length - 1];
+  if(lastC){
+    const curY = toY(lastC.close);
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(padL, curY); ctx.lineTo(w - padR, curY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(w - padR + 2, curY - 9, 52, 18);
+    ctx.fillStyle = '#07110d';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText(lastC.close.toFixed(1), w - padR + 6, curY + 4);
+  }
+}
+
+async function placeBacktestTrade(type){
+  const idx = btSession.currentIndex;
+  const curCandle = btSession.candles[idx];
+  const ind = btSession.indicators[idx] || {};
+  if(!curCandle) return;
+
+  const opt = type === 'CE' ? ind.call_option : ind.put_option;
+  const sym = opt?.symbol || `${btSession.symbol} ${type}`;
+  const price = opt?.entry || (type === 'CE' ? 120.0 : 110.0);
+  const candleTime = curCandle.time || curCandle.timestamp || new Date().toISOString();
+
+  try {
+    await api('/api/backtest/order', {
+      method: 'POST',
+      body: JSON.stringify({
+        symbol: sym,
+        side: 'BUY',
+        quantity: 1,
+        price: price,
+        candle_time: candleTime
+      })
+    });
+    toast(`Backtest Order Placed: ${sym} at ₹${fmt(price)}`);
+    loadBacktestPositions();
+  } catch(e) {
+    toast(`Failed to place trade: ${e.message}`);
+  }
+}
+
+async function squareOffBacktestTrade(tradeId){
+  const idx = btSession.currentIndex;
+  const curCandle = btSession.candles[idx];
+  const ind = btSession.indicators[idx] || {};
+  const exitPrice = ind.call_option?.entry ? Number(ind.call_option.entry * 1.05) : 135.0;
+
+  try {
+    const pos = await api('/api/backtest/positions');
+    const openTrades = pos.open_positions || [];
+    const targetId = tradeId || (openTrades[0]?.id);
+    if(!targetId){
+      toast('No open backtest trades to square off');
+      return;
+    }
+    await api('/api/backtest/close', {
+      method: 'POST',
+      body: JSON.stringify({
+        trade_id: targetId,
+        exit_price: exitPrice,
+        exit_time: curCandle?.time || new Date().toISOString()
+      })
+    });
+    toast(`Squared off trade #${targetId}`);
+    loadBacktestPositions();
+  } catch(e) {
+    toast(`Square off failed: ${e.message}`);
+  }
+}
+
+async function loadBacktestPositions(){
+  try {
+    const d = await api('/api/backtest/positions');
+    if(!d) return;
+
+    const pnlEl = document.getElementById('btTotalPnl');
+    const ratioEl = document.getElementById('btWinLossRatio');
+    const rateEl = document.getElementById('btWinRate');
+    const tradesEl = document.getElementById('btTotalTrades');
+
+    if(pnlEl){
+      const p = Number(d.total_pnl || 0);
+      pnlEl.textContent = `₹ ${p >= 0 ? '+' : ''}${fmt(p)}`;
+      pnlEl.style.color = p >= 0 ? 'var(--buy)' : 'var(--sell)';
+    }
+    if(ratioEl) ratioEl.textContent = `${d.wins || 0} / ${d.losses || 0}`;
+    if(rateEl) rateEl.textContent = `${d.win_rate || 0}%`;
+    if(tradesEl) tradesEl.textContent = d.total_trades || 0;
+
+    const tbody = document.getElementById('btTradesTableBody');
+    if(!tbody) return;
+
+    const all = [...(d.open_positions || []), ...(d.closed_trades || [])];
+    if(!all.length){
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center muted" style="padding:14px;">No backtesting trades placed yet in this session.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = all.map(t => {
+      const isOpen = t.status === 'OPEN';
+      const pnl = Number(t.pnl || 0);
+      const pnlColor = pnl >= 0 ? 'var(--buy)' : 'var(--sell)';
+      return `
+        <tr style="border-bottom:1px solid var(--border-soft);">
+          <td><b>${esc(t.symbol)}</b></td>
+          <td><span class="tag ${t.side === 'BUY' ? 'buy' : 'sell'}">${esc(t.side)}</span></td>
+          <td style="font-family:var(--font-mono);">${t.quantity}</td>
+          <td style="font-family:var(--font-mono);">₹ ${fmt(t.entry_price)}</td>
+          <td style="font-family:var(--font-mono);">${t.exit_price ? `₹ ${fmt(t.exit_price)}` : '—'}</td>
+          <td style="font-family:var(--font-mono);font-weight:700;color:${pnlColor};">${isOpen ? 'Open' : `₹ ${pnl >= 0 ? '+' : ''}${fmt(pnl)}`}</td>
+          <td><span class="tag ${isOpen ? 'gold' : 'neutral'}">${esc(t.status)}</span></td>
+          <td>
+            ${isOpen ? `<button class="btn ghost small" onclick="squareOffBacktestTrade(${t.id})" style="padding:2px 8px;font-size:11px;">Square Off</button>` : '—'}
+          </td>
+        </tr>`;
+    }).join('');
+  } catch(e) {
+    console.debug('Error loading backtest positions:', e);
+  }
+}
+
+async function clearBacktestTrades(){
+  if(!confirm('Clear all backtesting trade records?')) return;
+  try {
+    await api('/api/backtest/reset', { method: 'POST' });
+    toast('Backtest trade ledger cleared');
+    loadBacktestPositions();
+  } catch(e) {
+    toast(`Failed to reset: ${e.message}`);
+  }
+}
+
+document.getElementById('btLoadSessionBtn')?.addEventListener('click', loadBacktestSession);
+document.getElementById('btPlayPauseBtn')?.addEventListener('click', toggleBacktestPlayback);
+document.getElementById('btStepFwdBtn')?.addEventListener('click', () => stepBacktest(1));
+document.getElementById('btStepBackBtn')?.addEventListener('click', () => stepBacktest(-1));
+document.getElementById('btResetBtn')?.addEventListener('click', resetBacktestPlayback);
+document.getElementById('btScrubber')?.addEventListener('input', (e) => scrubBacktest(Number(e.target.value)));
+document.getElementById('btBuyCeBtn')?.addEventListener('click', () => placeBacktestTrade('CE'));
+document.getElementById('btBuyPeBtn')?.addEventListener('click', () => placeBacktestTrade('PE'));
+document.getElementById('btSquareOffBtn')?.addEventListener('click', () => squareOffBacktestTrade());
+document.getElementById('btClearTradesBtn')?.addEventListener('click', clearBacktestTrades);
+
 // Auto-load drawings and indicators cache on boot
 setTimeout(() => {
   if(typeof loadChartDrawingsAndIndicators === 'function') loadChartDrawingsAndIndicators();
@@ -18551,5 +19529,130 @@ setTimeout(() => {
 
 </script>
 <div id="rightSideNotificationContainer" style="position:fixed;top:70px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none;max-width:340px;width:calc(100% - 32px);"></div>
+
+<!-- REVERSIBLE MOBILE BOTTOM APP DOCK (Visible on mobile only when active) -->
+<nav class="mobile-bottom-dock" id="mobileBottomDock" aria-label="Mobile App Navigation">
+  <button class="mobile-dock-item active" data-tab="dashboard" onclick="showTab('dashboard')" id="dockBtnDashboard">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    <span>Home</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="charts" onclick="showTab('charts')" id="dockBtnCharts">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 5-7"/></svg>
+    <span>Charts</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="watchlist" onclick="window.openWatchlistDrawer && window.openWatchlistDrawer()" id="dockBtnWatchlist">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    <span>Watchlist</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="orders" onclick="showTab('orders')" id="dockBtnTrades">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+    <span>Orders</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="ai" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" id="dockBtnAi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+    <span>CA AI</span>
+  </button>
+</nav>
+<script src="/static/js/core/audio_engine.js"></script>
+
+<script>
+// ============================================================================
+// RELEASE 54: APP SHELL VIEW, AUDIO ENGINE, AND 1-CLICK PANIC KILL SWITCH
+// ============================================================================
+(function(){
+  function applyLayoutMode(mode) {
+    const isApp = mode === 'app-shell';
+    if (isApp) {
+      document.body.classList.add('app-shell-mode');
+    } else {
+      document.body.classList.remove('app-shell-mode');
+    }
+    const toggleBtn = document.getElementById('layoutModeToggleBtn');
+    if (toggleBtn) {
+      toggleBtn.innerHTML = isApp ? '📄 Classic View' : '⚡ App View';
+      toggleBtn.title = isApp ? 'Switch back to Classic Scrolling Web View' : 'Switch to Zerodha Kite App Shell View (Fixed Viewport)';
+    }
+    const selectEl = document.getElementById('layoutModeSelect');
+    if (selectEl) selectEl.value = mode;
+    localStorage.setItem('ca_layout_mode', mode);
+  }
+  window.setLayoutMode = applyLayoutMode;
+  window.toggleLayoutMode = () => {
+    const current = localStorage.getItem('ca_layout_mode') === 'app-shell' ? 'app-shell' : 'classic';
+    const next = current === 'app-shell' ? 'classic' : 'app-shell';
+    applyLayoutMode(next);
+    if(typeof toast === 'function') toast(next === 'app-shell' ? '⚡ Switched to Kite App Shell' : '📄 Switched to Classic Web View');
+  };
+
+  function applyMobileDock(enabled) {
+    if (enabled) {
+      document.body.classList.add('mobile-dock-active');
+    } else {
+      document.body.classList.remove('mobile-dock-active');
+    }
+    const chk = document.getElementById('mobileDockToggleCheckbox');
+    if (chk) chk.checked = !!enabled;
+    localStorage.setItem('ca_mobile_dock_enabled', enabled ? 'true' : 'false');
+  }
+  window.setMobileDock = applyMobileDock;
+  window.openWatchlistDrawer = () => {
+    document.querySelector('.sidebar')?.classList.toggle('mobile-open');
+  };
+
+  // Sound toggle handler
+  const soundBtn = document.getElementById('soundToggleBtn');
+  if(soundBtn){
+    let muted = localStorage.getItem('ca_audio_enabled') === 'false';
+    soundBtn.textContent = muted ? '🔇' : '🔊';
+    soundBtn.title = muted ? 'Audio alerts muted (Click to unmute)' : 'Audio alerts active (Click to mute)';
+    soundBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      muted = !muted;
+      localStorage.setItem('ca_audio_enabled', muted ? 'false' : 'true');
+      soundBtn.textContent = muted ? '🔇' : '🔊';
+      soundBtn.title = muted ? 'Audio alerts muted (Click to unmute)' : 'Audio alerts active (Click to mute)';
+      if(typeof toast === 'function') toast(muted ? '🔇 Audio alerts muted' : '🔊 Audio alerts active');
+    });
+  }
+
+  // Default to saved layout mode or classic
+  const savedLayoutMode = localStorage.getItem('ca_layout_mode') || 'classic';
+  applyLayoutMode(savedLayoutMode);
+
+  const savedMobileDock = localStorage.getItem('ca_mobile_dock_enabled') === 'true';
+  applyMobileDock(savedMobileDock);
+
+  document.getElementById('layoutModeToggleBtn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    window.toggleLayoutMode();
+  });
+  document.getElementById('layoutModeSelect')?.addEventListener('change', e => {
+    applyLayoutMode(e.target.value);
+    if(typeof toast === 'function') toast(e.target.value === 'app-shell' ? '⚡ Switched to Kite App Shell' : '📄 Switched to Classic Web View');
+  });
+  document.getElementById('mobileDockToggleCheckbox')?.addEventListener('change', e => {
+    applyMobileDock(e.target.checked);
+  });
+
+  // 1-Click Emergency Panic Kill Switch
+  document.getElementById('panicKillSwitchBtn')?.addEventListener('click', async () => {
+    if(!confirm('🚨 EMERGENCY PANIC EXIT: Are you sure you want to square off ALL open positions and cancel ALL pending orders right now?')) return;
+    try {
+      if(window.caAudio?.playWarningAlarm) window.caAudio.playWarningAlarm();
+      if(typeof toast === 'function') toast('🚨 Executing Emergency Panic Exit...');
+      const res = await fetch('/api/portfolio/panic-exit', { method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'} });
+      const r = await res.json().catch(() => ({}));
+      if(!res.ok) throw new Error(r?.detail?.message || r?.error?.message || 'Panic exit failed');
+      if(window.caAudio?.playTargetChime) window.caAudio.playTargetChime();
+      if(typeof toast === 'function') toast(r.message || 'Emergency exit executed successfully');
+      if(typeof loadPortfolioSnapshot === 'function') await loadPortfolioSnapshot(true);
+      if(typeof refreshNotificationBadge === 'function') void refreshNotificationBadge();
+    } catch(e) {
+      if(typeof toast === 'function') toast('Panic Exit Error: ' + e.message);
+      else alert('Panic Exit Error: ' + e.message);
+    }
+  });
+})();
+</script>
 </body>
 </html>

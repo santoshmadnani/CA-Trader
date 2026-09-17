@@ -12,6 +12,9 @@ COPY terminal.html .
 COPY CA_Trader_Login.html .
 COPY fitness.html .
 COPY terminal_selector.html .
+COPY ca_trader_guide.html .
+COPY static/ static/
+COPY backend/ backend/
 
 RUN mkdir -p /app/data
 

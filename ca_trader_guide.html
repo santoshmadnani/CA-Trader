@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CA Trader — Complete Architecture, Interactive Tutorial & System Knowledge Hub</title>
+  <style>
+    :root {
+      --bg: #070a10;
+      --surface: #0e1422;
+      --surface-2: #141c30;
+      --surface-3: #1a2540;
+      --border: #1f2c4a;
+      --border-accent: #2e4470;
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0, 229, 255, 0.12);
+      --buy: #10b981;
+      --buy-dim: rgba(16, 185, 129, 0.14);
+      --sell: #ef4444;
+      --sell-dim: rgba(239, 68, 68, 0.14);
+      --gold: #f59e0b;
+      --gold-dim: rgba(245, 158, 11, 0.14);
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+      --text-faint: #64748b;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: "JetBrains Mono", "SF Mono", Consolas, Menlo, monospace;
+      --radius: 10px;
+      --shadow: 0 12px 32px rgba(0,0,0,0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.55;
+      font-size: 14px;
+      overflow-x: hidden;
+    }
+
+    /* Custom animated scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-accent); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+    header {
+      background: linear-gradient(180deg, #0b111e 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-badge {
+      background: linear-gradient(135deg, var(--cyan), #3b82f6);
+      color: #000;
+      font-weight: 900;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      letter-spacing: 1px;
+    }
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-sub {
+      font-size: 11.5px;
+      color: var(--text-dim);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--surface);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+    .tab-btn.active {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.4);
+    }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+
+    .section-pane {
+      display: none;
+      animation: fadeIn 0.35s ease;
+    }
+    .section-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+    }
+    .card-title.cyan { color: var(--cyan); }
+    .card-title.gold { color: var(--gold); }
+    .card-title.buy { color: var(--buy); }
+
+    /* Branch Tree Diagram */
+    .tree-container {
+      background: #080c16;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin: 20px 0;
+      position: relative;
+    }
+    .tree-node {
+      margin-left: 28px;
+      position: relative;
+      padding: 6px 0;
+    }
+    .tree-node::before {
+      content: '';
+      position: absolute;
+      left: -18px;
+      top: 18px;
+      width: 14px;
+      height: 1px;
+      background: var(--border-accent);
+    }
+    .tree-node::after {
+      content: '';
+      position: absolute;
+      left: -18px;
+      top: -6px;
+      bottom: 18px;
+      width: 1px;
+      background: var(--border-accent);
+    }
+    .tree-node:first-child::after {
+      top: 0;
+    }
+
+    .node-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .node-pill:hover {
+      border-color: var(--cyan);
+      transform: translateX(4px);
+      box-shadow: 0 4px 12px rgba(0, 229, 255, 0.18);
+    }
+    .node-pill.root-pill {
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(59, 130, 246, 0.2));
+      border-color: var(--cyan);
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--cyan);
+    }
+    .node-pill.category-pill {
+      border-left: 4px solid var(--cyan);
+    }
+    .node-pill.data-pill {
+      border-left: 4px solid var(--gold);
+      background: #111726;
+    }
+    .node-pill.source-pill {
+      border-left: 4px solid var(--buy);
+      background: #0d1e19;
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+
+    .node-children {
+      display: block;
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+    .node-children.collapsed {
+      display: none;
+    }
+
+    .node-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tag-cyan { background: var(--cyan-dim); color: var(--cyan); }
+    .tag-gold { background: var(--gold-dim); color: var(--gold); }
+    .tag-buy { background: var(--buy-dim); color: var(--buy); }
+    .tag-sell { background: var(--sell-dim); color: var(--sell); }
+
+    /* Side-by-side details split */
+    .split-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 1024px) {
+      .split-layout { grid-template-columns: 1fr; }
+    }
+
+    .detail-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border-accent);
+      border-radius: 8px;
+      padding: 18px;
+      position: sticky;
+      top: 96px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    /* Term Glossary Grid */
+    .glossary-search-wrap {
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 16px;
+      color: var(--text);
+      font-size: 13.5px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+    }
+
+    .glossary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
+    }
+    .term-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .term-item:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+    .term-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .term-name {
+      font-weight: 700;
+      color: var(--cyan);
+      font-size: 13.5px;
+    }
+    .term-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .term-example {
+      margin-top: 8px;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.25);
+      border-left: 2px solid var(--gold);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: #e2e8f0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      margin: 12px 0;
+    }
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: var(--surface-2);
+      color: var(--text-faint);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Animated Cursor Walkthrough Simulator */
+    .sim-cursor {
+      position: fixed;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--cyan);
+      background: rgba(0, 229, 255, 0.25);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: all 0.65s cubic-bezier(0.2, 0.8, 0.2, 1);
+      box-shadow: 0 0 14px var(--cyan);
+      opacity: 0;
+    }
+    .sim-cursor.active {
+      opacity: 1;
+    }
+
+    .walkthrough-step-box {
+      border-left: 3px solid var(--cyan);
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating simulated cursor for guided animations -->
+  <div class="sim-cursor" id="simCursor"></div>
+
+  <header>
+    <div class="brand">
+      <div class="brand-badge">KNOWLEDGE HUB</div>
+      <div>
+        <div class="brand-title">CA Trader — Master Architecture &amp; User Tutorial</div>
+        <div class="brand-sub">Comprehensive Data Lineage · Interactive Branch Diagram · Glossary · Live Diagnostics</div>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-branches')">🌳 Interactive Branch Tree</button>
+      <button class="tab-btn" onclick="switchTab('tab-tutorial')">📖 Comprehensive User Tutorial</button>
+      <button class="tab-btn" onclick="switchTab('tab-glossary')">📚 Trading &amp; Greeks Dictionary</button>
+      <button class="tab-btn" onclick="switchTab('tab-data-sources')">🛰️ API &amp; Data Feeds Matrix</button>
+      <button class="tab-btn" onclick="switchTab('tab-architecture')">🏛️ Database &amp; Code Architecture</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 1: INTERACTIVE BRANCH-WISE DATA LINEAGE DIAGRAM -->
+    <!-- ========================================================================= -->
+    <section id="tab-branches" class="section-pane active">
+      <div class="card">
+        <div class="card-title cyan">
+          <span>🌳 Dynamic Branch Diagram: Multi-Factor Decision Pipeline</span>
+          <span class="node-tag tag-cyan">Interactive · Click Nodes to Expand</span>
+        </div>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">
+          Click any branch below to drill down into the sub-factors, real-time data elements, upstream API data sources, and financial definitions governing each institutional recommendation.
+        </p>
+
+        <div class="split-layout">
+          <!-- Tree Column -->
+          <div class="tree-container" id="branchTree">
+            <!-- Root -->
+            <div class="tree-node" style="margin-left:0;">
+              <div class="node-pill root-pill" onclick="showNodeDetail('root')">
+                <span>🎯 CA Trader AI Overall Recommendation</span>
+                <span class="node-tag tag-cyan">Master Engine</span>
+              </div>
+
+              <!-- Level 1: Core Pillars -->
+              <div class="node-children">
+
+                <!-- Pillar 1: Technical Indicators -->
+                <div class="tree-node">
+                  <div class="node-pill category-pill" onclick="toggleNode(this, 'technicals')">
+                    <span>📈 1. Technical Analysis Suite</span>
+                    <span class="node-tag tag-cyan">50+ Indicators</span>
+                  </div>
+                  <div class="node-children">
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('ema')">
+                        <span>EMA Trend Confluence (20 / 50 / 200 EMA)</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('upstox_candles')">
+                            <span>Source: Upstox Historical V2 REST + Live WebSocket V3</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('supertrend')">
+                        <span>Supertrend (10, 3) &amp; Parabolic SAR</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('upstox_candles')">
+                            <span>Source: Upstox V2 REST Candles Engine</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('rsi_macd')">
+                        <span>Momentum Oscillators: RSI(14), MACD(12,26,9), Stochastics</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('upstox_candles')">
+                            <span>Source: Quantitative Pandas TA Engine (In-Memory)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('patterns')">
+                        <span>Multi-Timeframe Patterns (Candlestick, Double Top, Head &amp; Shoulders)</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('pattern_engine')">
+                            <span>Source: Pattern Recognition Algorithm + Candle Timestamps</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Pillar 2: Options Chain & Pure Greeks -->
+                <div class="tree-node">
+                  <div class="node-pill category-pill" onclick="toggleNode(this, 'options')">
+                    <span>⚡ 2. Options Chain &amp; Pure Black-Scholes Greeks</span>
+                    <span class="node-tag tag-gold">Greeks Suite</span>
+                  </div>
+                  <div class="node-children">
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('delta_gamma')">
+                        <span>Delta (Δ) &amp; Gamma (Γ) Acceleration</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('greeks_engine')">
+                            <span>Source: Black-Scholes Analytical Engine + Upstox Option Feed</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('theta_burn')">
+                        <span>Theta (Θ) Decay Burn Rate (Hourly &amp; Daily)</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('theta_engine')">
+                            <span>Source: Real-time DTE (Days-to-Expiry) Decay Model</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('oi_pcr')">
+                        <span>Open Interest (OI) Concentration &amp; Put-Call Ratio (PCR)</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('upstox_oi')">
+                            <span>Source: NSE / MCX Exchange Settlement Stream</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Pillar 3: Real-Time Financial News & Materiality -->
+                <div class="tree-node">
+                  <div class="node-pill category-pill" onclick="toggleNode(this, 'news')">
+                    <span>📰 3. CA AI News Feed &amp; Impact Scoring</span>
+                    <span class="node-tag tag-buy">Sentiment AI</span>
+                  </div>
+                  <div class="node-children">
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('news_sentiment')">
+                        <span>Headline Sentiment Scoring (Bullish / Bearish / High Impact)</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('news_sources')">
+                            <span>Source: Google News RSS, Reuters, Economic Times, Mint</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('materiality_filter')">
+                        <span>Materiality &amp; Catalyst Classification (Earnings, War, RBI, Budget)</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('gemini_ai')">
+                            <span>Source: Google Gemini 2.0 Flash AI + Keyword NLP Lexicon</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Pillar 4: Global Macro Factors -->
+                <div class="tree-node">
+                  <div class="node-pill category-pill" onclick="toggleNode(this, 'macro')">
+                    <span>🌐 4. Global Macro Inter-Market Drivers</span>
+                    <span class="node-tag tag-cyan">Macro Suite</span>
+                  </div>
+                  <div class="node-children">
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('gift_nifty')">
+                        <span>GIFT Nifty Overnight Index Premium</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('yahoo_finance')">
+                            <span>Source: Yahoo Finance SGX API (^NSEIX) / NSE IFSC</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('crude_dxy')">
+                        <span>Crude Oil (Brent/WTI), Dollar Index (DXY), US 10Y Yield</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('yahoo_finance')">
+                            <span>Source: Yahoo Finance Realtime (`CL=F`, `DX-Y.NYB`, `^TNX`)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Pillar 5: CA AI Sentinel Position Monitor -->
+                <div class="tree-node">
+                  <div class="node-pill category-pill" onclick="toggleNode(this, 'sentinel')">
+                    <span>🛡️ 5. CA AI Sentinel Active Trade Guardian</span>
+                    <span class="node-tag tag-sell">Risk &amp; Autopsy</span>
+                  </div>
+                  <div class="node-children">
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('peak_pnl')">
+                        <span>Peak P&amp;L High-Water Mark Tracker</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('db_positions')">
+                            <span>Source: SQLite `positions.peak_pnl` Database Column</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node">
+                      <div class="node-pill data-pill" onclick="showNodeDetail('post_mortem')">
+                        <span>Post-Trade Autopsy Engine (Theta Traps &amp; Reversals)</span>
+                      </div>
+                      <div class="node-children">
+                        <div class="tree-node">
+                          <div class="node-pill source-pill" onclick="showNodeDetail('sentinel_engine')">
+                            <span>Source: CA AI Diagnostic Engine + Loss Lessons Cache</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Detail Inspection Column -->
+          <div class="detail-card" id="nodeDetailCard">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <b style="font-size:14.5px;color:var(--cyan);" id="detailTitle">Click Any Branch Node</b>
+              <span class="node-tag tag-cyan" id="detailCategory">Branch Inspection</span>
+            </div>
+            <div style="font-size:12.5px;color:var(--text-dim);line-height:1.6;" id="detailDescription">
+              Select any branch on the left to reveal its underlying mathematical model, data refresh rate, upstream API provider, and how CA Trader uses it in synthesis.
+            </div>
+
+            <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px;">
+              <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:700;margin-bottom:6px;">Upstream Data Provider / Source</div>
+              <div id="detailSource" style="font-family:var(--mono);font-size:11.5px;color:var(--buy);">—</div>
+            </div>
+
+            <div style="margin-top:12px;">
+              <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:700;margin-bottom:6px;">Trading Formula / Principle</div>
+              <div id="detailFormula" style="font-family:var(--mono);font-size:11px;background:#090d18;padding:8px 10px;border-radius:6px;border:1px solid var(--border);color:var(--gold);">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 2: COMPREHENSIVE USER TUTORIAL -->
+    <!-- ========================================================================= -->
+    <section id="tab-tutorial" class="section-pane">
+      <div class="card">
+        <div class="card-title cyan">
+          <span>📖 Complete Step-by-Step CA Trader User Tutorial</span>
+          <button class="tab-btn" style="padding:4px 10px;font-size:11px;margin-left:auto;" onclick="startInteractiveTour()">▶ Start Animated Interactive Tour</button>
+        </div>
+        <p style="color:var(--text-dim);margin-bottom:20px;">
+          Master all capabilities of CA Trader, from institutional multi-timeframe charting and algorithmic option contract selection to live paper order execution, trailing stops, and Sentinel post-trade analysis.
+        </p>
+
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <!-- Step 1 -->
+          <div class="walkthrough-step-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b style="color:var(--cyan);font-size:14px;">1. Workspace Navigation &amp; Section Bar</b>
+              <span class="node-tag tag-cyan">Navigation</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              The top navigation section bar contains all operational modules. On desktop, click any tab. On mobile, horizontally swipe across the bar to browse modules, then <b>tap</b> the module you wish to enter (sliding will not open unwanted tabs). The active panel will smoothly highlight. Use the <code>⚡ Turbo Refresh</code> button at any time to execute an instant, zero-reload refresh across all connected WebSockets and REST feeds.
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="walkthrough-step-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b style="color:var(--gold);font-size:14px;">2. Professional Canvas Charting &amp; Touch Controls</b>
+              <span class="node-tag tag-gold">Interactive Chart</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              The central chart is powered by a high-frequency Canvas renderer. Switch timeframes between 1m, 5m, 15m, 1h, and 1D. Use the <code>+</code> and <code>-</code> zoom buttons or pinch on mobile (pinch-in zooms in; pinch-out zooms out). Tap the <b>Crosshair</b> icon to reveal price and timestamp axes with clean single badges. To draw trendlines or support levels, choose a drawing tool. If you want to move drawings, unlock the <b>🔒 Lock</b> button—unlocked drawings feature a 24px touch tolerance for easy mobile repositioning. All applied indicators and custom drawings automatically save to your browser's <code>localStorage</code>.
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="walkthrough-step-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b style="color:var(--buy);font-size:14px;">3. Multi-Factor Recommendations, Mathematical Weightages &amp; Strict Consensus</b>
+              <span class="node-tag tag-buy">Algorithmic Signals</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              CA Trader does not rely on a single indicator. It cross-examines 4 quantitative pillars using an institutional weighted scoring matrix:
+            </p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:10px;margin:12px 0;">
+              <div style="background:var(--surface);padding:10px 14px;border-radius:6px;border-left:3px solid var(--buy);">
+                <b style="color:var(--buy);">1. Technicals (35% Weightage)</b><br>
+                <span style="font-size:11.5px;color:var(--text-dim);">20 EMA Trend Alignment (10%) · 50/200 EMA Regime (8%) · Supertrend (7%) · RSI-14 (5%) · MACD Momentum (5%)</span>
+              </div>
+              <div style="background:var(--surface);padding:10px 14px;border-radius:6px;border-left:3px solid var(--cyan);">
+                <b style="color:var(--cyan);">2. Greeks &amp; Order Flow (30% Weightage)</b><br>
+                <span style="font-size:11.5px;color:var(--text-dim);">Delta Alignment (10%) · Gamma Acceleration (8%) · Theta Burn Tolerance (7%) · PCR &amp; OI Build-up (5%)</span>
+              </div>
+              <div style="background:var(--surface);padding:10px 14px;border-radius:6px;border-left:3px solid var(--gold);">
+                <b style="color:var(--gold);">3. News Catalysts &amp; Materiality (20% Weightage)</b><br>
+                <span style="font-size:11.5px;color:var(--text-dim);">High-Materiality (75–100%) Financial News (12%) · Gemini AI Qualitative Digest (8%)</span>
+              </div>
+              <div style="background:var(--surface);padding:10px 14px;border-radius:6px;border-left:3px solid #a855f7;">
+                <b style="color:#a855f7;">4. Global Macro Drivers (15% Weightage)</b><br>
+                <span style="font-size:11.5px;color:var(--text-dim);">GIFT Nifty Overnight Index Premium (6%) · Crude Oil (Brent/WTI) (4%) · DXY &amp; US 10Y Yields (5%)</span>
+              </div>
+            </div>
+            <div style="background:rgba(239, 68, 68, 0.08);border:1px solid rgba(239, 68, 68, 0.25);border-radius:6px;padding:10px 14px;margin-bottom:12px;">
+              <b style="color:var(--sell);font-size:12px;">Explicit Exclusions (What the Engine Rejects):</b>
+              <div style="font-size:11.5px;color:var(--text-dim);margin-top:3px;">
+                • Social media rumors, unverified Telegram tip alerts, and anonymous pump-and-dump chatter.<br>
+                • Deep OTM lottery options with wide bid-ask slippage (&gt;0.5%) and zero market maker presence.<br>
+                • Stale news older than 48 hours or unverified blogs lacking institutional citations.<br>
+                • Holiday overnight spread distortions and low-volume illiquid price wicks.
+              </div>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              <b>Directional Consensus Rule:</b> When the underlying index or future is Bullish, the engine <i>strictly</i> recommends Call (<code>CE</code>) near-ATM options. When Bearish, it <i>strictly</i> recommends Put (<code>PE</code>) options. In the recommendation display, the primary consensus contract is actively highlighted while the opposing direction is displayed as theoretical/inactive.
+            </p>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="walkthrough-step-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b style="color:var(--cyan);font-size:14px;">4. Options Chain &amp; Pure Black-Scholes Greeks Suite</b>
+              <span class="node-tag tag-cyan">Options Desk</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              In the <b>Options Chain</b> tab, explore real-time strikes with true spot pricing (e.g. CRUDEOIL spot calibrated to ~₹6,150 with 100-lot increments). Click on any Greek column header (Delta, Gamma, Theta, Vega, IV) to open the interactive educational modal explaining the mathematical formula, decay rate, and directional risk.
+            </p>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="walkthrough-step-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b style="color:var(--sell);font-size:14px;">5. CA AI Sentinel: Active Trade Guardian &amp; Theta Decay Protection</b>
+              <span class="node-tag tag-sell">Risk Management</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              Once a trade is placed, open the <b>Sentinel Pop-up Mini-Window</b> or visit the <b>Orders &amp; Positions</b> tab. The Sentinel actively computes your <b>Peak P&amp;L High-Water Mark</b> and monitors your <b>Theta Decay Burn Rate</b> (e.g. <code>-₹113.00/hr</code>). If an option hits +₹500 profit but momentum stalls, Sentinel will advise you to trail your stop loss to breakeven or square off immediately to prevent Theta decay from turning a winner into a loss. If an adverse move occurs, Sentinel generates a post-trade autopsy lesson stored in your performance archive.
+            </p>
+          </div>
+
+          <!-- Step 6 -->
+          <div class="walkthrough-step-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b style="color:var(--gold);font-size:14px;">6. Admin API &amp; Resource Statement Passbook</b>
+              <span class="node-tag tag-gold">System Passbook</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              Accessible by administrators, the <b>API Passbook</b> provides real-time transparency into external infrastructure costs and rate limits. View your live Upstox REST RPM consumption (against the 250 requests/min ceiling), Google Gemini 2.0 AI token ledger, estimated costs in ₹ INR, connected data feeds status, and a chronological audit passbook updating every 3 seconds.
+            </p>
+          </div>
+
+          <!-- Step 7 -->
+          <div class="walkthrough-step-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <b style="color:var(--cyan);font-size:14px;">7. Historical Backtesting Simulator &amp; Bar-by-Bar Replay Engine</b>
+              <span class="node-tag tag-cyan">Backtesting Desk</span>
+            </div>
+            <p style="color:var(--text-dim);font-size:13px;line-height:1.55;">
+              Revisit any historical trading session for NIFTY, BANKNIFTY, CRUDEOIL, or individual equities with zero look-ahead bias:
+            </p>
+            <ul style="margin-left:18px;color:var(--text-dim);font-size:12.5px;line-height:1.6;margin-top:6px;">
+              <li><b>Playback Controls:</b> Play (▶), Pause (⏸), Step Next (⏭), Reset (⏮), speed controls (1x to 10x), and interactive candle scrubber.</li>
+              <li><b>Point-in-Time Synchronized Signals:</b> Every tick recomputes EMAs, Supertrend, RSI, MACD, candlestick patterns, and historical news catalysts strictly as of that historical candle.</li>
+              <li><b>Expired Option Recommendations:</b> Generates near-ATM options for expired contracts based on historical spot and futures pricing.</li>
+              <li><b>Isolated Paper Trading Desk:</b> Execute Buy CE, Buy PE, and Square Off orders. Backtest trades, MTM P&amp;L, and win/loss metrics are tagged <code>is_backtest = 1</code> and strictly segregated from live orders.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 3: TRADING TERMS & GREEKS DICTIONARY -->
+    <!-- ========================================================================= -->
+    <section id="tab-glossary" class="section-pane">
+      <div class="card">
+        <div class="card-title gold">
+          <span>📚 Exhaustive Trading Terms &amp; Options Greeks Dictionary</span>
+          <span class="node-tag tag-gold">Searchable · 25+ Institutional Concepts</span>
+        </div>
+        <div class="glossary-search-wrap">
+          <input type="text" class="search-input" id="glossarySearch" placeholder="🔍 Search any trading term (e.g., Delta, Theta Burn, Peak P&amp;L, PCR, IV, Slippage, VWAP)..." oninput="filterGlossary()">
+        </div>
+
+        <div class="glossary-grid" id="glossaryGrid">
+          <!-- Term 1: Delta -->
+          <div class="term-item" data-term="delta greeks directional sensitivity">
+            <div class="term-head">
+              <span class="term-name">Delta (Δ)</span>
+              <span class="node-tag tag-cyan">Option Greek</span>
+            </div>
+            <div class="term-desc">Measures the expected change in option price for every ₹1 change in the underlying spot price. Calls range from 0 to +1.0; Puts range from -1.0 to 0. ATM options typically have a Delta of ~0.50.</div>
+            <div class="term-example">Formula: Δ = ∂V / ∂S · If Nifty rises 100 pts, a 0.50 Delta CE gains ~₹50.</div>
+          </div>
+
+          <!-- Term 2: Theta Decay -->
+          <div class="term-item" data-term="theta decay time extrinsic burn rate">
+            <div class="term-head">
+              <span class="term-name">Theta (Θ) &amp; Hourly Burn Rate</span>
+              <span class="node-tag tag-sell">Option Greek</span>
+            </div>
+            <div class="term-desc">Measures the rate of time decay of an option's extrinsic premium over 24 hours. Accelerates drastically in the final 72 hours before expiry. Option buyers lose Theta daily, while option sellers gain it.</div>
+            <div class="term-example">CA Trader Sentinel: Hourly Burn = Daily Theta / 6.25 trading hours.</div>
+          </div>
+
+          <!-- Term 3: Gamma -->
+          <div class="term-item" data-term="gamma acceleration delta curvature">
+            <div class="term-head">
+              <span class="term-name">Gamma (Γ)</span>
+              <span class="node-tag tag-gold">Option Greek</span>
+            </div>
+            <div class="term-desc">Measures the rate of change of Delta for every ₹1 move in the underlying asset. Highest for At-the-Money (ATM) options and causes explosive premium surges during expiry day breakouts.</div>
+            <div class="term-example">Formula: Γ = ∂²V / ∂S² · High Gamma turns a 0.30 Delta option into 0.80 quickly.</div>
+          </div>
+
+          <!-- Term 4: Vega -->
+          <div class="term-item" data-term="vega volatility iv sensitivity">
+            <div class="term-head">
+              <span class="term-name">Vega (ν)</span>
+              <span class="node-tag tag-cyan">Option Greek</span>
+            </div>
+            <div class="term-desc">Measures the sensitivity of the option premium to a 1% change in Implied Volatility (IV). When IV surges (before earnings or RBI policy), both CE and PE premiums expand.</div>
+            <div class="term-example">Formula: ν = ∂V / ∂σ · High Vega options suffer when volatility crushes post-event.</div>
+          </div>
+
+          <!-- Term 5: Implied Volatility (IV) -->
+          <div class="term-item" data-term="iv implied volatility annual expectation">
+            <div class="term-head">
+              <span class="term-name">Implied Volatility (IV)</span>
+              <span class="node-tag tag-gold">Pricing Variable</span>
+            </div>
+            <div class="term-desc">The market's forecast of the underlying asset's likely movement over the coming year, annualized. Derived backwards from the market price using the Black-Scholes formula.</div>
+            <div class="term-example">High IV indicates expensive options; Low IV indicates cheap premium acquisition.</div>
+          </div>
+
+          <!-- Term 6: Peak P&L High-Water Mark -->
+          <div class="term-item" data-term="peak pnl high water mark mtm profit sentinel">
+            <div class="term-head">
+              <span class="term-name">Peak P&amp;L (High-Water Mark)</span>
+              <span class="node-tag tag-buy">Sentinel Metric</span>
+            </div>
+            <div class="term-desc">The absolute highest unrealized mark-to-market profit achieved by an open trade before any reversal occurred. Tracked live on every tick in the <code>positions.peak_pnl</code> database column.</div>
+            <div class="term-example">Example: If a position reaches +₹500 and retraces to +₹200, Peak P&amp;L remains recorded at +₹500.</div>
+          </div>
+
+          <!-- Term 7: Put-Call Ratio (PCR) -->
+          <div class="term-item" data-term="pcr put call ratio sentiment oi volume">
+            <div class="term-head">
+              <span class="term-name">Put-Call Ratio (PCR)</span>
+              <span class="node-tag tag-cyan">Order Flow</span>
+            </div>
+            <div class="term-desc">The ratio of total Put open interest divided by total Call open interest across all strikes. PCR &gt; 1.2 suggests an oversold market ready for a bullish bounce; PCR &lt; 0.7 suggests overbought conditions.</div>
+            <div class="term-example">Formula: PCR = Σ Put OI / Σ Call OI.</div>
+          </div>
+
+          <!-- Term 8: Volume Weighted Average Price (VWAP) -->
+          <div class="term-item" data-term="vwap volume weighted average price institutional benchmark">
+            <div class="term-head">
+              <span class="term-name">VWAP (Volume Weighted Avg Price)</span>
+              <span class="node-tag tag-buy">Technical Benchmark</span>
+            </div>
+            <div class="term-desc">The average price an asset has traded at throughout the day, weighted by volume. Institutional buyers use VWAP as their primary execution benchmark. Prices above VWAP indicate bullish intraday control.</div>
+            <div class="term-example">Formula: VWAP = Σ(Price × Volume) / Σ(Volume).</div>
+          </div>
+
+          <!-- Term 9: Relative Strength Index (RSI) -->
+          <div class="term-item" data-term="rsi relative strength index momentum oscillator">
+            <div class="term-head">
+              <span class="term-name">RSI (14-Period Momentum)</span>
+              <span class="node-tag tag-cyan">Oscillator</span>
+            </div>
+            <div class="term-desc">A momentum oscillator that measures the speed and magnitude of recent price changes on a scale of 0 to 100. RSI &gt; 70 indicates overbought momentum; RSI &lt; 30 indicates oversold exhaustion.</div>
+            <div class="term-example">Bullish Momentum Confirmation: RSI holding above 50 during pullbacks.</div>
+          </div>
+
+          <!-- Term 10: Exponential Moving Average (EMA) -->
+          <div class="term-item" data-term="ema exponential moving average trend dynamic support">
+            <div class="term-head">
+              <span class="term-name">EMA Confluence (20 / 50 / 200)</span>
+              <span class="node-tag tag-gold">Trend System</span>
+            </div>
+            <div class="term-desc">A type of moving average that places greater weight and significance on the most recent data points. CA Trader examines the 20 EMA for short-term trend, 50 EMA for intermediate support, and 200 EMA for structural regime.</div>
+            <div class="term-example">Golden Alignment: Price &gt; 20 EMA &gt; 50 EMA &gt; 200 EMA signifies strong institutional trend.</div>
+          </div>
+
+          <!-- Term 11: Slippage -->
+          <div class="term-item" data-term="slippage execution difference market order">
+            <div class="term-head">
+              <span class="term-name">Execution Slippage</span>
+              <span class="node-tag tag-sell">Market Microstructure</span>
+            </div>
+            <div class="term-desc">The difference between the expected price of a trade and the actual price at which the order is executed on the exchange. Typically caused by fast volatility or thin bid-ask spreads.</div>
+            <div class="term-example">Mitigation: Use limit orders or near-ATM liquid strikes with high trading volume.</div>
+          </div>
+
+          <!-- Term 12: Supertrend -->
+          <div class="term-item" data-term="supertrend atr trailing stop volatility breakout">
+            <div class="term-head">
+              <span class="term-name">Supertrend Indicator (10, 3)</span>
+              <span class="node-tag tag-buy">Trailing Volatility</span>
+            </div>
+            <div class="term-desc">A volatility-based trailing stop indicator calculated using the Average True Range (ATR) multiplied by a factor of 3. Changes color from green to red when price penetrates the dynamic stop level.</div>
+            <div class="term-example">Formula: Upper Band = (High + Low)/2 + (3 × ATR); Lower Band = (High + Low)/2 - (3 × ATR).</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 4: DATA SOURCES & API INVENTORY MATRIX -->
+    <!-- ========================================================================= -->
+    <section id="tab-data-sources" class="section-pane">
+      <div class="card">
+        <div class="card-title cyan">
+          <span>🛰️ Real-Time Data Sources &amp; API Integration Matrix</span>
+          <span class="node-tag tag-cyan">Production Topology</span>
+        </div>
+        <p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">
+          Comprehensive breakdown of every live data stream, polling interval, latency profile, and external provider powering CA Trader.
+        </p>
+
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Data Feature</th>
+                <th>Underlying Parameters</th>
+                <th>Primary Source Provider</th>
+                <th>Mechanism &amp; Protocol</th>
+                <th>Refresh Interval / Rate</th>
+                <th>Quota / Constraint</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Live Candlesticks &amp; Quotes</b></td>
+                <td>LTP, Open, High, Low, Close, Volume</td>
+                <td>Upstox Pro API (V2 / V3)</td>
+                <td>Binary WebSocket Stream + REST V2</td>
+                <td>Tick-by-tick (&lt;100ms)</td>
+                <td>250 REST req/min ceiling</td>
+              </tr>
+              <tr>
+                <td><b>Options Chain &amp; Contracts</b></td>
+                <td>Strikes, CE/PE LTP, OI, Expiries</td>
+                <td>Upstox Options API &amp; NSE/MCX Feeds</td>
+                <td>REST JSON + In-Memory Greek Engine</td>
+                <td>10 seconds cached TTL</td>
+                <td>Rate limited per IP</td>
+              </tr>
+              <tr>
+                <td><b>Pure Black-Scholes Greeks</b></td>
+                <td>Delta, Gamma, Theta, Vega, IV</td>
+                <td>Analytical Engine (In-House)</td>
+                <td>NumPy / SciPy Vectorized C-Level</td>
+                <td>Computed instantly on every tick</td>
+                <td>Zero external quota</td>
+              </tr>
+              <tr>
+                <td><b>Global Macro &amp; Commodities</b></td>
+                <td>GIFT Nifty, Brent Crude, DXY, US10Y</td>
+                <td>Yahoo Finance &amp; Inter-Market Feeds</td>
+                <td>Asynchronous HTTPS JSON Scraper</td>
+                <td>60 seconds cached TTL</td>
+                <td>Unmetered / Fair use</td>
+              </tr>
+              <tr>
+                <td><b>Real-Time Financial News</b></td>
+                <td>Headlines, Summaries, Timestamps</td>
+                <td>Google News RSS, Reuters, Mint, ET</td>
+                <td>Async Multi-Threaded RSS Parser</td>
+                <td>120 seconds background worker</td>
+                <td>Unmetered public RSS</td>
+              </tr>
+              <tr>
+                <td><b>News Sentiment &amp; Materiality</b></td>
+                <td>Buy/Sell impact score (75-100%), NLP insight</td>
+                <td>Google Gemini 2.0 Flash AI</td>
+                <td>REST JSON (`google-genai` / REST)</td>
+                <td>On-demand with cached digests</td>
+                <td>1,000,000 TPM limit</td>
+              </tr>
+              <tr>
+                <td><b>Institutional Order Flow</b></td>
+                <td>FII/DII Net Flow, Block Deals, PCR</td>
+                <td>NSE India Exchange Feed &amp; Reports</td>
+                <td>HTTP Digest Parser</td>
+                <td>End-of-day + Pre-market snapshots</td>
+                <td>Public regulatory feed</td>
+              </tr>
+              <tr>
+                <td><b>Paper Trading Ledger</b></td>
+                <td>Orders, Executions, Positions, P&amp;L</td>
+                <td>CA Trader SQLite Database</td>
+                <td>SQLite3 WAL Embedded Storage</td>
+                <td>Synchronous atomic transactions</td>
+                <td>Disk space bound (~100 MB)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 5: ARCHITECTURAL ROADMAP & AI DEVELOPMENT EFFICIENCY -->
+    <!-- ========================================================================= -->
+    <section id="tab-architecture" class="section-pane">
+      <div class="card">
+        <div class="card-title gold">
+          <span>🏛️ System Architecture Analysis &amp; Recommendations</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <!-- Col 1 -->
+          <div style="background:var(--surface-2);padding:18px;border-radius:8px;border:1px solid var(--border);">
+            <b style="color:var(--cyan);font-size:14px;display:block;margin-bottom:8px;">1. Is our backend &amp; frontend too long?</b>
+            <p style="color:var(--text-dim);font-size:12.5px;line-height:1.55;">
+              <b>Yes, significantly.</b><br>
+              • <code>app.py</code>: <b>12,386 lines</b> (~701 KB)<br>
+              • <code>terminal.html</code>: <b>18,111 lines</b> (~1.1 MB)<br><br>
+              Currently, both files are 100% monolithic. All features (auth, database, chart rendering, math calculations, news scraper, Sentinel advisor, admin passbook) reside in single mega-files.
+            </p>
+          </div>
+
+          <!-- Col 2 -->
+          <div style="background:var(--surface-2);padding:18px;border-radius:8px;border:1px solid var(--border);">
+            <b style="color:var(--gold);font-size:14px;display:block;margin-bottom:8px;">2. How to save AI tokens and time during edits?</b>
+            <p style="color:var(--text-dim);font-size:12.5px;line-height:1.55;">
+              When files are 18,000 lines long, sending or reading them consumes hundreds of thousands of tokens per prompt.<br><br>
+              <b>Actionable Strategies:</b><br>
+              • <b>Modularization:</b> Split <code>app.py</code> into <code>routers/</code> and <code>services/</code>. Editing a 150-line options router costs 95% fewer tokens than opening <code>app.py</code>.<br>
+              • <b>Targeted Instructions:</b> Specify the exact function name (e.g. <code>options_summary</code>) or DOM ID so the AI agent reads only 50 lines.
+            </p>
+          </div>
+
+          <!-- Col 3 -->
+          <div style="background:var(--surface-2);padding:18px;border-radius:8px;border:1px solid var(--border);">
+            <b style="color:var(--buy);font-size:14px;display:block;margin-bottom:8px;">3. Can we use Django to improve the database?</b>
+            <p style="color:var(--text-dim);font-size:12.5px;line-height:1.55;">
+              <b>Django ORM &amp; Migrations:</b> Django brings robust schema versioning (`makemigrations`), foreign keys, and an out-of-the-box admin panel.<br><br>
+              <b>Best Architecture Approach:</b> Rather than discarding FastAPI's ultra-fast asynchronous WebSocket stack, implement <b>SQLAlchemy ORM + Alembic migrations</b> inside FastAPI. This gives you identical relational power, automated migrations, and connection pooling without rewriting the WebSocket engine.
+            </p>
+          </div>
+
+          <!-- Col 4 -->
+          <div style="background:var(--surface-2);padding:18px;border-radius:8px;border:1px solid var(--border);">
+            <b style="color:var(--sell);font-size:14px;display:block;margin-bottom:8px;">4. Live Logging &amp; Visual Error Monitoring</b>
+            <p style="color:var(--text-dim);font-size:12.5px;line-height:1.55;">
+              Replace raw console prints with structured logging:<br>
+              • <b>Backend:</b> Use <code>loguru</code> with auto-rotating file handlers (`ca_trader.log`, max 50MB, retain 7 days).<br>
+              • <b>Frontend Visual Error Tracker:</b> Add a global <code>window.onerror</code> hook that automatically reports unhandled JS exceptions and layout overflow warnings back to the backend `/api/logs/client-error` so they appear live in the Admin Passbook!
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Tab switching with smooth fade
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.section-pane').forEach(p => p.classList.remove('active'));
+      
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
+      
+      const targetPane = document.getElementById(tabId);
+      if (targetPane) targetPane.classList.add('active');
+    }
+
+    // Interactive tree branch toggles
+    function toggleNode(btn, category) {
+      const children = btn.parentElement.querySelector('.node-children');
+      if (children) {
+        children.classList.toggle('collapsed');
+      }
+      showNodeDetail(category);
+    }
+
+    // Node Detail Data Repository
+    const nodeDetails = {
+      root: {
+        title: "CA Trader Algorithmic Synthesis Engine",
+        category: "Master Orchestration",
+        desc: "Combines 5 independent quantitative pillars: 50+ Technical indicators, Pure Black-Scholes Greeks, 48h Financial News Sentiment, Global Macro Drivers, and Sentinel Risk Rules. A signal is only generated when at least 3 pillars reach unanimous directional agreement.",
+        source: "In-Memory Python Async Engine (/api/recommendations)",
+        formula: "Final Score = (Tech × 0.35) + (Greeks × 0.30) + (News × 0.20) + (Macro × 0.15)"
+      },
+      technicals: {
+        title: "Technical Analysis Suite",
+        category: "Price & Trend Pillar",
+        desc: "Analyzes multi-timeframe OHLCV candles across 1m, 5m, 15m, 1h, and daily horizons. Evaluates trend alignment, dynamic support/resistance, momentum exhaustion, and institutional volume surges.",
+        source: "Upstox Historical REST V2 + Upstox WebSocket Stream",
+        formula: "Trend State = 'BULLISH' if Close > 20 EMA > 50 EMA & Supertrend is Green"
+      },
+      ema: {
+        title: "Exponential Moving Average Confluence",
+        category: "Trend Filter",
+        desc: "Exponential moving averages weigh recent bars heavily. When 20 EMA crosses above 50 EMA with price above 200 EMA, a structural golden regime is confirmed.",
+        source: "Pandas TA Engine (Exponential Smoothing)",
+        formula: "EMA_today = (Price_today × (2 / (N + 1))) + (EMA_yesterday × (1 - (2 / (N + 1))))"
+      },
+      supertrend: {
+        title: "Supertrend (10, 3) & ATR Volatility Bands",
+        category: "Dynamic Trailing Stop",
+        desc: "Calculates dynamic bands based on Average True Range. Protects against false whipsaws in trending markets by providing a mechanical trailing stop line.",
+        source: "Internal Quantitative Math Module",
+        formula: "Bands = (High + Low)/2 ± (3.0 × ATR_10)"
+      },
+      rsi_macd: {
+        title: "Momentum Oscillators: RSI(14) & MACD(12,26,9)",
+        category: "Momentum Confirmation",
+        desc: "RSI detects whether buyers or sellers have overextended price. MACD histogram reveals hidden divergence and velocity shifts before price turns.",
+        source: "Vectorized NumPy Computations",
+        formula: "MACD Line = EMA(12) - EMA(26); Signal Line = EMA(9) of MACD Line"
+      },
+      patterns: {
+        title: "Multi-Timeframe Pattern Recognition",
+        category: "Structural Geometry",
+        desc: "Detects classic candlestick formations (Engulfing, Hammer, Morning Star) and chart geometry (Double Top, Head & Shoulders, Ascending Triangle) with exact candle timestamps.",
+        source: "Pattern Recognition Heuristic Engine",
+        formula: "Engulfing = Body_today > Body_yesterday & Close_today > Open_yesterday"
+      },
+      options: {
+        title: "Options Chain & Black-Scholes Greeks Suite",
+        category: "Derivative Risk Pillar",
+        desc: "Evaluates exact strike premiums, open interest distribution, and intrinsic/extrinsic value. Guarantees single-direction consensus (Calls for Bullish, Puts for Bearish).",
+        source: "Upstox Option Chain API + In-House Black-Scholes Engine",
+        formula: "Option Price V = S × N(d1) - K × e^(-rT) × N(d2)"
+      },
+      delta_gamma: {
+        title: "Delta (Δ) & Gamma (Γ) Velocity",
+        category: "Directional & Curvature Risk",
+        desc: "Delta measures price sensitivity per ₹1 index move. Gamma measures how rapidly Delta accelerates, creating explosive gains on expiry day moves.",
+        source: "Analytical C-Optimized Black-Scholes Math",
+        formula: "d1 = [ln(S/K) + (r + σ²/2)T] / (σ√T); Delta = N(d1); Gamma = N'(d1)/(Sσ√T)"
+      },
+      theta_burn: {
+        title: "Theta (Θ) Decay Burn Rate",
+        category: "Time Decay Protection",
+        desc: "Calculates the exact rupee loss incurred per hour and per day due to time decay. High-decay options without directional momentum trigger Sentinel exit warnings.",
+        source: "Days-to-Expiry (DTE) Decay Model",
+        formula: "Hourly Theta = (Daily Theta / 6.25) × Position Quantity"
+      },
+      oi_pcr: {
+        title: "Open Interest & Put-Call Ratio (PCR)",
+        category: "Institutional Positioning",
+        desc: "Monitors the accumulation of contracts at key strikes. Massive put writing at lower strikes indicates strong institutional support.",
+        source: "Exchange Settlement Data via Upstox REST",
+        formula: "PCR = Total Put Open Interest / Total Call Open Interest"
+      },
+      news: {
+        title: "CA AI Financial News & Materiality Engine",
+        category: "Macro News Pillar",
+        desc: "Aggregates breaking business headlines and filters out low-impact filler. Classifies financial metrics, earnings, and regulatory changes with buy/sell conviction scores.",
+        source: "Google News RSS, Reuters, Economic Times, Mint",
+        formula: "Impact % = 75% to 100% based on financial metric presence and keyword severity"
+      },
+      news_sentiment: {
+        title: "Headline Sentiment & Probabilistic Scoring",
+        category: "NLP Catalyst",
+        desc: "Labels events as BULLISH or BEARISH with probability metrics (e.g. '100% Buy Signal' for massive earnings beats or rate cuts).",
+        source: "Lexicon NLP + Gemini 2.0 AI Digest",
+        formula: "Net Sentiment Score = 50 + ((Bull_Count - Bear_Count) / Total) × 45"
+      },
+      macro: {
+        title: "Global Macro Inter-Market Drivers",
+        category: "Global Regimes",
+        desc: "Monitors lead-lag relationships from foreign markets: overnight GIFT Nifty premium, crude oil prices, US 10Y Treasury yields, and the US Dollar Index (DXY).",
+        source: "Yahoo Finance Real-Time Scraper Engine",
+        formula: "Inter-Market Bias = Weighted average of GIFT Nifty (+), DXY (-), and Oil (-)"
+      },
+      gift_nifty: {
+        title: "GIFT Nifty Overnight Index Premium",
+        category: "Opening Hand-off",
+        desc: "Traded on NSE IFSC in GIFT City. Gives traders advance insight into Indian market gap-ups or gap-downs before the domestic 09:15 AM market bell.",
+        source: "Yahoo Finance (`^NSEIX`) / NSE IFSC",
+        formula: "Expected Gap = GIFT Nifty Futures Price - Previous Nifty 50 Cash Close"
+      },
+      crude_dxy: {
+        title: "Crude Oil & US Dollar Index (DXY)",
+        category: "Macro Drag Factors",
+        desc: "India imports over 85% of its crude oil. Surging crude oil or an appreciating USD causes rupee depreciation and drags equity indices down.",
+        source: "Yahoo Finance (`CL=F`, `DX-Y.NYB`)",
+        formula: "Higher Crude + Higher DXY = Bearish Headwind for Indian Equities"
+      },
+      sentinel: {
+        title: "CA AI Sentinel Active Trade Guardian",
+        category: "Active Trade Sentinel",
+        desc: "Monitors open trades every second. Evaluates Peak P&L retention, trailing stops, and extrinsic erosion to ensure winners don't turn into losers.",
+        source: "SQLite `positions` table + Background Risk Task",
+        formula: "If Current_PnL <= Peak_PnL * 0.40 and Peak_PnL >= 400: Trigger EXIT_NOW"
+      },
+      peak_pnl: {
+        title: "Peak P&L High-Water Mark Tracker",
+        category: "Profit Retention Rule",
+        desc: "Records the maximum profit achieved during the trade's lifespan. Prevents trades that gained +₹500 from closing at -₹960 due to theta decay.",
+        source: "SQLite `positions.peak_pnl` column",
+        formula: "peak_pnl = max(peak_pnl, current_unrealized_pnl)"
+      },
+      post_mortem: {
+        title: "Post-Trade Autopsy Engine",
+        category: "Trader Education",
+        desc: "Automatically diagnoses why a closed trade failed (e.g. Theta Decay Trap, Late Entry, Volatility Crush) and preserves lessons in the performance journal.",
+        source: "In-House Diagnostic Heuristics",
+        formula: "Verdict = 'THETA DECAY TRAP' if trade peaked > +300 but closed in loss with high theta burn"
+      }
+    };
+
+    function showNodeDetail(key) {
+      const d = nodeDetails[key] || nodeDetails.root;
+      document.getElementById('detailTitle').textContent = d.title;
+      document.getElementById('detailCategory').textContent = d.category;
+      document.getElementById('detailDescription').textContent = d.desc;
+      document.getElementById('detailSource').textContent = d.source;
+      document.getElementById('detailFormula').textContent = d.formula;
+
+      // Subtle pulse animation
+      const card = document.getElementById('nodeDetailCard');
+      card.style.animation = 'none';
+      requestAnimationFrame(() => card.style.animation = 'fadeIn 0.25s ease');
+    }
+
+    // Glossary instant filter
+    function filterGlossary() {
+      const q = document.getElementById('glossarySearch').value.toLowerCase().trim();
+      const items = document.querySelectorAll('.term-item');
+      items.forEach(it => {
+        const text = it.getAttribute('data-term') + ' ' + it.textContent.toLowerCase();
+        it.style.display = text.includes(q) ? 'block' : 'none';
+      });
+    }
+
+    // Simulated Cursor Interactive Tour
+    function startInteractiveTour() {
+      const cursor = document.getElementById('simCursor');
+      cursor.classList.add('active');
+
+      const steps = [
+        { tab: 'tab-branches', target: '.root-pill', label: '1. Exploring Overall Algorithm' },
+        { tab: 'tab-branches', target: '.category-pill', label: '2. Drilling into Technicals & Greeks' },
+        { tab: 'tab-tutorial', target: '.walkthrough-step-box', label: '3. Reading Interactive Tutorial Steps' },
+        { tab: 'tab-glossary', target: '#glossarySearch', label: '4. Searching Live Terms & Greeks Dictionary' },
+        { tab: 'tab-data-sources', target: 'table', label: '5. Verifying Real-Time API Data Sources' },
+        { tab: 'tab-architecture', target: '.card', label: '6. Reviewing Database & System Scaling' }
+      ];
+
+      let idx = 0;
+      function nextStep() {
+        if (idx >= steps.length) {
+          cursor.classList.remove('active');
+          switchTab('tab-branches');
+          return;
+        }
+        const s = steps[idx];
+        switchTab(s.tab);
+        setTimeout(() => {
+          const el = document.querySelector(s.target);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            cursor.style.left = (rect.left + rect.width / 2) + 'px';
+            cursor.style.top = (rect.top + rect.height / 2) + 'px';
+          }
+          idx++;
+          setTimeout(nextStep, 1500);
+        }, 300);
+      }
+      nextStep();
+    }
+  </script>
+</body>
+</html>
+

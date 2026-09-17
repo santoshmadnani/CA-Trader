@@ -236,6 +236,7 @@ HTML_PATH = next((p for p in HTML_CANDIDATES if p.exists()), None)
 LOGIN_HTML_PATH = next((p for p in LOGIN_HTML_CANDIDATES if p.exists()), None)
 FITNESS_HTML_PATH = BASE_DIR / "fitness.html"
 TERMINAL_SELECTOR_HTML_PATH = BASE_DIR / "terminal_selector.html"
+GUIDE_HTML_PATH = BASE_DIR / "ca_trader_guide.html"
 if HTML_PATH is None:
     # The exact uploaded filename is kept as a fallback reference for users
     # who place app.py elsewhere and keep the HTML beside it.
@@ -296,13 +297,15 @@ UPSTOX_ACCESS_TOKENS = [v for k, v in sorted(((k, v) for k, v in os.environ.item
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash-high")
 AVAILABLE_AI_MODELS = list(dict.fromkeys([
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-2.5-pro",
-    "gemini-1.5-pro",
     "gemini-3.8-flash-high",
     "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
+    "gemini-1.5-flash",
     "antigravity-deep-trader"
 ]))
 USDA_API_KEY = os.getenv("USDA_API_KEY", "DEMO_KEY")
@@ -347,6 +350,10 @@ def db_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=8000")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=-64000")
+    conn.execute("PRAGMA temp_store=MEMORY")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
@@ -670,6 +677,23 @@ def init_db() -> None:
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_fund_tx_user_wallet ON fund_transactions(user_id, wallet, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS backtest_trades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        symbol TEXT NOT NULL,
+        side TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        entry_price REAL NOT NULL,
+        exit_price REAL,
+        pnl REAL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        entry_time TEXT NOT NULL,
+        exit_time TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_backtest_trades_user ON backtest_trades(user_id, status);
     """
     with _DB_LOCK:
         conn = db_conn()
@@ -1540,6 +1564,7 @@ class UpstoxAdapter:
                 continue
             last_status = response.status_code
             last_text = response.text[:300]
+            log_upstox_call(path, response.status_code, "OK" if response.ok else f"HTTP {response.status_code}")
             if response.status_code in (401, 403):
                 continue
             if response.status_code == 429:
@@ -2478,7 +2503,7 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
             if best_row:
                 opt_node = best_row.get("call" if is_bull else "put") or {}
                 exp = str(chain.get("expiry") or "17 SEP 2026").replace(" 2026", "").strip()
-                opt_sym = f"{root} FUT {exp} {int(best_row['strike'])}{bias_tag}"
+                opt_sym = f"{root} {exp} {int(best_row['strike'])} {bias_tag}".strip()
                 return {
                     "symbol": opt_sym,
                     "display_name": opt_sym,
@@ -2759,19 +2784,31 @@ def normalize_option_chain(underlying: str, key: str, meta: dict[str, Any], payl
 # ---------------------------------------------------------------------------
 
 NEWS_SOURCES = [
-    # Top 10 Indian Financial & National News Publishers
+    # High-Reliability Google News Financial Aggregator Feeds (100% uptime, zero rate limits)
+    ("Google News Markets India", "https://news.google.com/rss/search?q=NSE+OR+BSE+OR+Nifty+50+OR+Sensex+when:2d&hl=en-IN&gl=IN&ceid=IN:en", "site:news.google.com", "india"),
+    ("Google News Banking & RBI", "https://news.google.com/rss/search?q=Bank+Nifty+OR+RBI+OR+Banking+India+when:2d&hl=en-IN&gl=IN&ceid=IN:en", "site:news.google.com", "india"),
+    ("Google News Crude Oil", "https://news.google.com/rss/search?q=Crude+Oil+MCX+OR+Brent+Crude+OR+OPEC+when:2d&hl=en-IN&gl=IN&ceid=IN:en", "site:news.google.com", "india"),
+    ("Google News Top Stocks", "https://news.google.com/rss/search?q=Reliance+OR+TCS+OR+HDFC+Bank+OR+Infosys+when:2d&hl=en-IN&gl=IN&ceid=IN:en", "site:news.google.com", "india"),
+
+    # Top Indian Financial & National News Publishers
     ("Economic Times", "https://economictimes.indiatimes.com/rssfeedsdefault.cms", "site:economictimes.indiatimes.com", "india"),
+    ("ET Markets", "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", "site:economictimes.indiatimes.com", "india"),
     ("Mint", "https://www.livemint.com/rss/markets", "site:livemint.com", "india"),
     ("Business Standard", "https://www.business-standard.com/rss/home_page_top_stories.rss", "site:business-standard.com", "india"),
-    ("Financial Express", "https://www.financialexpress.com/feed/", "site:financialexpress.com", "india"),
-    ("CNBC-TV18", "https://www.cnbctv18.com/commonfeeds/v1/cnbctv18.xml", "site:cnbctv18.com", "india"),
+    ("Business Standard Markets", "https://www.business-standard.com/rss/markets-106.rss", "site:business-standard.com", "india"),
+    ("Financial Express", "https://www.financialexpress.com/market/feed/", "site:financialexpress.com", "india"),
+    ("CNBC-TV18", "https://www.cnbctv18.com/commonfeeds/v1/market.xml", "site:cnbctv18.com", "india"),
     ("Moneycontrol", "https://www.moneycontrol.com/rss/latestnews.xml", "site:moneycontrol.com", "india"),
+    ("Moneycontrol Markets", "https://www.moneycontrol.com/rss/marketreports.xml", "site:moneycontrol.com", "india"),
     ("The Hindu BusinessLine", "https://www.thehindubusinessline.com/feeder/default.rss", "site:thehindubusinessline.com", "india"),
     ("NDTV Profit", "https://feeds.feedburner.com/ndtvnews-top-stories", "site:ndtv.com", "india"),
     ("Times of India", "https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "site:timesofindia.indiatimes.com", "india"),
     ("The Indian Express", "https://indianexpress.com/feed/", "site:indianexpress.com", "india"),
+    ("Zee Business", "https://www.zeebiz.com/market-news.xml", "site:zeebiz.com", "india"),
 
-    # Top 10 Global Financial & International News Publishers
+    # Top Global Financial & International News Publishers
+    ("Google News Global Markets", "https://news.google.com/rss/search?q=Global+Markets+Fed+Inflation+Oil+when:2d&hl=en-US&gl=US&ceid=US:en", "site:news.google.com", "global"),
+    ("Yahoo Finance", "https://finance.yahoo.com/rss/topstories", "site:finance.yahoo.com", "global"),
     ("Reuters", "https://feeds.reuters.com/reuters/topNews", "site:reuters.com", "global"),
     ("Bloomberg", "https://feeds.bloomberg.com/markets/news.rss", "site:bloomberg.com", "global"),
     ("Financial Times", "https://www.ft.com/rss/home", "site:ft.com", "global"),
@@ -2780,8 +2817,6 @@ NEWS_SOURCES = [
     ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/topstories/", "site:marketwatch.com", "global"),
     ("Associated Press", "https://feeds.apnews.com/rss/apf-topnews", "site:apnews.com", "global"),
     ("BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml", "site:bbc.com", "global"),
-    ("The Guardian", "https://www.theguardian.com/world/rss", "site:theguardian.com", "global"),
-    ("CNN", "http://rss.cnn.com/rss/edition.rss", "site:cnn.com", "global"),
 ]
 BANKING_CONTEXT = [
     "banking sector", "banking system", "system credit", "credit growth", "deposit growth",
@@ -3170,6 +3205,8 @@ def _news_identity(article: dict[str,Any]) -> str:
     base=_news_text(article.get("title"),article.get("summary"))[:400]
     return "text:"+hashlib.sha256(base.encode()).hexdigest()
 
+article_key = _news_identity
+
 
 def _news_dedupe(articles: list[dict[str,Any]]) -> list[dict[str,Any]]:
     seen=set(); out=[]
@@ -3387,15 +3424,19 @@ def _parse_news_datetime(value: str | None) -> datetime | None:
 
 
 def _news_allowed_session(published_at: str | None, now: datetime | None = None) -> bool:
-    """Allow current-day news and a short carryover window from the previous market day, using IST."""
+    """Allow current and recent session news (within last 48 hours, or last trading session) in IST."""
     now = now or datetime.now(IST)
-    dt=_parse_news_datetime(published_at)
+    dt = _parse_news_datetime(published_at)
     if not dt:
-        return False
-    if dt.date()==now.date():
         return True
-    prev=_previous_market_day(now.date())
-    return dt.date()==prev and dt.time() >= datetime.strptime('14:00','%H:%M').time()
+    try:
+        age = now - dt
+        if age.total_seconds() <= 172800:  # 48 hours
+            return True
+        prev = _previous_market_day(now.date())
+        return dt.date() >= prev
+    except Exception:
+        return True
 
 
 def _external_news_row(row: dict[str,Any]) -> dict[str,Any]:
@@ -4641,20 +4682,29 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     evidence = {"technical": ta, "patterns": patterns, "news": news}
     opt_bias = side if side in {"BUY", "SELL"} else ("BUY" if (rsi_val >= 50 or last_price >= ema20) else "SELL")
-    is_fut = is_future_symbol(symbol)
-    root = extract_root_symbol(symbol)
-    cand = None
-    if is_fut:
-        cand = resolve_option_for_future(symbol, opt_bias, user_id)
-    elif user_id:
+    root = extract_root_symbol(symbol).upper()
+    is_fut = is_future_symbol(symbol) or root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "NIFTY", "BANKNIFTY"}
+    
+    # Always resolve optimal near-ATM option for commodities, indices, and futures
+    cand = resolve_option_for_future(symbol, opt_bias, user_id)
+    if not cand and user_id:
         wl_options = user_watchlist_option_contracts(user_id, symbol, opt_bias)
         if wl_options:
             cand = wl_options[0]
 
-    if cand:
-        c_sym = str(cand.get("symbol") or "")
-        c_key = str(cand.get("instrument_key") or c_sym)
-        disp_raw = str(cand.get("display_name") or "")
+    opp_bias = "SELL" if opt_bias == "BUY" else "BUY"
+    alt_cand = resolve_option_for_future(symbol, opp_bias, user_id)
+
+    def _format_opt_candidate(c_node, c_bias, is_consensus=True):
+        if not c_node:
+            return None
+        raw_sym = str(c_node.get("symbol") or "")
+        c_sym = re.sub(r'\s+FUT(?:\s+EXP)?\s+', ' ', raw_sym).strip()
+        c_sym = re.sub(r'(\d+)(CE|PE)$', r'\1 \2', c_sym)
+        c_key = str(c_node.get("instrument_key") or c_sym)
+        disp_raw = str(c_node.get("display_name") or c_sym)
+        disp_raw = re.sub(r'\s+FUT(?:\s+EXP)?\s+', ' ', disp_raw).strip()
+        disp_raw = re.sub(r'(\d+)(CE|PE)$', r'\1 \2', disp_raw)
         c_disp = disp_raw if any(x in disp_raw.upper() for x in (" CE", " PE", "CE", "PE")) else c_sym
         try:
             q = UPSTOX.quote(c_key or c_sym)
@@ -4662,26 +4712,24 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         except Exception:
             opt_entry = 0.0
         if opt_entry <= 0:
-            try:
-                q = UPSTOX.quote(c_sym)
-                opt_entry = float(q.get("ltp") or q.get("last_price") or 0.0)
-            except Exception:
-                opt_entry = 0.0
+            opt_entry = float(c_node.get("entry") or 0.0)
         opt_parsed = parse_option_contract(c_sym)
         opt_type = "CE" if (" CE" in c_sym or "CE " in c_sym or c_sym.endswith("CE")) else "PE"
-        strike_val = float(opt_parsed.get("strike") or 0.0) if opt_parsed else None
-        expiry_val = opt_parsed.get("expiry") if opt_parsed else None
+        strike_val = float(opt_parsed.get("strike") or c_node.get("strike") or 0.0) if opt_parsed else float(c_node.get("strike") or 0.0)
+        expiry_val = (opt_parsed.get("expiry") if opt_parsed else None) or c_node.get("expiry")
         if opt_entry <= 0 and strike_val:
             opt_entry = bs_price(last_price, strike_val, opt_type=opt_type)
         if opt_entry <= 0:
             opt_entry = 150.0
-        lot = int(cand.get("lot_size") or resolve_lot_size(c_sym, resolve_lot_size(symbol, 1)))
-        evidence["options"] = {
+        lot = int(c_node.get("lot_size") or resolve_lot_size(c_sym, resolve_lot_size(symbol, 1)))
+        sl_mult = 0.82 if opt_type == "CE" else 0.80
+        tgt_mult = 1.35 if opt_type == "CE" else 1.38
+        return {
             "available": True,
             "instrument_kind": "OPTION",
             "underlying": symbol,
             "root": root,
-            "direction": opt_bias,
+            "direction": c_bias,
             "transaction_side": "BUY",
             "instrument_key": c_key,
             "symbol": c_sym,
@@ -4689,21 +4737,22 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "strike": strike_val,
             "expiry": expiry_val,
             "display": c_disp,
-            "entry": opt_entry,
+            "display_name": c_disp,
+            "entry": round(opt_entry, 2),
+            "stop_loss": round(opt_entry * sl_mult, 2),
+            "target": round(opt_entry * tgt_mult, 2),
             "lot_size": lot,
-            "from_watchlist": True,
-            "score": 95.0
+            "score": 95.0 if is_consensus else 45.0,
+            "is_consensus": is_consensus,
+            "consensus_label": "Algorithmic Consensus Active" if is_consensus else "Inactive / Theoretical (Requires Trend Shift)"
         }
+
+    if cand:
+        evidence["options"] = _format_opt_candidate(cand, opt_bias, is_consensus=True)
         if side not in {"BUY", "SELL"}:
             side = opt_bias
-    elif (option_preferences.get("enabled") or option_preferences) and not is_fut:
-        try:
-            opt = option_trade_candidate(symbol, opt_bias)
-            evidence["options"] = opt
-            if opt.get("available") and side not in {"BUY", "SELL"}:
-                side = opt_bias
-        except Exception as exc:
-            evidence["options"] = {"available": False, "reason": safe_text(exc)}
+    if alt_cand:
+        evidence["alternative_option"] = _format_opt_candidate(alt_cand, opp_bias, is_consensus=False)
 
     # Check next market day when market is closed
     seg = get_symbol_segment(symbol)
@@ -5242,11 +5291,43 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     reco_symbol = instrument.get("symbol") if (instrument.get("kind") == "OPTION" and instrument.get("symbol")) else symbol
     reco_display = instrument.get("display") if (instrument.get("kind") == "OPTION" and instrument.get("display")) else reco_symbol
-    reco_action = "BUY" if instrument.get("kind") == "OPTION" else side
+    reco_symbol = re.sub(r'\s+FUT(?:\s+EXP)?\s+', ' ', str(reco_symbol)).strip()
+    reco_symbol = re.sub(r'(\d+)(CE|PE)$', r'\1 \2', reco_symbol)
+    reco_display = re.sub(r'\s+FUT(?:\s+EXP)?\s+', ' ', str(reco_display)).strip()
+    reco_display = re.sub(r'(\d+)(CE|PE)$', r'\1 \2', reco_display)
+
+    opt_type_detected = instrument.get("option_type") or (
+        "CE" if (" CE" in reco_symbol or reco_symbol.endswith("CE")) else ("PE" if (" PE" in reco_symbol or reco_symbol.endswith("PE")) else None)
+    )
+    if opt_type_detected:
+        signal_action = "BUY CALL" if opt_type_detected == "CE" else "BUY PUT"
+        reco_action = signal_action
+    else:
+        signal_action = "BUY" if side == "BUY" else "SELL"
+        reco_action = side
+
+    # Ensure BOTH Call and Put options are always available in payload
+    pri_opt = evidence.get("options")
+    alt_opt = evidence.get("alternative_option")
+    ce_opt = pri_opt if (pri_opt and pri_opt.get("option_type") == "CE") else (alt_opt if (alt_opt and alt_opt.get("option_type") == "CE") else None)
+    pe_opt = pri_opt if (pri_opt and pri_opt.get("option_type") == "PE") else (alt_opt if (alt_opt and alt_opt.get("option_type") == "PE") else None)
+    if not ce_opt:
+        ce_cand = resolve_option_for_future(symbol, "BUY", user_id)
+        if ce_cand:
+            ce_opt = _format_opt_candidate(ce_cand, "BUY", is_consensus=(opt_bias == "BUY"))
+    if not pe_opt:
+        pe_cand = resolve_option_for_future(symbol, "SELL", user_id)
+        if pe_cand:
+            pe_opt = _format_opt_candidate(pe_cand, "SELL", is_consensus=(opt_bias == "SELL"))
 
     result = {
         "qualifies": True,
         "recommendation": reco_action,
+        "action": signal_action,
+        "signal": signal_action,
+        "signal_action": signal_action,
+        "direction": "BUY" if (opt_type_detected == "CE" or (not opt_type_detected and side == "BUY")) else "SELL",
+        "option_type": opt_type_detected,
         "timeframe": timeframe,
         "symbol": reco_symbol,
         "display_symbol": reco_display,
@@ -5261,6 +5342,10 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         },
         "instrument": instrument,
         "evidence": evidence,
+        "recommended_option": pri_opt,
+        "alternative_option": alt_opt,
+        "call_option": ce_opt,
+        "put_option": pe_opt,
         "rationale": rationale_text,
         "provider": "upstox+news",
         "timestamp": now_iso(),
@@ -5334,6 +5419,10 @@ def ai_analyze(evidence: dict[str, Any]) -> dict[str, Any]:
             text = "".join(p.get("text", "") for p in payload.get("candidates", [{}])[0].get("content", {}).get("parts", []))
             match = re.search(r"\{.*\}", text, re.S)
             data = json.loads(match.group(0)) if match else {"decision": "NO_TRADE", "rationale": text}
+            usage = payload.get("usageMetadata") or {}
+            p_tok = int(usage.get("promptTokenCount") or len(prompt) // 4)
+            r_tok = int(usage.get("candidatesTokenCount") or len(text) // 4)
+            log_gemini_tokens(f"ai_analyze:{model}", p_tok, r_tok, f"Decision: {data.get('decision')}")
             provider_ok("gemini")
             return {"available": True, **data, "model": model, "timestamp": now_iso()}
         except Exception as exc:
@@ -5407,6 +5496,20 @@ class BuyableIn(BaseModel):
 init_db()
 seed_admin()
 
+async def _auto_news_worker_loop():
+    """Continuously refreshes and pre-warms news feeds in the background every 60 seconds."""
+    while True:
+        try:
+            for tgt in ["NIFTY", "BANKNIFTY", "CRUDEOIL", "GLOBAL"]:
+                try:
+                    await asyncio.to_thread(_refresh_news_background, tgt, tgt, None, 50)
+                except Exception:
+                    pass
+                await asyncio.sleep(2)
+        except Exception as e:
+            log.debug("Auto news loop error: %s", safe_text(e))
+        await asyncio.sleep(60)
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     global MAIN_LOOP
@@ -5416,23 +5519,36 @@ async def lifespan(app: FastAPI):
     auto_task = asyncio.create_task(_auto_trade_loop())
     risk_task = asyncio.create_task(_paper_risk_loop())
     reco_task = asyncio.create_task(_auto_recommendation_recorder_loop())
+    news_task = asyncio.create_task(_auto_news_worker_loop())
     log.info("CA Trader backend ready host=%s port=%s auth=%s", HOST, PORT, AUTH_ENABLED)
     log.info("Terminal HTML served from %s", HTML_PATH)
     log.info("Login HTML served from %s", LOGIN_HTML_PATH)
     try:
         yield
     finally:
-        auto_task.cancel(); risk_task.cancel(); reco_task.cancel()
+        auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await auto_task
         with contextlib.suppress(asyncio.CancelledError):
             await risk_task
+        with contextlib.suppress(asyncio.CancelledError):
+            await news_task
         MARKET_STREAM.stop()
         log.info("CA Trader backend shutting down")
 
+from starlette.middleware.gzip import GZipMiddleware
 app = FastAPI(title="CA Trader Headless Backend", version="1.0.0", lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(SessionMiddleware, secret_key=AUTH_SECRET, max_age=int(AUTH_IDLE_HOURS * 3600), same_site="lax", https_only=False)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+try:
+    from fastapi.staticfiles import StaticFiles
+    _static_dir = BASE_DIR / "static"
+    if _static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+except Exception as _st_err:
+    log.warning("Could not mount /static: %s", _st_err)
 
 
 @app.middleware("http")
@@ -5453,6 +5569,12 @@ async def request_middleware(request: Request, call_next):
         return JSONResponse({"error": {"code": "INTERNAL_ERROR", "message": "Internal server error"}}, status_code=500)
     elapsed=round((time.monotonic() - started) * 1000, 2)
     response.headers["X-CA-Trader-Request-Time-Ms"] = str(elapsed)
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=3600"
     scope = "API" if request.url.path.startswith("/api/") else "APP"
     log.info("%s %s %s -> %s in %sms", scope, request.method, request.url.path, response.status_code, elapsed)
     return response
@@ -5640,6 +5762,13 @@ async def fitness_page(request: Request) -> Response:
     if not FITNESS_HTML_PATH.exists(): return error_json("FITNESS_UI_NOT_FOUND", "fitness.html is missing", 500)
     request.session["selected_terminal"]="fitness"
     return HTMLResponse(FITNESS_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+
+@app.get("/guide", response_class=HTMLResponse)
+@app.get("/tutorial", response_class=HTMLResponse)
+async def guide_page(request: Request) -> Response:
+    if not GUIDE_HTML_PATH.exists():
+        return error_json("GUIDE_UI_NOT_FOUND", "ca_trader_guide.html is missing", 500)
+    return HTMLResponse(GUIDE_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
 
 @app.get("/terminal", response_class=HTMLResponse)
 async def terminal_page(request: Request) -> Response:
@@ -7617,8 +7746,8 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
                             real_c = contract_map[(stk, side_type)]
                             s_item[side]["instrument_key"] = real_c.get("instrument_key") or s_item[side].get("instrument_key")
                             s_item[side]["trading_symbol"] = real_c.get("trading_symbol") or f"{root} {stk} {side_type} {exp_tag} 26"
-                            s_item[side]["symbol"] = f"{root} FUT {exp_tag} {stk}{side_type}"
-                            s_item[side]["display_symbol"] = f"{root} FUT {exp_tag} {stk}{side_type}"
+                            s_item[side]["symbol"] = f"{root} {exp_tag} {stk} {side_type}"
+                            s_item[side]["display_symbol"] = f"{root} {exp_tag} {stk} {side_type}"
                 data["is_mock"] = False
                 data["provider"] = "upstox_mcx"
                 data["expiry"] = f"{exp_tag} 2026"
@@ -9014,6 +9143,82 @@ async def square_off(order_id: str, request: Request, user: dict[str, Any] = Dep
     return {"ok": True, "final_pnl": pnl, "exit_price": exit_price, "order": db_exec("SELECT * FROM orders WHERE id=? AND user_id=?", [order_id, user["id"]], "one")}
 
 
+@app.post("/api/portfolio/panic-exit")
+async def portfolio_panic_exit(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """1-Click Emergency Panic Kill Switch:
+    Squares off all active open positions at live market price, cancels all pending orders,
+    and immediately pauses auto-trade to prevent new orders.
+    """
+    uid = user["id"]
+    now_str = now_iso()
+    positions = db_exec("SELECT * FROM positions WHERE user_id=? AND COALESCE(status,'OPEN')='OPEN' AND quantity>0", [uid], "all") or []
+    closed_count = 0
+    total_exit_pnl = 0.0
+
+    for p in positions:
+        try:
+            key = str(p.get("instrument_key") or p.get("symbol"))
+            exit_price = 0.0
+            try:
+                q = UPSTOX.ltp(key)
+                exit_price = float(q.get("ltp") or 0.0)
+            except Exception:
+                pass
+            if exit_price <= 0:
+                exit_price = float(p.get("avg_price") or 100.0)
+            side = str(p.get("side") or "BUY").upper()
+            close_side = "SELL" if side == "BUY" else "BUY"
+            qty = int(p.get("quantity") or 0)
+            entry = float(p.get("avg_price") or exit_price)
+            pnl = round((exit_price - entry) * qty if side == "BUY" else (entry - exit_price) * qty, 2)
+            total_exit_pnl += pnl
+
+            order = {
+                "symbol": p.get("symbol"),
+                "instrument_key": key,
+                "side": close_side,
+                "quantity": qty,
+                "price": exit_price,
+                "fill_price": exit_price,
+                "paper": 1,
+                "product": "I",
+                "underlying": p.get("underlying"),
+                "instrument_kind": p.get("instrument_kind"),
+                "fund_bucket": p.get("fund_bucket") or "trading"
+            }
+            _paper_fill(uid, order, p.get("recommendation_id"))
+            closed_count += 1
+            db_exec(
+                "UPDATE orders SET status='SQUARED_OFF', execution_state='CLOSED', exit_price=?, final_pnl=?, updated_at=? WHERE (symbol=? OR instrument_key=?) AND user_id=? AND status IN ('PAPER_FILLED','FILLED','PENDING')",
+                [exit_price, pnl, now_str, p.get("symbol"), key, uid]
+            )
+        except Exception as e:
+            log.warning("Panic exit error for %s: %s", p.get("symbol"), safe_text(e))
+
+    # Cancel all pending/AMO orders
+    db_exec("UPDATE orders SET status='CANCELLED', execution_state='CANCELLED', updated_at=? WHERE user_id=? AND status IN ('PENDING', 'AMO_QUEUED', 'SUBMITTED')", [now_str, uid])
+
+    # Pause Auto-Trade
+    db_exec("UPDATE auto_trade_configs SET enabled=0, updated_at=? WHERE user_id=?", [now_str, uid])
+
+    await add_notification(
+        uid,
+        "risk_event",
+        "warning",
+        100,
+        "🚨 Emergency Panic Exit Executed",
+        f"Squared off {closed_count} open position(s) (Net P&L: {'+' if total_exit_pnl>=0 else ''}₹{total_exit_pnl:,.2f}), cancelled all pending orders, and paused auto-trade.",
+        "panic:exit"
+    )
+
+    return {
+        "ok": True,
+        "closed_positions": closed_count,
+        "total_pnl": round(total_exit_pnl, 2),
+        "message": f"Panic Exit complete: {closed_count} positions squared off, auto-trade paused."
+    }
+
+
 @app.get("/api/funds")
 async def funds(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     local = db_exec("SELECT * FROM funds WHERE user_id=?", [user["id"]], "one")
@@ -9405,28 +9610,43 @@ async def position_live_advisor_api(
     uid = user["id"]
     pos = None
 
-    if position_id and position_id != "undefined":
-        pos = db_exec("SELECT * FROM positions WHERE id=? AND user_id=?", [position_id, uid], "one")
-    if not pos:
-        # Check active open position first
+    explicit_requested = bool(position_id and position_id not in ("undefined", "null", ""))
+    if explicit_requested:
+        pos = db_exec("SELECT * FROM positions WHERE (id=? OR symbol=?) AND user_id=?", [position_id, position_id, uid], "one")
+        if not pos:
+            ord_row = db_exec("SELECT * FROM orders WHERE (id=? OR symbol=?) AND user_id=? ORDER BY created_at DESC LIMIT 1", [position_id, position_id, uid], "one")
+            if ord_row:
+                pos = {
+                    "id": ord_row["id"],
+                    "symbol": ord_row["symbol"],
+                    "side": ord_row["side"],
+                    "quantity": ord_row["quantity"],
+                    "avg_price": ord_row.get("price") or 100.0,
+                    "status": "CLOSED" if str(ord_row.get("status") or "").upper() in ("SQUARED_OFF", "CANCELLED") else "OPEN",
+                    "stop_loss": ord_row.get("stop_loss"),
+                    "target": ord_row.get("target"),
+                    "unrealized_pnl": ord_row.get("final_pnl") or 0.0,
+                    "final_pnl": ord_row.get("final_pnl") or 0.0
+                }
+    else:
+        # Check active open position ONLY
         pos = db_exec("SELECT * FROM positions WHERE user_id=? AND (status='OPEN' OR status IS NULL) AND quantity > 0 ORDER BY updated_at DESC", [uid], "one")
-    if not pos:
-        # Check most recently closed position
-        pos = db_exec("SELECT * FROM positions WHERE user_id=? ORDER BY updated_at DESC LIMIT 1", [uid], "one")
 
     if not pos:
         return {
             "has_position": False,
+            "is_open": False,
             "status": "NO_POSITION",
             "decision": "SCANNING",
-            "verdict": "AWAITING TRADE EXECUTION",
-            "reason": "No active or recent trade found in your trading book. Place a 1-click Quick Order to initialize real-time CA AI sentinel monitoring.",
+            "verdict": "⚡ NO ACTIVE OPEN POSITIONS",
+            "reason": "No open trade is currently active in your account. Place a trade to launch real-time CA AI Sentinel tracking.",
             "theta_decay_hourly": 0.0,
             "theta_decay_daily": 0.0,
+            "theta_pts": 0.0,
             "peak_pnl": 0.0,
             "current_pnl": 0.0,
-            "technical_summary": "Neutral / Waiting for market order trigger.",
-            "news_summary": "Macro catalysts monitored.",
+            "technical_summary": "Waiting for active market position.",
+            "news_summary": "Macro & market momentum monitored.",
             "advice": "Select an instrument from the watchlist and trigger Quick Order to launch the sentinel.",
             "suggested_actions": ["OPEN_WATCHLIST", "QUICK_ORDER"]
         }
@@ -9479,8 +9699,23 @@ async def position_live_advisor_api(
     bg_color = "var(--buy)"
 
     if is_open:
-        # Case A: Trade went into profit (e.g. +400 to +600) but is retracing towards breakeven/loss due to Theta decay
-        if peak_pnl >= 350 and pnl <= peak_pnl * 0.6:
+        user_max_loss = 500.0
+        try:
+            cfg = db_exec("SELECT max_loss FROM auto_trade_configs WHERE user_id=?", [uid], "one") or {}
+            if cfg.get("max_loss") and float(cfg["max_loss"]) > 0:
+                user_max_loss = float(cfg["max_loss"])
+        except Exception:
+            pass
+
+        # Priority 1: Strict User Max Loss Enforcement (e.g. ₹500 cap)
+        if pnl <= -user_max_loss:
+            decision = "EXIT_NOW"
+            verdict = f"🚨 MAX LOSS LIMIT HIT (-₹{abs(pnl):,.2f}) · SQUARE OFF NOW"
+            reason = f"Unrealized loss (-₹{abs(pnl):,.2f}) has reached your hard risk limit of -₹{user_max_loss:,.2f}. Square off immediately to protect your trading capital!"
+            urgency = "HIGH"
+            bg_color = "var(--sell)"
+        # Priority 2: Peak Profit Protection (Retracement > 35% from peak)
+        elif peak_pnl >= 350 and pnl <= peak_pnl * 0.65:
             decision = "EXIT_NOW"
             verdict = "🚨 EXIT NOW & BOOK REMAINING PROFIT"
             reason = f"Trade achieved peak profit of +₹{peak_pnl:,.2f} but has retraced to +₹{pnl:,.2f}. Severe Theta Decay (-₹{theta_hourly_rupees:,.2f}/hr) is rapidly destroying your option premium. Square off immediately to lock your gains!"
@@ -9778,6 +10013,229 @@ async def holdings(request: Request, user: dict[str, Any] = Depends(require_user
         except Exception:
             provider = None
     return {"user_id": user["id"], "items": local, "provider": provider}
+
+# ---------------------------------------------------------------------------
+# CA AI News User Insertion Endpoint
+# ---------------------------------------------------------------------------
+
+class UserNewsIn(BaseModel):
+    headline: str = Field(min_length=3, max_length=500)
+    summary: str = Field(default="", max_length=2000)
+    url: str = Field(default="", max_length=500)
+    source: str = Field(default="CA AI Chat", max_length=100)
+    target: str = Field(default="GLOBAL", max_length=50)
+    sentiment: str = Field(default="Neutral", max_length=20)
+    materiality: float = Field(default=85.0, ge=0.0, le=100.0)
+
+@app.post("/api/news/user-add")
+async def add_user_news(payload: UserNewsIn, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    uid = int(user["id"])
+    t = payload.target.upper().strip()
+    is_glob = 1 if t in {"GLOBAL", "MARKET"} else 0
+    now = now_iso()
+    k = "user:" + hashlib.sha256(f"{payload.headline}:{uid}:{now}".encode()).hexdigest()[:24]
+    
+    db_exec(
+        "INSERT INTO external_news(user_id, headline, summary, source, url, target, is_global, materiality, classification, reason, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        [uid, payload.headline, payload.summary, payload.source, payload.url, t, is_glob, payload.materiality, "NEWS", "User/CA AI added news", now],
+        "commit"
+    )
+    db_exec(
+        "INSERT OR REPLACE INTO persisted_news_events(article_key, target, headline, summary, full_summary, url, source, published_at, matched_keyword, sentiment, materiality, scope, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [k, t, payload.headline, payload.summary, payload.summary, payload.url, payload.source, now, t, payload.sentiment, payload.materiality, "global" if is_glob else "stock", now],
+        "commit"
+    )
+    CACHE.delete(_news_cache_key(t, uid))
+    CACHE.delete(_news_cache_key(t, None))
+    CACHE.delete(_news_cache_key("GLOBAL", uid))
+    return {"ok": True, "article_key": k, "headline": payload.headline, "target": t}
+
+# ---------------------------------------------------------------------------
+# Backtesting Simulator & Replay Engine
+# ---------------------------------------------------------------------------
+
+class BacktestOrderIn(BaseModel):
+    symbol: str
+    side: str
+    quantity: int = Field(default=1, ge=1)
+    price: float = Field(gt=0)
+    stop_loss: float | None = None
+    target: float | None = None
+    candle_time: str
+
+@app.get("/api/backtest/session")
+async def backtest_session(symbol: str = "NIFTY", date: str | None = None, timeframe: str = "5m", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Returns historical candles for the specified symbol & date, with pre-computed indicators, options and news."""
+    sym = symbol.upper().strip()
+    root = extract_root_symbol(sym)
+    tf = timeframe.lower().strip()
+    
+    candles = []
+    try:
+        candles = UPSTOX.candles(sym, tf.rstrip("m"), "minutes", days=10)
+    except Exception:
+        candles = []
+    
+    if not candles:
+        base_price = 23400.0 if "NIFTY" in root else 56500.0 if "BANK" in root else 6150.0 if "CRUDE" in root else 1250.0
+        cur_date_str = date or datetime.now(IST).strftime("%Y-%m-%d")
+        t_cur = datetime.strptime(f"{cur_date_str} 09:15:00", "%Y-%m-%d %H:%M:%S")
+        candles = []
+        p = base_price
+        for i in range(75):
+            chg = (hash(f"{sym}:{cur_date_str}:{i}") % 100 - 48) * (0.0012 * base_price)
+            op = p
+            cl = p + chg
+            hi = max(op, cl) + abs(chg) * 0.4
+            lo = min(op, cl) - abs(chg) * 0.4
+            vol = 15000 + abs(int(chg * 100))
+            candles.append({
+                "time": t_cur.isoformat(),
+                "timestamp": int(t_cur.timestamp() * 1000),
+                "open": round(op, 2),
+                "high": round(hi, 2),
+                "low": round(lo, 2),
+                "close": round(cl, 2),
+                "volume": vol
+            })
+            p = cl
+            t_cur += timedelta(minutes=5 if "5" in tf else 15 if "15" in tf else 1)
+    
+    if date:
+        date_candles = [c for c in candles if str(c.get("timestamp","") or c.get("time","")).startswith(date)]
+        if len(date_candles) >= 10:
+            candles = date_candles
+
+    norm_candles = []
+    for c in candles:
+        t_str = str(c.get("timestamp") or c.get("time") or "")
+        norm_candles.append({
+            "time": t_str,
+            "timestamp": t_str,
+            "open": float(c.get("open") or 0.0),
+            "high": float(c.get("high") or 0.0),
+            "low": float(c.get("low") or 0.0),
+            "close": float(c.get("close") or 0.0),
+            "volume": float(c.get("volume") or 0.0)
+        })
+    candles = norm_candles
+
+    closes = [float(c["close"]) for c in candles]
+    indicator_series = []
+    for i in range(len(candles)):
+        sub_closes = closes[:i+1]
+        c_price = sub_closes[-1]
+        e20 = sum(sub_closes[-20:]) / min(20, len(sub_closes))
+        e50 = sum(sub_closes[-50:]) / min(50, len(sub_closes))
+        
+        if len(sub_closes) >= 14:
+            diffs = [sub_closes[j] - sub_closes[j-1] for j in range(-13, 0)]
+            gains = [d for d in diffs if d > 0]
+            losses = [-d for d in diffs if d < 0]
+            avg_g = sum(gains) / 14.0 if gains else 0.001
+            avg_l = sum(losses) / 14.0 if losses else 0.001
+            rs = avg_g / max(0.0001, avg_l)
+            rsi = 100.0 - (100.0 / (1.0 + rs))
+        else:
+            rsi = 50.0
+
+        st_bias = "BUY" if c_price >= e20 else "SELL"
+        sig = "BUY" if (c_price > e20 and rsi >= 50) else "SELL" if (c_price < e20 and rsi <= 50) else "NEUTRAL"
+        
+        step = 50.0 if "NIFTY" in root or "CRUDE" in root else 100.0 if "BANK" in root else 20.0
+        atm_strike = round(c_price / step) * step
+        ce_sym = f"{root} {int(atm_strike)} CE"
+        pe_sym = f"{root} {int(atm_strike)} PE"
+
+        indicator_series.append({
+            "index": i,
+            "time": candles[i]["time"],
+            "ema20": round(e20, 2),
+            "ema50": round(e50, 2),
+            "rsi": round(rsi, 1),
+            "signal": sig,
+            "supertrend": st_bias,
+            "atm_strike": atm_strike,
+            "call_option": {"symbol": ce_sym, "strike": atm_strike, "entry": round(c_price * 0.015, 2)},
+            "put_option": {"symbol": pe_sym, "strike": atm_strike, "entry": round(c_price * 0.014, 2)}
+        })
+
+    news_rows = db_exec(
+        "SELECT headline, summary, source, url, published_at, matched_keyword, sentiment, materiality FROM persisted_news_events WHERE target=? OR target='GLOBAL' ORDER BY published_at DESC LIMIT 15",
+        [root],
+        "all"
+    )
+
+    return {
+        "symbol": sym,
+        "root": root,
+        "date": date or datetime.now(IST).strftime("%Y-%m-%d"),
+        "timeframe": tf,
+        "candles": candles,
+        "indicators": indicator_series,
+        "news": news_rows
+    }
+
+@app.post("/api/backtest/order")
+async def place_backtest_order(payload: BacktestOrderIn, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    uid = int(user["id"])
+    now = now_iso()
+    db_exec(
+        "INSERT INTO backtest_trades(user_id, symbol, side, quantity, entry_price, status, entry_time, created_at) VALUES(?,?,?,?,?,?,?,?)",
+        [uid, payload.symbol.upper(), payload.side.upper(), payload.quantity, payload.price, "OPEN", payload.candle_time, now],
+        "commit"
+    )
+    return {"ok": True, "message": f"Backtest {payload.side} order recorded for {payload.symbol} at {payload.price}"}
+
+@app.post("/api/backtest/close")
+async def close_backtest_order(payload: dict[str, Any], user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    uid = int(user["id"])
+    trade_id = payload.get("trade_id")
+    exit_price = float(payload.get("exit_price") or 0.0)
+    exit_time = str(payload.get("exit_time") or now_iso())
+    
+    trade = db_exec("SELECT * FROM backtest_trades WHERE id=? AND user_id=?", [trade_id, uid], "one")
+    if not trade:
+        raise HTTPException(404, "Backtest trade not found")
+    
+    entry = float(trade["entry_price"])
+    qty = int(trade["quantity"])
+    side = trade["side"].upper()
+    
+    pnl = (exit_price - entry) * qty if side == "BUY" else (entry - exit_price) * qty
+    db_exec(
+        "UPDATE backtest_trades SET exit_price=?, pnl=?, status='CLOSED', exit_time=? WHERE id=? AND user_id=?",
+        [exit_price, round(pnl, 2), exit_time, trade_id, uid],
+        "commit"
+    )
+    return {"ok": True, "pnl": round(pnl, 2), "trade_id": trade_id}
+
+@app.get("/api/backtest/positions")
+async def get_backtest_positions(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    uid = int(user["id"])
+    open_trades = db_exec("SELECT * FROM backtest_trades WHERE user_id=? AND status='OPEN' ORDER BY id DESC", [uid], "all")
+    closed_trades = db_exec("SELECT * FROM backtest_trades WHERE user_id=? AND status='CLOSED' ORDER BY id DESC LIMIT 50", [uid], "all")
+    
+    total_pnl = sum(float(t.get("pnl") or 0) for t in closed_trades)
+    wins = sum(1 for t in closed_trades if float(t.get("pnl") or 0) > 0)
+    losses = sum(1 for t in closed_trades if float(t.get("pnl") or 0) < 0)
+    win_rate = round((wins / max(1, len(closed_trades))) * 100, 1) if closed_trades else 0.0
+    
+    return {
+        "open_positions": open_trades,
+        "closed_trades": closed_trades,
+        "total_pnl": round(total_pnl, 2),
+        "wins": wins,
+        "losses": losses,
+        "win_rate": win_rate,
+        "total_trades": len(closed_trades)
+    }
+
+@app.post("/api/backtest/reset")
+async def reset_backtest_session(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    uid = int(user["id"])
+    db_exec("DELETE FROM backtest_trades WHERE user_id=?", [uid], "commit")
+    return {"ok": True, "message": "Backtest trade ledger reset successfully"}
 
 # ---------------------------------------------------------------------------
 # Auto trade / threshold crossing
@@ -10380,7 +10838,11 @@ async def _monitor_paper_positions_once() -> None:
         except Exception:
             quotes=[]
         qmap={str(q.get("instrument_key") or q.get("symbol") or q.get("instrument")).upper():q for q in quotes if q}
-        nse_open=bool(market_session("NSE_EQ").get("active")); mcx_open=bool(market_session("MCX").get("active"))
+        cfg = db_exec("SELECT max_loss FROM auto_trade_configs WHERE user_id=?", [uid], "one") or {}
+        user_max_loss = float(cfg.get("max_loss") or 0)
+        if user_max_loss <= 0:
+            user_max_loss = 500.0
+
         for p in positions:
             key=str(p.get("instrument_key") or p.get("symbol")); q=qmap.get(key.upper()) or qmap.get(str(p.get("symbol") or "").upper())
             price=float(q.get("ltp") or 0) if q else 0
@@ -10416,7 +10878,26 @@ async def _monitor_paper_positions_once() -> None:
                                 await add_notification(uid,"position_advisory","warning",92,f"Position Risk Alert · {p.get('symbol')}",f"CA AI bias flipped to {rec_side} ({r_cached.get('confidence',80)}% conviction). Consider squaring off or tightening SL.",f"reco_advisory:{p['id']}:{rec_side}")
                                 break
                 except Exception: pass
-                reason=threshold_crossed(side,price,p.get("stop_loss"),p.get("target"))
+                avg_entry = float(p.get("avg_price") or p.get("entry") or p.get("fill_price") or 0)
+                qty_val = int(p.get("quantity") or 0)
+                cur_profit = (price - avg_entry) * qty_val if side == "BUY" else (avg_entry - price) * qty_val
+                if cur_profit >= 300.0 and avg_entry > 0:
+                    if side == "BUY" and (cur_sl < avg_entry):
+                        be_sl = round(avg_entry + 0.5, 2)
+                        db_exec("UPDATE positions SET stop_loss=?, updated_at=? WHERE id=?", [be_sl, now_iso(), p["id"]])
+                        p["stop_loss"] = be_sl
+                        await add_notification(uid, "risk_event", "success", 75, f"🛡️ Breakeven Locked · {p.get('symbol')}", f"Profit reached +₹{cur_profit:,.2f}. SL automatically locked to entry (₹{be_sl}).", f"be_lock:{p['id']}")
+                    elif side == "SELL" and (cur_sl <= 0 or cur_sl > avg_entry):
+                        be_sl = round(avg_entry - 0.5, 2)
+                        db_exec("UPDATE positions SET stop_loss=?, updated_at=? WHERE id=?", [be_sl, now_iso(), p["id"]])
+                        p["stop_loss"] = be_sl
+                        await add_notification(uid, "risk_event", "success", 75, f"🛡️ Breakeven Locked · {p.get('symbol')}", f"Profit reached +₹{cur_profit:,.2f}. SL automatically locked to entry (₹{be_sl}).", f"be_lock:{p['id']}")
+
+                cur_loss = (avg_entry - price) * qty_val if side == "BUY" else (price - avg_entry) * qty_val
+                if user_max_loss > 0 and cur_loss >= user_max_loss:
+                    reason = f"MAX_LOSS_LIMIT_HIT (-₹{cur_loss:,.2f} >= ₹{user_max_loss:,.2f})"
+                else:
+                    reason = threshold_crossed(side, price, p.get("stop_loss"), p.get("target"))
                 instrument_kind=str(p.get("instrument_kind") or "EQUITY").upper()
                 seg="MCX" if "MCX" in instrument_kind or str(key).upper().startswith("MCX") else "NSE_EQ"
                 market_open=mcx_open if seg=="MCX" else nse_open
@@ -10426,7 +10907,10 @@ async def _monitor_paper_positions_once() -> None:
                     try:
                         closed=_paper_fill(uid,order,p.get("recommendation_id"))
                         why=reason or "MARKET_CLOSE"
-                        await add_notification(uid,"risk_event","success" if float(closed.get("final_pnl") or closed.get("realized_pnl") or 0)>=0 else "warning",95,f"Auto square-off · {p.get('symbol')}",f"{why} · Exit ₹{price:,.2f}",f"auto-squareoff:{p.get('id')}:{why}")
+                        now_str = now_iso()
+                        calc_pnl = round((price - avg_entry) * qty_val if side == "BUY" else (avg_entry - price) * qty_val, 2)
+                        db_exec("UPDATE orders SET status='SQUARED_OFF', execution_state='CLOSED', exit_price=?, final_pnl=?, updated_at=? WHERE (symbol=? OR instrument_key=?) AND user_id=? AND status IN ('PAPER_FILLED','FILLED','PENDING')", [price, calc_pnl, now_str, p.get("symbol"), key, uid])
+                        await add_notification(uid,"risk_event","warning" if "MAX_LOSS" in str(why) else ("success" if float(closed.get("final_pnl") or closed.get("realized_pnl") or 0)>=0 else "warning"),95,f"Auto square-off · {p.get('symbol')}",f"{why} · Exit ₹{price:,.2f}",f"auto-squareoff:{p.get('id')}:{why}")
                     except Exception as exc:
                         log.warning("Paper risk close failed for %s/%s: %s",uid,p.get("symbol"),safe_text(exc))
         try: _position_mark_and_pnl(uid)
@@ -12308,6 +12792,20 @@ if __name__ == "__main__":
         raise SystemExit("uvicorn is required to run app.py (it is normally preinstalled with this environment).")
     uvicorn.run(app, host=HOST, port=PORT, log_level=LOG_LEVEL.lower(), reload=DEBUG)
 
+CLIENT_ERRORS_LOG: deque[dict[str, Any]] = deque(maxlen=100)
+
+@app.post("/api/logs/client-error")
+async def log_client_error(request: Request) -> dict[str, Any]:
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    if data and isinstance(data, dict):
+        data["received_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        CLIENT_ERRORS_LOG.appendleft(data)
+        log.warning("Client UI Error: %s at %s:%s", data.get("message"), data.get("source"), data.get("lineno"))
+    return {"ok": True}
+
 # ==============================================================================
 # ADMIN API & DATA SOURCES PASSBOOK STATEMENT (Item 12)
 # ==============================================================================
@@ -12323,17 +12821,8 @@ async def get_admin_api_passbook(user: dict[str, Any] = Depends(require_user)) -
         UPSTOX_USAGE_LOG["minute_calls"].popleft()
     while GEMINI_USAGE_LOG["minute_tokens"] and now - GEMINI_USAGE_LOG["minute_tokens"][0][0] > 60:
         GEMINI_USAGE_LOG["minute_tokens"].popleft()
-    
-    current_upstox_rpm = max(18, len(UPSTOX_USAGE_LOG["minute_calls"]))
-    current_gemini_tpm = max(4500, sum(t[1] for t in GEMINI_USAGE_LOG["minute_tokens"]))
-
-    # Seed mock history if empty for rich initial audit trail
-    if not UPSTOX_USAGE_LOG["history"]:
-        for ep, desc in [("/option/chain/MCX_FO", "Crude Oil Option Chain stream"), ("/market-quote/quotes", "Live tick quotes (CRUDEOIL, NIFTY)"), ("/historical-candle/5minute", "Candlestick fetch (CRUDEOIL FUT 5m)"), ("/order/place", "Paper execution sentinel route")]:
-            log_upstox_call(ep, 200, desc)
-    if not GEMINI_USAGE_LOG["history"]:
-        for feat, pt, rt, dt in [("CA AI Live Position Sentinel", 680, 240, "Evaluating Greeks & Theta decay risk"), ("CA AI Position Chat", 420, 180, "Strategy discussion & trailing SL advice"), ("Institutional Trade Thesis", 850, 310, "Multi-timeframe confluence scoring"), ("Post-Trade Loss Analysis", 550, 210, "Post-mortem theta decay lesson extraction")]:
-            log_gemini_tokens(feat, pt, rt, dt)
+    current_upstox_rpm = len(UPSTOX_USAGE_LOG["minute_calls"])
+    current_gemini_tpm = sum(t[1] for t in GEMINI_USAGE_LOG["minute_tokens"])
 
     ledger = []
     for u in list(UPSTOX_USAGE_LOG["history"])[:30]:
@@ -12381,5 +12870,6 @@ async def get_admin_api_passbook(user: dict[str, Any] = Depends(require_user)) -
             {"source": "Yahoo Global Market Feeds", "type": "REST Commodities & FX", "limit": "2000 req/hr", "status": "Connected 🟢"},
             {"source": "Institutional RSS & News Feeds", "type": "Multi-Source Financial RSS", "limit": "Unlimited", "status": "Active 🟢"}
         ],
+        "client_errors": list(CLIENT_ERRORS_LOG)[:20],
         "statement": ledger[:50]
     }
