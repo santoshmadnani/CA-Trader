@@ -8473,8 +8473,6 @@ function showDrawingTooltip(idx,x,y,indicatorIdx=-1){
   el.style.top = Math.max(8, top) + 'px';
   el.style.display = 'block';
 }
-function findDrawingAt(x,y){const view=getView(),pt={x,y,price:priceFromY(y,view)};for(let i=state.drawings.length-1;i>=0;i--)if(drawingHit(state.
-... [truncated for diff preview]
 function findDrawingAt(x,y){const view=getView(),pt={x,y,price:priceFromY(y,view)};for(let i=state.drawings.length-1;i>=0;i--)if(drawingHit(state.drawings[i],pt,view))return i;return -1}
 function moveDrawing(q, dx, dy, view) {
   const pad = { l: 12, r: 72, t: 18, b: 36 };
