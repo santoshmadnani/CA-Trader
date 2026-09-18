@@ -136,10 +136,13 @@
     clearInterval(startupTimer);
   });
 })();
-</script>
 
-<!-- ===== polish pass: ripple + sidebar backdrop ===== -->
-<script>
+
+/* ===== polish pass: ripple + sidebar backdrop ===== */
+
+
+/* ===== polish pass: ripple + sidebar backdrop ===== */
+
 (() => {
   // --- ripple micro-interaction ---
   const rippleSel = '.btn,.icon-btn,.navtab,.chip-filter,.tf-btn,.add-btn,.mobile-menu-btn';
@@ -174,10 +177,13 @@
     backdrop.addEventListener('click', () => sidebar.classList.remove('mobile-open'));
   }
 })();
-</script>
 
-<!-- ================= UI ENHANCEMENT SCRIPT (additive, non-breaking) ================= -->
-<script>
+
+/* ================= UI ENHANCEMENT SCRIPT (additive, non-breaking) ================= */
+
+
+/* ================= UI ENHANCEMENT SCRIPT (additive, non-breaking) ================= */
+
 (function(){
   // 1) Ripple ink effect on buttons/tabs/cards you click
   document.addEventListener('click', function(e){
@@ -254,10 +260,13 @@
     chartSurface.style.userSelect='none';
     chartSurface.style.webkitTouchCallout='none';
   }
-</script>
-<div id="liveNotificationStack"></div>
 
-<script>
+
+
+
+
+
+
 // ============================================================================
 // CA TRADER COMPLETE ENHANCEMENT SUITE
 // ============================================================================
@@ -464,7 +473,8 @@ async function loadAiDashboardTab(force = false) {
             <div><div class="muted" style="font-size:11px;font-weight:600;">Lot Size / Qty</div><div style="font-weight:800;font-size:14px;color:var(--text);">${s.lot_size || 1} qty</div></div>
           </div>
 
-          <!-- One-Sight Rationale Strip: Technicals, News & Greeks Reasons -->
+          /* One-Sight Rationale Strip: Technicals, News & Greeks Reasons */
+          /* One-Sight Rationale Strip: Technicals, News & Greeks Reasons */
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:10px;margin-bottom:14px;">
             <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:6px;padding:10px;">
               <div style="font-weight:700;font-size:12px;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:6px;">
@@ -532,7 +542,7 @@ async function turboLoadAll(){
   const btn = document.getElementById('turboLoadBtn');
   if(btn) { btn.disabled = true; btn.textContent = '⚡ Priming…'; }
   window.__caTurboMode = true;
-  const sym = (typeof selectedSymbol === 'function' ? selectedSymbol() : null) || window.CATraderSymbol || 'RELIANCE';
+  const sym = (typeof selectedSymbol === 'function' ? selectedSymbol() : null) || window.CATraderSymbol || 'NIFTY';
   showLiveToast('⚡ Turbo Load', 'Force-reloading all terminal sections & clearing timeout states…', 'gold');
 
   // Scan and reset any timed out error banners in the DOM
@@ -603,4 +613,5 @@ setTimeout(() => {
   if(typeof loadFundsTab === 'function') void loadFundsTab();
 }, 600);
 
-</script>
+
+

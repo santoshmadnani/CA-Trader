@@ -1,3 +1,4 @@
+(() => {
   const api = async (url, options={}) => {
     const timeoutMs = Math.max(1200, Number(options.timeoutMs || 8000));
     const ctrl = options.signal ? null : new AbortController();
@@ -275,7 +276,7 @@
 
   async function loadNewsByCaAi(mode = caAiNewsMode) {
     caAiNewsMode = mode;
-    const rawSym = selectedSymbol() || 'RELIANCE';
+    const rawSym = selectedSymbol() || 'NIFTY';
     const sym = extractUnderlying(rawSym);
     const host = $('newsList');
     if (!host) return;
@@ -1514,8 +1515,10 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     }
 
     const entry = Number(opt.entry || 0);
-    const sl = Number(opt.stop_loss || (isCall ? entry * 0.82 : entry * 0.80));
-    const tgt = Number(opt.target || (isCall ? entry * 1.35 : entry * 1.38));
+    const tgtGain = Math.max(3.0, Math.min(entry * 0.15, Math.max(entry * 0.08, 20.0)));
+    const slDist = Math.max(1.5, tgtGain / 1.7);
+    const sl = Number(opt.stop_loss || (entry ? roundVal(entry - slDist) : (isCall ? entry * 0.82 : entry * 0.80)));
+    const tgt = Number(opt.target || (entry ? roundVal(entry + tgtGain) : (isCall ? entry * 1.35 : entry * 1.38)));
     const lot = Number(opt.lot_size || 1);
 
     if(document.getElementById('chartRecoEntry')) document.getElementById('chartRecoEntry').textContent = entry ? '₹' + fmt(entry) : '—';
@@ -1649,8 +1652,10 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
 
     // 3. Update Entry, SL, Target Pills
     const entryPrice = Number(activeOpt.entry || rec.entry || 0);
-    const slPrice = Number(activeOpt.stop_loss || rec.stop_loss || (isCallConsensus ? entryPrice * 0.82 : entryPrice * 0.80));
-    const tgtPrice = Number(activeOpt.target || rec.target || (isCallConsensus ? entryPrice * 1.35 : entryPrice * 1.38));
+    const tgtGain = Math.max(3.0, Math.min(entryPrice * 0.15, Math.max(entryPrice * 0.08, 20.0)));
+    const slDist = Math.max(1.5, tgtGain / 1.7);
+    const slPrice = Number(activeOpt.stop_loss || rec.stop_loss || (entryPrice ? roundVal(entryPrice - slDist) : (isCallConsensus ? entryPrice * 0.82 : entryPrice * 0.80)));
+    const tgtPrice = Number(activeOpt.target || rec.target || (entryPrice ? roundVal(entryPrice + tgtGain) : (isCallConsensus ? entryPrice * 1.35 : entryPrice * 1.38)));
 
     if(document.getElementById('chartRecoEntry')) document.getElementById('chartRecoEntry').textContent = entryPrice ? '₹' + fmt(entryPrice) : '—';
     if(document.getElementById('chartRecoSl')) document.getElementById('chartRecoSl').textContent = slPrice ? '₹' + fmt(slPrice) : '—';
@@ -2603,12 +2608,20 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     $('quickOrderSymbol').dataset.lotSize = lotSize;
     $('quickOrderSymbol').dataset.side = orderSideText;
     $('quickOrderLtp').textContent = entry ? `₹${fmt(entry)}` : 'Market Price';
+    const cmp = Number(rec.cmp || rec.ltp || (typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(dispSym, sym)?.ltp : 0)) || entry;
+    const diff = Number(Math.abs(cmp - entry).toFixed(2));
+    let ltpText = cmp ? `₹${fmt(cmp)} (LTP)` : 'Market Price';
+    if (cmp && entry && diff >= 0.05) {
+      ltpText += ` · ${isBuy ? 'Dip' : 'Relief'} ₹${fmt(diff)}`;
+    }
+    $('quickOrderLtp').textContent = ltpText;
 
     $('quickOrderQty').value = lotSize;
     $('quickOrderQtyLabel').textContent = isOption ? `Quantity (1 Lot = ${lotSize} Contracts)` : 'Quantity';
     $('quickOrderSharesHint').textContent = isOption ? `1 Lot = ${lotSize} Contracts (Type 1 or ${lotSize} for 1 Lot, ${lotSize*2} for 2 Lots)` : `1 unit`;
 
     $('quickOrderPrice').value = entry ? entry : '';
+    if ($('quickOrderType')) $('quickOrderType').value = 'LIMIT';
     $('quickOrderSL').value = constrainedSl ? constrainedSl : '';
     $('quickOrderTarget').value = tgt ? tgt : '';
     $('quickOrderTrailingSl').value = tslPts ? tslPts : '';
@@ -3669,7 +3682,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
 
   // ================= DEDICATED BACKTESTING REPLAY ENGINE =================
   const btState = {
-    symbol: 'RELIANCE',
+    symbol: 'NIFTY',
     tf: '5m',
     allCandles: [],
     allNews: [],
@@ -4002,7 +4015,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
 
   async function loadBacktestData(){
     pauseBacktest();
-    const sym = $('btSymbolSelect')?.value || btState.symbol || 'RELIANCE';
+    const sym = $('btSymbolSelect')?.value || btState.symbol || 'NIFTY';
     const tf = $('btTfSelect')?.value || btState.tf || '5m';
     const startTime = $('btDateTime')?.value || '';
     btState.symbol = sym;

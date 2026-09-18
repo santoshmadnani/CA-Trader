@@ -3,7 +3,7 @@
   const esc = window.esc || (v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
   const api = window.api || (async (u, o={}) => { const r = await fetch(u, {credentials:'include', headers:{'Content-Type':'application/json'}, ...o}); return r.json(); });
   const toast = window.toast || ((m) => console.log(m));
-  const selectedSymbol = window.selectedSymbol || (() => window.state?.symbol || 'RELIANCE');
+  const selectedSymbol = window.selectedSymbol || (() => window.state?.symbol || 'NIFTY');
   const fmtMoney = window.fmtMoney || (v => '₹' + Number(v||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
   const formatTime = window.formatTime || (v => { try { const d = new Date(v); return isNaN(d) ? String(v||'') : d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch(_) { return String(v||''); } });
   const isOscillator = (name) => ['RSI','MACD','STOCH','CCI','WILLR','ADX'].includes(String(name||'').toUpperCase());
@@ -853,9 +853,9 @@
     const btSel = document.getElementById('btSymbolSelect');
     if(!btSel) return;
     const items = (window.__CA_WL_GROUP?.items || []).map(i => i.symbol).filter(Boolean);
-    const fallbackSyms = ['RELIANCE', 'BANKNIFTY', 'NIFTY', 'CRUDEOIL', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK'];
+    const fallbackSyms = ['NIFTY', 'BANKNIFTY', 'CRUDEOIL', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK'];
     const syms = Array.from(new Set([...(items.length ? items : fallbackSyms)]));
-    const currSym = (typeof selectedSymbol === 'function' ? selectedSymbol() : (window.selectedSymbol ? window.selectedSymbol() : window.CATraderSymbol)) || 'RELIANCE';
+    const currSym = (typeof selectedSymbol === 'function' ? selectedSymbol() : (window.selectedSymbol ? window.selectedSymbol() : window.CATraderSymbol)) || 'NIFTY';
     const curVal = btSel.value || currSym;
     btSel.innerHTML = syms.map(s => `<option value="${esc(s)}"${s === curVal ? ' selected' : ''}>${esc(s)}</option>`).join('');
     if(typeof btState !== 'undefined') btState.symbol = btSel.value || currSym;
