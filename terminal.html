@@ -8312,8 +8312,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     if(!state.appliedIndicators) state.appliedIndicators = [];
     const indClean = indName.split(' ')[0].toUpperCase();
     if(!state.appliedIndicators.includes(indClean)){
-      state.appliedIndic
-... [truncated for diff preview]
       state.appliedIndicators.push(indClean);
     }
     renderApplied();
