@@ -328,9 +328,9 @@ UPSTOX_ACCESS_TOKENS = [v for k, v in sorted(((k, v) for k, v in os.environ.item
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 AVAILABLE_AI_MODELS = list(dict.fromkeys([
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-2.5-flash",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
     "gemini-flash-latest",
     "antigravity-deep-trader"
 ]))
@@ -739,37 +739,6 @@ def init_db() -> None:
         conn = db_conn()
         try:
             conn.executescript(schema)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS saved_chart_views (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    name TEXT NOT NULL,
-                    view_data TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS user_passbooks (
-                    user_id INTEGER PRIMARY KEY,
-                    starting_balance REAL NOT NULL DEFAULT 100000,
-                    current_balance REAL NOT NULL DEFAULT 100000,
-                    total_buy REAL NOT NULL DEFAULT 0,
-                    total_sell REAL NOT NULL DEFAULT 0,
-                    trade_count INTEGER NOT NULL DEFAULT 0,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS user_notification_settings (
-                    user_id INTEGER PRIMARY KEY,
-                    auto_prune_days INTEGER NOT NULL DEFAULT 15,
-                    muted_categories TEXT NOT NULL DEFAULT '[]',
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            notif_cols = {row[1] for row in conn.execute("PRAGMA table_info(notifications)").fetchall()}
-            if "is_read" not in notif_cols:
-                conn.execute("ALTER TABLE notifications ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0")
             cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
             if "full_name" not in cols:
                 conn.execute("ALTER TABLE users ADD COLUMN full_name TEXT")
@@ -866,10 +835,6 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE positions ADD COLUMN peak_pnl REAL DEFAULT 0")
             with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE positions ADD COLUMN source TEXT DEFAULT 'CA_TRADER'")
-            with contextlib.suppress(Exception):
-                conn.execute("ALTER TABLE orders ADD COLUMN is_backtest INTEGER NOT NULL DEFAULT 0")
-            with contextlib.suppress(Exception):
-                conn.execute("ALTER TABLE orders ADD COLUMN entry_reco_json TEXT")
             for adm_e in ADMIN_EMAILS:
                 conn.execute("UPDATE users SET role='admin' WHERE LOWER(email)=?", [adm_e])
             conn.execute("UPDATE users SET role='admin' WHERE email=?", [(os.getenv("CA_EMAIL_ID") or "").strip().lower()])
@@ -1026,7 +991,6 @@ def gemini_text(prompt: str, max_chars: int = 18000) -> dict[str, Any]:
             resp = requests.post(url, headers=headers, json=body, timeout=4)
             resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp = requests.post(url, headers=headers, json=body, timeout=4.5)
-            resp = requests.post(url, headers=headers, json=body, timeout=6.0)
             if resp.status_code == 429 or resp.status_code >= 500:
                 continue
             if resp.status_code >= 400:
@@ -1770,18 +1734,12 @@ class UpstoxAdapter:
         cached=CACHE.get(cache_key)
         if cached is not None:
             return float(cached) if cached is not None else None
-            return float(cached) if isinstance(cached, (int, float)) and cached > 0 else None
-        # F&O derivative contracts do not have daily historical candle series in Upstox
-        if "FO|" in key or "FO%7C" in key or "%7C" in key and ("_FO" in key):
-            CACHE.set(cache_key, 0.0, 1800.0)
-            return None
         try:
             now=datetime.now(IST)
             end=(now.date()-timedelta(days=1))
             start=end-timedelta(days=7)
-            path=f"/historical-candle/{quote(key,safe='')}/day/{end.isoformat()}/{start.isoformat()}"
+            path=f"/historical-candle/{quote(key,safe='')}/days/1/{end.isoformat()}/{start.isoformat()}"
             payload=self._get(path,{},ttl=300.0,cache_key=cache_key,base_url=UPSTOX_V3_BASE_URL)
-            payload=self._get(path,{},ttl=1800.0,cache_key=cache_key)
             rows=(payload.get('data') or {}).get('candles') or []
             vals=[]
             for row in rows:
@@ -1792,11 +1750,8 @@ class UpstoxAdapter:
             if vals:
                 close=sorted(vals)[-1][1]
                 CACHE.set(cache_key,close,300.0)
-                CACHE.set(cache_key,close,1800.0)
                 return close
-            CACHE.set(cache_key, 0.0, 1800.0)
         except Exception as exc:
-            CACHE.set(cache_key, 0.0, 1800.0)
             log.debug("Previous close lookup failed for %s: %s", key, safe_text(exc))
         return None
 
@@ -1809,32 +1764,6 @@ class UpstoxAdapter:
         # Terminal intraday change is defined from TODAY'S OPEN, not previous close.
         # Keep provider day-over-day fields for compatibility, but expose explicit
         # session_* values for every live UI component.
-        # Real Day Change matching Upstox / Zerodha is calculated from PREVIOUS CLOSE (cp)
-        if ltp is not None:
-            fltp = float(ltp)
-            prev_close = None
-            if cp not in (None, 0):
-                try:
-                    prev_close = float(cp)
-                except Exception:
-                    pass
-            if (prev_close is None or prev_close <= 0):
-                recovered_prev = self._previous_session_close(key)
-                if recovered_prev and recovered_prev > 0:
-                    prev_close = float(recovered_prev)
-                    q["cp"] = prev_close
-
-            if prev_close and prev_close > 0:
-                calc_net = round(fltp - prev_close, 2)
-                calc_pct = round((calc_net / prev_close) * 100.0, 2)
-                q["net_change"] = calc_net
-                q["change_pct"] = calc_pct
-            elif net is not None:
-                q["net_change"] = round(float(net), 2)
-                if q.get("change_pct") is not None:
-                    q["change_pct"] = round(float(q["change_pct"]), 2)
-
-        # Intraday session change from open
         if ltp is not None and day_open not in (None, 0):
             try:
                 day_open=float(day_open)
@@ -1842,11 +1771,6 @@ class UpstoxAdapter:
                 q["session_open"]=day_open
                 q["session_change"]=live-day_open
                 q["session_change_pct"]=(live-day_open)/day_open*100.0
-                day_open = float(day_open)
-                live = float(ltp)
-                q["session_open"] = day_open
-                q["session_change"] = round(live - day_open, 2)
-                q["session_change_pct"] = round((live - day_open) / day_open * 100.0, 2)
             except Exception:
                 pass
 
@@ -2005,35 +1929,12 @@ class UpstoxAdapter:
                 out.append({"timestamp": ts, "open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4]), "volume": float(c[5])})
         return out
 
-    def _format_upstox_interval(self, unit: str, timeframe: str) -> tuple[str, int]:
-        u = str(unit or "").lower().rstrip("s")
-        tf = str(timeframe or "1").lower().rstrip("m")
-        target_resample = 1
-        if u in ("minute", "min", ""):
-            try:
-                val = int(tf)
-                if val == 30:
-                    return "30minute", 1
-                elif val > 1:
-                    return "1minute", val
-                else:
-                    return "1minute", 1
-            except ValueError:
-                return "1minute", 1
-        elif u in ("day", "d"):
-            return "day", 1
-        elif u in ("week", "w"):
-            return "week", 1
-        elif u in ("month", "m"):
-            return "month", 1
-        return "day", 1
-
     def _intraday_candles(self, key: str, timeframe: str, unit: str) -> list[dict[str, Any]]:
         # Upstox V3 exposes the current trading day's intraday candles separately.
-        # Single path segment interval: e.g. /historical-candle/intraday/{key}/1minute
-        interval_str, _ = self._format_upstox_interval(unit, timeframe)
-        path = f"/historical-candle/intraday/{quote(key, safe='')}/{interval_str}"
-        payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}", base_url=UPSTOX_V3_BASE_URL)
+        # This is required for live charts because the normal historical endpoint can
+        # lag the current session.
+        path=f"/historical-candle/intraday/{quote(key,safe='')}/{unit}/{timeframe}"
+        payload=self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{unit}:{timeframe}", base_url=UPSTOX_V3_BASE_URL)
         return self._parse_candle_rows((payload.get("data") or {}).get("candles") or [])
 
     def candles(self, instrument: str, timeframe: str = "15", unit: str = "minutes", days: int = 7) -> list[dict[str, Any]]:
@@ -2047,40 +1948,41 @@ class UpstoxAdapter:
         to_date = end_date.isoformat()
         out: list[dict[str, Any]] = []
 
-        interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
-        hist_path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date}/{from_date}"
+        # Fetch historical and current-session candles independently. A transient 429
+        # (or another upstream failure) on one endpoint must not erase usable data from
+        # the other endpoint and produce a blank chart.
+        hist_path=f"/historical-candle/{quote(key,safe='')}/{unit}/{timeframe}/{to_date}/{from_date}"
         try:
-            payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}", base_url=UPSTOX_V3_BASE_URL)
+            payload=self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{unit}:{timeframe}:{from_date}:{to_date}:{'open' if active else 'closed'}", base_url=UPSTOX_V3_BASE_URL)
             out.extend(self._parse_candle_rows((payload.get("data") or {}).get("candles") or []))
         except Exception as exc:
             log.warning("Historical candle fetch failed for %s/%s: %s", instrument, timeframe, safe_text(exc))
 
-        # Intraday supplement
-        if unit in {"minutes", "minute"}:
+        # V3 intraday is especially important during the open session. It is safe to
+        # use as an independent supplement even after the close, but failures are kept
+        # non-fatal when historical candles are already available.
+        if unit in {"minutes", "hours"}:
             try:
-                recent = self._intraday_candles(key, "1", "minute")
+                recent=self._intraday_candles(key,timeframe,unit)
                 if recent:
                     out.extend(recent)
             except Exception as exc:
                 log.warning("Intraday candle fetch failed for %s/%s: %s", instrument, timeframe, safe_text(exc))
 
-        seen = set(); merged = []
+        seen=set(); merged=[]
         for c in out:
-            ts = c.get("timestamp")
+            ts=c.get("timestamp")
             if ts in seen: continue
             seen.add(ts); merged.append(c)
-        merged.sort(key=lambda x: x.get("timestamp") or "")
+        merged.sort(key=lambda x:x.get("timestamp") or "")
         if not merged:
             raise ProviderUnavailable(f"No Upstox candles returned for {instrument} ({timeframe})")
-        if target_resample > 1:
-            merged = resample_candles_to_tf(merged, target_resample)
         return merged
 
     def candles_between(self, instrument: str, timeframe: str, unit: str, from_date: datetime.date, to_date: datetime.date) -> list[dict[str, Any]]:
         key, meta = self.resolve_instrument(instrument)
-        interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
-        path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date.isoformat()}/{from_date.isoformat()}"
-        payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}", base_url=UPSTOX_V3_BASE_URL)
+        path = f"/historical-candle/{quote(key, safe='')}/{unit}/{timeframe}/{to_date.isoformat()}/{from_date.isoformat()}"
+        payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{unit}:{timeframe}:{from_date}:{to_date}", base_url=UPSTOX_V3_BASE_URL)
         data = payload.get("data") or {}
         candles = data.get("candles") or []
         out=[]
@@ -2117,19 +2019,7 @@ class UpstoxAdapter:
                 resolved_expiry=future[0] if future else (exps[0] if exps else "current_week")
             except Exception:
                 resolved_expiry="current_week"
-        # Normalize expiry_date to ISO YYYY-MM-DD
-        iso_exp = None
-        if resolved_expiry and resolved_expiry != "current_week":
-            s_exp = str(resolved_expiry).strip()
-            for fmt in ("%Y-%m-%d", "%d %b %Y", "%d %B %Y", "%d-%b-%Y", "%d-%m-%Y"):
-                try:
-                    iso_exp = datetime.strptime(s_exp, fmt).strftime("%Y-%m-%d")
-                    break
-                except Exception:
-                    pass
-        if not iso_exp:
-            iso_exp = resolved_expiry
-        params: dict[str, Any] = {"instrument_key": key, "expiry_date": iso_exp}
+        params: dict[str, Any] = {"instrument_key": key, "expiry_date": resolved_expiry}
         payload = self._get("/option/chain", params, ttl=3.0, cache_key=f"option-chain:{key}:{resolved_expiry}")
         out=normalize_option_chain(underlying, key, meta, payload)
         out["expiry"]=out.get("expiry") or resolved_expiry
@@ -4579,8 +4469,6 @@ def detect_candlestick_patterns(candles: list[dict[str, Any]], timeframe: str) -
                 "confidence": confidence,
                 "prediction": prediction,
                 "candle_time": candle_time_str,
-                "from_time": str(candles[pattern_start_idx].get("timestamp") or candles[pattern_start_idx].get("ts") or ""),
-                "to_time": str(candles[i].get("timestamp") or candles[i].get("ts") or ""),
                 "detected_at": now_ts,
                 "start_idx": pattern_start_idx,
                 "end_idx": i
@@ -4917,136 +4805,6 @@ def reset_active_calibration(symbol: str) -> None:
     CACHE.delete_pattern("overall-reco:*")
 
 
-
-def calculate_spec_levels(
-    side: str = "CE",
-    spot: float = 23346.40,
-    vwap: float | None = None,
-    ltp_opt: float = 219.46,
-    delta: float = 0.52,
-    gamma: float = 0.0014,
-    theta: float = -12.4,
-    vega: float = 14.8,
-    iv: float = 13.8,
-    rsi: float = 58.4,
-    adx: float = 28.5,
-    support: float | None = None,
-    resistance: float | None = None,
-    spot_atr: float | None = None,
-    opt_atr: float | None = None,
-    confluence_score: float = 0.478,
-    order_flow_factor: float = 0.58,
-    bid: float | None = None,
-    ask: float | None = None
-) -> dict[str, Any]:
-    """Unified formula framework from ca_trader_formula_dashboard_spec.md (Section 12):
-    1. Dashboard Confluence Score & Direction Gate (Section 1 & 2)
-    2. Pullback Entry Price (Section 3)
-    3. Stop-Loss / Risk Budget with 6-stage auditable breakdown (Section 4)
-    4. Target Price via Greek projection & 2R feasibility gate (Section 5)
-    5. Actual Risk:Reward ratio computation (Section 6)
-    """
-    is_ce = str(side).upper() in ("BUY", "CALL", "CE")
-    score = float(confluence_score if is_ce else -confluence_score)
-    spot = float(spot or 1.0)
-    vwap = float(vwap if vwap is not None else spot)
-    ltp_opt = float(ltp_opt or max(spot * 0.009, 10.0))
-    abs_delta = abs(float(delta or 0.50))
-    gamma = float(gamma or 0.0014)
-    theta = float(theta or -12.4)
-    vega = float(vega or 14.8)
-    iv = float(iv or 13.8)
-
-    # ATR derivations
-    s_atr = float(spot_atr or max(spot * 0.006, 35.0))
-    o_atr = float(opt_atr or max(ltp_opt * 0.085, s_atr * abs_delta * 0.12, 6.0))
-    supp = float(support if support is not None else spot - s_atr * 1.5)
-    res = float(resistance if resistance is not None else spot + s_atr * 1.5)
-
-    # 1. Pullback Entry Price (Section 3 & 12)
-    vwap_gap = max(spot - vwap, 0.0) if is_ce else max(vwap - spot, 0.0)
-    a_vwap = 0.15
-    a_atr = 0.10
-    noise_buffer = 0.40
-
-    base_pullback = a_vwap * abs_delta * vwap_gap + a_atr * o_atr + noise_buffer
-    pullback_factor = min(1.0, max(0.50, 1.0 - 0.50 * abs(score)))
-    d_entry = base_pullback * pullback_factor
-
-    raw_entry = ltp_opt - d_entry
-    lower_bound = max(float(bid) if bid else 0.0, 0.90 * ltp_opt)
-    upper_bound = min(ltp_opt, float(ask) if ask else ltp_opt)
-    entry = round(min(upper_bound, max(lower_bound, raw_entry)), 2)
-    entry_discount = round(ltp_opt - entry, 2)
-
-    # 2. Stop Loss & Risk Budget (Section 4 & 12: 6-stage auditable breakdown)
-    d_invalidation = max(spot - supp, 0.0) if is_ce else max(res - spot, 0.0)
-    structural_risk = round(abs_delta * d_invalidation, 2)
-    k_atr = 1.45
-    volatility_risk = round(k_atr * o_atr, 2)
-    raw_risk = max(structural_risk, volatility_risk)
-
-    vol_multiplier = min(1.25, max(0.90, iv / 14.0))
-    risk_before_cap = round(raw_risk * vol_multiplier + noise_buffer, 2)
-
-    max_risk_pct = 0.095  # 9.5% risk cap reconciling ~₹20.22 on ₹212.87 entry
-    risk_cap = round(max_risk_pct * entry, 2)
-    final_risk_budget = round(min(risk_before_cap, risk_cap), 2)
-    final_risk_budget = max(final_risk_budget, round(entry * 0.08, 2), 6.0)  # robust non-tight floor
-
-    stop = round(entry - final_risk_budget, 2)
-
-    # 3. Target Price & Feasibility Gate (Section 5 & 12)
-    d_target = max(0.0, res - spot) if is_ce else max(0.0, spot - supp)
-    k_target_atr = 1.8
-    d_target_capped = min(d_target, k_target_atr * s_atr)
-
-    d_iv = 0.5  # expected IV change
-    dt = 0.08   # intraday holding time (~2h)
-    d_option_target = (
-        abs_delta * d_target_capped
-        + 0.5 * gamma * (d_target_capped ** 2)
-        + vega * (d_iv / 100.0)
-        - abs(theta) * dt
-    )
-    model_target = round(entry + d_option_target, 2)
-    min_target = round(entry + 2.0 * final_risk_budget, 2)
-    target_feasible = model_target >= min_target
-    target = model_target if target_feasible else min_target
-
-    # 4. Actual Risk-Reward Ratio (Section 6 & 12)
-    actual_risk = round(entry - stop, 2)
-    actual_reward = round(target - entry, 2)
-    actual_rr = round(actual_reward / max(0.01, actual_risk), 2)
-
-    return {
-        "side": "CE" if is_ce else "PE",
-        "cmp": round(ltp_opt, 2),
-        "entry": entry,
-        "entry_discount": entry_discount,
-        "base_pullback": round(base_pullback, 2),
-        "pullback_factor": round(pullback_factor, 3),
-        "vwap_gap": round(vwap_gap, 2),
-        "d_invalidation": round(d_invalidation, 2),
-        "structural_risk": structural_risk,
-        "volatility_risk": volatility_risk,
-        "vol_multiplier": round(vol_multiplier, 3),
-        "risk_before_cap": risk_before_cap,
-        "risk_cap": risk_cap,
-        "risk_budget": final_risk_budget,
-        "stop": stop,
-        "d_target_capped": round(d_target_capped, 2),
-        "d_option_target": round(d_option_target, 2),
-        "model_target": model_target,
-        "min_target": min_target,
-        "target": target,
-        "target_feasible": target_feasible,
-        "actual_risk": actual_risk,
-        "actual_reward": actual_reward,
-        "actual_rr": actual_rr,
-        "rr_display": f"1 : {actual_rr:.2f}"
-    }
-
 def calculate_perfect_entry(
     side: str,
     last_price: float,
@@ -5136,19 +4894,10 @@ def calculate_perfect_entry(
         delta_val = abs(float(opt_delta or 0.50))
         o_atr = float(opt_atr or max(opt_ltp * 0.10, 3.0))
 
-        spec = calculate_spec_levels(
-            side="CE" if opt_type == "CE" else "PE",
-            spot=last_price,
-            vwap=vwap,
-            ltp_opt=opt_ltp,
-            delta=delta_val,
-            support=supp,
-            resistance=res,
-            spot_atr=a,
-            opt_atr=o_atr
-        )
-        opt_discount = spec["entry_discount"]
-        perfect_opt_entry = spec["entry"]
+        opt_discount = und_discount * delta_val
+        opt_discount = round(max(0.75, min(opt_ltp * 0.065, max(opt_discount, min(o_atr * 0.30, opt_ltp * 0.04)))), 2)
+
+        perfect_opt_entry = round(max(0.50, opt_ltp - opt_discount), 2)
         opt_zone_min = round(max(0.25, perfect_opt_entry - opt_discount * 0.35), 2)
         opt_zone_max = round(min(opt_ltp, perfect_opt_entry + opt_discount * 0.25), 2)
 
@@ -5157,16 +4906,15 @@ def calculate_perfect_entry(
             "ltp": round(opt_ltp, 2),
             "discount_pts": opt_discount,
             "discount_pct": round((opt_discount / opt_ltp) * 100, 1),
-            "entry_type": "OPTION_PULLBACK_SPEC",
-            "entry_label": f"Optimal Pullback Entry (Limit -₹{opt_discount:.2f} below CMP)",
+            "entry_type": "OPTION_DIP_LIMIT",
+            "entry_label": f"Optimal Pullback Entry (Limit -₹{opt_discount:.2f} below LTP)",
             "entry_zone_min": opt_zone_min,
             "entry_zone_max": opt_zone_max,
-            "entry_reason": f"{entry_reason}. Spec pullback: Base ₹{spec['base_pullback']} × Factor {spec['pullback_factor']} gives -₹{opt_discount:.2f} dip entry.",
+            "entry_reason": f"{entry_reason}. Delta pass-through (Δ {delta_val:.2f}) gives -₹{opt_discount:.2f} dip entry.",
             "underlying_entry": und_entry,
             "underlying_ltp": round(last_price, 2),
             "underlying_discount_pts": und_discount,
-            "underlying_entry_type": entry_type,
-            "spec_levels": spec
+            "underlying_entry_type": entry_type
         }
 
     return {
@@ -5443,31 +5191,29 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         )
         opt_entry_final = opt_perf["entry"]
 
-        # Option ATR estimation (minimum 8.5% of premium or 6.0 pts)
+        # Option ATR estimation (minimum 8% of premium or 6.0 pts)
         opt_atr_est = max(opt_entry_final * 0.085, 6.0)
         spot_atr_est = float(ta.get("atr", 35.0) if isinstance(ta, dict) else 35.0)
+        delta_invalidation = round(0.50 * spot_atr_est * 0.65, 2)
 
-        spec = calculate_spec_levels(
-            side=opt_type,
-            spot=last_price,
-            vwap=float(ta.get("vwap") or last_price),
-            ltp_opt=opt_entry,
-            delta=0.52 if opt_type == "CE" else -0.48,
-            gamma=0.0014,
-            theta=-12.4 if opt_type == "CE" else -11.8,
-            vega=14.8 if opt_type == "CE" else 14.2,
-            iv=13.8 if opt_type == "CE" else 14.5,
-            rsi=rsi_val,
-            adx=float(ta.get("adx") or 28.5),
-            support=support,
-            resistance=resistance,
-            spot_atr=spot_atr_est,
-            opt_atr=opt_atr_est,
-            confluence_score=0.478 if opt_type == "CE" else -0.478
-        )
-        opt_entry_final = spec["entry"]
-        opt_sl = spec["stop"]
-        opt_target = spec["target"]
+        if expiry_scalp:
+            tgt_gain = round(max(1.8, min(opt_entry_final * 0.065, max(opt_entry_final * 0.035, 3.0))), 2)
+            sl_dist = round(max(1.5, tgt_gain / 1.35), 2)
+            sl_dist = round(max(opt_entry_final * 0.08, opt_atr_est * 1.2, 8.0), 2)
+            tgt_gain = round(sl_dist * 1.8, 2)
+        else:
+            # Dynamic Calibrated Target & SL for high probability 5m reach
+            calib = get_active_calibration(symbol)
+            calib_tgt_pct = float(calib.get("scalp_gain_pct", 0.045))
+            calib_sl_ratio = float(calib.get("sl_atr_multiplier", 1.40)) / max(0.1, float(calib.get("target_atr_multiplier", 0.95)))
+            tgt_gain = round(max(2.5, min(opt_entry_final * 0.15, max(opt_entry_final * calib_tgt_pct, 15.0))), 2)
+            sl_dist = round(max(1.5, tgt_gain / max(1.1, calib_sl_ratio)), 2)
+            # Institutional risk budget: 9% to 14% of option premium or 1.4x Option ATR
+            sl_dist = round(max(opt_entry_final * 0.095, opt_atr_est * 1.40, delta_invalidation, 12.0), 2)
+            tgt_gain = round(sl_dist * 2.0, 2)
+
+        opt_target = round(opt_entry_final + tgt_gain, 2)
+        opt_sl = round(max(0.05, opt_entry_final - sl_dist), 2)
         return {
             "available": True,
             "instrument_kind": "OPTION",
@@ -5487,17 +5233,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "stop_loss": opt_sl,
             "target": opt_target,
             "perfect_entry_details": opt_perf,
-            "spec_levels": spec,
-            "structural_risk": spec["structural_risk"],
-            "volatility_risk": spec["volatility_risk"],
-            "risk_before_cap": spec["risk_before_cap"],
-            "risk_cap": spec["risk_cap"],
-            "risk_budget": spec["risk_budget"],
-            "model_target": spec["model_target"],
-            "min_target": spec["min_target"],
-            "target_feasible": spec["target_feasible"],
-            "actual_rr": spec["actual_rr"],
-            "rr_display": spec["rr_display"],
             "is_expiry_scalp": expiry_scalp,
             "lot_size": lot,
             "score": 95.0 if is_consensus else 45.0,
@@ -6302,7 +6037,6 @@ class OrderIn(BaseModel):
     paper: bool = True
     live: bool = False
     amo: bool = False
-    is_backtest: bool = False
 
 class OrderModifyIn(BaseModel):
     quantity: int | None = Field(default=None, gt=0, le=1_000_000)
@@ -9025,11 +8759,11 @@ async def news_discuss(request: Request, user: dict[str, Any] = Depends(require_
 
 @app.get("/api/news/ca-ai-feed")
 async def news_ca_ai_feed(
-    symbol: str = "NIFTY",
+    symbol: str = "RELIANCE",
     mode: str = "all",  # "all", "global", "stock"
     user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
-    sym = (symbol or "NIFTY").upper().strip()
+    sym = (symbol or "RELIANCE").upper().strip()
     cache_key = f"ca_ai_feed:{sym}:{mode}"
     cached = CACHE.get(cache_key)
     if cached is not None:
@@ -9480,6 +9214,8 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
         underlying = str(r.get("underlying") or "").upper().strip()
         base_sym = sym.split("|")[-1] if "|" in sym else sym.split(":")[-1] if ":" in sym else sym
         is_on_demand = str(r.get("source") or "") == "on-demand"
+        is_in_watchlist = bool(sym in allowed_symbols or base_sym in allowed_symbols or un
+... [truncated for diff preview]
         is_in_watchlist = bool(sym in allowed_symbols or base_sym in allowed_symbols or underlying in allowed_symbols or any(w in sym for w in allowed_symbols))
         if (is_on_demand or is_in_watchlist) and str(r.get("recommendation") or "").upper() in {"BUY", "SELL"}:
             # Check and compute P&L if null or 0
@@ -9555,30 +9291,6 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
 # Backtesting & Historical Market Replay Endpoints
 # ===========================================================================
 
-def resample_candles_to_tf(candles_1m: list[dict[str, Any]], target_minutes: int) -> list[dict[str, Any]]:
-    if not candles_1m or target_minutes <= 1:
-        return candles_1m or []
-    resampled = []
-    for i in range(0, len(candles_1m), target_minutes):
-        group = candles_1m[i:i+target_minutes]
-        if not group:
-            continue
-        c_open = group[0].get("open")
-        c_high = max(float(c.get("high") or 0) for c in group)
-        c_low = min(float(c.get("low") or 0) for c in group)
-        c_close = group[-1].get("close")
-        c_vol = sum(float(c.get("volume") or 0) for c in group)
-        c_ts = group[-1].get("timestamp") or group[0].get("timestamp")
-        resampled.append({
-            "timestamp": c_ts,
-            "open": c_open,
-            "high": c_high,
-            "low": c_low,
-            "close": c_close,
-            "volume": c_vol
-        })
-    return resampled
-
 def resample_candles_to_3m(candles_1m: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not candles_1m:
         return []
@@ -9610,7 +9322,7 @@ def generate_fallback_replay_candles(instrument: str, timeframe: str = "5m", day
     sym = str(instrument).upper()
     if "BANK" in sym: base_price = 50500.0
     elif "CRUDE" in sym: base_price = 6200.0
-    elif "RELIANCE" in sym: base_price = 1307.0
+    elif "RELIANCE" in sym: base_price = 2950.0
     else:
         try:
             q = UPSTOX.quote(instrument)
@@ -9706,7 +9418,7 @@ async def backtest_evaluate(
     else:
         payload = request if isinstance(request, dict) else {}
 
-    symbol = str(payload.get("symbol") or payload.get("instrument") or "NIFTY").upper()
+    symbol = str(payload.get("symbol") or payload.get("instrument") or "RELIANCE").upper()
     candles_slice = payload.get("candles") or []
     if not candles_slice or len(candles_slice) < 5:
         return {
@@ -10628,7 +10340,7 @@ async def order_create(payload: OrderIn, request: Request, user: dict[str, Any] 
             status = "PAPER_FILLED"
 
     exec_state = "PENDING" if (status in {"PENDING", "AMO_QUEUED"} or payload.live) else "FILLED"
-    db_exec("INSERT INTO orders(id,user_id,symbol,instrument_key,side,quantity,order_type,price,trigger_price,stop_loss,target,trailing_sl,amo,status,execution_state,product,paper,created_at,updated_at,recommendation_id,is_backtest,entry_reco_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[oid,user["id"],payload.symbol.upper(),key,payload.side,payload.quantity,payload.order_type,payload.price,payload.trigger_price,payload.stop_loss,payload.target,payload.trailing_sl,int(payload.amo),status,exec_state,payload.product,int(payload.paper),now,now,payload.recommendation_id,int(payload.is_backtest),payload.entry_reco_json])
+    db_exec("INSERT INTO orders(id,user_id,symbol,instrument_key,side,quantity,order_type,price,trigger_price,stop_loss,target,trailing_sl,amo,status,execution_state,product,paper,created_at,updated_at,recommendation_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[oid,user["id"],payload.symbol.upper(),key,payload.side,payload.quantity,payload.order_type,payload.price,payload.trigger_price,payload.stop_loss,payload.target,payload.trailing_sl,int(payload.amo),status,exec_state,payload.product,int(payload.paper),now,now,payload.recommendation_id])
     provider_result=None
     if payload.live and not payload.paper:
         body={"quantity":payload.quantity,"product":payload.product,"validity":"DAY","price":payload.price or 0,"tag":"CA_TRADER","instrument_token":key,"order_type":payload.order_type,"transaction_type":payload.side,"disclosed_quantity":0,"trigger_price":payload.trigger_price or 0,"is_amo":payload.amo}
@@ -11375,32 +11087,6 @@ async def position_advisor_chat_api(
     if not pos:
         pos = db_exec("SELECT * FROM positions WHERE user_id=? ORDER BY updated_at DESC LIMIT 1", [user["id"]], "one")
         
-    msg_low = message.lower().strip()
-    p_sym = str(pos.get("symbol") or "NIFTY") if pos else "NIFTY"
-
-    # Conversational / Casual Queries (Hindi / Hinglish / English)
-    if any(w in msg_low for w in ["khana", "lunch", "dinner", "breakfast", "khao", "food", "khaye", "khaya"]):
-        text = (
-            f"Arey Santosh ji, main to AI assistant hoon, mera fuel to live market ticks aur order flow hai! 😄\n\n"
-            f"Aap batayein, aapne lunch/dinner kar liya? Trading hours mein regular meals aur hydration bohot zaroori hai! "
-            f"Aapki active position `{p_sym}` par main continuous risk sentinel monitor kar raha hoon."
-        )
-        return {"reply": text, "message": text, "status": "SUCCESS"}
-
-    if any(w in msg_low for w in ["kya haal", "kaise ho", "how are you", "kaisa hai", "sab thik", "sab theek"]):
-        text = (
-            f"Main bilkul badiya hoon aur aapke live portfolio par risk guard deploy karke baithe hoon! ⚡\n\n"
-            f"`{p_sym}` trade healthy structure mein hai. Aap batayein, trading kaisi chal rahi hai?"
-        )
-        return {"reply": text, "message": text, "status": "SUCCESS"}
-
-    if any(w in msg_low for w in ["hello", "hi", "hey", "namaste", "pranam", "good morning", "good afternoon", "good evening"]):
-        text = (
-            f"Namaste Santosh ji! ✦ CA AI Position Sentinel active hai.\n\n"
-            f"Aapki open position `{p_sym}` ke stop loss, MTM profit target ya Theta decay burn rate ke baare mein koi bhi query ho to pooch sakte hain!"
-        )
-        return {"reply": text, "message": text, "status": "SUCCESS"}
-
     prompt = f"""You are CA AI, the senior institutional risk manager at CA Trader.
 Trader is actively asking you for immediate counsel on their trade.
 Trade Context:
@@ -11417,18 +11103,7 @@ Explicitly address:
 Keep response concise, bulleted, bolded where critical, and highly actionable."""
 
     ai_resp = gemini_text(prompt, max_chars=4000)
-    p_pnl = float(pos.get("unrealized_pnl") or pos.get("pnl") or 0) if pos else 0.0
-    p_entry = float(pos.get("avg_price") or 100.0) if pos else 100.0
-    p_side = str(pos.get("side") or "BUY").upper() if pos else "BUY"
-    
-    dynamic_fallback = (
-        f"✦ **CA AI Position Sentinel — {p_sym}**\n\n"
-        f"• **MTM & Risk Status**: Open position `{p_side} {p_sym}` at entry ₹{p_entry:.2f}. "
-        f"Current P&L is **{'₹+' if p_pnl >= 0 else '₹'}{p_pnl:,.2f}**.\n"
-        f"• **Decay Sentinel**: Current option Theta burn is manageable (~₹12-18/pt). Intraday delta alignment remains intact.\n"
-        f"• **Institutional Advice**: Maintain discipline. If profit target hits +₹500/lot, trail Stop Loss to cost (₹{p_entry:.2f}) to eliminate tail risk and lock in asymmetric returns."
-    )
-    text = ai_resp.get("text") or dynamic_fallback
+    text = ai_resp.get("text") or "✦ CA AI Position Sentinel: Based on real-time option volatility, Theta decay is currently eroding your option premium by ~₹240/hour. If your trade achieved +₹500 profit, exit immediately or move your Stop Loss to breakeven entry to prevent turning a winning trade into a loss."
 
     return {
         "reply": text,
@@ -13872,31 +13547,7 @@ async def ai_dashboard(symbol: str = Query("NIFTY"), force: int = Query(0), user
 
 def _ca_ai_quantitative_chat(symbol: str, message: str, current_setup: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
     """Generates authoritative institutional trader analysis with setup updates when AI API is unavailable."""
-    msg_low = message.lower().strip()
-    sym = (symbol or "NIFTY").upper()
-
-    # Conversational / Casual Queries (Hindi / Hinglish / English)
-    if any(w in msg_low for w in ["khana", "lunch", "dinner", "breakfast", "khao", "food", "khaye", "khaya"]):
-        return (
-            f"Arey Santosh ji, main to institutional AI assistant hoon, mera khana to live market ticks, Level-2 order flow aur charts hain! 😄\n\n"
-            f"Aap batayein, aapne lunch/dinner kar liya? Trading sessions mein time par khana, proper rest aur hydration bohot zaroori hai! "
-            f"Aaj `{sym}` par market ka structure kafi interesting hai. Koi specific strike ya setup analyze karein?",
-            None
-        )
-    if any(w in msg_low for w in ["kya haal", "kaise ho", "how are you", "kaisa hai", "sab thik", "sab theek", "all good"]):
-        return (
-            f"Main bilkul mast aur fully energized hoon! ⚡ Live market feeds continuously process kar raha hoon.\n\n"
-            f"Currently `{sym}` ka multi-timeframe structure scan ho chuka hai. "
-            f"Aap batayein, aaj trading session kaisa chal raha hai? Koi trade ya option hedge evaluate karna hai?",
-            None
-        )
-    if any(w in msg_low for w in ["hello", "hi", "hey", "namaste", "pranam", "good morning", "good afternoon", "good evening"]):
-        return (
-            f"Namaste Santosh ji! ✦ Main aapka CA AI quantitative trading assistant hoon.\n\n"
-            f"Aap `{sym}` ke option chain, Greeks (Delta/Theta), news impact ya entry/exit levels ke baare mein kuch bhi pooch sakte hain. "
-            f"Main real-time mathematical validation ke saath turant analyze karke bataunga!",
-            None
-        )
+    msg_low = message.lower()
     sym = (symbol or "NIFTY").upper()
     direction = str(current_setup.get("direction") or "BUY").upper()
     contract = str(current_setup.get("contract") or f"{sym} Nearest ATM")
@@ -14267,8 +13918,7 @@ async def reports_trades(
                 "exit_price": pr,
                 "turnover": round(pr * qty, 2),
                 "pnl": 0.0,
-                "status": o.get("status") or "FILLED",
-                "is_backtest": bool(o.get("is_backtest"))
+                "status": o.get("status") or "FILLED"
             })
 
     return {
@@ -14610,9 +14260,6 @@ async def get_admin_api_passbook(user: dict[str, Any] = Depends(require_user)) -
     current_upstox_rpm = len(UPSTOX_USAGE_LOG["minute_calls"])
     current_gemini_tpm = sum(t[1] for t in GEMINI_USAGE_LOG["minute_tokens"])
 
-
-
-
     ledger = []
     for u in list(UPSTOX_USAGE_LOG["history"])[:30]:
         ledger.append({
@@ -14662,323 +14309,3 @@ async def get_admin_api_passbook(user: dict[str, Any] = Depends(require_user)) -
         "client_errors": list(CLIENT_ERRORS_LOG)[:20],
         "statement": ledger[:50]
     }
-
-# ===========================================================================
-# Release 56 & 57: Persistent Saved Views, Funds Passbook, Real Trades & Notification Management
-# ===========================================================================
-
-@app.get("/api/chart/views")
-async def get_chart_views(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    rows = db_exec("SELECT id, name, view_data, created_at FROM saved_chart_views WHERE user_id=? ORDER BY id DESC", [uid], "all")
-    views = []
-    for r in rows:
-        try:
-            vd = json.loads(r["view_data"])
-            views.append({"id": r["id"], "name": r["name"], **vd, "created_at": r["created_at"]})
-        except Exception:
-            views.append({"id": r["id"], "name": r["name"], "created_at": r["created_at"]})
-    return {"ok": True, "views": views}
-
-@app.post("/api/chart/views")
-async def save_chart_view(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    body = await request.json()
-    name = str(body.get("name") or "Custom View").strip()
-    view_data = json.dumps(body)
-    now_str = now_iso()
-    db_exec("INSERT INTO saved_chart_views (user_id, name, view_data, created_at) VALUES (?, ?, ?, ?)", [uid, name, view_data, now_str])
-    new_id = db_exec("SELECT last_insert_rowid() as id", [], "one")
-    return {"ok": True, "id": new_id["id"] if new_id else 1, "name": name}
-
-@app.delete("/api/chart/views/{view_id}")
-async def delete_chart_view(view_id: int, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    db_exec("DELETE FROM saved_chart_views WHERE id=? AND user_id=?", [view_id, uid])
-    return {"ok": True}
-
-@app.post("/api/funds/passbook/upload")
-async def upload_passbook(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    content_type = request.headers.get("content-type", "")
-    csv_text = ""
-    starting_balance = 100000.0
-    trades = []
-    
-    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
-        form = await request.form()
-        starting_balance = float(form.get("starting_balance") or 100000.0)
-        upload_file = form.get("file")
-        if upload_file is not None and hasattr(upload_file, "filename"):
-            filename = str(upload_file.filename or "").lower()
-            file_bytes = await upload_file.read()
-            if filename.endswith(".xlsx") or filename.endswith(".xls"):
-                try:
-                    import pandas as pd
-                    import io
-                    df_raw = pd.read_excel(io.BytesIO(file_bytes), header=None)
-                    header_idx = None
-                    for i in range(min(25, len(df_raw))):
-                        row_vals = [str(x).lower().strip() for x in df_raw.iloc[i].dropna().tolist()]
-                        if any("symbol" in x for x in row_vals) and any("trade" in x or "type" in x or "price" in x for x in row_vals):
-                            header_idx = i
-                            break
-                    if header_idx is not None:
-                        cols = [str(x).strip().lower().replace(" ", "_") for x in df_raw.iloc[header_idx]]
-                        df = df_raw.iloc[header_idx+1:].copy()
-                        df.columns = cols
-                        for _, row in df.iterrows():
-                            sym = str(row.get("symbol") or "").strip().upper()
-                            if not sym or sym == "NAN":
-                                continue
-                            ttype = str(row.get("trade_type") or "BUY").strip().upper()
-                            try:
-                                qty = float(row.get("quantity") or 0)
-                                price = float(row.get("price") or 0)
-                            except Exception:
-                                continue
-                            if qty <= 0 or price <= 0:
-                                continue
-                            t_val = qty * price
-                            t_time = str(row.get("order_execution_time") or row.get("trade_date") or now_iso())
-                            trades.append({
-                                "symbol": sym,
-                                "trade_type": ttype,
-                                "quantity": qty,
-                                "price": price,
-                                "amount": t_val,
-                                "time": t_time
-                            })
-                except Exception as exc:
-                    record_error("passbook_excel_parse", safe_text(exc), user_id=uid)
-            else:
-                csv_text = file_bytes.decode("utf-8", errors="ignore")
-    else:
-        try:
-            body = await request.json()
-            csv_text = body.get("csv_text") or ""
-            starting_balance = float(body.get("starting_balance") or 100000.0)
-        except Exception:
-            pass
-
-    if csv_text and not trades:
-        lines = [line.strip() for line in csv_text.strip().splitlines() if line.strip()]
-        if lines:
-            header_idx = 0
-            for i, l in enumerate(lines[:20]):
-                if "symbol" in l.lower():
-                    header_idx = i
-                    break
-            header = [h.strip().lower().replace(" ", "_") for h in lines[header_idx].split(",")]
-            for row_str in lines[header_idx+1:]:
-                parts = [p.strip().strip('"') for p in row_str.split(",")]
-                if len(parts) < 4:
-                    continue
-                row = dict(zip(header, parts))
-                sym = str(row.get("symbol") or "").strip().upper()
-                if not sym:
-                    continue
-                ttype = str(row.get("trade_type") or "BUY").strip().upper()
-                try:
-                    qty = float(row.get("quantity") or 0)
-                    price = float(row.get("price") or 0)
-                except Exception:
-                    continue
-                if qty <= 0 or price <= 0:
-                    continue
-                t_val = qty * price
-                t_time = str(row.get("order_execution_time") or row.get("trade_date") or now_iso())
-                trades.append({
-                    "symbol": sym,
-                    "trade_type": ttype,
-                    "quantity": qty,
-                    "price": price,
-                    "amount": t_val,
-                    "time": t_time
-                })
-
-    net_realized_cashflow = 0.0
-    total_buy_val = 0.0
-    total_sell_val = 0.0
-    for t in trades:
-        if t["trade_type"] == "BUY":
-            net_realized_cashflow -= t["amount"]
-            total_buy_val += t["amount"]
-        elif t["trade_type"] == "SELL":
-            net_realized_cashflow += t["amount"]
-            total_sell_val += t["amount"]
-
-    current_balance = starting_balance + net_realized_cashflow
-    db_exec("""
-        INSERT OR REPLACE INTO user_passbooks (user_id, starting_balance, current_balance, total_buy, total_sell, trade_count, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, [uid, starting_balance, current_balance, total_buy_val, total_sell_val, len(trades), now_iso()])
-
-    return {
-        "ok": True,
-        "starting_balance": starting_balance,
-        "current_balance": round(current_balance, 2),
-        "net_pnl": round(net_realized_cashflow, 2),
-        "total_trades": len(trades),
-        "trades_imported": len(trades),
-        "trades": trades[:50]
-    }
-
-@app.get("/api/funds/passbook")
-async def get_passbook(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    p = db_exec("SELECT * FROM user_passbooks WHERE user_id=?", [uid], "one")
-    if not p:
-        return {"ok": True, "starting_balance": 100000.0, "current_balance": 100000.0, "net_pnl": 0.0, "total_trades": 0, "trades": []}
-    return {
-        "ok": True,
-        "starting_balance": float(p.get("starting_balance") or 100000.0),
-        "current_balance": float(p.get("current_balance") or 100000.0),
-        "net_pnl": float((p.get("current_balance") or 100000.0) - (p.get("starting_balance") or 100000.0)),
-        "total_trades": int(p.get("trade_count") or 0)
-    }
-
-@app.get("/api/portfolio/external-positions")
-async def list_external_positions(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    rows = db_exec("SELECT * FROM positions WHERE user_id=? AND id LIKE 'pos_ext_%' AND COALESCE(status, 'OPEN')='OPEN' ORDER BY id DESC", [uid], "all")
-    res = []
-    for r in rows:
-        sym = r.get("symbol", "")
-        entry = float(r.get("avg_price") or 0)
-        qty = int(r.get("quantity") or 1)
-        side = str(r.get("side") or "BUY").upper()
-        sl = float(r.get("stop_loss") or 0)
-        tgt = float(r.get("target") or 0)
-        
-        ltp = entry
-        try:
-            q = UPSTOX.quote(sym)
-            if q and q.get("ltp"):
-                ltp = float(q["ltp"])
-        except Exception:
-            pass
-            
-        pnl = (ltp - entry) * qty if side == "BUY" else (entry - ltp) * qty
-        pnl_pct = (pnl / (entry * qty)) * 100 if (entry * qty) > 0 else 0
-        
-        advice = "HOLD"
-        advice_reason = "Position advancing within structural invalidation boundaries."
-        if side == "BUY":
-            if sl > 0 and ltp <= sl:
-                advice = "EXIT / STOPPED OUT"
-                advice_reason = f"LTP (₹{ltp:,.2f}) hit stop level (₹{sl:,.2f}). Invalidate trade to protect capital."
-            elif tgt > 0 and ltp >= tgt:
-                advice = "BOOK PROFIT"
-                advice_reason = f"LTP (₹{ltp:,.2f}) attained profit target (₹{tgt:,.2f}). Harvest asymmetric gains."
-            elif pnl_pct >= 20.0:
-                advice = "TRAIL STOP"
-                advice_reason = f"+{pnl_pct:.1f}% gain. Trail stop loss to breakeven (₹{entry:,.2f}) to lock in gains."
-        else:
-            if sl > 0 and ltp >= sl:
-                advice = "EXIT / STOPPED OUT"
-                advice_reason = f"LTP (₹{ltp:,.2f}) exceeded stop level (₹{sl:,.2f}). Protect capital."
-            elif tgt > 0 and ltp <= tgt:
-                advice = "BOOK PROFIT"
-                advice_reason = f"LTP (₹{ltp:,.2f}) hit downside target (₹{tgt:,.2f}). Harvest short gains."
-                
-        res.append({
-            **dict(r),
-            "ltp": ltp,
-            "pnl": round(pnl, 2),
-            "pnl_pct": round(pnl_pct, 2),
-            "ca_ai_advice": advice,
-            "advice_reason": advice_reason
-        })
-    return {"ok": True, "positions": res}
-
-@app.post("/api/portfolio/external-positions")
-async def add_external_position(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    body = await request.json()
-    sym = str(body.get("symbol") or "").strip().upper()
-    side = str(body.get("side") or "BUY").strip().upper()
-    qty = int(body.get("quantity") or 1)
-    entry = float(body.get("avg_price") or 0.0)
-    sl = float(body.get("stop_loss") or 0.0)
-    tgt = float(body.get("target") or 0.0)
-    if not sym or entry <= 0:
-        raise HTTPException(status_code=400, detail="Invalid symbol or entry price")
-    
-    pos_id = f"pos_ext_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}"
-    now_str = now_iso()
-    db_exec(
-        """INSERT INTO positions (id, user_id, symbol, instrument_key, side, quantity, avg_price, stop_loss, target, realized_pnl, unrealized_pnl, opened_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, ?, ?)""",
-        [pos_id, uid, sym, sym, side, qty, entry, sl, tgt, now_str, now_str]
-    )
-    return {"ok": True, "position_id": pos_id}
-
-@app.delete("/api/portfolio/trades/{trade_id}")
-async def delete_trade(trade_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    db_exec("DELETE FROM positions WHERE id=? AND user_id=?", [trade_id, uid])
-    db_exec("DELETE FROM orders WHERE id=? AND user_id=?", [trade_id, uid])
-    db_exec("DELETE FROM backtest_trades WHERE id=? AND user_id=?", [trade_id, uid])
-    return {"ok": True, "trade_id": trade_id}
-
-@app.delete("/api/portfolio/trades")
-async def clear_all_trades(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    db_exec("DELETE FROM positions WHERE user_id=? AND status='CLOSED'", [uid])
-    db_exec("DELETE FROM orders WHERE user_id=?", [uid])
-    db_exec("DELETE FROM backtest_trades WHERE user_id=?", [uid])
-    return {"ok": True}
-
-@app.delete("/api/notifications/{notif_id}")
-async def delete_notification(notif_id: int, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    db_exec("DELETE FROM notifications WHERE id=? AND user_id=?", [notif_id, uid])
-    return {"ok": True}
-
-@app.post("/api/notifications/delete-batch")
-async def delete_notifications_batch(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    body = await request.json()
-    ids = body.get("ids") or []
-    if ids:
-        placeholders = ",".join("?" * len(ids))
-        db_exec(f"DELETE FROM notifications WHERE user_id=? AND id IN ({placeholders})", [uid, *ids])
-    return {"ok": True}
-
-@app.delete("/api/notifications")
-async def delete_all_notifications(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    db_exec("DELETE FROM notifications WHERE user_id=?", [uid])
-    return {"ok": True}
-
-@app.post("/api/notifications/mark-read")
-async def mark_notifications_read(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    body = await request.json()
-    ids = body.get("ids") or []
-    if ids:
-        placeholders = ",".join("?" * len(ids))
-        db_exec(f"UPDATE notifications SET is_read=1 WHERE user_id=? AND id IN ({placeholders})", [uid, *ids])
-    return {"ok": True}
-
-@app.post("/api/notifications/mark-all-read")
-async def mark_all_notifications_read(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    db_exec("UPDATE notifications SET is_read=1 WHERE user_id=?", [uid])
-    return {"ok": True}
-
-@app.post("/api/notifications/settings")
-async def set_notification_settings(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    uid = user["id"]
-    body = await request.json()
-    prune_days = int(body.get("auto_prune_days") or 15)
-    muted = json.dumps(body.get("muted_categories") or [])
-    now_str = now_iso()
-    db_exec("""
-        INSERT OR REPLACE INTO user_notification_settings (user_id, auto_prune_days, muted_categories, updated_at)
-        VALUES (?, ?, ?, ?)
-    """, [uid, prune_days, muted, now_str])
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=prune_days)).isoformat()
-    db_exec("DELETE FROM notifications WHERE user_id=? AND created_at < ?", [uid, cutoff])
-    return {"ok": True, "auto_prune_days": prune_days}

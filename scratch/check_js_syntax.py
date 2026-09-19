@@ -1,58 +1,70 @@
-with open('terminal.html', encoding='utf-8', errors='ignore') as f:
-    text = f.read()
-import sys
-sys.stdout.reconfigure(encoding='utf-8')
-from bs4 import BeautifulSoup
-import subprocess
-import tempfile
-import os
+import os, glob, subprocess, json, urllib.request, time, sys
 
-import re
-scripts = list(re.finditer(r'<script(?:\s+[^>]*)?>(.*?)</script>', text, re.DOTALL))
-print(f'Total script tags: {len(scripts)}')
-with open('terminal.html', 'r', encoding='utf-8') as f:
-    html = f.read()
+CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+PORT = 9260
 
-for idx, match in enumerate(scripts):
-    s = match.group(1)
-    start_pos = match.start()
-    line_no = text[:start_pos].count('\n') + 1
-    print(f'\n--- Script {idx} (starts around line {line_no}, len: {len(s)}) ---')
-    # Check for basic JS syntax issues
-    # Count braces, parens, brackets
-    curly = s.count('{') - s.count('}')
-    paren = s.count('(') - s.count(')')
-    square = s.count('[') - s.count(']')
-    print(f'Curly: {curly}, Paren: {paren}, Square: {square}')
-soup = BeautifulSoup(html, 'html.parser')
-scripts = soup.find_all('script')
-print(f"Found {len(scripts)} <script> tags.")
+proc = subprocess.Popen([
+    CHROME,
+    "--headless=new",
+    f"--remote-debugging-port={PORT}",
+    "--disable-gpu",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "about:blank"
+], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-# Check if node is available to test JS syntax
-has_node = False
+time.sleep(2)
+
 try:
-    subprocess.run(['node', '-v'], capture_output=True, check=True)
-    has_node = True
-except Exception:
-    pass
+    with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/json/list") as resp:
+        targets = json.loads(resp.read().decode())
+    page_target = next(t for t in targets if t.get("type") == "page")
+    ws_url = page_target["webSocketDebuggerUrl"]
 
-print(f"Node.js available: {has_node}")
+    import asyncio, websockets
+    async def run():
+        async with websockets.connect(ws_url) as ws:
+            mid = 0
+            async def call(method, params=None):
+                nonlocal mid
+                mid += 1
+                cur_id = mid
+                await ws.send(json.dumps({"id": cur_id, "method": method, "params": params or {}}))
+                while True:
+                    m = await ws.recv()
+                    d = json.loads(m)
+                    if d.get("id") == cur_id:
+                        return d
 
-if has_node:
-    for idx, s in enumerate(scripts):
-        code = s.string or ''
-        if not code.strip():
-            continue
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.js', encoding='utf-8', delete=False) as tf:
-            tf.write(code)
-            t_path = tf.name
-        try:
-            r = subprocess.run(['node', '--check', t_path], capture_output=True, text=True, encoding='utf-8')
-            if r.returncode != 0:
-                print(f"\n[!] Syntax Error in script #{idx+1}:")
-                print(r.stderr)
-            else:
-                print(f"Script #{idx+1} syntax OK ({len(code):,} chars)")
-        finally:
-            if os.path.exists(t_path):
-                os.remove(t_path)
+            js_files = glob.glob("static/**/*.js", recursive=True)
+            print(f"Found {len(js_files)} JS files to check.")
+            for fpath in sorted(js_files):
+                with open(fpath, "r", encoding="utf-8") as f:
+                    code = f.read()
+                
+                # Check for tags
+                has_open = "<script" in code
+                has_close = "</script" in code
+                if has_open or has_close:
+                    print(f"\n[TAG ERROR] {fpath}: contains <script or </script> tags! (open: {has_open}, close: {has_close})")
+
+                # Test compile script via CDP
+                res = await call("Runtime.compileScript", {
+                    "expression": code,
+                    "sourceURL": fpath.replace("\\", "/"),
+                    "persistScript": False
+                })
+                
+                if "exceptionDetails" in res.get("result", {}):
+                    ex = res["result"]["exceptionDetails"]
+                    print(f"\n[SYNTAX ERROR] {fpath}:")
+                    print(f"  Line {ex.get('lineNumber')}, Col {ex.get('columnNumber')}: {ex.get('text')}")
+                    if "exception" in ex:
+                        print(f"  Description: {ex['exception'].get('description')}")
+                else:
+                    print(f"[OK] {fpath}")
+
+    asyncio.run(run())
+finally:
+    proc.kill()
+

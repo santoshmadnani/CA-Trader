@@ -8,6 +8,7 @@ for m in re.finditer(r'@app\.(get|post)\(["\']([^"\']+)["\']', content):
         print(m.group(1).upper(), m.group(2))
 with open('app.py', 'r', encoding='utf-8', errors='ignore') as f:
     app = f.read()
+    text = f.read()
 
 def find_routes():
     pattern = r'(@app\.(?:get|post)\(["\']/api/recommendations[^\n]*)'
@@ -17,3 +18,7 @@ def find_routes():
         print("="*60)
 
 find_routes()
+routes = re.findall(r'@app\.(?:get|post|put|delete|patch)\([\'\"]([^\'\"]+)[\'\"]', text)
+for r in routes:
+    if any(k in r.lower() for k in ['ai', 'analy', 'diag', 'reco', 'chat', 'copilot', 'advisor', 'bot', 'gemini', 'overall']):
+        print(r)

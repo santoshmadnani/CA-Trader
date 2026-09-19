@@ -10,6 +10,9 @@ print('Has CRLF:', b'\\r' in data)
 lines = data.splitlines()
 for i, l in enumerate(lines[35:50], 36):
     print(f'{i}: {repr(l)}')
+    lines = f.read().splitlines()
+for i in range(40, min(58, len(lines))):
+    print(f'{i+1}: {repr(lines[i])}')
 """
 
 cmd = ['ssh', '-i', KEY, '-o', 'StrictHostKeyChecking=no', HOST, f"python3 -c \"{py_code}\""]

@@ -10,3 +10,7 @@ for m in set(modals):
         line = text[:pos].count('\n') + 1
         print(f"{m} at line {line}")
 
+with open('terminal.html', 'r', encoding='utf-8', errors='ignore') as f:
+    for i, line in enumerate(f, 1):
+        if 'Modal' in line and 'id=' in line:
+            print(f'{i}: {line.strip()[:100]}'.encode('ascii', 'replace').decode('ascii'))
