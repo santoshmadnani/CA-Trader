@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CA Trader — AI Video Generation Studio (Veo 3.1)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a0e;
+      --surface: #0f151e;
+      --surface-2: #16202c;
+      --surface-3: #1e2b3b;
+      --border: rgba(56, 189, 248, 0.18);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --gold: #f59e0b;
+      --gold-glow: rgba(245, 158, 11, 0.25);
+      --teal: #14b8a6;
+      --danger: #ef4444;
+      --success: #10b981;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 40%);
+      color: var(--text);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(15, 21, 30, 0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      color: #031726;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .admin-pill {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: var(--gold);
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .terminal-selector-dropdown {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .terminal-selector-dropdown:hover {
+      border-color: var(--accent);
+    }
+
+    .user-pill {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .signout-btn {
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .signout-btn:hover {
+      color: #fff;
+      border-color: var(--danger);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 20px;
+      padding: 20px 24px;
+      max-width: 1720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (max-width: 1080px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Studio Controls Panel */
+    .studio-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      height: fit-content;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 12px;
+    }
+
+    .panel-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Prompt Input Area */
+    .prompt-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .prompt-textarea {
+      width: 100%;
+      min-height: 120px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      color: #fff;
+      font-family: var(--font-main);
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .prompt-textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .prompt-actions-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .magic-enhance-btn {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15));
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: #d8b4fe;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .magic-enhance-btn:hover {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(168, 85, 247, 0.3));
+      border-color: #c084fc;
+      transform: translateY(-1px);
+    }
+
+    .char-counter {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    /* Enhancement Options Accordion / Dropdown */
+    .enhancement-results {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--surface-2);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+    }
+
+    .enhancement-option-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .enhancement-option-card:hover {
+      background: rgba(56, 189, 248, 0.1);
+      border-color: var(--accent);
+    }
+
+    .enhancement-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .enhancement-text {
+      font-size: 11.5px;
+      color: var(--text);
+      line-height: 1.4;
+      margin-top: 4px;
+    }
+
+    /* Quick Style Chips */
+    .style-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .style-chip {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .style-chip:hover {
+      color: #fff;
+      border-color: var(--accent);
+      background: var(--surface-3);
+    }
+
+    /* Generation Settings Grid */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .select-field {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .select-field:focus {
+      border-color: var(--accent);
+    }
+
+    /* Generate Main Action Button */
+    .generate-btn {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      border: 0;
+      color: #031726;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 13px 20px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 18px var(--accent-glow);
+      transition: all 0.2s;
+      letter-spacing: 0.02em;
+    }
+
+    .generate-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(56, 189, 248, 0.4);
+    }
+
+    .generate-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Status & Progress Banner */
+    .status-banner {
+      display: none;
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .status-banner.generating {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #7dd3fc;
+    }
+
+    .status-banner.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    .status-banner.success {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(56, 189, 248, 0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Right Workstation: Cinema Player & Archive */
+    .workstation {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .cinema-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .player-wrapper {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    .player-wrapper.portrait {
+      max-width: 360px;
+      aspect-ratio: 9 / 16;
+      margin: 0 auto;
+    }
+
+    .player-wrapper.square {
+      max-width: 480px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+
+    video#activePlayer {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    .player-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-dim);
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .placeholder-icon {
+      font-size: 48px;
+      filter: drop-shadow(0 4px 12px rgba(56, 189, 248, 0.2));
+    }
+
+    .video-info-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 12px;
+    }
+
+    .active-prompt-display {
+      font-size: 13px;
+      color: #fff;
+      font-weight: 500;
+      line-height: 1.4;
+      flex: 1;
+      min-width: 260px;
+    }
+
+    .video-badges {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .badge {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .video-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-action {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+      border-color: var(--accent);
+      color: #fff;
+      background: var(--surface-3);
+    }
+
+    /* History Gallery */
+    .history-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+      max-height: 480px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .gallery-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .gallery-item:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    }
+
+    .gallery-item.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .gallery-thumb {
+      background: #000;
+      aspect-ratio: 16 / 9;
+      border-radius: 4px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      color: var(--text-dim);
+    }
+
+    .gallery-thumb video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .gallery-prompt {
+      font-size: 11px;
+      line-height: 1.35;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .gallery-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .status-tag {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 9px;
+    }
+
+    .status-tag.completed { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .status-tag.generating { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+    .status-tag.failed { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    /* Custom Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface-3);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1000;
+    }
+
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="brand-section">
+      <div class="logo-badge">🎬</div>
+      <div>
+        <div class="brand-title">
+          CA AI Video Studio
+          <span class="admin-pill">Admin Exclusive</span>
+        </div>
+        <div class="brand-subtitle">Google Veo 3.1 &amp; Gemini Multi-Modal Creative Engine</div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Switch Workspace Dropdown -->
+      <select class="terminal-selector-dropdown" id="workspaceSelector" onchange="switchWorkspace(this.value)">
+        <option value="video" selected>🎬 AI Video Studio</option>
+        <option value="trading">📈 CA Trader</option>
+        <option value="fitness">🏋️ CA Fitness Tracker</option>
+      </select>
+
+      <div class="user-pill" id="userPill">
+        <span>👤</span>
+        <span id="userEmail">Admin</span>
+      </div>
+
+      <button class="signout-btn" onclick="location.href='/logout'">Sign out</button>
+    </div>
+  </header>
+
+  <!-- Main Studio Workspace -->
+  <main>
+    
+    <!-- Left Sidebar: Creative Control Console -->
+    <div class="studio-panel">
+      <div class="panel-header">
+        <h2><span>⚡</span> Prompt Director</h2>
+        <span class="badge">Veo 3.1 Active</span>
+      </div>
+
+      <!-- Prompt Input -->
+      <div class="prompt-container">
+        <div class="section-label">
+          <span>Scene Description &amp; Camera Movement</span>
+          <button type="button" onclick="clearPrompt()" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;">Clear</button>
+        </div>
+        <textarea id="promptInput" class="prompt-textarea" placeholder="Describe the scene in vivid detail. E.g.: Cinematic aerial drone shot tracking a high-speed silver sports car winding along a coastal highway at golden hour, 35mm lens, volumetric lens flares..."></textarea>
+        
+        <div class="prompt-actions-row">
+          <button type="button" class="magic-enhance-btn" id="enhanceBtn" onclick="enhancePrompt()">
+            <span>🪄</span> Magic Enhance (Gemini 3.6)
+          </button>
+          <span class="char-counter" id="charCounter">0 / 1000</span>
+        </div>
+      </div>
+
+      <!-- Gemini AI Prompt Enhancements Accordion -->
+      <div class="enhancement-results" id="enhancementBox">
+        <div style="font-size:11px;font-weight:700;color:#c084fc;margin-bottom:4px;">✨ Hollywood Director Expansions (Click to adopt):</div>
+        <div id="enhancementOptionsList"></div>
+      </div>
+
+      <!-- Quick Style Presets -->
+      <div>
+        <div class="section-label">Style Presets</div>
+        <div class="style-chips">
+          <span class="style-chip" onclick="applyPreset('Cinematic 4K, anamorphic lens, shallow depth of field, dramatic volumetric lighting')">🎬 Cinematic 4K</span>
+          <span class="style-chip" onclick="applyPreset('Cyberpunk nocturnal aesthetic, rainy neon reflections on wet street, cyan & magenta palette')">🌆 Cyberpunk Neon</span>
+          <span class="style-chip" onclick="applyPreset('National Geographic documentary, macro telephoto lens, natural golden sunlight, slow motion')">🌿 Nature Macro</span>
+          <span class="style-chip" onclick="applyPreset('Studio Ghibli style, vibrant hand-painted pastel skies, whimsical wind animation')">🎨 Anime Painterly</span>
+          <span class="style-chip" onclick="applyPreset('FPV racing drone perspective, sweeping banking turns, speed blur, dynamic horizon')">🚁 Drone FPV</span>
+          <span class="style-chip" onclick="applyPreset('Vintage 35mm film grain, 1970s warm retro color grading, subtle lens aberration')">📼 35mm Film</span>
+        </div>
+      </div>
+
+      <!-- Settings Grid -->
+      <div class="settings-grid">
+        <div>
+          <div class="section-label">Model Engine</div>
+          <select id="modelSelect" class="select-field">
+            <option value="models/veo-3.1-fast-generate-preview" selected>Veo 3.1 Fast (Low Latency)</option>
+            <option value="models/veo-3.1-generate-preview">Veo 3.1 Cinema (High Detail)</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="section-label">Aspect Ratio</div>
+          <select id="aspectSelect" class="select-field" onchange="updatePlayerAspect(this.value)">
+            <option value="16:9" selected>16:9 (Landscape)</option>
+            <option value="9:16">9:16 (Vertical / Reels)</option>
+            <option value="1:1">1:1 (Square)</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="section-label">Duration</div>
+          <select id="durationSelect" class="select-field">
+            <option value="4" selected>4 Seconds</option>
+            <option value="8">8 Seconds</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="section-label">Billing / API Key</div>
+          <input type="password" id="customApiKey" class="select-field" placeholder="Default Server Key" autocomplete="off" title="Optionally override default Gemini API key with your billing-enabled key">
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button type="button" class="generate-btn" id="generateBtn" onclick="submitVideoJob()">
+        <span>🎬</span> Generate AI Video
+      </button>
+
+      <!-- Status & Diagnostics -->
+      <div id="statusBanner" class="status-banner"></div>
+    </div>
+
+    <!-- Right Area: Cinema Player & Production History -->
+    <div class="workstation">
+      
+      <!-- Current Cinema Player -->
+      <div class="cinema-card">
+        <div class="panel-header">
+          <h2><span>🎥</span> Cinema Viewport</h2>
+          <div class="video-badges" id="activeBadges">
+            <span class="badge" id="badgeAspect">16:9</span>
+            <span class="badge" id="badgeModel">Veo 3.1</span>
+            <span class="badge" id="badgeDuration">4s</span>
+          </div>
+        </div>
+
+        <div class="player-wrapper" id="playerWrapper">
+          <div class="player-placeholder" id="playerPlaceholder">
+            <div class="placeholder-icon">🎬</div>
+            <div>
+              <b style="color:#fff;font-size:14px;">No Video Loaded</b>
+              <p style="font-size:12px;margin-top:4px;">Enter a prompt on the left and click "Generate AI Video" or pick a production from history below.</p>
+            </div>
+          </div>
+          <video id="activePlayer" controls loop playsinline></video>
+        </div>
+
+        <div class="video-info-bar">
+          <div class="active-prompt-display" id="activePromptText">
+            Ready to generate your next cinematic production.
+          </div>
+          
+          <div class="video-actions">
+            <button type="button" class="btn-action" id="downloadBtn" onclick="downloadCurrentVideo()" disabled>
+              <span>⬇️</span> Download MP4
+            </button>
+            <button type="button" class="btn-action" id="copyLinkBtn" onclick="copyVideoLink()" disabled>
+              <span>🔗</span> Copy Link
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Production History Archive -->
+      <div class="history-card">
+        <div class="panel-header">
+          <h2><span>🎞️</span> Production Archive</h2>
+          <button type="button" class="btn-action" onclick="loadHistory()" style="padding:4px 10px;font-size:11px;">
+            <span>🔄</span> Refresh
+          </button>
+        </div>
+
+        <div class="gallery-grid" id="historyGrid">
+          <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-dim);font-size:12px;">
+            Loading video history...
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    let currentVideoJob = null;
+    let pollInterval = null;
+    let elapsedTimer = null;
+    let elapsedSeconds = 0;
+    let currentLoadedVideoUrl = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      setupPromptEvents();
+      await checkAuth();
+      await loadHistory();
+    });
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const data = await res.json();
+        if (!data.authenticated) {
+          location.href = '/login';
+          return;
+        }
+        if (!data.is_admin) {
+          alert('AI Video Studio is strictly reserved for administrators.');
+          location.href = '/terminal';
+          return;
+        }
+        document.getElementById('userEmail').textContent = data.user?.email || 'Admin';
+      } catch (err) {
+        console.error('Auth verification error:', err);
+      }
+    }
+
+    function switchWorkspace(val) {
+      if (val === 'trading') {
+        location.href = '/terminal';
+      } else if (val === 'fitness') {
+        location.href = '/fitness';
+      } else {
+        location.href = '/video';
+      }
+    }
+
+    function setupPromptEvents() {
+      const p = document.getElementById('promptInput');
+      const counter = document.getElementById('charCounter');
+      p.addEventListener('input', () => {
+        counter.textContent = `${p.value.length} / 1000`;
+      });
+    }
+
+    function clearPrompt() {
+      const p = document.getElementById('promptInput');
+      p.value = '';
+      document.getElementById('charCounter').textContent = '0 / 1000';
+      document.getElementById('enhancementBox').style.display = 'none';
+    }
+
+    function applyPreset(presetText) {
+      const p = document.getElementById('promptInput');
+      if (p.value.trim().length > 0) {
+        p.value = `${p.value.trim()}, ${presetText}`;
+      } else {
+        p.value = presetText;
+      }
+      document.getElementById('charCounter').textContent = `${p.value.length} / 1000`;
+      p.focus();
+    }
+
+    function updatePlayerAspect(ratio) {
+      const wrapper = document.getElementById('playerWrapper');
+      wrapper.className = 'player-wrapper';
+      if (ratio === '9:16') wrapper.classList.add('portrait');
+      if (ratio === '1:1') wrapper.classList.add('square');
+      document.getElementById('badgeAspect').textContent = ratio;
+    }
+
+    // Gemini Magic Enhance Prompt
+    async function enhancePrompt() {
+      const promptInput = document.getElementById('promptInput');
+      const idea = promptInput.value.trim();
+      if (!idea) {
+        toast('Enter a concept or prompt to enhance first!');
+        promptInput.focus();
+        return;
+      }
+
+      const btn = document.getElementById('enhanceBtn');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span>⏳</span> Enhancing...';
+      btn.disabled = true;
+
+      try {
+        const apiKey = document.getElementById('customApiKey').value.trim();
+        const res = await fetch('/api/video/enhance-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ idea, api_key: apiKey })
+        });
+        const data = await res.json();
+        
+        if (data.ok && data.options && data.options.length) {
+          renderEnhancementOptions(data.options);
+          toast('Gemini generated 3 cinematic expansions!');
+        } else {
+          toast(data.error || 'Could not enhance prompt.');
+        }
+      } catch (err) {
+        console.error('Enhance error:', err);
+        toast('Prompt enhancement request failed.');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    function renderEnhancementOptions(options) {
+      const box = document.getElementById('enhancementBox');
+      const list = document.getElementById('enhancementOptionsList');
+      list.innerHTML = '';
+
+      options.forEach(opt => {
+        const card = document.createElement('div');
+        card.className = 'enhancement-option-card';
+        card.innerHTML = `
+          <div class="enhancement-title">
+            <span>${opt.title || 'Cinematic Cut'}</span>
+            <span style="color:#a855f7;font-size:10px;">${opt.style || ''}</span>
+          </div>
+          <div class="enhancement-text">${opt.prompt}</div>
+        `;
+        card.onclick = () => {
+          document.getElementById('promptInput').value = opt.prompt;
+          document.getElementById('charCounter').textContent = `${opt.prompt.length} / 1000`;
+          box.style.display = 'none';
+          toast('Adopted cinematic prompt!');
+        };
+        list.appendChild(card);
+      });
+
+      box.style.display = 'flex';
+    }
+
+    // Submit Video Job
+    async function submitVideoJob() {
+      const prompt = document.getElementById('promptInput').value.trim();
+      if (!prompt) {
+        toast('Please enter a video prompt.');
+        document.getElementById('promptInput').focus();
+        return;
+      }
+
+      const model = document.getElementById('modelSelect').value;
+      const aspect = document.getElementById('aspectSelect').value;
+      const duration = parseInt(document.getElementById('durationSelect').value, 10);
+      const apiKey = document.getElementById('customApiKey').value.trim();
+
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Submitting to Veo...';
+
+      setStatus('generating', 'Connecting to Google Veo 3.1 Video Engine...');
+
+      try {
+        const res = await fetch('/api/video/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            prompt,
+            model,
+            aspect_ratio: aspect,
+            duration_seconds: duration,
+            api_key: apiKey
+          })
+        });
+
+        const data = await res.json();
+
+        if (!data.ok) {
+          handleGenerationError(data);
+          btn.disabled = false;
+          btn.innerHTML = '<span>🎬</span> Generate AI Video';
+          return;
+        }
+
+        currentVideoJob = data.id;
+        startPolling(data.id, prompt, aspect, model, duration);
+
+      } catch (err) {
+        console.error('Submission error:', err);
+        setStatus('error', `Network error submitting request: ${err.message}`);
+        btn.disabled = false;
+        btn.innerHTML = '<span>🎬</span> Generate AI Video';
+      }
+    }
+
+    function handleGenerationError(data) {
+      const err = data.error || 'Generation failed.';
+      const isQuota = data.status_code === 429 || err.includes('Quota') || err.includes('RESOURCE_EXHAUSTED');
+      
+      let html = `<b>⚠️ Generation Error:</b> ${err}`;
+      if (isQuota) {
+        html += `
+          <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(239,68,68,0.3);font-size:11px;">
+            💡 <b>Google Veo Quota Notice:</b> Veo video generation requires a billing-enabled Google Cloud / AI Studio project.
+            <br>You can enter your billing-enabled Gemini API key in the <b>Billing / API Key</b> field above.
+            <br><br>
+            <button type="button" class="btn-action" style="background:#1e2b3b;color:#38bdf8;" onclick="submitDemoJob()">
+              <span>🧪</span> Test with Sample Video Player
+            </button>
+          </div>
+        `;
+      }
+      setStatus('error', html);
+    }
+
+    async function submitDemoJob() {
+      const prompt = document.getElementById('promptInput').value.trim() || 'Cinematic ocean waves at sunset';
+      const model = document.getElementById('modelSelect').value;
+      const aspect = document.getElementById('aspectSelect').value;
+      const duration = parseInt(document.getElementById('durationSelect').value, 10);
+
+      try {
+        const res = await fetch('/api/video/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            prompt,
+            model,
+            aspect_ratio: aspect,
+            duration_seconds: duration,
+            is_demo: true
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('Demo video test entry created!');
+          await loadHistory();
+        }
+      } catch (e) {
+        toast('Demo test error');
+      }
+    }
+
+    function startPolling(jobId, prompt, aspect, model, duration) {
+      clearInterval(pollInterval);
+      clearInterval(elapsedTimer);
+      elapsedSeconds = 0;
+
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = true;
+
+      elapsedTimer = setInterval(() => {
+        elapsedSeconds++;
+        btn.innerHTML = `<div class="spinner"></div> Generating... (${elapsedSeconds}s)`;
+      }, 1000);
+
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/video/status/${jobId}`, { credentials: 'include' });
+          const data = await res.json();
+
+          if (data.status === 'completed') {
+            clearInterval(pollInterval);
+            clearInterval(elapsedTimer);
+            btn.disabled = false;
+            btn.innerHTML = '<span>🎬</span> Generate AI Video';
+            setStatus('success', `🎉 Video generation complete in ${elapsedSeconds} seconds!`);
+            loadVideoIntoPlayer(data.video_url, prompt, aspect, model, duration);
+            await loadHistory();
+          } else if (data.status === 'failed') {
+            clearInterval(pollInterval);
+            clearInterval(elapsedTimer);
+            btn.disabled = false;
+            btn.innerHTML = '<span>🎬</span> Generate AI Video';
+            setStatus('error', `Generation failed: ${data.error || 'Unknown error'}`);
+            await loadHistory();
+          } else {
+            setStatus('generating', `Rendering frames via Google Veo 3.1 neural model... Elapsed: ${elapsedSeconds}s`);
+          }
+        } catch (e) {
+          console.error('Polling error:', e);
+        }
+      }, 5000);
+    }
+
+    function setStatus(type, msgHtml) {
+      const banner = document.getElementById('statusBanner');
+      banner.className = `status-banner ${type}`;
+      banner.innerHTML = type === 'generating' ? `<div class="spinner"></div> <div>${msgHtml}</div>` : msgHtml;
+      banner.style.display = 'flex';
+    }
+
+    function loadVideoIntoPlayer(videoUrl, prompt, aspect, model, duration) {
+      currentLoadedVideoUrl = videoUrl;
+      const player = document.getElementById('activePlayer');
+      const placeholder = document.getElementById('playerPlaceholder');
+
+      updatePlayerAspect(aspect || '16:9');
+      document.getElementById('badgeAspect').textContent = aspect || '16:9';
+      document.getElementById('badgeModel').textContent = (model || 'Veo 3.1').replace('models/', '');
+      document.getElementById('badgeDuration').textContent = `${duration || 4}s`;
+      document.getElementById('activePromptText').textContent = prompt || 'AI Generated Video';
+
+      player.src = videoUrl;
+      player.style.display = 'block';
+      placeholder.style.display = 'none';
+      player.play().catch(() => {});
+
+      document.getElementById('downloadBtn').disabled = false;
+      document.getElementById('copyLinkBtn').disabled = false;
+    }
+
+    function downloadCurrentVideo() {
+      if (!currentLoadedVideoUrl) return;
+      const a = document.createElement('a');
+      a.href = currentLoadedVideoUrl;
+      a.download = `ca_trader_video_${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast('Download initiated.');
+    }
+
+    function copyVideoLink() {
+      if (!currentLoadedVideoUrl) return;
+      const fullUrl = window.location.origin + currentLoadedVideoUrl;
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        toast('Video link copied to clipboard!');
+      }).catch(() => {
+        toast('Could not copy link.');
+      });
+    }
+
+    // History Loader
+    async function loadHistory() {
+      const grid = document.getElementById('historyGrid');
+      try {
+        const res = await fetch('/api/video/history', { credentials: 'include' });
+        const data = await res.json();
+        if (!data.ok || !data.videos || !data.videos.length) {
+          grid.innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-dim);font-size:12px;">
+              No video productions yet. Create your first video using the prompt director above!
+            </div>
+          `;
+          return;
+        }
+
+        grid.innerHTML = '';
+        data.videos.forEach(v => {
+          const item = document.createElement('div');
+          item.className = 'gallery-item';
+          const isDone = v.status === 'completed' && v.video_url;
+
+          item.innerHTML = `
+            <div class="gallery-thumb">
+              ${isDone ? `<video src="${v.video_url}" muted preload="metadata" onmouseover="this.play()" onmouseout="this.pause()"></video>` : '🎬'}
+            </div>
+            <div class="gallery-prompt" title="${v.prompt}">${v.prompt}</div>
+            <div class="gallery-meta">
+              <span class="status-tag ${v.status}">${v.status}</span>
+              <span>${v.aspect_ratio || '16:9'} · ${v.duration_seconds || 4}s</span>
+              <button type="button" onclick="event.stopPropagation(); deleteVideo('${v.id}')" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:12px;" title="Delete">🗑️</button>
+            </div>
+          `;
+
+          if (isDone) {
+            item.onclick = () => {
+              document.querySelectorAll('.gallery-item').forEach(i => i.classList.remove('active'));
+              item.classList.add('active');
+              loadVideoIntoPlayer(v.video_url, v.prompt, v.aspect_ratio, v.model, v.duration_seconds);
+            };
+          }
+
+          grid.appendChild(item);
+        });
+
+      } catch (err) {
+        console.error('History load error:', err);
+      }
+    }
+
+    async function deleteVideo(id) {
+      if (!confirm('Are you sure you want to delete this video?')) return;
+      try {
+        const res = await fetch(`/api/video/${id}`, { method: 'DELETE', credentials: 'include' });
+        const data = await res.json();
+        if (data.ok) {
+          toast('Video deleted.');
+          await loadHistory();
+        }
+      } catch (e) {
+        toast('Delete failed.');
+      }
+    }
+
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => {
+        t.classList.remove('show');
+      }, 3000);
+    }
+
+    // Attach to window
+    window.switchWorkspace = switchWorkspace;
+    window.clearPrompt = clearPrompt;
+    window.applyPreset = applyPreset;
+    window.updatePlayerAspect = updatePlayerAspect;
+    window.enhancePrompt = enhancePrompt;
+    window.submitVideoJob = submitVideoJob;
+    window.submitDemoJob = submitDemoJob;
+    window.downloadCurrentVideo = downloadCurrentVideo;
+    window.copyVideoLink = copyVideoLink;
+    window.loadHistory = loadHistory;
+    window.deleteVideo = deleteVideo;
+    window.toast = toast;
+  </script>
+</body>
+</html>

@@ -199,7 +199,7 @@ except Exception:
     websocket_sync_connect = None
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, FileResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -250,6 +250,9 @@ LOGIN_HTML_PATH = next((p for p in LOGIN_HTML_CANDIDATES if p.exists()), None)
 FITNESS_HTML_PATH = BASE_DIR / "fitness.html"
 TERMINAL_SELECTOR_HTML_PATH = BASE_DIR / "terminal_selector.html"
 GUIDE_HTML_PATH = BASE_DIR / "ca_trader_guide.html"
+VIDEO_TERMINAL_HTML_PATH = BASE_DIR / "video_terminal.html"
+VIDEO_STORAGE_DIR = BASE_DIR / "data" / "videos"
+VIDEO_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 if HTML_PATH is None:
     # The exact uploaded filename is kept as a fallback reference for users
     # who place app.py elsewhere and keep the HTML beside it.
@@ -777,6 +780,24 @@ def init_db() -> None:
                     auto_prune_days INTEGER NOT NULL DEFAULT 15,
                     muted_categories TEXT NOT NULL DEFAULT '[]',
                     updated_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_videos (
+                    id TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    prompt TEXT NOT NULL,
+                    enhanced_prompt TEXT DEFAULT '',
+                    model TEXT NOT NULL,
+                    aspect_ratio TEXT DEFAULT '16:9',
+                    duration_seconds INTEGER DEFAULT 4,
+                    status TEXT NOT NULL,
+                    operation_name TEXT DEFAULT '',
+                    video_filename TEXT DEFAULT '',
+                    error_message TEXT DEFAULT '',
+                    is_demo INTEGER DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    completed_at TEXT DEFAULT ''
                 )
             """)
             notif_cols = {row[1] for row in conn.execute("PRAGMA table_info(notifications)").fetchall()}
@@ -6557,8 +6578,10 @@ async def index(request: Request) -> Response:
     user = current_user(request)
     if AUTH_ENABLED and not user:
         return await login_page(request)
-    if fitness_allowlisted(user) and not selected_terminal(request):
+    if (fitness_allowlisted(user) or is_admin(user)) and not selected_terminal(request):
         return RedirectResponse("/post-login")
+    if selected_terminal(request) == "video" and is_admin(user):
+        return await video_terminal_page(request)
     if selected_terminal(request) == "fitness":
         return await fitness_page(request)
     return await terminal_page(request)
@@ -6591,7 +6614,8 @@ async def force_login(request: Request) -> Response:
 async def post_login_page(request: Request) -> Response:
     user=current_user(request)
     if AUTH_ENABLED and not user: return RedirectResponse("/login")
-    if not fitness_allowlisted(user): return RedirectResponse("/terminal")
+    if not (fitness_allowlisted(user) or is_admin(user)): return RedirectResponse("/terminal")
+    if selected_terminal(request)=="video" and is_admin(user): return RedirectResponse("/video")
     if selected_terminal(request)=="fitness": return RedirectResponse("/fitness")
     if selected_terminal(request)=="trading": return RedirectResponse("/terminal")
     if not TERMINAL_SELECTOR_HTML_PATH.exists(): return RedirectResponse("/terminal")
@@ -6600,8 +6624,9 @@ async def post_login_page(request: Request) -> Response:
 @app.post("/api/auth/select-terminal")
 async def auth_select_terminal(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     body=await request.json(); terminal=str(body.get("terminal") or "").strip().lower()
-    if terminal not in {"trading","fitness"}: raise HTTPException(422,"Unsupported terminal")
-    if not fitness_allowlisted(user) and terminal!="trading": raise HTTPException(403,"Fitness terminal is not enabled for this account")
+    if terminal not in {"trading","fitness","video"}: raise HTTPException(422,"Unsupported terminal")
+    if terminal=="fitness" and not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
+    if terminal=="video" and not is_admin(user): raise HTTPException(403,"AI Video Studio is restricted to administrators")
     request.session["selected_terminal"]=terminal
     return {"ok":True,"terminal":terminal}
 
@@ -6613,6 +6638,15 @@ async def fitness_page(request: Request) -> Response:
     if not FITNESS_HTML_PATH.exists(): return error_json("FITNESS_UI_NOT_FOUND", "fitness.html is missing", 500)
     request.session["selected_terminal"]="fitness"
     return HTMLResponse(FITNESS_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+
+@app.get("/video", response_class=HTMLResponse)
+async def video_terminal_page(request: Request) -> Response:
+    user=current_user(request)
+    if AUTH_ENABLED and not user: return RedirectResponse("/login")
+    if not is_admin(user): return RedirectResponse("/terminal")
+    if not VIDEO_TERMINAL_HTML_PATH.exists(): return error_json("VIDEO_UI_NOT_FOUND", "video_terminal.html is missing", 500)
+    request.session["selected_terminal"]="video"
+    return HTMLResponse(VIDEO_TERMINAL_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
 
 @app.get("/guide", response_class=HTMLResponse)
 @app.get("/tutorial", response_class=HTMLResponse)
@@ -6626,6 +6660,8 @@ async def terminal_page(request: Request) -> Response:
     user=current_user(request)
     if AUTH_ENABLED and not user:
         return RedirectResponse("/login")
+    if is_admin(user) and selected_terminal(request)=="video":
+        return RedirectResponse("/video")
     if fitness_allowlisted(user) and selected_terminal(request)=="fitness":
         return RedirectResponse("/fitness")
     if not HTML_PATH.exists():
@@ -6668,7 +6704,15 @@ async def health() -> dict[str, Any]:
 @app.get("/api/auth/me")
 async def auth_me(request: Request) -> dict[str, Any]:
     user = current_user(request)
-    return {"authenticated": bool(user), "user": user and {"id": user["id"], "username": user["username"], "email": user.get("email"), "full_name": user.get("full_name"), "role": user.get("role","user")}, "terminal_selector": fitness_allowlisted(user), "selected_terminal": selected_terminal(request)}
+    admin_flag = is_admin(user)
+    return {
+        "authenticated": bool(user),
+        "user": user and {"id": user["id"], "username": user["username"], "email": user.get("email"), "full_name": user.get("full_name"), "role": user.get("role","user")},
+        "terminal_selector": fitness_allowlisted(user) or admin_flag,
+        "selected_terminal": selected_terminal(request),
+        "is_admin": admin_flag,
+        "video_allowlisted": admin_flag
+    }
 
 @app.patch("/api/auth/profile")
 async def update_profile(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
@@ -15071,3 +15115,187 @@ async def send_reco_to_telegram_api(reco_id: str, user: dict[str, Any] = Depends
     if not ok:
         raise HTTPException(400, f"Telegram delivery failed: {msg}")
     return {"ok": True, "message": "Trade alert successfully delivered to Telegram!"}
+
+
+# ===========================================================================
+# 🎬 AI Video Generation Studio (Google Veo 3.1 & Gemini) - Admin Only
+# ===========================================================================
+
+@app.post("/api/video/generate")
+async def api_video_generate(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(403, "AI Video Studio is restricted to administrators")
+    body = await request.json()
+    prompt = str(body.get("prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(422, "Please enter a video prompt")
+    model = str(body.get("model") or "models/veo-3.1-fast-generate-preview").strip()
+    aspect_ratio = str(body.get("aspect_ratio") or "16:9").strip()
+    duration = int(body.get("duration_seconds") or 4)
+    custom_key = str(body.get("api_key") or "").strip() or None
+    is_demo = bool(body.get("is_demo", False))
+
+    video_id = secrets.token_hex(8)
+    created_at = now_iso()
+
+    if is_demo:
+        demo_fn = f"demo_{video_id}.mp4"
+        db_exec("""
+            INSERT INTO ai_videos(id, user_id, prompt, enhanced_prompt, model, aspect_ratio, duration_seconds, status, operation_name, video_filename, error_message, is_demo, created_at, completed_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, [video_id, user["id"], prompt, "", model, aspect_ratio, duration, "completed", "demo_preview", demo_fn, "", 1, created_at, created_at])
+        return {"ok": True, "id": video_id, "status": "completed", "is_demo": True, "video_url": f"/api/video/stream/{video_id}"}
+
+    from backend.services.video_service import start_video_generation
+    res = await asyncio.to_thread(start_video_generation, prompt, model, aspect_ratio, duration, 1, custom_key)
+    if not res.get("ok"):
+        err = res.get("error", "Failed to submit video generation request")
+        status_code = res.get("status_code", 400)
+        db_exec("""
+            INSERT INTO ai_videos(id, user_id, prompt, enhanced_prompt, model, aspect_ratio, duration_seconds, status, operation_name, video_filename, error_message, is_demo, created_at, completed_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, [video_id, user["id"], prompt, "", model, aspect_ratio, duration, "failed", "", "", err, 0, created_at, created_at])
+        return {"ok": False, "id": video_id, "error": err, "status_code": status_code}
+
+    op_name = res["operation_name"]
+    db_exec("""
+        INSERT INTO ai_videos(id, user_id, prompt, enhanced_prompt, model, aspect_ratio, duration_seconds, status, operation_name, video_filename, error_message, is_demo, created_at, completed_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, [video_id, user["id"], prompt, "", model, aspect_ratio, duration, "generating", op_name, "", "", 0, created_at, ""])
+
+    return {"ok": True, "id": video_id, "operation_name": op_name, "status": "generating"}
+
+
+@app.get("/api/video/status/{video_id}")
+async def api_video_status(video_id: str, request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(403, "Admin access required")
+    row = db_exec("SELECT * FROM ai_videos WHERE id=? AND user_id=?", [video_id, user["id"]], "one")
+    if not row:
+        row = db_exec("SELECT * FROM ai_videos WHERE id=?", [video_id], "one")
+    if not row:
+        raise HTTPException(404, "Video job not found")
+
+    status = row.get("status")
+    if status in ("completed", "failed"):
+        return {
+            "ok": status == "completed",
+            "id": video_id,
+            "status": status,
+            "error": row.get("error_message"),
+            "video_url": f"/api/video/stream/{video_id}" if status == "completed" else None,
+            "completed_at": row.get("completed_at")
+        }
+
+    op_name = row.get("operation_name")
+    if not op_name:
+        return {"ok": False, "status": "failed", "error": "Operation name is missing"}
+
+    from backend.services.video_service import check_operation_status, download_video_file
+    check_res = await asyncio.to_thread(check_operation_status, op_name)
+    if not check_res.get("ok"):
+        err = check_res.get("error", "Error checking operation status")
+        db_exec("UPDATE ai_videos SET status='failed', error_message=?, completed_at=? WHERE id=?", [err, now_iso(), video_id])
+        return {"ok": False, "id": video_id, "status": "failed", "error": err}
+
+    if not check_res.get("done"):
+        return {"ok": True, "id": video_id, "status": "generating", "metadata": check_res.get("metadata", {})}
+
+    video_uri = check_res.get("video_uri")
+    if not video_uri:
+        err = "Video generated but download URI was missing"
+        db_exec("UPDATE ai_videos SET status='failed', error_message=?, completed_at=? WHERE id=?", [err, now_iso(), video_id])
+        return {"ok": False, "id": video_id, "status": "failed", "error": err}
+
+    target_filename = f"{video_id}.mp4"
+    target_path = str(VIDEO_STORAGE_DIR / target_filename)
+
+    dl_ok, dl_err = await asyncio.to_thread(download_video_file, video_uri, target_path)
+    if not dl_ok:
+        err = f"Failed to download video file: {dl_err}"
+        db_exec("UPDATE ai_videos SET status='failed', error_message=?, completed_at=? WHERE id=?", [err, now_iso(), video_id])
+        return {"ok": False, "id": video_id, "status": "failed", "error": err}
+
+    comp_time = now_iso()
+    db_exec("UPDATE ai_videos SET status='completed', video_filename=?, completed_at=? WHERE id=?", [target_filename, comp_time, video_id])
+    return {
+        "ok": True,
+        "id": video_id,
+        "status": "completed",
+        "video_url": f"/api/video/stream/{video_id}",
+        "completed_at": comp_time
+    }
+
+
+@app.get("/api/video/stream/{video_id}")
+async def api_video_stream(video_id: str, request: Request, user: dict[str, Any] = Depends(require_user)) -> Response:
+    if not is_admin(user):
+        raise HTTPException(403, "Admin access required")
+    row = db_exec("SELECT * FROM ai_videos WHERE id=?", [video_id], "one")
+    if not row:
+        raise HTTPException(404, "Video record not found")
+    fn = row.get("video_filename") or f"{video_id}.mp4"
+    vpath = VIDEO_STORAGE_DIR / fn
+    if not vpath.exists():
+        vpath_alt = VIDEO_STORAGE_DIR / f"{video_id}.mp4"
+        if vpath_alt.exists():
+            vpath = vpath_alt
+        else:
+            raise HTTPException(404, "Video file does not exist on disk")
+    return FileResponse(vpath, media_type="video/mp4", filename=f"video_{video_id}.mp4")
+
+
+@app.get("/api/video/history")
+async def api_video_history(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(403, "Admin access required")
+    rows = db_exec("SELECT * FROM ai_videos WHERE user_id=? ORDER BY created_at DESC LIMIT 60", [user["id"]], "all")
+    items = []
+    for r in (rows or []):
+        vid_id = r["id"]
+        status = r["status"]
+        items.append({
+            "id": vid_id,
+            "prompt": r["prompt"],
+            "model": r["model"],
+            "aspect_ratio": r["aspect_ratio"],
+            "duration_seconds": r["duration_seconds"],
+            "status": status,
+            "created_at": r["created_at"],
+            "completed_at": r["completed_at"],
+            "error_message": r["error_message"],
+            "video_url": f"/api/video/stream/{vid_id}" if status == "completed" else None,
+        })
+    return {"ok": True, "videos": items}
+
+
+@app.delete("/api/video/{video_id}")
+async def api_video_delete(video_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(403, "Admin access required")
+    row = db_exec("SELECT * FROM ai_videos WHERE id=? AND user_id=?", [video_id, user["id"]], "one")
+    if not row:
+        raise HTTPException(404, "Video not found")
+    if row.get("video_filename"):
+        p = VIDEO_STORAGE_DIR / row["video_filename"]
+        if p.exists():
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+    db_exec("DELETE FROM ai_videos WHERE id=?", [video_id])
+    return {"ok": True, "id": video_id}
+
+
+@app.post("/api/video/enhance-prompt")
+async def api_video_enhance_prompt(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(403, "Admin access required")
+    body = await request.json()
+    idea = str(body.get("idea") or "").strip()
+    if not idea:
+        raise HTTPException(422, "Please enter a concept or idea to enhance")
+    custom_key = str(body.get("api_key") or "").strip() or None
+    from backend.services.video_service import enhance_prompt_with_gemini
+    res = await asyncio.to_thread(enhance_prompt_with_gemini, idea, custom_key)
+    return res

@@ -1,3 +1,202 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#081015"><title>Choose your terminal</title><style>
-:root{--bg:#081015;--panel:#0d1a20;--line:#24434b;--text:#eef7f7;--muted:#88a4aa;--teal:#42c8ba;--orange:#ff855c}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 0,#16323b,#081015 55%);color:var(--text);font-family:Inter,system-ui,sans-serif;display:grid;place-items:center;padding:18px}.wrap{width:min(620px,100%)}.top{display:flex;align-items:center;gap:10px;margin-bottom:18px}.logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--teal),#238c88);color:#031413;font-weight:800}.muted{color:var(--muted)}h1{font-size:28px;margin:0 0 7px}p{color:var(--muted);line-height:1.5}.grid{display:grid;gap:12px;margin-top:18px}.card{border:1px solid var(--line);background:rgba(13,26,32,.95);border-radius:20px;padding:18px;display:flex;justify-content:space-between;gap:14px;align-items:center;transition:.2s;box-shadow:0 22px 55px rgba(0,0,0,.26)}.card:hover{transform:translateY(-2px);border-color:#3d7982}.icon{font-size:32px}.title{font-weight:800;font-size:17px}.desc{font-size:12px;color:var(--muted);margin-top:4px}.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:800}.primary{background:var(--teal);color:#041311}.secondary{background:#163039;color:#b9e6e2;border:1px solid #2d5861}.foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:11px}.tag{padding:5px 8px;border-radius:999px;background:#123038;color:#a8d8d4}.warn{background:#2c1b13;color:#ffbf9c}
-</style></head><body><div class="wrap"><div class="top"><div class="logo">CA</div><div><div style="font-weight:800">Terminal switch</div><div class="muted" style="font-size:11px">Your account can enter either workspace.</div></div></div><div><h1>Where do you want to work?</h1><p id="hello">Choose a terminal. You can switch later from the account menu.</p></div><div class="grid"><div class="card"><div style="display:flex;gap:14px;align-items:center"><div class="icon">📈</div><div><div class="title">CA Trader</div><div class="desc">Markets, watchlists, news, orders and CA AI.</div></div></div><button class="btn primary" onclick="choose('trading')">Open</button></div><div class="card"><div style="display:flex;gap:14px;align-items:center"><div class="icon">🏋️</div><div><div class="title">CA Fitness Tracker</div><div class="desc">Nutrition, workout progress, No Smoking and Mike Mentzer.AI.</div></div></div><button class="btn primary" onclick="choose('fitness')">Open</button></div></div><div class="foot"><span class="tag">Allowlisted account</span><button class="btn secondary" onclick="location.href='/logout'">Sign out</button></div></div><script>async function choose(t){const r=await fetch('/api/auth/select-terminal',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal:t})});const d=await r.json().catch(()=>({}));if(!r.ok){alert(d?.detail?.message||d?.error?.message||'Could not select terminal');return}location.href=t==='fitness'?'/fitness':'/terminal'}fetch('/api/auth/me',{credentials:'include'}).then(r=>r.json()).then(d=>{document.getElementById('hello').textContent='Welcome '+(d.user?.full_name||d.user?.email||'back')+'. Choose your terminal.'})</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#081015">
+  <title>Choose your terminal — CA Trader</title>
+  <style>
+    :root {
+      --bg: #081015;
+      --panel: #0d1a20;
+      --line: #24434b;
+      --text: #eef7f7;
+      --muted: #88a4aa;
+      --teal: #42c8ba;
+      --orange: #ff855c;
+      --gold: #f59e0b;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 0, #16323b, #081015 55%);
+      color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+    .wrap { width: min(640px, 100%); }
+    .top { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--teal), #238c88);
+      color: #031413;
+      font-weight: 800;
+    }
+    .muted { color: var(--muted); }
+    h1 { font-size: 28px; margin: 0 0 7px; }
+    p { color: var(--muted); line-height: 1.5; }
+    .grid { display: grid; gap: 12px; margin-top: 18px; }
+    .card {
+      border: 1px solid var(--line);
+      background: rgba(13, 26, 32, 0.95);
+      border-radius: 20px;
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      transition: .2s;
+      box-shadow: 0 22px 55px rgba(0,0,0,.26);
+    }
+    .card:hover { transform: translateY(-2px); border-color: #3d7982; }
+    .icon { font-size: 32px; flex-shrink: 0; }
+    .title { font-weight: 800; font-size: 17px; }
+    .desc { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+    .btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 18px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .primary { background: var(--teal); color: #041311; }
+    .primary:hover { opacity: 0.92; }
+    .secondary {
+      background: #163039;
+      color: #b9e6e2;
+      border: 1px solid #2d5861;
+    }
+    .foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 18px;
+      font-size: 11px;
+    }
+    .tag {
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #123038;
+      color: #a8d8d4;
+      font-weight: 600;
+    }
+    .admin-pill {
+      font-size: 9.5px;
+      background: rgba(245,158,11,0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245,158,11,0.45);
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="logo">CA</div>
+      <div>
+        <div style="font-weight:800">Terminal Switcher</div>
+        <div class="muted" style="font-size:11px">Select your active workstation.</div>
+      </div>
+    </div>
+
+    <div>
+      <h1>Where do you want to work?</h1>
+      <p id="hello">Choose a terminal. You can switch later from the top navigation bar.</p>
+    </div>
+
+    <div class="grid">
+      <!-- 1. CA Trader -->
+      <div class="card">
+        <div style="display:flex;gap:14px;align-items:center">
+          <div class="icon">📈</div>
+          <div>
+            <div class="title">CA Trader</div>
+            <div class="desc">Markets, watchlists, technical charts, orders and CA AI.</div>
+          </div>
+        </div>
+        <button class="btn primary" onclick="choose('trading')">Open</button>
+      </div>
+
+      <!-- 2. CA Fitness Tracker -->
+      <div class="card">
+        <div style="display:flex;gap:14px;align-items:center">
+          <div class="icon">🏋️</div>
+          <div>
+            <div class="title">CA Fitness Tracker</div>
+            <div class="desc">Nutrition, workout progress, No Smoking and Mike Mentzer.AI.</div>
+          </div>
+        </div>
+        <button class="btn primary" onclick="choose('fitness')">Open</button>
+      </div>
+
+      <!-- 3. AI Video Studio (Admin Only) -->
+      <div class="card" id="videoCard" style="display:none;border-color:rgba(56,189,248,0.35);">
+        <div style="display:flex;gap:14px;align-items:center">
+          <div class="icon">🎬</div>
+          <div>
+            <div class="title" style="display:flex;align-items:center;gap:8px;">
+              AI Video Generation Studio
+              <span class="admin-pill">ADMIN ONLY</span>
+            </div>
+            <div class="desc">Google Veo 3.1 cinema engine, Gemini prompt director &amp; MP4 player.</div>
+          </div>
+        </div>
+        <button class="btn primary" style="background:linear-gradient(135deg,#0284c7,#38bdf8);color:#031726;" onclick="choose('video')">Open</button>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span class="tag" id="accessTag">Allowlisted account</span>
+      <button class="btn secondary" onclick="location.href='/logout'">Sign out</button>
+    </div>
+  </div>
+
+  <script>
+    async function choose(t) {
+      const r = await fetch('/api/auth/select-terminal', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ terminal: t })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        alert(d?.detail?.message || d?.error?.message || 'Could not select terminal');
+        return;
+      }
+      if (t === 'fitness') {
+        location.href = '/fitness';
+      } else if (t === 'video') {
+        location.href = '/video';
+      } else {
+        location.href = '/terminal';
+      }
+    }
+
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('hello').textContent = 'Welcome ' + (d.user?.full_name || d.user?.email || 'back') + '. Choose your terminal.';
+        if (d.is_admin || d.video_allowlisted) {
+          document.getElementById('videoCard').style.display = 'flex';
+          document.getElementById('accessTag').textContent = 'Administrator Privileges';
+          document.getElementById('accessTag').style.background = 'rgba(245,158,11,0.2)';
+          document.getElementById('accessTag').style.color = '#fbbf24';
+        }
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

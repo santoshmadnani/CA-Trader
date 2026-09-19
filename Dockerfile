@@ -13,10 +13,11 @@ COPY CA_Trader_Login.html .
 COPY fitness.html .
 COPY terminal_selector.html .
 COPY ca_trader_guide.html .
+COPY video_terminal.html .
 COPY static/ static/
 COPY backend/ backend/
 
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data/videos
 
 EXPOSE 8000
 
