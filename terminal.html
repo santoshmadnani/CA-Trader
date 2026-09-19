@@ -8312,6 +8312,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     if(!state.appliedIndicators) state.appliedIndicators = [];
     const indClean = indName.split(' ')[0].toUpperCase();
     if(!state.appliedIndicators.includes(indClean)){
+      state.appliedIndic
+... [truncated for diff preview]
       state.appliedIndicators.push(indClean);
     }
     renderApplied();
@@ -23179,74 +23181,77 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <!-- MODAL: TELEGRAM BOT INTEGRATION -->
-<div class="modal" id="telegramSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
-  <div class="modal-card" style="background:var(--surface, #1e222d);border:1px solid rgba(0,136,204,0.35);border-radius:12px;width:92%;max-width:520px;padding:22px;box-shadow:0 16px 40px rgba(0,0,0,0.65);color:var(--text, #d1d4dc);">
+<div class="modal" id="telegramSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:10px;">
+  <div class="modal-card" style="background:var(--surface, #1e222d);border:1px solid rgba(0,136,204,0.35);border-radius:10px;width:95%;max-width:470px;max-height:calc(100vh - 24px);display:flex;flex-direction:column;box-shadow:0 16px 40px rgba(0,0,0,0.7);color:var(--text, #d1d4dc);margin:auto;overflow:hidden;">
     
-    <!-- Modal Header -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border-soft, #2a2e39);padding-bottom:12px;">
+    <!-- Modal Header (Fixed at top) -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border-soft, #2a2e39);flex-shrink:0;background:var(--surface, #1e222d);">
       <div style="display:flex;align-items:center;gap:8px;">
-        <div style="width:28px;height:28px;border-radius:6px;background:rgba(0,136,204,0.2);display:flex;align-items:center;justify-content:center;color:#29b6f6;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+        <div style="width:26px;height:26px;border-radius:5px;background:rgba(0,136,204,0.2);display:flex;align-items:center;justify-content:center;color:#29b6f6;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
         </div>
         <div>
-          <b style="font-size:15px;color:var(--text, #fff);">Telegram Alert Bot</b>
-          <div style="font-size:11px;color:var(--text-dim, #787b86);">Live AI signals, trailing stop updates &amp; breaking market news</div>
+          <b style="font-size:14px;color:var(--text, #fff);display:block;line-height:1.2;">Telegram Alert Bot</b>
+          <span style="font-size:10.5px;color:var(--text-dim, #787b86);">Live AI signals, trailing SL &amp; market news</span>
         </div>
       </div>
-      <button type="button" onclick="window.closeTelegramModal()" style="background:transparent;border:none;color:var(--text-dim, #787b86);font-size:22px;line-height:1;cursor:pointer;">×</button>
+      <button type="button" onclick="window.closeTelegramModal()" style="background:transparent;border:none;color:var(--text-dim, #787b86);font-size:22px;line-height:1;cursor:pointer;padding:0 4px;" title="Close">×</button>
     </div>
 
-    <!-- Quick Guide Banner -->
-    <div style="background:rgba(0,136,204,0.08);border:1px solid rgba(0,136,204,0.25);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;line-height:1.45;color:var(--text, #d1d4dc);">
-      <div style="font-weight:700;color:#29b6f6;margin-bottom:3px;display:flex;align-items:center;gap:4px;">
-        <span>⚡ Quick 60-Second Setup:</span>
-      </div>
-      <div>1. Search <b>@BotFather</b> on Telegram, send <code>/newbot</code>, and copy your <b>Bot Token</b>.</div>
-      <div>2. Open <b>@userinfobot</b> on Telegram to find your numeric <b>Chat ID</b>.</div>
-      <div>3. Paste both below, click <b>"Send Test Alert"</b>, then click <b>"Save Configuration"</b>.</div>
-    </div>
-
-    <!-- Form Fields -->
-    <div style="display:flex;flex-direction:column;gap:12px;font-size:12px;">
+    <!-- Modal Body (Scrollable if height is small) -->
+    <div style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px;font-size:11.5px;min-height:0;">
       
-      <!-- Enable Switch -->
-      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2, #2a2e39);padding:10px 12px;border-radius:6px;border:1px solid var(--border, #363a45);">
-        <div>
-          <b style="font-size:12.5px;color:var(--text, #fff);">Activate Telegram Alerts</b>
-          <div style="font-size:11px;color:var(--text-dim, #787b86);">Enable real-time mobile push notifications</div>
+      <!-- Collapsible Setup Guide -->
+      <details style="background:rgba(0,136,204,0.08);border:1px solid rgba(0,136,204,0.25);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--text, #d1d4dc);">
+        <summary style="font-weight:700;color:#29b6f6;cursor:pointer;user-select:none;">⚡ 60-Second Setup Instructions (Click to expand)</summary>
+        <div style="margin-top:6px;line-height:1.45;color:var(--text-dim, #a0a3ad);border-top:1px dashed rgba(0,136,204,0.2);padding-top:5px;">
+          <div>1. Open Telegram, search <b>@BotFather</b>, send <code>/newbot</code>, and copy your <b>Bot Token</b>.</div>
+          <div>2. Open your new bot in Telegram and tap <b>Start</b> (or send <code>/start</code>).</div>
+          <div>3. Search <b>@userinfobot</b> to get your numeric <b>Chat ID</b>.</div>
+          <div>4. Paste both below, click <b>"Send Test Alert"</b>, then click <b>"Save Configuration"</b>.</div>
         </div>
-        <input type="checkbox" id="tgEnabled" style="width:18px;height:18px;cursor:pointer;accent-color:#0088cc;">
+      </details>
+
+      <!-- Enable Switch -->
+      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2, #2a2e39);padding:8px 10px;border-radius:6px;border:1px solid var(--border, #363a45);">
+        <div>
+          <b style="font-size:12px;color:var(--text, #fff);display:block;">Activate Telegram Alerts</b>
+          <span style="font-size:10px;color:var(--text-dim, #787b86);">Enable real-time mobile push notifications</span>
+        </div>
+        <input type="checkbox" id="tgEnabled" style="width:17px;height:17px;cursor:pointer;accent-color:#0088cc;">
       </div>
 
       <!-- Bot Token Field -->
       <div>
-        <label style="display:block;color:var(--text-dim, #787b86);margin-bottom:5px;font-weight:600;">Telegram Bot Token</label>
+        <label style="display:block;color:var(--text-dim, #787b86);margin-bottom:3px;font-weight:600;font-size:11px;">Telegram Bot Token</label>
         <div style="position:relative;display:flex;align-items:center;">
-          <input type="password" id="tgBotToken" placeholder="e.g. 7123456789:AAFx9z-kOpq..." class="tool-input" style="width:100%;padding-right:65px;font-family:monospace;font-size:11.5px;background:var(--surface-2, #2a2e39);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:6px;padding:8px 10px;" autocomplete="off">
-          <button type="button" id="tgToggleTokenView" onclick="window.toggleTgTokenVisibility()" style="position:absolute;right:8px;background:transparent;border:none;color:var(--text-dim, #787b86);cursor:pointer;font-size:11px;font-weight:600;">Show</button>
+          <input type="password" id="tgBotToken" placeholder="Paste Bot Token e.g. 7123456789:AAFx9z-kOpq..." class="tool-input" style="width:100%;padding-right:55px;font-family:monospace;font-size:11px;background:var(--surface-2, #2a2e39);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:5px;padding:6px 8px;" autocomplete="off">
+          <button type="button" id="tgToggleTokenView" onclick="window.toggleTgTokenVisibility()" style="position:absolute;right:6px;background:transparent;border:none;color:var(--text-dim, #787b86);cursor:pointer;font-size:10.5px;font-weight:600;">Show</button>
         </div>
+        <span style="font-size:9.5px;color:var(--text-dim, #787b86);display:block;margin-top:2px;">Get from @BotFather in Telegram. Keep as-is if already saved.</span>
       </div>
 
       <!-- Chat ID Field -->
       <div>
-        <label style="display:block;color:var(--text-dim, #787b86);margin-bottom:5px;font-weight:600;">Telegram Chat ID</label>
-        <input type="text" id="tgChatId" placeholder="e.g. 987654321 or -100xxxxxxx" class="tool-input" style="width:100%;font-family:monospace;font-size:11.5px;background:var(--surface-2, #2a2e39);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:6px;padding:8px 10px;" autocomplete="off">
+        <label style="display:block;color:var(--text-dim, #787b86);margin-bottom:3px;font-weight:600;font-size:11px;">Telegram Chat ID</label>
+        <input type="text" id="tgChatId" placeholder="e.g. 827376201" class="tool-input" style="width:100%;font-family:monospace;font-size:11px;background:var(--surface-2, #2a2e39);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:5px;padding:6px 8px;" autocomplete="off">
+        <span style="font-size:9.5px;color:var(--text-dim, #787b86);display:block;margin-top:2px;">Get from @userinfobot in Telegram.</span>
       </div>
 
       <!-- Alert Filters Section -->
-      <div style="border:1px solid var(--border, #363a45);border-radius:8px;padding:12px;background:var(--surface-2, #2a2e39);">
-        <div style="font-size:11px;font-weight:700;color:var(--text-dim, #787b86);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Notification Channels</div>
+      <div style="border:1px solid var(--border, #363a45);border-radius:6px;padding:8px 10px;background:var(--surface-2, #2a2e39);">
+        <div style="font-size:10px;font-weight:700;color:var(--text-dim, #787b86);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Notification Channels</div>
         
-        <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;flex-direction:column;gap:6px;">
           <!-- Recos Filter -->
           <div style="display:flex;align-items:center;justify-content:space-between;">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text, #fff);">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text, #fff);">
               <input type="checkbox" id="tgNotifyRecos" checked style="accent-color:#0088cc;">
               <span>🎯 Trade Setups (Buy/Sell signals)</span>
             </label>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <span style="font-size:10.5px;color:var(--text-dim, #787b86);">Min Score:</span>
-              <select id="tgMinScore" style="background:var(--surface, #1e222d);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:4px;font-size:11px;padding:2px 6px;">
+            <div style="display:flex;align-items:center;gap:3px;">
+              <span style="font-size:10px;color:var(--text-dim, #787b86);">Min Score:</span>
+              <select id="tgMinScore" style="background:var(--surface, #1e222d);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:3px;font-size:10px;padding:1px 4px;">
                 <option value="70">70%+</option>
                 <option value="75" selected>75%+</option>
                 <option value="80">80%+</option>
@@ -23256,32 +23261,32 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
 
           <!-- Risk / SL Filter -->
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text, #fff);">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text, #fff);">
             <input type="checkbox" id="tgNotifyRisk" checked style="accent-color:#0088cc;">
             <span>🛡️ Position &amp; SL Alerts (Target hit, Trailing stop, Exit)</span>
           </label>
 
           <!-- News Filter -->
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text, #fff);">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text, #fff);">
             <input type="checkbox" id="tgNotifyNews" checked style="accent-color:#0088cc;">
-            <span>⚡ Breaking Institutional News (Materiality ≥ 80%)</span>
+            <span>⚡ Breaking News (Materiality ≥ 80%)</span>
           </label>
         </div>
       </div>
 
       <!-- Status banner -->
-      <div id="tgStatusMsg" style="display:none;font-size:11.5px;padding:8px 12px;border-radius:6px;font-weight:500;"></div>
+      <div id="tgStatusMsg" style="display:none;font-size:11px;padding:7px 10px;border-radius:5px;font-weight:500;line-height:1.4;"></div>
 
     </div>
 
-    <!-- Modal Footer Actions -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;border-top:1px solid var(--border-soft, #2a2e39);padding-top:14px;">
-      <button type="button" class="btn small" id="tgTestBtn" onclick="window.testTelegramAlert()" style="background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:5px;padding:6px 12px;font-weight:600;">
+    <!-- Modal Footer Actions (Fixed at bottom) -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:1px solid var(--border-soft, #2a2e39);flex-shrink:0;background:var(--surface, #1e222d);">
+      <button type="button" class="btn small" id="tgTestBtn" onclick="window.testTelegramAlert()" style="background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;padding:5px 10px;font-size:11px;font-weight:600;">
         ⚡ Send Test Alert
       </button>
-      <div style="display:flex;gap:8px;">
-        <button type="button" class="btn ghost small" onclick="window.closeTelegramModal()" style="border-radius:5px;padding:6px 12px;">Cancel</button>
-        <button type="button" class="btn gold small" id="tgSaveBtn" onclick="window.saveTelegramSettings()" style="border-radius:5px;padding:6px 16px;font-weight:700;">Save Configuration</button>
+      <div style="display:flex;gap:6px;">
+        <button type="button" class="btn ghost small" onclick="window.closeTelegramModal()" style="border-radius:4px;padding:5px 10px;font-size:11px;">Cancel</button>
+        <button type="button" class="btn gold small" id="tgSaveBtn" onclick="window.saveTelegramSettings()" style="border-radius:4px;padding:5px 14px;font-size:11px;font-weight:700;">Save Configuration</button>
       </div>
     </div>
 
@@ -23982,12 +23987,26 @@ window.openTelegramModal = async function(){
     if(data && data.ok && data.settings){
       const s = data.settings;
       const chkEnabled = document.getElementById('tgEnabled');
-      if(chkEnabled) chkEnabled.checked = !!s.enabled;
+      if(chkEnabled) chkEnabled.checked = (s.enabled !== false);
       
       const txtToken = document.getElementById('tgBotToken');
       if(txtToken){
-        txtToken.value = s.bot_token_masked || '';
-        txtToken.dataset.isMasked = s.bot_token_masked ? '1' : '0';
+        if(s.bot_token_masked){
+          txtToken.value = s.bot_token_masked;
+          txtToken.dataset.isMasked = '1';
+        } else {
+          txtToken.value = '';
+          txtToken.dataset.isMasked = '0';
+        }
+        if(!txtToken._hasClearListener){
+          txtToken._hasClearListener = true;
+          txtToken.addEventListener('focus', function(){
+            if(this.dataset.isMasked === '1' && (this.value.includes('*') || this.value.includes('•'))){
+              this.value = '';
+              this.dataset.isMasked = '0';
+            }
+          });
+        }
       }
       
       const txtChat = document.getElementById('tgChatId');
@@ -24032,20 +24051,24 @@ window.saveTelegramSettings = async function(){
   const btn = document.getElementById('tgSaveBtn');
   const statusMsg = document.getElementById('tgStatusMsg');
   const enabled = document.getElementById('tgEnabled')?.checked || false;
-  const botToken = (document.getElementById('tgBotToken')?.value || '').trim();
+  let botToken = (document.getElementById('tgBotToken')?.value || '').trim();
   const chatId = (document.getElementById('tgChatId')?.value || '').trim();
   const notifyRecos = document.getElementById('tgNotifyRecos')?.checked || false;
   const minScore = parseInt(document.getElementById('tgMinScore')?.value || '75', 10);
   const notifyRisk = document.getElementById('tgNotifyRisk')?.checked || false;
   const notifyNews = document.getElementById('tgNotifyNews')?.checked || false;
   
-  if(enabled && (!botToken || !chatId)){
+  if(botToken.includes('*') || botToken.includes('•')){
+    botToken = '';
+  }
+  
+  if(enabled && !chatId){
     if(statusMsg){
       statusMsg.style.display = 'block';
       statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
       statusMsg.style.color = '#f87171';
       statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-      statusMsg.textContent = 'Please provide both Bot Token and Chat ID to enable alerts.';
+      statusMsg.textContent = 'Please enter your Telegram Chat ID (from @userinfobot).';
     }
     return;
   }
@@ -24103,16 +24126,20 @@ window.saveTelegramSettings = async function(){
 window.testTelegramAlert = async function(){
   const btn = document.getElementById('tgTestBtn');
   const statusMsg = document.getElementById('tgStatusMsg');
-  const botToken = (document.getElementById('tgBotToken')?.value || '').trim();
+  let botToken = (document.getElementById('tgBotToken')?.value || '').trim();
   const chatId = (document.getElementById('tgChatId')?.value || '').trim();
   
-  if(!botToken || !chatId){
+  if(botToken.includes('*') || botToken.includes('•')){
+    botToken = '';
+  }
+  
+  if(!chatId){
     if(statusMsg){
       statusMsg.style.display = 'block';
       statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
       statusMsg.style.color = '#f87171';
       statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-      statusMsg.textContent = 'Enter both Bot Token and Chat ID above before sending test alert.';
+      statusMsg.textContent = 'Please enter your Telegram Chat ID (from @userinfobot).';
     }
     return;
   }

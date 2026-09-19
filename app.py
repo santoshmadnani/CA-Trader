@@ -15040,14 +15040,20 @@ async def test_telegram_api(request: Request, user: dict[str, Any] = Depends(req
     except Exception:
         payload = {}
     cfg = get_user_telegram_config(db_exec, user["id"])
-    bot_token = (payload.get("bot_token") or "").strip() or cfg.get("bot_token")
-    chat_id = (payload.get("chat_id") or "").strip() or cfg.get("chat_id")
+    raw_token = str(payload.get("bot_token") or "").strip().strip('"\'')
+    # If the token is masked or empty, fall back to the securely stored token in database
+    if not raw_token or "****" in raw_token or "•" in raw_token:
+        bot_token = str(cfg.get("bot_token") or "").strip()
+    else:
+        bot_token = raw_token
+        
+    chat_id = str(payload.get("chat_id") or "").strip().strip('"\'') or str(cfg.get("chat_id") or "").strip()
     if not bot_token or not chat_id:
-        raise HTTPException(400, "Bot Token and Chat ID are required. Please configure them in Telegram settings.")
+        raise HTTPException(400, "Bot Token and Chat ID are required. Please paste your Bot Token from @BotFather.")
     test_text = format_test_msg()
     ok, msg = await send_telegram_msg(bot_token, chat_id, test_text)
     if not ok:
-        raise HTTPException(400, f"Telegram delivery failed: {msg}")
+        raise HTTPException(400, f"{msg}")
     return {"ok": True, "message": "Test alert successfully delivered to your Telegram!"}
 
 @app.post("/api/telegram/send-reco/{reco_id}")
@@ -15064,4 +15070,4 @@ async def send_reco_to_telegram_api(reco_id: str, user: dict[str, Any] = Depends
     ok, msg = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], tg_text)
     if not ok:
         raise HTTPException(400, f"Telegram delivery failed: {msg}")
-    return {"ok": True, "message": "Trade alert successfully delivered to Telegram!"}
+    return {"ok": True, "message": "Trade alert successfully delivered to Telegram!"}

@@ -32,20 +32,33 @@ def escape_html(text: str) -> str:
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 def _sync_send_telegram(bot_token: str, chat_id: str, text: str, parse_mode: str = "HTML") -> Tuple[bool, str]:
-    """Synchronous send message to Telegram API with plain-text fallback on parse error."""
+    """Synchronous send message to Telegram API with token sanitization, plain-text fallback, and clear error diagnostics."""
     if not bot_token or not chat_id or not text:
         return False, "Bot token, chat ID, and text are required."
     
-    url = f"https://api.telegram.org/bot{bot_token.strip()}/sendMessage"
+    # Sanitize token
+    clean_token = str(bot_token).strip().strip('"\'')
+    if "api.telegram.org/bot" in clean_token:
+        clean_token = clean_token.split("api.telegram.org/bot")[-1].split("/")[0].strip()
+    if clean_token.lower().startswith("bot") and ":" in clean_token:
+        clean_token = clean_token[3:].strip()
+        
+    if "****" in clean_token or "•" in clean_token:
+        return False, "Token appears masked or incomplete. Please paste the full Bot Token from @BotFather."
+    if ":" not in clean_token:
+        return False, "Invalid Bot Token format. Tokens from @BotFather look like '7123456789:AAFx9z-kOpq...'"
+        
+    clean_chat_id = str(chat_id).strip().strip('"\'')
+    url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
     payload = {
-        "chat_id": str(chat_id).strip(),
+        "chat_id": clean_chat_id,
         "text": text,
         "parse_mode": parse_mode,
         "disable_web_page_preview": True
     }
     
     try:
-        resp = requests.post(url, json=payload, timeout=6.0)
+        resp = requests.post(url, json=payload, timeout=8.0)
         data = resp.json()
         if resp.status_code == 200 and data.get("ok"):
             return True, "Message sent successfully."
@@ -55,15 +68,23 @@ def _sync_send_telegram(bot_token: str, chat_id: str, text: str, parse_mode: str
             clean_text = re.sub(r"<[^>]+>", "", text)
             payload["text"] = clean_text
             payload.pop("parse_mode", None)
-            retry_resp = requests.post(url, json=payload, timeout=6.0)
+            retry_resp = requests.post(url, json=payload, timeout=8.0)
             retry_data = retry_resp.json()
             if retry_resp.status_code == 200 and retry_data.get("ok"):
                 return True, "Message sent (fallback to plain text)."
             return False, retry_data.get("description", "Failed to send message.")
             
-        return False, data.get("description", f"HTTP {resp.status_code}")
+        desc = str(data.get("description", "")).strip()
+        if resp.status_code == 404 or desc.lower() == "not found":
+            return False, "Bot Token not found by Telegram. Please check the token provided by @BotFather. Also open your bot in Telegram and press 'Start'."
+        if "chat not found" in desc.lower():
+            return False, "Chat ID not found. Open your bot in Telegram and send /start or any message to it first."
+        if "blocked" in desc.lower():
+            return False, "The bot was blocked by the user. Please unblock the bot in Telegram."
+            
+        return False, desc or f"HTTP {resp.status_code}"
     except requests.exceptions.Timeout:
-        return False, "Telegram API request timed out."
+        return False, "Telegram API request timed out. Please check your internet connection."
     except Exception as exc:
         logger.warning(f"Telegram dispatch error: {exc}")
         return False, str(exc)
@@ -204,15 +225,15 @@ def save_user_telegram_config(db_exec_fn: Callable, user_id: int, config: Dict[s
     """Save or update user's telegram configuration."""
     existing = get_user_telegram_config(db_exec_fn, user_id)
     
-    # If user submitted a masked token, preserve the existing token
-    new_token = str(config.get("bot_token", "")).strip()
-    if "****" in new_token and existing.get("bot_token"):
+    # If user submitted a masked token or left empty, preserve the existing token
+    new_token = str(config.get("bot_token", "")).strip().strip('"\'')
+    if ("****" in new_token or "•" in new_token or not new_token) and existing.get("bot_token"):
         new_token = existing["bot_token"]
     
     merged = {
         "enabled": bool(config.get("enabled", existing.get("enabled", False))),
         "bot_token": new_token,
-        "chat_id": str(config.get("chat_id", existing.get("chat_id", ""))).strip(),
+        "chat_id": str(config.get("chat_id", existing.get("chat_id", ""))).strip().strip('"\''),
         "notify_recos": bool(config.get("notify_recos", existing.get("notify_recos", True))),
         "min_reco_score": int(config.get("min_reco_score", existing.get("min_reco_score", 75))),
         "notify_risk": bool(config.get("notify_risk", existing.get("notify_risk", True))),
@@ -258,3 +279,4 @@ async def dispatch_telegram_alert(db_exec_fn: Callable, user_id: int, category: 
         
     ok, _ = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], text)
     return ok
+
