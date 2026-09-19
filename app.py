@@ -209,6 +209,18 @@ try:
 except Exception as exc:  # pragma: no cover
     uvicorn = None
 
+from backend.services.telegram_service import (
+    mask_token,
+    send_telegram_msg,
+    format_test_msg,
+    format_recommendation_alert,
+    format_risk_alert,
+    format_news_alert,
+    get_user_telegram_config,
+    save_user_telegram_config,
+    dispatch_telegram_alert,
+)
+
 # ---------------------------------------------------------------------------
 # Paths / configuration
 # ---------------------------------------------------------------------------
@@ -11914,6 +11926,15 @@ async def add_notification(user_id: int, category: str, severity: str, materiali
     nid = secrets.token_hex(12)
     db_exec("INSERT INTO notifications(id,user_id,category,severity,materiality,title,body,unread,dedupe_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)", [nid,user_id,category,severity,float(materiality),title,body,1,dedupe_key,now_iso()])
     await EVENT_BUS.publish({"type": "notification", "id": nid, "user_id": user_id, "category": category, "severity": severity, "materiality": materiality, "title": title, "body": body, "timestamp": now_iso()})
+    try:
+        if category in ("risk_event", "position_opened", "position_closed", "order_execution", "order_placed", "order_executed"):
+            tg_text = format_risk_alert(title, body, severity)
+            asyncio.create_task(dispatch_telegram_alert(db_exec, user_id, "risk", tg_text, dedupe_key=f"tg:risk:{title}:{user_id}"))
+        elif category in ("material_news", "news") and float(materiality or 0) >= 80:
+            tg_text = format_news_alert(title, body, severity, materiality)
+            asyncio.create_task(dispatch_telegram_alert(db_exec, user_id, "news", tg_text, dedupe_key=f"tg:news:{title}:{user_id}"))
+    except Exception:
+        pass
 
 
 @app.get("/api/notifications")
@@ -12297,7 +12318,14 @@ def _save_auto_recommendation(user_id: int, analysis: dict[str,Any]) -> dict[str
         return latest
     rid=secrets.token_hex(12); now=now_iso()
     db_exec("INSERT INTO recommendations(id,user_id,source,symbol,recommendation,timeframe,entry,target,stop_loss,rationale,technical_basis,news_basis,option_basis,created_at,underlying,instrument_key,instrument_kind,option_side,option_strike,option_expiry,score,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[rid,user_id,"auto",symbol,side,"5m",entry,instrument.get("target"),instrument.get("stop_loss"),analysis.get("reason"),json.dumps(analysis.get("timeframes"),default=str),json.dumps(analysis.get("news"),default=str),json.dumps(analysis.get("option_candidate"),default=str) if analysis.get("option_candidate") else None,now,analysis.get("symbol"),instrument.get("instrument_key"),instrument.get("kind"),instrument.get("option_type"),instrument.get("strike"),instrument.get("expiry"),score,"NEW"] )
-    return db_exec("SELECT * FROM recommendations WHERE id=?",[rid],"one")
+    reco_item = db_exec("SELECT * FROM recommendations WHERE id=?",[rid],"one")
+    try:
+        if reco_item and float(score or 0) >= 70 and side in ("BUY", "SELL"):
+            tg_text = format_recommendation_alert(reco_item)
+            asyncio.create_task(dispatch_telegram_alert(db_exec, user_id, "recommendation", tg_text, dedupe_key=f"tg:rec:{symbol}:{side}"))
+    except Exception:
+        pass
+    return reco_item
 
 def _position_mark_and_pnl(user_id: int) -> None:
     rows=db_exec("SELECT * FROM positions WHERE user_id=? AND COALESCE(status,'OPEN')='OPEN'",[user_id],"all")
@@ -14982,3 +15010,58 @@ async def set_notification_settings(request: Request, user: dict[str, Any] = Dep
     cutoff = (datetime.now(timezone.utc) - timedelta(days=prune_days)).isoformat()
     db_exec("DELETE FROM notifications WHERE user_id=? AND created_at < ?", [uid, cutoff])
     return {"ok": True, "auto_prune_days": prune_days}
+
+# ---------------------------------------------------------------------------
+# Telegram Bot Integration Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/telegram/settings")
+async def get_telegram_settings_api(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    cfg = get_user_telegram_config(db_exec, user["id"])
+    cfg_copy = dict(cfg)
+    cfg_copy["bot_token_masked"] = mask_token(cfg_copy.get("bot_token", ""))
+    cfg_copy.pop("bot_token", None)
+    return {"ok": True, "settings": cfg_copy}
+
+@app.post("/api/telegram/settings")
+async def save_telegram_settings_api(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    payload = await request.json()
+    saved = save_user_telegram_config(db_exec, user["id"], payload)
+    saved_copy = dict(saved)
+    saved_copy["bot_token_masked"] = mask_token(saved_copy.get("bot_token", ""))
+    saved_copy.pop("bot_token", None)
+    return {"ok": True, "message": "Telegram configuration saved successfully", "settings": saved_copy}
+
+@app.post("/api/telegram/test")
+async def test_telegram_api(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    payload = {}
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    cfg = get_user_telegram_config(db_exec, user["id"])
+    bot_token = (payload.get("bot_token") or "").strip() or cfg.get("bot_token")
+    chat_id = (payload.get("chat_id") or "").strip() or cfg.get("chat_id")
+    if not bot_token or not chat_id:
+        raise HTTPException(400, "Bot Token and Chat ID are required. Please configure them in Telegram settings.")
+    test_text = format_test_msg()
+    ok, msg = await send_telegram_msg(bot_token, chat_id, test_text)
+    if not ok:
+        raise HTTPException(400, f"Telegram delivery failed: {msg}")
+    return {"ok": True, "message": "Test alert successfully delivered to your Telegram!"}
+
+@app.post("/api/telegram/send-reco/{reco_id}")
+async def send_reco_to_telegram_api(reco_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    row = db_exec("SELECT * FROM recommendations WHERE id=? AND user_id=?", [reco_id, user["id"]], "one")
+    if not row:
+        row = db_exec("SELECT * FROM recommendations WHERE id=?", [reco_id], "one")
+    if not row:
+        raise HTTPException(404, "Recommendation not found.")
+    cfg = get_user_telegram_config(db_exec, user["id"])
+    if not cfg.get("bot_token") or not cfg.get("chat_id"):
+        raise HTTPException(400, "Telegram Bot is not configured. Please enter Bot Token and Chat ID in Telegram settings.")
+    tg_text = format_recommendation_alert(row)
+    ok, msg = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], tg_text)
+    if not ok:
+        raise HTTPException(400, f"Telegram delivery failed: {msg}")
+    return {"ok": True, "message": "Trade alert successfully delivered to Telegram!"}

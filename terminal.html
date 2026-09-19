@@ -2501,6 +2501,10 @@ select#watchlistSelect, select.watchlist-select {
     <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
     <button class="btn small gold" id="turboLoadBtn" title="⚡ Turbo Refresh (Immediate instant live reload of all data feeds)" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;font-weight:600;margin-right:4px;">⚡ Turbo</button>
     <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active (Click to mute)" style="font-size:13px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin-right:4px;">🔊</button>
+    <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="✈️ Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:600;margin-right:4px;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+      <span>Telegram</span>
+    </button>
     <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;">🚨 Panic Exit</button>
     <div class="top-icon-wrap"><button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button><div class="notification-menu" id="notificationMenu">
         <div class="notification-tabs" id="notifTabs" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-soft);padding:4px 8px;">
@@ -23174,8 +23178,115 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
+<!-- MODAL: TELEGRAM BOT INTEGRATION -->
+<div class="modal" id="telegramSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div class="modal-card" style="background:var(--surface, #1e222d);border:1px solid rgba(0,136,204,0.35);border-radius:12px;width:92%;max-width:520px;padding:22px;box-shadow:0 16px 40px rgba(0,0,0,0.65);color:var(--text, #d1d4dc);">
+    
+    <!-- Modal Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border-soft, #2a2e39);padding-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:28px;height:28px;border-radius:6px;background:rgba(0,136,204,0.2);display:flex;align-items:center;justify-content:center;color:#29b6f6;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+        </div>
+        <div>
+          <b style="font-size:15px;color:var(--text, #fff);">Telegram Alert Bot</b>
+          <div style="font-size:11px;color:var(--text-dim, #787b86);">Live AI signals, trailing stop updates &amp; breaking market news</div>
+        </div>
+      </div>
+      <button type="button" onclick="window.closeTelegramModal()" style="background:transparent;border:none;color:var(--text-dim, #787b86);font-size:22px;line-height:1;cursor:pointer;">×</button>
+    </div>
 
-</body>
+    <!-- Quick Guide Banner -->
+    <div style="background:rgba(0,136,204,0.08);border:1px solid rgba(0,136,204,0.25);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;line-height:1.45;color:var(--text, #d1d4dc);">
+      <div style="font-weight:700;color:#29b6f6;margin-bottom:3px;display:flex;align-items:center;gap:4px;">
+        <span>⚡ Quick 60-Second Setup:</span>
+      </div>
+      <div>1. Search <b>@BotFather</b> on Telegram, send <code>/newbot</code>, and copy your <b>Bot Token</b>.</div>
+      <div>2. Open <b>@userinfobot</b> on Telegram to find your numeric <b>Chat ID</b>.</div>
+      <div>3. Paste both below, click <b>"Send Test Alert"</b>, then click <b>"Save Configuration"</b>.</div>
+    </div>
+
+    <!-- Form Fields -->
+    <div style="display:flex;flex-direction:column;gap:12px;font-size:12px;">
+      
+      <!-- Enable Switch -->
+      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2, #2a2e39);padding:10px 12px;border-radius:6px;border:1px solid var(--border, #363a45);">
+        <div>
+          <b style="font-size:12.5px;color:var(--text, #fff);">Activate Telegram Alerts</b>
+          <div style="font-size:11px;color:var(--text-dim, #787b86);">Enable real-time mobile push notifications</div>
+        </div>
+        <input type="checkbox" id="tgEnabled" style="width:18px;height:18px;cursor:pointer;accent-color:#0088cc;">
+      </div>
+
+      <!-- Bot Token Field -->
+      <div>
+        <label style="display:block;color:var(--text-dim, #787b86);margin-bottom:5px;font-weight:600;">Telegram Bot Token</label>
+        <div style="position:relative;display:flex;align-items:center;">
+          <input type="password" id="tgBotToken" placeholder="e.g. 7123456789:AAFx9z-kOpq..." class="tool-input" style="width:100%;padding-right:65px;font-family:monospace;font-size:11.5px;background:var(--surface-2, #2a2e39);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:6px;padding:8px 10px;" autocomplete="off">
+          <button type="button" id="tgToggleTokenView" onclick="window.toggleTgTokenVisibility()" style="position:absolute;right:8px;background:transparent;border:none;color:var(--text-dim, #787b86);cursor:pointer;font-size:11px;font-weight:600;">Show</button>
+        </div>
+      </div>
+
+      <!-- Chat ID Field -->
+      <div>
+        <label style="display:block;color:var(--text-dim, #787b86);margin-bottom:5px;font-weight:600;">Telegram Chat ID</label>
+        <input type="text" id="tgChatId" placeholder="e.g. 987654321 or -100xxxxxxx" class="tool-input" style="width:100%;font-family:monospace;font-size:11.5px;background:var(--surface-2, #2a2e39);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:6px;padding:8px 10px;" autocomplete="off">
+      </div>
+
+      <!-- Alert Filters Section -->
+      <div style="border:1px solid var(--border, #363a45);border-radius:8px;padding:12px;background:var(--surface-2, #2a2e39);">
+        <div style="font-size:11px;font-weight:700;color:var(--text-dim, #787b86);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Notification Channels</div>
+        
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <!-- Recos Filter -->
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text, #fff);">
+              <input type="checkbox" id="tgNotifyRecos" checked style="accent-color:#0088cc;">
+              <span>🎯 Trade Setups (Buy/Sell signals)</span>
+            </label>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:10.5px;color:var(--text-dim, #787b86);">Min Score:</span>
+              <select id="tgMinScore" style="background:var(--surface, #1e222d);color:var(--text, #fff);border:1px solid var(--border, #363a45);border-radius:4px;font-size:11px;padding:2px 6px;">
+                <option value="70">70%+</option>
+                <option value="75" selected>75%+</option>
+                <option value="80">80%+</option>
+                <option value="85">85%+</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Risk / SL Filter -->
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text, #fff);">
+            <input type="checkbox" id="tgNotifyRisk" checked style="accent-color:#0088cc;">
+            <span>🛡️ Position &amp; SL Alerts (Target hit, Trailing stop, Exit)</span>
+          </label>
+
+          <!-- News Filter -->
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text, #fff);">
+            <input type="checkbox" id="tgNotifyNews" checked style="accent-color:#0088cc;">
+            <span>⚡ Breaking Institutional News (Materiality ≥ 80%)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Status banner -->
+      <div id="tgStatusMsg" style="display:none;font-size:11.5px;padding:8px 12px;border-radius:6px;font-weight:500;"></div>
+
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;border-top:1px solid var(--border-soft, #2a2e39);padding-top:14px;">
+      <button type="button" class="btn small" id="tgTestBtn" onclick="window.testTelegramAlert()" style="background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:5px;padding:6px 12px;font-weight:600;">
+        ⚡ Send Test Alert
+      </button>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn ghost small" onclick="window.closeTelegramModal()" style="border-radius:5px;padding:6px 12px;">Cancel</button>
+        <button type="button" class="btn gold small" id="tgSaveBtn" onclick="window.saveTelegramSettings()" style="border-radius:5px;padding:6px 16px;font-weight:700;">Save Configuration</button>
+      </div>
+    </div>
+
+  </div>
+</div>
 
 <script>
 window.searchRealTradeInstruments = function(query){
@@ -23856,6 +23967,217 @@ window.deleteAllNotifications = async function(){
     if(typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
   } catch(e){}
 };
+
+// --- Telegram Alert Bot Client Engine ---
+window.openTelegramModal = async function(){
+  const modal = document.getElementById('telegramSettingsModal');
+  if(!modal) return;
+  modal.style.display = 'flex';
+  const statusMsg = document.getElementById('tgStatusMsg');
+  if(statusMsg) statusMsg.style.display = 'none';
+  
+  try {
+    const res = await fetch('/api/telegram/settings');
+    const data = await res.json();
+    if(data && data.ok && data.settings){
+      const s = data.settings;
+      const chkEnabled = document.getElementById('tgEnabled');
+      if(chkEnabled) chkEnabled.checked = !!s.enabled;
+      
+      const txtToken = document.getElementById('tgBotToken');
+      if(txtToken){
+        txtToken.value = s.bot_token_masked || '';
+        txtToken.dataset.isMasked = s.bot_token_masked ? '1' : '0';
+      }
+      
+      const txtChat = document.getElementById('tgChatId');
+      if(txtChat) txtChat.value = s.chat_id || '';
+      
+      const chkRecos = document.getElementById('tgNotifyRecos');
+      if(chkRecos) chkRecos.checked = (s.notify_recos !== false);
+      
+      const selScore = document.getElementById('tgMinScore');
+      if(selScore) selScore.value = String(s.min_reco_score || 75);
+      
+      const chkRisk = document.getElementById('tgNotifyRisk');
+      if(chkRisk) chkRisk.checked = (s.notify_risk !== false);
+      
+      const chkNews = document.getElementById('tgNotifyNews');
+      if(chkNews) chkNews.checked = (s.notify_news !== false);
+    }
+  } catch(err){
+    console.error('Failed to load telegram settings:', err);
+  }
+};
+
+window.closeTelegramModal = function(){
+  const modal = document.getElementById('telegramSettingsModal');
+  if(modal) modal.style.display = 'none';
+};
+
+window.toggleTgTokenVisibility = function(){
+  const inp = document.getElementById('tgBotToken');
+  const btn = document.getElementById('tgToggleTokenView');
+  if(!inp || !btn) return;
+  if(inp.type === 'password'){
+    inp.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    inp.type = 'password';
+    btn.textContent = 'Show';
+  }
+};
+
+window.saveTelegramSettings = async function(){
+  const btn = document.getElementById('tgSaveBtn');
+  const statusMsg = document.getElementById('tgStatusMsg');
+  const enabled = document.getElementById('tgEnabled')?.checked || false;
+  const botToken = (document.getElementById('tgBotToken')?.value || '').trim();
+  const chatId = (document.getElementById('tgChatId')?.value || '').trim();
+  const notifyRecos = document.getElementById('tgNotifyRecos')?.checked || false;
+  const minScore = parseInt(document.getElementById('tgMinScore')?.value || '75', 10);
+  const notifyRisk = document.getElementById('tgNotifyRisk')?.checked || false;
+  const notifyNews = document.getElementById('tgNotifyNews')?.checked || false;
+  
+  if(enabled && (!botToken || !chatId)){
+    if(statusMsg){
+      statusMsg.style.display = 'block';
+      statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusMsg.style.color = '#f87171';
+      statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      statusMsg.textContent = 'Please provide both Bot Token and Chat ID to enable alerts.';
+    }
+    return;
+  }
+  
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving...'; }
+  
+  try {
+    const res = await fetch('/api/telegram/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled: enabled,
+        bot_token: botToken,
+        chat_id: chatId,
+        notify_recos: notifyRecos,
+        min_reco_score: minScore,
+        notify_risk: notifyRisk,
+        notify_news: notifyNews
+      })
+    });
+    const data = await res.json();
+    if(res.ok && data.ok){
+      if(typeof toast === 'function') toast('✓ Telegram configuration saved!');
+      if(statusMsg){
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(34, 197, 94, 0.15)';
+        statusMsg.style.color = '#4ade80';
+        statusMsg.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+        statusMsg.textContent = '✓ Configuration saved successfully.';
+      }
+      setTimeout(() => { window.closeTelegramModal(); }, 1200);
+    } else {
+      const errTxt = data.detail || data.message || 'Failed to save settings';
+      if(statusMsg){
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusMsg.style.color = '#f87171';
+        statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        statusMsg.textContent = errTxt;
+      }
+    }
+  } catch(err){
+    if(statusMsg){
+      statusMsg.style.display = 'block';
+      statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusMsg.style.color = '#f87171';
+      statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      statusMsg.textContent = 'Network error saving settings.';
+    }
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = 'Save Configuration'; }
+  }
+};
+
+window.testTelegramAlert = async function(){
+  const btn = document.getElementById('tgTestBtn');
+  const statusMsg = document.getElementById('tgStatusMsg');
+  const botToken = (document.getElementById('tgBotToken')?.value || '').trim();
+  const chatId = (document.getElementById('tgChatId')?.value || '').trim();
+  
+  if(!botToken || !chatId){
+    if(statusMsg){
+      statusMsg.style.display = 'block';
+      statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusMsg.style.color = '#f87171';
+      statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      statusMsg.textContent = 'Enter both Bot Token and Chat ID above before sending test alert.';
+    }
+    return;
+  }
+  
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending...'; }
+  if(statusMsg){
+    statusMsg.style.display = 'block';
+    statusMsg.style.background = 'rgba(0, 136, 204, 0.15)';
+    statusMsg.style.color = '#29b6f6';
+    statusMsg.style.border = '1px solid rgba(0, 136, 204, 0.3)';
+    statusMsg.textContent = 'Dispatching test message to Telegram...';
+  }
+  
+  try {
+    const res = await fetch('/api/telegram/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bot_token: botToken, chat_id: chatId })
+    });
+    const data = await res.json();
+    if(res.ok && data.ok){
+      if(statusMsg){
+        statusMsg.style.background = 'rgba(34, 197, 94, 0.15)';
+        statusMsg.style.color = '#4ade80';
+        statusMsg.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+        statusMsg.textContent = '🚀 Success! Test alert delivered to your Telegram app.';
+      }
+      if(typeof toast === 'function') toast('✓ Test alert sent to Telegram!');
+    } else {
+      const errTxt = data.detail || data.message || 'Telegram delivery failed.';
+      if(statusMsg){
+        statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusMsg.style.color = '#f87171';
+        statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        statusMsg.textContent = 'Failed: ' + errTxt;
+      }
+    }
+  } catch(err){
+    if(statusMsg){
+      statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusMsg.style.color = '#f87171';
+      statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      statusMsg.textContent = 'Network error communicating with server.';
+    }
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '⚡ Send Test Alert'; }
+  }
+};
+
+window.sendRecoToTelegram = async function(recoId){
+  if(!recoId) return;
+  try {
+    if(typeof toast === 'function') toast('Dispatching to Telegram...');
+    const res = await fetch('/api/telegram/send-reco/' + encodeURIComponent(recoId), { method: 'POST' });
+    const data = await res.json();
+    if(res.ok && data.ok){
+      if(typeof toast === 'function') toast('✓ Recommendation sent to Telegram!');
+    } else {
+      if(typeof toast === 'function') toast(data.detail || data.message || 'Failed to send alert to Telegram');
+    }
+  } catch(err){
+    if(typeof toast === 'function') toast('Error sending to Telegram');
+  }
+};
+
 </script>
 </body>
 </html>
