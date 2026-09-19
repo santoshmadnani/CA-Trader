@@ -8058,11 +8058,9 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     ];
 
     return {
-      trendlines,
       trendlines: [],
       horizontal_levels,
       indicators,
-      summary: `CA AI: ${trendlines.length} dynamic visible trendlines, ${horizontal_levels.length} key S/R levels, and ${indicators.length} indicators recommended.`
       summary: `CA AI: ${horizontal_levels.length} key S/R levels and ${indicators.length} indicators recommended.`
     };
   }
@@ -8078,7 +8076,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     localData.trendlines = [];
     __currentChartAiData = localData;
     renderChartAiPanel(localData);
-    const totalCount = localData.trendlines.length + localData.horizontal_levels.length + localData.indicators.length;
     const totalCount = localData.horizontal_levels.length + localData.indicators.length;
     if(badge) badge.textContent = String(totalCount);
 
@@ -8086,12 +8083,10 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     if(activeSym){
       try {
         const d = await A(`/api/analysis/chart-ai-suggestions/${encodeURIComponent(activeSym)}?timeframe=${encodeURIComponent(state.tf || '5m')}&days=${state.history || 5}`, {timeoutMs: 6000});
-        if(d && (d.trendlines?.length || d.horizontal_levels?.length)){
         if(d && (d.horizontal_levels?.length || d.indicators?.length)){
           d.trendlines = [];
           __currentChartAiData = d;
           renderChartAiPanel(d);
-          const serverCount = (d.trendlines?.length || 0) + (d.horizontal_levels?.length || 0) + (d.indicators?.length || 0);
           const serverCount = (d.horizontal_levels?.length || 0) + (d.indicators?.length || 0);
           if(badge) badge.textContent = String(serverCount);
         }
@@ -8363,8 +8358,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     // Bollinger Bands
     const sma20 = sma(20);
     const variance = closes.slice(-20).reduce((acc, val) => acc + Math.pow(val - sma20, 2), 0) / 20;
-    const std20 = roundVal(Math.sqrt(varia
-... [truncated for diff preview]
     const std20 = roundVal(Math.sqrt(variance));
     const bbUpper = roundVal(sma20 + 2 * std20);
     const bbLower = roundVal(sma20 - 2 * std20);
