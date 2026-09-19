@@ -3683,6 +3683,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
   // ================= DEDICATED BACKTESTING REPLAY ENGINE =================
   const btState = {
     symbol: 'NIFTY',
+    symbol: 'NIFTY',
     tf: '5m',
     allCandles: [],
     allNews: [],

@@ -246,6 +246,7 @@
   toastObserver.observe(document.body, { childList:true, subtree:true });
 })();
 
+(() => {
   // Harden mobile drawer state after orientation/resize.
   window.addEventListener('resize',()=>{
     if(window.innerWidth>760){
@@ -260,7 +261,11 @@
     chartSurface.style.userSelect='none';
     chartSurface.style.webkitTouchCallout='none';
   }
+</script>
+<div id="liveNotificationStack"></div>
+})();
 
+<script>
 
 
 
@@ -473,8 +478,7 @@ async function loadAiDashboardTab(force = false) {
             <div><div class="muted" style="font-size:11px;font-weight:600;">Lot Size / Qty</div><div style="font-weight:800;font-size:14px;color:var(--text);">${s.lot_size || 1} qty</div></div>
           </div>
 
-          /* One-Sight Rationale Strip: Technicals, News & Greeks Reasons */
-          /* One-Sight Rationale Strip: Technicals, News & Greeks Reasons */
+          
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:10px;margin-bottom:14px;">
             <div style="background:var(--surface-2);border:1px solid var(--border-soft);border-radius:6px;padding:10px;">
               <div style="font-weight:700;font-size:12px;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:6px;">
@@ -612,6 +616,3 @@ document.addEventListener('click', (e) => {
 setTimeout(() => {
   if(typeof loadFundsTab === 'function') void loadFundsTab();
 }, 600);
-
-
-

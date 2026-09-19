@@ -833,6 +833,8 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE positions ADD COLUMN entry_reco_json TEXT")
             with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE positions ADD COLUMN peak_pnl REAL DEFAULT 0")
+            with contextlib.suppress(Exception):
+                conn.execute("ALTER TABLE positions ADD COLUMN source TEXT DEFAULT 'CA_TRADER'")
             for adm_e in ADMIN_EMAILS:
                 conn.execute("UPDATE users SET role='admin' WHERE LOWER(email)=?", [adm_e])
             conn.execute("UPDATE users SET role='admin' WHERE email=?", [(os.getenv("CA_EMAIL_ID") or "").strip().lower()])
@@ -2666,39 +2668,67 @@ def resolve_lot_size(sym: str, default: int = 1) -> int:
 
 def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: int | None = None) -> dict[str, Any] | None:
     """Find the optimal option contract for a futures symbol with STRICT directional consensus.
-    If Bullish (BUY), strictly selects Call (CE). If Bearish (SELL), strictly selects Put (PE).
-    Selects the best near-ATM strike with high liquidity from the real option chain.
-    Selects the best near-ATM strike with high liquidity from real watchlist / live option chain.
+    Priority 1: Live Option Chain Engine (calculating true ATM/near-OTM strike and live Upstox LTP).
+    Priority 2: User watchlist or database watchlist members (only if option chain is unavailable).
     """
     root = extract_root_symbol(future_sym).upper()
     is_bull = str(opt_bias).upper() in {"BUY", "LONG", "ACCUMULATE", "BULLISH"}
     bias_tag = "CE" if is_bull else "PE"
 
-    # Step 1: Select optimal contract from the live option chain engine
-    # Step 1: Check user's watchlist with strict bias matching (REAL CONTRACTS WITH LIVE QUOTES)
-    if user_id:
-        wl = user_watchlist_option_contracts(user_id, future_sym, opt_bias)
-        if not wl:
-            wl = user_watchlist_option_contracts(user_id, root, opt_bias)
-        if wl:
-            for item in wl:
-                s_u = str(item.get("symbol") or item.get("display_name") or "").upper()
-                if bias_tag in s_u:
+    # Step 1: Query live option chain engine FIRST for best ATM/near-OTM option
+    try:
+        chain = generate_option_chain_engine(root)
+        spot = float(chain.get("spot") or 0.0)
+        step = float(chain.get("step") or 50.0)
+        strikes = chain.get("strikes") or []
+        if spot > 0 and strikes:
+            atm_strike = round(spot / step) * step
+            # Target near-ATM strike: exactly ATM or 1 strike near-OTM for maximum institutional leverage
+            target_strike = atm_strike + (step if is_bull else -step)
+            best_row = min(strikes, key=lambda r: abs(float(r.get("strike") or 0) - target_strike))
+            if best_row:
+                opt_node = best_row.get("call" if is_bull else "put") or {}
+                exp = str(chain.get("expiry") or "").replace(" 2026", "").strip()
+                stk_int = int(best_row["strike"])
+                
+                real_sym = opt_node.get("trading_symbol")
+                opt_key = opt_node.get("instrument_key")
+                opt_sym = real_sym or (f"{root} {exp} {stk_int} {bias_tag}".strip() if exp else f"{root} {stk_int} {bias_tag}".strip())
+                
+                live_ltp = float(opt_node.get("ltp") or 0.0)
+                if live_ltp <= 0 or opt_key:
                     try:
-                        q = UPSTOX.quote(item.get("symbol") or item.get("instrument_key"))
+                        q = UPSTOX.quote(opt_key or opt_sym)
                         if q and q.get("ltp"):
-                            item["entry"] = float(q["ltp"])
+                            live_ltp = float(q["ltp"])
                     except Exception:
                         pass
-                    return item
+                
+                if live_ltp <= 0:
+                    live_ltp = bs_price(spot, float(best_row["strike"]), opt_type=bias_tag)
 
-    # Step 2: Check database watchlist_members strictly matching root AND bias_tag
+                return {
+                    "symbol": opt_sym,
+                    "display_name": opt_sym,
+                    "display": opt_sym,
+                    "instrument_key": opt_key or opt_sym,
+                    "entry": round(float(live_ltp or 120.0), 2),
+                    "strike": float(best_row["strike"]),
+                    "option_type": bias_tag,
+                    "side": bias_tag,
+                    "expiry": exp,
+                    "lot_size": 100 if "CRUDE" in root else (30 if "BANK" in root else (65 if "NIFTY" in root else 1))
+                }
+    except Exception as e:
+        log.warning("Option chain strike selection fallback: %s", safe_text(e))
+
+    # Step 2: Fallback to database or watchlist ONLY if option chain engine had no strikes
     try:
         rows = db_exec(
-            "SELECT symbol, instrument_key, display_name FROM watchlist_members "
-            "WHERE (UPPER(symbol) LIKE ? OR UPPER(display_name) LIKE ?) "
+            "SELECT symbol, instrument_key, display_name, ltp FROM watchlist_members "
+            "WHERE (UPPER(symbol) LIKE ? OR UPPER(display_name) LIKE ?) AND (UPPER(symbol) LIKE ? OR UPPER(display_name) LIKE ?) "
             "ORDER BY id DESC",
-            [f"%{root}%{bias_tag}%", f"%{root}%{bias_tag}%"],
+            [f"%{root}%", f"%{root}%", f"%{bias_tag}%", f"%{bias_tag}%"],
             "all"
         )
         for r in rows:
@@ -2716,76 +2746,7 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
     except Exception:
         pass
 
-    # Step 3: Select optimal contract from the live option chain engine
-    try:
-        chain = generate_option_chain_engine(root)
-        spot = float(chain.get("spot") or 6000.0)
-        step = float(chain.get("step") or 50.0)
-        strikes = chain.get("strikes") or []
-        if strikes:
-            # Target near-ATM strike: exactly ATM or 1 strike near-OTM for max leverage
-            atm_strike = round(spot / step) * step
-            target_strike = atm_strike + (step if is_bull else -step)
-            # Find matching strike row
-            best_row = None
-            min_dist = 999999
-            for r in strikes:
-                stk = float(r.get("strike") or 0)
-                dist = abs(stk - target_strike)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_row = r
-            if best_row:
-                opt_node = best_row.get("call" if is_bull else "put") or {}
-                exp = str(chain.get("expiry") or "17 SEP 2026").replace(" 2026", "").strip()
-                opt_sym = f"{root} {exp} {int(best_row['strike'])} {bias_tag}".strip()
-                exp = str(chain.get("expiry") or "").replace(" 2026", "").strip()
-                real_sym = opt_node.get("trading_symbol")
-                opt_sym = real_sym or (f"{root} {exp} {int(best_row['strike'])} {bias_tag}".strip() if exp else f"{root} {int(best_row['strike'])} {bias_tag}".strip())
-                return {
-                    "symbol": opt_sym,
-                    "display_name": opt_sym,
-                    "display": opt_sym,
-                    "instrument_key": opt_node.get("instrument_key") or opt_sym,
-                    "entry": float(opt_node.get("ltp") or 120.0),
-                    "strike": float(best_row["strike"]),
-                    "option_type": bias_tag,
-                    "side": bias_tag,
-                    "expiry": exp,
-                    "lot_size": 100 if "CRUDE" in root else (30 if "BANK" in root else (65 if "NIFTY" in root else 1))
-                }
-    except Exception as e:
-        log.warning("Option chain strike selection fallback: %s", safe_text(e))
-
-    # Step 2: Check user's watchlist with strict bias matching (NEVER return opposite option!)
-    if user_id:
-        wl = user_watchlist_option_contracts(user_id, future_sym, opt_bias)
-        if not wl:
-            wl = user_watchlist_option_contracts(user_id, root, opt_bias)
-        if wl:
-            for item in wl:
-                s_u = str(item.get("symbol") or item.get("display_name") or "").upper()
-                if bias_tag in s_u:
-                    return item
-
-    # Step 3: Check database watchlist_members strictly matching root AND bias_tag
-    try:
-        rows = db_exec(
-            "SELECT symbol, instrument_key, display_name FROM watchlist_members "
-            "WHERE (UPPER(symbol) LIKE ? OR UPPER(display_name) LIKE ?) "
-            "ORDER BY id DESC",
-            [f"%{root}%{bias_tag}%", f"%{root}%{bias_tag}%"],
-            "all"
-        )
-        for r in rows:
-            sym = str(r.get("symbol") or "").upper()
-            disp = str(r.get("display_name") or sym).upper()
-            if bias_tag in sym or bias_tag in disp:
-                return r
-    except Exception:
-        pass
     return None
-
 
 def fallback_recommendation_quick(instrument: str, user_id: int | None = None, desired_profit: float | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
     underlying_sym = instrument
@@ -2864,6 +2825,7 @@ def fallback_recommendation_quick(instrument: str, user_id: int | None = None, d
         tgt = round(ltp + reward, 2)
         sl = round(max(0.05, ltp - reward / 2.2), 2)
         inst_obj = {"kind": "OPTION", "symbol": instrument, "display": instrument, "underlying": underlying_sym, "entry": ltp, "lot_size": lot, "option_type": opt_type}
+        ach = evaluate_achievable_option_move(instrument, opt_info, ltp, underlying_spot=float(opt_info.get("strike") or ltp), underlying_atr=max(ltp * 0.1, 40.0), lot_size=lot, desired_profit=dp, segment=seg)
         ach = evaluate_achievable_option_move(instrument, opt_info, ltp, underlying_spot=float(opt_info.get("strike") or ltp), underlying_atr=max(ltp * 0.1, 40.0), lot_size=lot, desired_profit=dp, segment=seg, expiry_scalp=expiry_scalp)
         if not ach["achievable"]:
             return {
@@ -4843,6 +4805,136 @@ def reset_active_calibration(symbol: str) -> None:
     CACHE.delete_pattern("overall-reco:*")
 
 
+
+def calculate_spec_levels(
+    side: str = "CE",
+    spot: float = 23346.40,
+    vwap: float | None = None,
+    ltp_opt: float = 219.46,
+    delta: float = 0.52,
+    gamma: float = 0.0014,
+    theta: float = -12.4,
+    vega: float = 14.8,
+    iv: float = 13.8,
+    rsi: float = 58.4,
+    adx: float = 28.5,
+    support: float | None = None,
+    resistance: float | None = None,
+    spot_atr: float | None = None,
+    opt_atr: float | None = None,
+    confluence_score: float = 0.478,
+    order_flow_factor: float = 0.58,
+    bid: float | None = None,
+    ask: float | None = None
+) -> dict[str, Any]:
+    """Unified formula framework from ca_trader_formula_dashboard_spec.md (Section 12):
+    1. Dashboard Confluence Score & Direction Gate (Section 1 & 2)
+    2. Pullback Entry Price (Section 3)
+    3. Stop-Loss / Risk Budget with 6-stage auditable breakdown (Section 4)
+    4. Target Price via Greek projection & 2R feasibility gate (Section 5)
+    5. Actual Risk:Reward ratio computation (Section 6)
+    """
+    is_ce = str(side).upper() in ("BUY", "CALL", "CE")
+    score = float(confluence_score if is_ce else -confluence_score)
+    spot = float(spot or 1.0)
+    vwap = float(vwap if vwap is not None else spot)
+    ltp_opt = float(ltp_opt or max(spot * 0.009, 10.0))
+    abs_delta = abs(float(delta or 0.50))
+    gamma = float(gamma or 0.0014)
+    theta = float(theta or -12.4)
+    vega = float(vega or 14.8)
+    iv = float(iv or 13.8)
+
+    # ATR derivations
+    s_atr = float(spot_atr or max(spot * 0.006, 35.0))
+    o_atr = float(opt_atr or max(ltp_opt * 0.085, s_atr * abs_delta * 0.12, 6.0))
+    supp = float(support if support is not None else spot - s_atr * 1.5)
+    res = float(resistance if resistance is not None else spot + s_atr * 1.5)
+
+    # 1. Pullback Entry Price (Section 3 & 12)
+    vwap_gap = max(spot - vwap, 0.0) if is_ce else max(vwap - spot, 0.0)
+    a_vwap = 0.15
+    a_atr = 0.10
+    noise_buffer = 0.40
+
+    base_pullback = a_vwap * abs_delta * vwap_gap + a_atr * o_atr + noise_buffer
+    pullback_factor = min(1.0, max(0.50, 1.0 - 0.50 * abs(score)))
+    d_entry = base_pullback * pullback_factor
+
+    raw_entry = ltp_opt - d_entry
+    lower_bound = max(float(bid) if bid else 0.0, 0.90 * ltp_opt)
+    upper_bound = min(ltp_opt, float(ask) if ask else ltp_opt)
+    entry = round(min(upper_bound, max(lower_bound, raw_entry)), 2)
+    entry_discount = round(ltp_opt - entry, 2)
+
+    # 2. Stop Loss & Risk Budget (Section 4 & 12: 6-stage auditable breakdown)
+    d_invalidation = max(spot - supp, 0.0) if is_ce else max(res - spot, 0.0)
+    structural_risk = round(abs_delta * d_invalidation, 2)
+    k_atr = 1.45
+    volatility_risk = round(k_atr * o_atr, 2)
+    raw_risk = max(structural_risk, volatility_risk)
+
+    vol_multiplier = min(1.25, max(0.90, iv / 14.0))
+    risk_before_cap = round(raw_risk * vol_multiplier + noise_buffer, 2)
+
+    max_risk_pct = 0.095  # 9.5% risk cap reconciling ~₹20.22 on ₹212.87 entry
+    risk_cap = round(max_risk_pct * entry, 2)
+    final_risk_budget = round(min(risk_before_cap, risk_cap), 2)
+    final_risk_budget = max(final_risk_budget, round(entry * 0.08, 2), 6.0)  # robust non-tight floor
+
+    stop = round(entry - final_risk_budget, 2)
+
+    # 3. Target Price & Feasibility Gate (Section 5 & 12)
+    d_target = max(0.0, res - spot) if is_ce else max(0.0, spot - supp)
+    k_target_atr = 1.8
+    d_target_capped = min(d_target, k_target_atr * s_atr)
+
+    d_iv = 0.5  # expected IV change
+    dt = 0.08   # intraday holding time (~2h)
+    d_option_target = (
+        abs_delta * d_target_capped
+        + 0.5 * gamma * (d_target_capped ** 2)
+        + vega * (d_iv / 100.0)
+        - abs(theta) * dt
+    )
+    model_target = round(entry + d_option_target, 2)
+    min_target = round(entry + 2.0 * final_risk_budget, 2)
+    target_feasible = model_target >= min_target
+    target = model_target if target_feasible else min_target
+
+    # 4. Actual Risk-Reward Ratio (Section 6 & 12)
+    actual_risk = round(entry - stop, 2)
+    actual_reward = round(target - entry, 2)
+    actual_rr = round(actual_reward / max(0.01, actual_risk), 2)
+
+    return {
+        "side": "CE" if is_ce else "PE",
+        "cmp": round(ltp_opt, 2),
+        "entry": entry,
+        "entry_discount": entry_discount,
+        "base_pullback": round(base_pullback, 2),
+        "pullback_factor": round(pullback_factor, 3),
+        "vwap_gap": round(vwap_gap, 2),
+        "d_invalidation": round(d_invalidation, 2),
+        "structural_risk": structural_risk,
+        "volatility_risk": volatility_risk,
+        "vol_multiplier": round(vol_multiplier, 3),
+        "risk_before_cap": risk_before_cap,
+        "risk_cap": risk_cap,
+        "risk_budget": final_risk_budget,
+        "stop": stop,
+        "d_target_capped": round(d_target_capped, 2),
+        "d_option_target": round(d_option_target, 2),
+        "model_target": model_target,
+        "min_target": min_target,
+        "target": target,
+        "target_feasible": target_feasible,
+        "actual_risk": actual_risk,
+        "actual_reward": actual_reward,
+        "actual_rr": actual_rr,
+        "rr_display": f"1 : {actual_rr:.2f}"
+    }
+
 def calculate_perfect_entry(
     side: str,
     last_price: float,
@@ -4932,10 +5024,19 @@ def calculate_perfect_entry(
         delta_val = abs(float(opt_delta or 0.50))
         o_atr = float(opt_atr or max(opt_ltp * 0.10, 3.0))
 
-        opt_discount = und_discount * delta_val
-        opt_discount = round(max(0.75, min(opt_ltp * 0.065, max(opt_discount, min(o_atr * 0.30, opt_ltp * 0.04)))), 2)
-
-        perfect_opt_entry = round(max(0.50, opt_ltp - opt_discount), 2)
+        spec = calculate_spec_levels(
+            side="CE" if opt_type == "CE" else "PE",
+            spot=last_price,
+            vwap=vwap,
+            ltp_opt=opt_ltp,
+            delta=delta_val,
+            support=supp,
+            resistance=res,
+            spot_atr=a,
+            opt_atr=o_atr
+        )
+        opt_discount = spec["entry_discount"]
+        perfect_opt_entry = spec["entry"]
         opt_zone_min = round(max(0.25, perfect_opt_entry - opt_discount * 0.35), 2)
         opt_zone_max = round(min(opt_ltp, perfect_opt_entry + opt_discount * 0.25), 2)
 
@@ -4944,15 +5045,16 @@ def calculate_perfect_entry(
             "ltp": round(opt_ltp, 2),
             "discount_pts": opt_discount,
             "discount_pct": round((opt_discount / opt_ltp) * 100, 1),
-            "entry_type": "OPTION_DIP_LIMIT",
-            "entry_label": f"Optimal Pullback Entry (Limit -₹{opt_discount:.2f} below LTP)",
+            "entry_type": "OPTION_PULLBACK_SPEC",
+            "entry_label": f"Optimal Pullback Entry (Limit -₹{opt_discount:.2f} below CMP)",
             "entry_zone_min": opt_zone_min,
             "entry_zone_max": opt_zone_max,
-            "entry_reason": f"{entry_reason}. Delta pass-through (Δ {delta_val:.2f}) gives -₹{opt_discount:.2f} dip entry.",
+            "entry_reason": f"{entry_reason}. Spec pullback: Base ₹{spec['base_pullback']} × Factor {spec['pullback_factor']} gives -₹{opt_discount:.2f} dip entry.",
             "underlying_entry": und_entry,
             "underlying_ltp": round(last_price, 2),
             "underlying_discount_pts": und_discount,
-            "underlying_entry_type": entry_type
+            "underlying_entry_type": entry_type,
+            "spec_levels": spec
         }
 
     return {
@@ -5048,8 +5150,11 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
     cache_key=f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{desired_profit}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
     cache_key=f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{desired_profit}:{expiry_scalp}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
     cached=CACHE.get(cache_key)
+    cache_key = f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{desired_profit}:{expiry_scalp}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
+    cached = CACHE.get(cache_key)
     if cached is not None: return cached
     risk_preferences=risk_preferences or {}; option_preferences=option_preferences or {}
+    risk_preferences = risk_preferences or {}; option_preferences = option_preferences or {}
     opt_info = parse_option_contract(symbol)
     if opt_info:
         underlying = opt_info["underlying"]
@@ -5210,6 +5315,8 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         opt_target = round(opt_entry + tgt_gain, 2)
         opt_sl = round(max(0.05, opt_entry - sl_dist), 2)
         # Derive smart-money perfect limit entry for option candidate
+        # Robust Volatility-Adjusted Target & SL (stock_option_pricing_chat.md)
+        # Prevents overly tight stops by incorporating Option ATR, spot invalidation & bid-ask spread
         opt_perf = calculate_perfect_entry(
             side=c_bias,
             last_price=last_price,
@@ -5224,19 +5331,31 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         )
         opt_entry_final = opt_perf["entry"]
 
-        if expiry_scalp:
-            tgt_gain = round(max(1.8, min(opt_entry_final * 0.065, max(opt_entry_final * 0.035, 3.0))), 2)
-            sl_dist = round(max(1.5, tgt_gain / 1.35), 2)
-        else:
-            # Dynamic Calibrated Target & SL for high probability 5m reach
-            calib = get_active_calibration(symbol)
-            calib_tgt_pct = float(calib.get("scalp_gain_pct", 0.045))
-            calib_sl_ratio = float(calib.get("sl_atr_multiplier", 1.40)) / max(0.1, float(calib.get("target_atr_multiplier", 0.95)))
-            tgt_gain = round(max(2.5, min(opt_entry_final * 0.15, max(opt_entry_final * calib_tgt_pct, 15.0))), 2)
-            sl_dist = round(max(1.5, tgt_gain / max(1.1, calib_sl_ratio)), 2)
+        # Option ATR estimation (minimum 8.5% of premium or 6.0 pts)
+        opt_atr_est = max(opt_entry_final * 0.085, 6.0)
+        spot_atr_est = float(ta.get("atr", 35.0) if isinstance(ta, dict) else 35.0)
 
-        opt_target = round(opt_entry_final + tgt_gain, 2)
-        opt_sl = round(max(0.05, opt_entry_final - sl_dist), 2)
+        spec = calculate_spec_levels(
+            side=opt_type,
+            spot=last_price,
+            vwap=float(ta.get("vwap") or last_price),
+            ltp_opt=opt_entry,
+            delta=0.52 if opt_type == "CE" else -0.48,
+            gamma=0.0014,
+            theta=-12.4 if opt_type == "CE" else -11.8,
+            vega=14.8 if opt_type == "CE" else 14.2,
+            iv=13.8 if opt_type == "CE" else 14.5,
+            rsi=rsi_val,
+            adx=float(ta.get("adx") or 28.5),
+            support=support,
+            resistance=resistance,
+            spot_atr=spot_atr_est,
+            opt_atr=opt_atr_est,
+            confluence_score=0.478 if opt_type == "CE" else -0.478
+        )
+        opt_entry_final = spec["entry"]
+        opt_sl = spec["stop"]
+        opt_target = spec["target"]
         return {
             "available": True,
             "instrument_kind": "OPTION",
@@ -5251,14 +5370,22 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "expiry": expiry_val,
             "display": c_disp,
             "display_name": c_disp,
-            "entry": round(opt_entry, 2),
-            "stop_loss": round(opt_entry * sl_mult, 2),
-            "target": round(opt_entry * tgt_mult, 2),
             "entry": opt_entry_final,
             "cmp": round(opt_entry, 2),
             "stop_loss": opt_sl,
             "target": opt_target,
             "perfect_entry_details": opt_perf,
+            "spec_levels": spec,
+            "structural_risk": spec["structural_risk"],
+            "volatility_risk": spec["volatility_risk"],
+            "risk_before_cap": spec["risk_before_cap"],
+            "risk_cap": spec["risk_cap"],
+            "risk_budget": spec["risk_budget"],
+            "model_target": spec["model_target"],
+            "min_target": spec["min_target"],
+            "target_feasible": spec["target_feasible"],
+            "actual_rr": spec["actual_rr"],
+            "rr_display": spec["rr_display"],
             "is_expiry_scalp": expiry_scalp,
             "lot_size": lot,
             "score": 95.0 if is_consensus else 45.0,
@@ -5496,14 +5623,15 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "risk_reward": rr_ratio,
             "instrument": inst_obj,
             "evidence": evidence,
+            "provider": "upstox+greeks_engine",
             "perfect_entry_details": opt_perf,
             "is_expiry_scalp": expiry_scalp,
             "greeks": greeks,
             "rationale": f"{'Next Market Day Setup (' + next_session_str + '): ' if not is_mkt_open else ''}Option Setup: {symbol} · Entry ₹{entry_to_use:.2f} (LTP ₹{opt_entry:.2f}, {opt_perf.get('entry_label', '')}), Target ₹{opt_tgt:.2f} (Est. Profit ₹{ach['realistic_profit']:,.0f}/lot), SL ₹{opt_sl:.2f} (R:R 1:{rr_ratio:.2f}). Greeks: Δ {abs(greeks['delta']):.2f}, Γ {greeks['gamma']:.4f}, Θ {greeks['theta']:.1f}/d · Achievable in {ach['time_horizon']}m.",
-            "provider": "upstox+greeks_engine",
             "timestamp": now_iso(),
             **next_day_info
         }
+        CACHE.set(cache_key, res_opt, 20)
         CACHE.set(cache_key, res_opt, 15)
         return res_opt
 
@@ -8283,10 +8411,18 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         pass
 
     if spot is None:
+        index_map = {
+            "BANKNIFTY": "NSE_INDEX|Nifty Bank",
+            "NIFTY": "NSE_INDEX|Nifty 50",
+            "FINNIFTY": "NSE_INDEX|Nifty Fin Service",
+            "MIDCPNIFTY": "NSE_INDEX|NIFTY MID SELECT"
+        }
         try:
+            # STRICTLY match UNDERLYING only, NEVER option contracts (which have CE/PE and low option prices like 93 or 532)!
             row = db_exec(
-                "SELECT ltp FROM watchlist_members WHERE (UPPER(symbol) LIKE ? OR UPPER(display_name) LIKE ?) AND ltp > 0 ORDER BY id DESC",
-                [f"%{root}%", f"%{root}%"],
+                "SELECT ltp FROM watchlist_members WHERE (UPPER(symbol) = ? OR UPPER(display_name) = ? OR UPPER(instrument_key) = ?) "
+                "AND UPPER(symbol) NOT LIKE '%CE%' AND UPPER(symbol) NOT LIKE '%PE%' AND ltp > 1000 ORDER BY id DESC",
+                [root, root, index_map.get(root, root)],
                 "one"
             )
             if row and row.get("ltp"):
@@ -8776,11 +8912,11 @@ async def news_discuss(request: Request, user: dict[str, Any] = Depends(require_
 
 @app.get("/api/news/ca-ai-feed")
 async def news_ca_ai_feed(
-    symbol: str = "RELIANCE",
+    symbol: str = "NIFTY",
     mode: str = "all",  # "all", "global", "stock"
     user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
-    sym = (symbol or "RELIANCE").upper().strip()
+    sym = (symbol or "NIFTY").upper().strip()
     cache_key = f"ca_ai_feed:{sym}:{mode}"
     cached = CACHE.get(cache_key)
     if cached is not None:
@@ -9108,6 +9244,8 @@ async def recommendation_on_demand(payload: RecommendationIn, request: Request, 
         else:
             ai = {"available": False, "decision": rec.get("recommendation", "BUY"), "reason": "CA AI will analyze after a fresh recommendation is available."}
     except Exception as exc:
+        record_error("r
+... [truncated for diff preview]
         record_error("recommendation_failure", safe_text(exc), user_id=user["id"])
         return error_json("RECOMMENDATION_UNAVAILABLE", safe_text(exc), 503)
     rid = secrets.token_hex(12)
@@ -9337,7 +9475,7 @@ def generate_fallback_replay_candles(instrument: str, timeframe: str = "5m", day
     sym = str(instrument).upper()
     if "BANK" in sym: base_price = 50500.0
     elif "CRUDE" in sym: base_price = 6200.0
-    elif "RELIANCE" in sym: base_price = 2950.0
+    elif "RELIANCE" in sym: base_price = 1307.0
     else:
         try:
             q = UPSTOX.quote(instrument)
@@ -9433,7 +9571,7 @@ async def backtest_evaluate(
     else:
         payload = request if isinstance(request, dict) else {}
 
-    symbol = str(payload.get("symbol") or payload.get("instrument") or "RELIANCE").upper()
+    symbol = str(payload.get("symbol") or payload.get("instrument") or "NIFTY").upper()
     candles_slice = payload.get("candles") or []
     if not candles_slice or len(candles_slice) < 5:
         return {
@@ -11289,6 +11427,41 @@ async def position_ai_analysis(position_id: str, request: Request, user: dict[st
         "factor_attribution": diagnosis,
         "ai_summary": f"{'Trade Invalidation Post-Mortem' if went_wrong else 'Winning Trade Analysis'}: Net P&L was ₹{pnl:+.2f} ({pnl_pct:+.2f}%) over {duration_min} minutes. Primary factor: {diagnosis[0]['factor']} ({diagnosis[0]['impact_pct']}% attribution)."
     }
+
+@app.post("/api/portfolio/external-position")
+@app.post("/api/positions/external")
+async def add_external_position(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    body = await request.json()
+    symbol = str(body.get("symbol") or "").strip().upper()
+    if not symbol:
+        raise HTTPException(422, "Symbol is required")
+    side = str(body.get("side") or "BUY").strip().upper()
+    qty = int(body.get("quantity") or body.get("qty") or 1)
+    entry = float(body.get("price") or body.get("entry") or body.get("avg_price") or 0.0)
+    sl = float(body.get("stop_loss") or body.get("sl") or 0.0)
+    tgt = float(body.get("target") or body.get("tgt") or 0.0)
+    broker = str(body.get("terminal") or body.get("broker") or "Zerodha").strip()
+    
+    # Try fetching live LTP
+    ltp = entry
+    try:
+        q = UPSTOX.quote(symbol)
+        if q and q.get("ltp"):
+            ltp = float(q["ltp"])
+    except Exception:
+        pass
+
+    now_str = now_iso()
+    pos_id = f"pos_ext_{secrets.token_hex(5)}"
+    db_exec(
+        "INSERT INTO positions (id, user_id, symbol, instrument_key, side, quantity, avg_price, stop_loss, target, status, source, fund_bucket, opened_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, 'trading', ?, ?)",
+        [pos_id, user["id"], symbol, symbol, side, qty, entry, sl, tgt, broker.upper(), now_str, now_str]
+    )
+    new_pos = db_exec("SELECT * FROM positions WHERE id=?", [pos_id], "one")
+    await add_notification(user["id"], "position_opened", "info", 80, f"External Position ({broker}) Added", f"{side} {qty}x {symbol} @ ₹{entry:,.2f}", f"pos:{pos_id}")
+    return {"ok": True, "position": new_pos}
+
 @app.post("/api/positions/{position_id}/square-off")
 async def position_square_off(position_id: str, request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     pos=db_exec("SELECT * FROM positions WHERE id=? AND user_id=?",[position_id,user["id"]],"one")
@@ -11701,7 +11874,8 @@ async def notification_monitor(user: dict[str, Any] = Depends(require_user)) -> 
     except Exception: pass
     # Strong technical signals are market-only; do not generate NSE/BSE technical alerts after close.
     try:
-        if not bool(market_session("MCX" if "MCX" in sym.upper() else "NSE_EQ").get("active")):
+        is_sym_mcx = any(x in sym.upper() for x in ("MCX", "CRUDE", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "ALUMINIUM"))
+        if not bool(market_session("MCX" if is_sym_mcx else "NSE_EQ").get("active")):
             mtf={"items":[]}
         else:
             mtf=await analysis_technical_mtf(sym,user)

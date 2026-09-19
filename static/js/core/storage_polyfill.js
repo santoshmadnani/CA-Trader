@@ -49,7 +49,8 @@ window.toast = window.toast || ((m) => {
     el._t = setTimeout(() => el.style.opacity = '0', 2200);
   } catch(_) { console.log(m); }
 });
-window.selectedSymbol = window.selectedSymbol || (() => document.querySelector('.wl-item.selected')?.dataset.symbol || window.CATraderSymbol || window.state?.symbol || 'NIFTY');
+window.CATraderSymbol = window.CATraderSymbol || 'NIFTY';
+window.selectedSymbol = () => document.querySelector('.wl-item.selected')?.dataset.symbol || window.CATraderSymbol || window.state?.symbol || 'NIFTY';
 function extractUnderlying(sym){
   if(!sym) return 'NIFTY';
   let s = String(sym).trim();
