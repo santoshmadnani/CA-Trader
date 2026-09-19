@@ -10,3 +10,4 @@ itsdangerous
 beautifulsoup4
 websocket-client
 upstox-python-sdk>=2.23,<3
+huggingface_hub

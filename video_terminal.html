@@ -761,9 +761,15 @@
       <div class="settings-grid">
         <div>
           <div class="section-label">Model Engine</div>
-          <select id="modelSelect" class="select-field">
-            <option value="models/veo-3.1-fast-generate-preview" selected>Veo 3.1 Fast (Low Latency)</option>
-            <option value="models/veo-3.1-generate-preview">Veo 3.1 Cinema (High Detail)</option>
+          <select id="modelSelect" class="select-field" onchange="onModelChange(this.value)">
+            <optgroup label="Hugging Face AI Engines (HF_TOKEN)">
+              <option value="hf:wavespeed:larryvrh/MiniMax-H3-Turbo-Lora" selected>MiniMax H3 Turbo (WaveSpeed / Hugging Face)</option>
+              <option value="hf:fal-ai:Wan-AI/Wan2.1-T2V-1.3B">Wan 2.1 Video (Fal.ai / Hugging Face)</option>
+            </optgroup>
+            <optgroup label="Google DeepMind (Billing Required)">
+              <option value="models/veo-3.1-fast-generate-preview">Google Veo 3.1 Fast (Low Latency)</option>
+              <option value="models/veo-3.1-generate-preview">Google Veo 3.1 Cinema (High Detail)</option>
+            </optgroup>
           </select>
         </div>
 
@@ -785,8 +791,8 @@
         </div>
 
         <div>
-          <div class="section-label">Billing / API Key</div>
-          <input type="password" id="customApiKey" class="select-field" placeholder="Default Server Key" autocomplete="off" title="Optionally override default Gemini API key with your billing-enabled key">
+          <div class="section-label" id="apiKeyLabel">HF Token (HF_TOKEN)</div>
+          <input type="password" id="customApiKey" class="select-field" placeholder="Paste HF_TOKEN (hf_...)" autocomplete="off" title="Paste your Hugging Face access token or Gemini key">
         </div>
       </div>
 
@@ -938,6 +944,18 @@
       document.getElementById('badgeAspect').textContent = ratio;
     }
 
+    function onModelChange(val) {
+      const keyInput = document.getElementById('customApiKey');
+      const keyLabel = document.getElementById('apiKeyLabel');
+      if (val.startsWith('hf:') || val.includes('MiniMax')) {
+        if (keyLabel) keyLabel.textContent = 'HF Token (HF_TOKEN)';
+        keyInput.placeholder = 'Paste your HF_TOKEN (hf_...)';
+      } else {
+        if (keyLabel) keyLabel.textContent = 'Google Billing / Gemini Key';
+        keyInput.placeholder = 'Default Server Key (Requires Billing)';
+      }
+    }
+
     // Gemini Magic Enhance Prompt
     async function enhancePrompt() {
       const promptInput = document.getElementById('promptInput');
@@ -1021,9 +1039,15 @@
 
       const btn = document.getElementById('generateBtn');
       btn.disabled = true;
-      btn.innerHTML = '<div class="spinner"></div> Submitting to Veo...';
 
-      setStatus('generating', 'Connecting to Google Veo 3.1 Video Engine...');
+      const isHf = model.startsWith('hf:') || model.includes('MiniMax') || (apiKey && apiKey.startsWith('hf_'));
+      if (isHf) {
+        btn.innerHTML = '<div class="spinner"></div> Generating via Hugging Face...';
+        setStatus('generating', 'Generating video via Hugging Face MiniMax-H3-Turbo / WaveSpeed Engine (approx 20-45s)...');
+      } else {
+        btn.innerHTML = '<div class="spinner"></div> Submitting to Google Veo...';
+        setStatus('generating', 'Connecting to Google Veo 3.1 Video Engine...');
+      }
 
       try {
         const res = await fetch('/api/video/generate', {
@@ -1049,6 +1073,17 @@
         }
 
         currentVideoJob = data.id;
+
+        // Hugging Face synchronous return
+        if (data.status === 'completed') {
+          btn.disabled = false;
+          btn.innerHTML = '<span>🎬</span> Generate AI Video';
+          setStatus('success', `🎉 Video generation complete! Ready in cinema viewport.`);
+          loadVideoIntoPlayer(data.video_url, prompt, aspect, model, duration);
+          await loadHistory();
+          return;
+        }
+
         startPolling(data.id, prompt, aspect, model, duration);
 
       } catch (err) {
@@ -1062,13 +1097,24 @@
     function handleGenerationError(data) {
       const err = data.error || 'Generation failed.';
       const isQuota = data.status_code === 429 || err.includes('Quota') || err.includes('RESOURCE_EXHAUSTED');
+      const isTokenMissing = err.includes('HF_TOKEN') || err.includes('token') || err.includes('Unauthorized') || err.includes('401');
       
       let html = `<b>⚠️ Generation Error:</b> ${err}`;
-      if (isQuota) {
+      if (isTokenMissing) {
+        html += `
+          <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(239,68,68,0.3);font-size:11px;">
+            💡 <b>Hugging Face Token:</b> Paste your Hugging Face access token (starts with <code>hf_...</code>) in the <b>HF Token</b> input above.
+            <br><br>
+            <button type="button" class="btn-action" style="background:#1e2b3b;color:#38bdf8;" onclick="submitDemoJob()">
+              <span>🧪</span> Test with Sample Video Player
+            </button>
+          </div>
+        `;
+      } else if (isQuota) {
         html += `
           <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(239,68,68,0.3);font-size:11px;">
             💡 <b>Google Veo Quota Notice:</b> Veo video generation requires a billing-enabled Google Cloud / AI Studio project.
-            <br>You can enter your billing-enabled Gemini API key in the <b>Billing / API Key</b> field above.
+            <br>Switch model to <b>MiniMax H3 Turbo (Hugging Face)</b> or enter your billing-enabled Gemini API key.
             <br><br>
             <button type="button" class="btn-action" style="background:#1e2b3b;color:#38bdf8;" onclick="submitDemoJob()">
               <span>🧪</span> Test with Sample Video Player

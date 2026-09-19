@@ -15145,6 +15145,56 @@ async def api_video_generate(request: Request, user: dict[str, Any] = Depends(re
         """, [video_id, user["id"], prompt, "", model, aspect_ratio, duration, "completed", "demo_preview", demo_fn, "", 1, created_at, created_at])
         return {"ok": True, "id": video_id, "status": "completed", "is_demo": True, "video_url": f"/api/video/stream/{video_id}"}
 
+    is_hf = model.startswith("hf:") or "MiniMax" in model or "Wan" in model or (custom_key and custom_key.startswith("hf_"))
+    if is_hf:
+        hf_provider = "wavespeed"
+        hf_model = "larryvrh/MiniMax-H3-Turbo-Lora"
+        if model.startswith("hf:"):
+            parts = model.split(":", 2)
+            if len(parts) >= 2 and parts[1]:
+                hf_provider = parts[1]
+            if len(parts) >= 3 and parts[2]:
+                hf_model = parts[2]
+        elif "MiniMax" in model:
+            hf_provider = "wavespeed"
+            hf_model = "larryvrh/MiniMax-H3-Turbo-Lora"
+
+        from backend.services.video_service import generate_video_huggingface
+        ok, res_data = await asyncio.to_thread(generate_video_huggingface, prompt, hf_model, hf_provider, custom_key)
+        if not ok:
+            err = str(res_data)
+            db_exec("""
+                INSERT INTO ai_videos(id, user_id, prompt, enhanced_prompt, model, aspect_ratio, duration_seconds, status, operation_name, video_filename, error_message, is_demo, created_at, completed_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, [video_id, user["id"], prompt, "", model, aspect_ratio, duration, "failed", "", "", err, 0, created_at, created_at])
+            return {"ok": False, "id": video_id, "error": err, "status_code": 400}
+
+        target_fn = f"{video_id}.mp4"
+        target_path = VIDEO_STORAGE_DIR / target_fn
+        try:
+            with open(target_path, "wb") as f:
+                f.write(res_data)
+        except Exception as e:
+            err = f"Failed to save video to disk: {e}"
+            db_exec("""
+                INSERT INTO ai_videos(id, user_id, prompt, enhanced_prompt, model, aspect_ratio, duration_seconds, status, operation_name, video_filename, error_message, is_demo, created_at, completed_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, [video_id, user["id"], prompt, "", model, aspect_ratio, duration, "failed", "", "", err, 0, created_at, created_at])
+            return {"ok": False, "id": video_id, "error": err, "status_code": 500}
+
+        db_exec("""
+            INSERT INTO ai_videos(id, user_id, prompt, enhanced_prompt, model, aspect_ratio, duration_seconds, status, operation_name, video_filename, error_message, is_demo, created_at, completed_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, [video_id, user["id"], prompt, "", model, aspect_ratio, duration, "completed", "", target_fn, "", 0, created_at, now_iso()])
+
+        return {
+            "ok": True,
+            "id": video_id,
+            "status": "completed",
+            "video_url": f"/api/video/stream/{video_id}",
+            "model": model,
+        }
+
     from backend.services.video_service import start_video_generation
     res = await asyncio.to_thread(start_video_generation, prompt, model, aspect_ratio, duration, 1, custom_key)
     if not res.get("ok"):

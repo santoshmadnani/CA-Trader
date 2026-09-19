@@ -299,3 +299,36 @@ def enhance_prompt_with_gemini(user_idea: str, custom_key: Optional[str] = None)
         ]
     }
 
+
+def generate_video_huggingface(
+    prompt: str,
+    model: str = "larryvrh/MiniMax-H3-Turbo-Lora",
+    provider: str = "wavespeed",
+    custom_token: Optional[str] = None,
+) -> Tuple[bool, Any]:
+    """
+    Generates video using Hugging Face InferenceClient with providers such as WaveSpeed or Fal.ai.
+    Returns (True, video_bytes) on success, or (False, error_string) on failure.
+    """
+    token = (custom_token or "").strip() or os.getenv("HF_TOKEN", "").strip() or os.getenv("HUGGINGFACE_TOKEN", "").strip()
+    if not token:
+        return False, "Hugging Face token (HF_TOKEN) is required. Please paste your token in the API Key box or set HF_TOKEN on the server."
+
+    try:
+        from huggingface_hub import InferenceClient
+        client = InferenceClient(
+            provider=provider,
+            api_key=token
+        )
+        video_bytes = client.text_to_video(
+            prompt,
+            model=model
+        )
+        if video_bytes and len(video_bytes) > 500:
+            return True, video_bytes
+        return False, "Hugging Face returned empty video bytes."
+    except Exception as e:
+        logger.exception(f"Hugging Face video generation failed: {e}")
+        return False, f"Hugging Face ({provider}) error: {str(e)}"
+
+
