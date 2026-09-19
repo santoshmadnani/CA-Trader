@@ -761,6 +761,9 @@
       <div class="settings-grid">
         <div>
           <div class="section-label">Model Engine</div>
+          <select id="modelSelect" class="select-field">
+            <option value="models/veo-3.1-fast-generate-preview" selected>Veo 3.1 Fast (Low Latency)</option>
+            <option value="models/veo-3.1-generate-preview">Veo 3.1 Cinema (High Detail)</option>
           <select id="modelSelect" class="select-field" onchange="onModelChange(this.value)">
             <optgroup label="Hugging Face AI Engines (HF_TOKEN)">
               <option value="hf:wavespeed:larryvrh/MiniMax-H3-Turbo-Lora" selected>MiniMax H3 Turbo (WaveSpeed / Hugging Face)</option>
@@ -791,6 +794,8 @@
         </div>
 
         <div>
+          <div class="section-label">Billing / API Key</div>
+          <input type="password" id="customApiKey" class="select-field" placeholder="Default Server Key" autocomplete="off" title="Optionally override default Gemini API key with your billing-enabled key">
           <div class="section-label" id="apiKeyLabel">HF Token (HF_TOKEN)</div>
           <input type="password" id="customApiKey" class="select-field" placeholder="Paste HF_TOKEN (hf_...)" autocomplete="off" title="Paste your Hugging Face access token or Gemini key">
         </div>
@@ -1039,7 +1044,9 @@
 
       const btn = document.getElementById('generateBtn');
       btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Submitting to Veo...';
 
+      setStatus('generating', 'Connecting to Google Veo 3.1 Video Engine...');
       const isHf = model.startsWith('hf:') || model.includes('MiniMax') || (apiKey && apiKey.startsWith('hf_'));
       if (isHf) {
         btn.innerHTML = '<div class="spinner"></div> Generating via Hugging Face...';
@@ -1100,6 +1107,7 @@
       const isTokenMissing = err.includes('HF_TOKEN') || err.includes('token') || err.includes('Unauthorized') || err.includes('401');
       
       let html = `<b>⚠️ Generation Error:</b> ${err}`;
+      if (isQuota) {
       if (isTokenMissing) {
         html += `
           <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(239,68,68,0.3);font-size:11px;">
@@ -1114,6 +1122,7 @@
         html += `
           <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(239,68,68,0.3);font-size:11px;">
             💡 <b>Google Veo Quota Notice:</b> Veo video generation requires a billing-enabled Google Cloud / AI Studio project.
+            <br>You can enter your billing-enabled Gemini API key in the <b>Billing / API Key</b> field above.
             <br>Switch model to <b>MiniMax H3 Turbo (Hugging Face)</b> or enter your billing-enabled Gemini API key.
             <br><br>
             <button type="button" class="btn-action" style="background:#1e2b3b;color:#38bdf8;" onclick="submitDemoJob()">

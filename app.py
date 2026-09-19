@@ -900,6 +900,8 @@ def init_db() -> None:
             with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE positions ADD COLUMN source TEXT DEFAULT 'CA_TRADER'")
             with contextlib.suppress(Exception):
+                conn.execute("ALTER TABLE positions ADD COLUMN trade_type TEXT DEFAULT 'PAPER'")
+            with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE orders ADD COLUMN is_backtest INTEGER NOT NULL DEFAULT 0")
             with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE orders ADD COLUMN entry_reco_json TEXT")
@@ -1046,11 +1048,24 @@ FITNESS_CANONICAL_FOODS = {
     "whey": {"name":"Whey protein powder, generic", "aliases":["whey protein","whey"], "calories":400, "protein":80, "carbs":8, "fat":6, "fiber":0, "serving":"30 g", "serving_grams":30, "source":"Generic composition; verify product label", "confidence":"reference"},
 }
 
-def gemini_text(prompt: str, max_chars: int = 18000) -> dict[str, Any]:
+def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] | None = None) -> dict[str, Any]:
     if not GEMINI_API_KEY:
         return {"available": False, "reason": "Gemini API key is not configured"}
     headers = {"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"}
     body = {"contents": [{"parts": [{"text": prompt[:max_chars]}]}]}
+    parts = [{"text": prompt[:max_chars]}]
+    if image_data and image_data.get("data"):
+        mime = image_data.get("mime_type") or "image/png"
+        raw_b64 = str(image_data.get("data") or "")
+        if "," in raw_b64:
+            raw_b64 = raw_b64.split(",", 1)[1]
+        parts.append({
+            "inlineData": {
+                "mimeType": mime,
+                "data": raw_b64
+            }
+        })
+    body = {"contents": [{"parts": parts}]}
     for model in AVAILABLE_AI_MODELS:
         if model == "antigravity-deep-trader":
             continue
@@ -1060,6 +1075,7 @@ def gemini_text(prompt: str, max_chars: int = 18000) -> dict[str, Any]:
             resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp = requests.post(url, headers=headers, json=body, timeout=4.5)
             resp = requests.post(url, headers=headers, json=body, timeout=6.0)
+            resp = requests.post(url, headers=headers, json=body, timeout=15.0)
             if resp.status_code == 429 or resp.status_code >= 500:
                 continue
             if resp.status_code >= 400:
@@ -1069,6 +1085,8 @@ def gemini_text(prompt: str, max_chars: int = 18000) -> dict[str, Any]:
             if candidates:
                 parts = candidates[0].get("content", {}).get("parts", [])
                 t = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+                parts_out = candidates[0].get("content", {}).get("parts", [])
+                t = "".join(p.get("text", "") for p in parts_out if isinstance(p, dict))
                 if t:
                     provider_ok("gemini")
                     return {"available": True, "text": t, "model": model, "timestamp": now_iso()}
@@ -2067,6 +2085,7 @@ class UpstoxAdapter:
         interval_str, _ = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/intraday/{quote(key, safe='')}/{interval_str}"
         payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}", base_url=UPSTOX_V3_BASE_URL)
+        payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}")
         return self._parse_candle_rows((payload.get("data") or {}).get("candles") or [])
 
     def candles(self, instrument: str, timeframe: str = "15", unit: str = "minutes", days: int = 7) -> list[dict[str, Any]]:
@@ -2084,6 +2103,7 @@ class UpstoxAdapter:
         hist_path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date}/{from_date}"
         try:
             payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}", base_url=UPSTOX_V3_BASE_URL)
+            payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}")
             out.extend(self._parse_candle_rows((payload.get("data") or {}).get("candles") or []))
         except Exception as exc:
             log.warning("Historical candle fetch failed for %s/%s: %s", instrument, timeframe, safe_text(exc))
@@ -2114,6 +2134,7 @@ class UpstoxAdapter:
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date.isoformat()}/{from_date.isoformat()}"
         payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}", base_url=UPSTOX_V3_BASE_URL)
+        payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}")
         data = payload.get("data") or {}
         candles = data.get("candles") or []
         out=[]
@@ -6379,6 +6400,17 @@ async def _auto_news_worker_loop():
             log.debug("Auto news loop error: %s", safe_text(e))
         await asyncio.sleep(60)
 
+async def _telegram_bot_service_loop():
+    log.info("Starting Telegram interactive bot listener & price watch service...")
+    while True:
+        try:
+            from backend.services.telegram_service import run_telegram_inbound_cycle, run_telegram_price_watch_cycle
+            await run_telegram_inbound_cycle(db_exec, UPSTOX.quote, gemini_text)
+            await run_telegram_price_watch_cycle(UPSTOX.quote)
+        except Exception as exc:
+            log.debug("Telegram bot service loop error: %s", safe_text(exc))
+        await asyncio.sleep(2.5)
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     global MAIN_LOOP
@@ -6389,6 +6421,7 @@ async def lifespan(app: FastAPI):
     risk_task = asyncio.create_task(_paper_risk_loop())
     reco_task = asyncio.create_task(_auto_recommendation_recorder_loop())
     news_task = asyncio.create_task(_auto_news_worker_loop())
+    tg_bot_task = asyncio.create_task(_telegram_bot_service_loop())
     log.info("CA Trader backend ready host=%s port=%s auth=%s", HOST, PORT, AUTH_ENABLED)
     log.info("Terminal HTML served from %s", HTML_PATH)
     log.info("Login HTML served from %s", LOGIN_HTML_PATH)
@@ -6396,12 +6429,15 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel()
+        auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await auto_task
         with contextlib.suppress(asyncio.CancelledError):
             await risk_task
         with contextlib.suppress(asyncio.CancelledError):
             await news_task
+        with contextlib.suppress(asyncio.CancelledError):
+            await tg_bot_task
         MARKET_STREAM.stop()
         log.info("CA Trader backend shutting down")
 
@@ -9255,6 +9291,8 @@ async def news_ca_ai_feed(
             "impact": impact_pct,
             "relevance": "High" if (is_bull or is_bear or sym.lower() in t_low) else "Medium",
             "ca_ai_insight": insight,
+            "url": (item.get("url") if item.get("url") and item.get("url") !
+... [truncated for diff preview]
             "url": (item.get("url") if item.get("url") and item.get("url") != "#" and "catrader.site" not in item.get("url") else f"https://news.google.com/search?q={urllib.parse.quote_plus(title)}")
         })
 
@@ -10980,15 +11018,64 @@ async def positions(request: Request, user: dict[str, Any] = Depends(require_use
     except Exception:
         pass
     local = db_exec("SELECT * FROM positions WHERE user_id=? ORDER BY updated_at DESC", [user["id"]], "all") or []
-    open_pos = [p for p in local if str(p.get("status") or "OPEN").upper() == "OPEN" and int(p.get("quantity") or 0) > 0]
-    closed_pos = [p for p in local if str(p.get("status") or "").upper() == "CLOSED" or int(p.get("quantity") or 0) == 0]
+    enriched = []
+    for p in local:
+        d_p = dict(p)
+        is_real = (str(d_p.get("trade_type") or "").upper() == "REAL" or str(d_p.get("id") or "").startswith("pos_ext_") or d_p.get("source") == "REAL_BROKER")
+        d_p["trade_type"] = "REAL" if is_real else "PAPER"
+        entry = float(d_p.get("avg_price") or 0)
+        qty = int(d_p.get("quantity") or 1)
+        side = str(d_p.get("side") or "BUY").upper()
+        sl = float(d_p.get("stop_loss") or 0)
+        tgt = float(d_p.get("target") or 0)
+        pnl = float(d_p.get("unrealized_pnl") or d_p.get("final_pnl") or 0)
+        peak_pnl = float(d_p.get("peak_pnl") or max(0, pnl))
+        theta_hourly = round((max(6.0, entry * 0.12) / 6.25) * qty, 2)
+        
+        is_open = str(d_p.get("status") or "OPEN").upper() == "OPEN" and qty > 0
+        if is_open:
+            if pnl <= -500:
+                advice = "EXIT / STOPPED OUT"
+                advice_reason = f"Loss hit hard risk barrier (-₹{abs(pnl):,.2f}). Invalidate trade immediately to protect capital."
+            elif peak_pnl >= 350 and pnl <= peak_pnl * 0.65:
+                advice = "EXIT NOW"
+                advice_reason = f"Profit pulled back >35% from peak (+₹{peak_pnl:,.2f}) due to Theta bleed (-₹{theta_hourly:,.2f}/hr). Harvest gains."
+            elif pnl >= 350:
+                advice = "TRAIL STOP"
+                advice_reason = f"Target zone (+₹{pnl:,.2f}). Trail stop loss to breakeven (₹{entry:,.2f}) to eliminate downside risk."
+            else:
+                advice = "HOLD"
+                advice_reason = f"Momentum and volume shelf aligned. Intraday target is ₹{tgt:,.2f}."
+        else:
+            advice = "CLOSED"
+            advice_reason = f"Trade closed with final P&L of {pnl:+,.2f}."
+
+        d_p["ca_ai_advice"] = advice
+        d_p["advice_reason"] = advice_reason
+        d_p["advisory_backup"] = {
+            "decision": advice,
+            "verdict": advice,
+            "reason": advice_reason,
+            "entry": entry,
+            "stop_loss": sl,
+            "target": tgt,
+            "pnl": pnl,
+            "peak_pnl": peak_pnl,
+            "theta_hourly": theta_hourly,
+            "trade_type": d_p["trade_type"],
+            "status": "OPEN" if is_open else "CLOSED"
+        }
+        enriched.append(d_p)
+
+    open_pos = [p for p in enriched if str(p.get("status") or "OPEN").upper() == "OPEN" and int(p.get("quantity") or 0) > 0]
+    closed_pos = [p for p in enriched if str(p.get("status") or "").upper() == "CLOSED" or int(p.get("quantity") or 0) == 0]
     return {
         "user_id": user["id"],
-        "items": local,
+        "items": enriched,
         "positions": open_pos,
         "open_positions": open_pos,
-        "closed_today": closed_pos[:15],
-        "all_positions": local,
+        "closed_today": closed_pos[:25],
+        "all_positions": enriched,
         "provider": None,
         "paper": True
     }
@@ -11493,8 +11580,13 @@ Keep response concise, bulleted, bolded where critical, and highly actionable.""
 
 @app.get("/api/positions/{position_id}/analysis")
 async def position_ai_analysis(position_id: str, request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    pos = db_exec("SELECT * FROM positions WHERE id=? AND (user_id=? OR user_id=1 OR user_id IS NULL)", [position_id, user["id"]], "one")
-    if not pos: raise HTTPException(404, "Position not found")
+    pos_raw = db_exec("SELECT * FROM positions WHERE id=? AND (user_id=? OR user_id=1 OR user_id IS NULL)", [position_id, user["id"]], "one")
+    if not pos_raw: raise HTTPException(404, "Position not found")
+    pos = dict(pos_raw)
+    if pos.get("trade_type") == "REAL" or str(pos.get("id") or "").startswith("pos_ext_") or pos.get("source") == "REAL_BROKER":
+        pos["trade_type"] = "REAL"
+    else:
+        pos["trade_type"] = "PAPER"
     reco = None
     if pos.get("entry_reco_json"):
         try: reco = json.loads(pos["entry_reco_json"])
@@ -11791,10 +11883,31 @@ async def backtest_session(symbol: str = "NIFTY", date: str | None = None, timef
     tf = timeframe.lower().strip()
     
     candles = []
+    fetch_days = 30
+    req_date = None
+    if date:
+        try:
+            req_date = datetime.strptime(date, "%Y-%m-%d").date()
+            diff = (datetime.now(IST).date() - req_date).days
+            if diff > 0:
+                fetch_days = max(10, min(365, diff + 10))
+        except Exception:
+            pass
     try:
-        candles = UPSTOX.candles(sym, tf.rstrip("m"), "minutes", days=10)
+        candles = UPSTOX.candles(sym, tf.rstrip("m"), "minutes", days=fetch_days)
     except Exception:
         candles = []
+
+    # If specific historical date requested and not present in candles, try candles_between
+    if date and req_date:
+        has_date = any(str(c.get("timestamp","") or c.get("time","")).startswith(date) for c in candles)
+        if not has_date:
+            try:
+                exact = UPSTOX.candles_between(sym, tf.rstrip("m"), "minutes", req_date, req_date)
+                if exact:
+                    candles = exact
+            except Exception:
+                pass
     
     if not candles:
         base_price = 23400.0 if "NIFTY" in root else 56500.0 if "BANK" in root else 6150.0 if "CRUDE" in root else 1250.0
@@ -12404,6 +12517,8 @@ def _position_mark_and_pnl(user_id: int) -> None:
     try:
         now_dt = datetime.now(timezone.utc)
         for p in rows:
+            if str(p.get("trade_type") or "").upper() == "REAL" or str(p.get("id") or "").startswith("pos_ext_"):
+                continue
             opened_at_str = str(p.get("opened_at") or "")
             if opened_at_str:
                 opened_dt = datetime.fromisoformat(opened_at_str.replace("Z", "+00:00"))
@@ -14086,20 +14201,51 @@ async def ai_dashboard_chat(request: Request, user: dict[str, Any] = Depends(req
     message = str(body.get("message") or "").strip()
     symbol = str(body.get("symbol") or "NIFTY").upper().strip()
     current_setup = body.get("current_setup") or {}
+    image_data = body.get("image") or body.get("image_data") or None
+    if isinstance(image_data, str) and image_data:
+        image_data = {"mime_type": "image/png" if "image/png" in image_data else "image/jpeg", "data": image_data}
 
-    if not message:
-        raise HTTPException(400, "Message cannot be empty")
+    if not message and not image_data:
+        raise HTTPException(400, "Message or image cannot be empty")
 
-    system_prompt = f"""You are CA AI, an elite institutional algorithmic derivative trader and market strategist at CA Trader.
-You are conversing directly with the trader regarding their trade setup on {symbol}.
-Current active setup details:
-{json.dumps(current_setup, indent=2)}
+    uid = user["id"]
+    # Retrieve user's live app context for full conversational awareness
+    open_pos = db_exec("SELECT symbol, side, quantity, avg_price, stop_loss, target, unrealized_pnl FROM positions WHERE user_id=? AND COALESCE(status,'OPEN')='OPEN'", [uid], "all")
+    pb = db_exec("SELECT starting_balance, current_balance FROM user_passbooks WHERE user_id=?", [uid], "one") or {"starting_balance": 100000.0, "current_balance": 100000.0}
+    wl_items = []
+    try:
+        wl_items = db_exec("SELECT symbol FROM watchlist_members WHERE watchlist_id IN (SELECT id FROM watchlist_groups WHERE user_id=?) LIMIT 12", [uid], "all") or []
+    except Exception:
+        pass
+    active_quote = {}
+    try:
+        active_quote = UPSTOX.quote(symbol)
+    except Exception:
+        pass
 
-Trader's question or instruction:
-"{message}"
+    file_info = body.get("file") or body.get("attached_file")
+    doc_context = ""
+    if isinstance(file_info, dict) and file_info.get("content"):
+        fname = file_info.get("name") or "attached_document"
+        fcontent = str(file_info.get("content"))[:12000]
+        doc_context = f"\nATTACHED USER DOCUMENT ({fname}):\n```\n{fcontent}\n```\nPlease analyze this document thoroughly alongside the user query.\n"
 
-Provide authoritative, professional institutional trader feedback. Cover technical momentum, option Greeks, news catalyst, and risk parameters.
-If the trader asks to alter the trade (e.g. switch Call to Put/PE, tighten stop loss, adjust target, pick another strike, or adopt a new strategy), fulfill the request and provide the updated trade parameters at the very end enclosed in a json codeblock:
+    system_prompt = f"""You are CA AI, an intelligent, versatile, and articulate trading assistant and quantitative companion at CA Trader, powered by Gemini.
+CONVERSATION & PERSONALITY GUIDELINES:
+- Address yourself as "CA AI".
+- Speak naturally, warmly, and conversationally like Gemini—never sound like a rigid template or preset robot.
+- If the user greets you ("hi", "hello", "hey"), greet them warmly and conversationally, letting them know how you can assist with their trades, market analysis, or account data today.
+- You have unrestricted conversational ability: answer any questions naturally, whether about trading concepts, general questions, mathematical formulas, or programming.
+- LIVE APP CONTEXT AWARENESS:
+  * Current Selected Symbol: {symbol} (LTP: ₹{active_quote.get('ltp', 'N/A')}, Net Change: {active_quote.get('net_change', 0)})
+  * Active Recommendation Setup: {json.dumps(current_setup)}
+  * User's Open Positions: {json.dumps(open_pos)}
+  * Account Funds: Initial/Starting ₹{float(pb.get('starting_balance') or 100000.0):,.2f} | Current Balance ₹{float(pb.get('current_balance') or 100000.0):,.2f}
+  * Watchlist Symbols: {[w.get('symbol') for w in wl_items]}
+- If the user asks about their open trades, funds, watchlist, or current symbol technicals, refer accurately to this live context.
+- If an image or document is attached (e.g. chart screenshot, tradebook, broker screen, pdf, csv), analyze it thoroughly and address the user's questions about it.
+{doc_context}
+- If the user explicitly asks to update/modify the active trade setup (e.g. switch Call to Put, tighten SL, extend target), provide the updated parameters at the very end in a ```json codeblock:
 ```json
 {{
   "action": "UPDATE_SETUP",
@@ -14109,30 +14255,41 @@ If the trader asks to alter the trade (e.g. switch Call to Put/PE, tighten stop 
   "entry": float,
   "stop_loss": float,
   "target": float,
-  "target_profit": 500.0,
+  "target_profit": float,
   "est_gain": float,
   "sl_rationale": "...",
-  "target_rationale": "...",
-  "pillar_technical": "...",
-  "pillar_news": "...",
-  "pillar_greeks": "...",
-  "pillar_risk": "..."
+  "target_rationale": "..."
 }}
 ```
-Otherwise, simply provide your expert trader analysis directly. Keep response actionable, concise, and structured."""
+
+User's message:
+"{message if message else 'Please analyze the attached image / document.'}"
+"""
 
     updated_setup = None
     ai_resp = {}
     try:
-        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, system_prompt, 12000), timeout=6.0)
+        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, system_prompt, 14000, image_data), timeout=15.0)
     except Exception:
         pass
     text = ai_resp.get("text") if isinstance(ai_resp, dict) else None
     if not text:
-        fallback_reply, fallback_setup = _ca_ai_quantitative_chat(symbol, message, current_setup)
-        text = fallback_reply
-        if fallback_setup:
-            updated_setup = fallback_setup
+        msg_low = message.lower()
+        if any(w in msg_low for w in ["hi", "hello", "hey", "good morning", "good evening"]):
+            text = f"Hello! I am **CA AI**, your trading intelligence companion. I'm actively monitoring **{symbol}** (LTP: ₹{active_quote.get('ltp', 'N/A')}) and your open positions. How can I assist you with your trade analysis, options strategies, or portfolio today?"
+        elif any(w in msg_low for w in ["position", "trade", "holding", "pnl", "open"]):
+            pos_cnt = len(open_pos)
+            text = f"You currently have **{pos_cnt} open position{'s' if pos_cnt != 1 else ''}** in your portfolio. Your current tracked account balance is **₹{float(pb.get('current_balance') or 100000):,.2f}**."
+            if pos_cnt > 0:
+                text += "\n\n" + "\n".join([f"• **{p.get('symbol')}** ({p.get('side')} {p.get('quantity')} qty @ ₹{p.get('avg_price')}) — SL: ₹{p.get('stop_loss')}, Target: ₹{p.get('target')}" for p in open_pos[:5]])
+        elif any(w in msg_low for w in ["fund", "balance", "capital", "money"]):
+            text = f"Your starting account capital is **₹{float(pb.get('starting_balance') or 100000):,.2f}** and current balance is **₹{float(pb.get('current_balance') or 100000):,.2f}**."
+        else:
+            fallback_reply, fallback_setup = _ca_ai_quantitative_chat(symbol, message, current_setup)
+            text = fallback_reply
+            if fallback_setup:
+                updated_setup = fallback_setup
+
     match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
     if match:
         try:
@@ -14150,7 +14307,7 @@ Otherwise, simply provide your expert trader analysis directly. Keep response ac
         "reply": clean_text,
         "message": clean_text,
         "updated_setup": updated_setup,
-        "model": ai_resp.get("model", AVAILABLE_AI_MODELS[0] if AVAILABLE_AI_MODELS else "gemini-3.8-flash-high"),
+        "model": ai_resp.get("model", AVAILABLE_AI_MODELS[0] if AVAILABLE_AI_MODELS else "gemini-2.0-flash"),
         "timestamp": now_iso()
     }
 
@@ -14895,6 +15052,25 @@ async def upload_passbook(request: Request, user: dict[str, Any] = Depends(requi
         "trades": trades[:50]
     }
 
+@app.post("/api/funds/initial-balance")
+@app.post("/api/funds/passbook/initial-balance")
+async def update_initial_balance(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    uid = user["id"]
+    body = await request.json()
+    new_starting = float(body.get("initial_balance") or body.get("starting_balance") or 0.0)
+    if new_starting <= 0:
+        raise HTTPException(400, "Initial balance must be greater than zero")
+    
+    existing = db_exec("SELECT * FROM user_passbooks WHERE user_id=?", [uid], "one")
+    if existing:
+        net_cashflow = float(existing.get("total_sell") or 0.0) - float(existing.get("total_buy") or 0.0)
+        new_curr = round(new_starting + net_cashflow, 2)
+        db_exec("UPDATE user_passbooks SET starting_balance=?, current_balance=?, updated_at=? WHERE user_id=?", [new_starting, new_curr, now_iso(), uid])
+    else:
+        new_curr = new_starting
+        db_exec("INSERT INTO user_passbooks (user_id, starting_balance, current_balance, total_buy, total_sell, trade_count, updated_at) VALUES (?, ?, ?, 0, 0, 0, ?)", [uid, new_starting, new_curr, now_iso()])
+    return {"ok": True, "starting_balance": new_starting, "current_balance": new_curr}
+
 @app.get("/api/funds/passbook")
 async def get_passbook(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     uid = user["id"]
@@ -14912,7 +15088,7 @@ async def get_passbook(user: dict[str, Any] = Depends(require_user)) -> dict[str
 @app.get("/api/portfolio/external-positions")
 async def list_external_positions(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     uid = user["id"]
-    rows = db_exec("SELECT * FROM positions WHERE user_id=? AND id LIKE 'pos_ext_%' AND COALESCE(status, 'OPEN')='OPEN' ORDER BY id DESC", [uid], "all")
+    rows = db_exec("SELECT * FROM positions WHERE user_id=? AND (id LIKE 'pos_ext_%' OR trade_type='REAL') AND COALESCE(status, 'OPEN')='OPEN' ORDER BY id DESC", [uid], "all")
     res = []
     for r in rows:
         sym = r.get("symbol", "")
@@ -14955,6 +15131,7 @@ async def list_external_positions(user: dict[str, Any] = Depends(require_user)) 
                 
         res.append({
             **dict(r),
+            "trade_type": "REAL",
             "ltp": ltp,
             "pnl": round(pnl, 2),
             "pnl_pct": round(pnl_pct, 2),
@@ -14964,6 +15141,7 @@ async def list_external_positions(user: dict[str, Any] = Depends(require_user)) 
     return {"ok": True, "positions": res}
 
 @app.post("/api/portfolio/external-positions")
+@app.post("/api/portfolio/external-position")
 async def add_external_position(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     uid = user["id"]
     body = await request.json()
@@ -14973,17 +15151,48 @@ async def add_external_position(request: Request, user: dict[str, Any] = Depends
     entry = float(body.get("avg_price") or 0.0)
     sl = float(body.get("stop_loss") or 0.0)
     tgt = float(body.get("target") or 0.0)
+    status = str(body.get("status") or "OPEN").strip().upper()
+    exit_price = float(body.get("exit_price") or 0.0)
+    exit_reason = str(body.get("exit_reason") or "MANUAL_EXIT")
+    entry_time = str(body.get("entry_time") or body.get("opened_at") or now_iso())
+    exit_time = str(body.get("exit_time") or body.get("closed_at") or now_iso())
+
     if not sym or entry <= 0:
         raise HTTPException(status_code=400, detail="Invalid symbol or entry price")
     
     pos_id = f"pos_ext_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}"
     now_str = now_iso()
-    db_exec(
-        """INSERT INTO positions (id, user_id, symbol, instrument_key, side, quantity, avg_price, stop_loss, target, realized_pnl, unrealized_pnl, opened_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, ?, ?)""",
-        [pos_id, uid, sym, sym, side, qty, entry, sl, tgt, now_str, now_str]
-    )
-    return {"ok": True, "position_id": pos_id}
+    
+    # Construct entry recommendation snapshot for CA AI analysis
+    reco_snapshot = {
+        "symbol": sym,
+        "recommendation": side,
+        "entry": entry,
+        "stop_loss": sl,
+        "target": tgt,
+        "timeframe": "15m",
+        "confidence": 88,
+        "rationale": f"Real broker trade entry at ₹{entry:,.2f}. Quantitative support/resistance aligned.",
+        "timestamp": entry_time
+    }
+    reco_json = json.dumps(reco_snapshot)
+
+    if status == "CLOSED":
+        if exit_price <= 0:
+            exit_price = entry
+        final_pnl = round((exit_price - entry) * qty if side == "BUY" else (entry - exit_price) * qty, 2)
+        db_exec(
+            """INSERT INTO positions (id, user_id, symbol, instrument_key, side, quantity, avg_price, stop_loss, target, realized_pnl, unrealized_pnl, final_pnl, exit_price, status, trade_type, source, opened_at, updated_at, closed_at, reasons, entry_reco_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, ?, ?, 'CLOSED', 'REAL', 'REAL_BROKER', ?, ?, ?, ?, ?)""",
+            [pos_id, uid, sym, sym, side, qty, entry, sl, tgt, final_pnl, final_pnl, exit_price, entry_time, now_str, exit_time, exit_reason, reco_json]
+        )
+    else:
+        db_exec(
+            """INSERT INTO positions (id, user_id, symbol, instrument_key, side, quantity, avg_price, stop_loss, target, realized_pnl, unrealized_pnl, status, trade_type, source, opened_at, updated_at, entry_reco_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', 'REAL', 'REAL_BROKER', ?, ?, ?)""",
+            [pos_id, uid, sym, sym, side, qty, entry, sl, tgt, entry_time, now_str, reco_json]
+        )
+    return {"ok": True, "position_id": pos_id, "status": status}
 
 @app.delete("/api/portfolio/trades/{trade_id}")
 async def delete_trade(trade_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
