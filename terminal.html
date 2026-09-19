@@ -878,8 +878,11 @@ tr:hover td{background:rgba(255,255,255,0.015);}
   margin-top:6px;
   background:#FFFFFF !important;
   border:1px solid #DDDDDD !important;
+  background:var(--surface-2) !important;
+  border:1px solid var(--border) !important;
   border-radius:8px;
   box-shadow:0 8px 24px rgba(0,0,0,.15);
+  box-shadow:0 8px 24px rgba(0,0,0,.45);
   opacity:0;
   visibility:hidden;
   transform:translateY(-4px);
@@ -901,6 +904,7 @@ tr:hover td{background:rgba(255,255,255,0.015);}
   border:none;
   background:transparent !important;
   color:#1A1A1A !important;
+  color:var(--text) !important;
   cursor:pointer;
   font-size:13px;
   font-weight:500;
@@ -912,14 +916,30 @@ tr:hover td{background:rgba(255,255,255,0.015);}
 .theme-option:hover{
   background:#F5F5F5 !important;
   color:#000000 !important;
+  background:var(--surface-3) !important;
+  color:var(--text) !important;
 }
 .theme-option.active{
   background:#4CAF50 !important;
+  background:var(--primary) !important;
   color:#FFFFFF !important;
   font-weight:600;
 }
 .theme-option span{
   color:inherit !important;
+}
+
+/* Enforce dark-mode consistency across all inputs and date-pickers (Zero White Boxes) */
+input[type="date"], input[type="datetime-local"], select, input[type="text"], input[type="number"], textarea, .tool-input {
+  color-scheme: dark !important;
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
 }
 .theme-option-color{
   width:16px;
@@ -3209,7 +3229,17 @@ select#watchlistSelect, select.watchlist-select {
           </div>
 
           <!-- Note Content Area -->
-          <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+            <!-- Note Formatting Toolbar -->
+            <div class="note-format-toolbar" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:5px 8px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:6px;">
+              <button type="button" class="btn ghost small" onclick="formatNoteText('**', '**')" style="font-weight:700;font-size:11px;padding:2px 8px;" title="Bold">B</button>
+              <button type="button" class="btn ghost small" onclick="formatNoteText('*', '*')" style="font-style:italic;font-size:11px;padding:2px 8px;" title="Italic">I</button>
+              <button type="button" class="btn ghost small" onclick="formatNoteText('## ', '')" style="font-weight:700;font-size:11px;padding:2px 8px;" title="Heading 2">H2</button>
+              <button type="button" class="btn ghost small" onclick="formatNoteText('- ', '')" style="font-size:11px;padding:2px 8px;" title="Bullet List">• List</button>
+              <button type="button" class="btn ghost small" onclick="formatNoteText('- [ ] ', '')" style="font-size:11px;padding:2px 8px;" title="Checklist">✓ Checklist</button>
+              <button type="button" class="btn ghost small" onclick="formatNoteText('\n---\n', '')" style="font-size:11px;padding:2px 8px;" title="Divider Line">— Divider</button>
+              <button type="button" class="btn ghost small" onclick="insertNoteTimestamp()" style="font-size:11px;padding:2px 8px;color:var(--gold);" title="Insert Current Timestamp">🕒 Timestamp</button>
+            </div>
             <textarea id="noteEditorContent" class="note-editor-area" placeholder="Write detailed trade observations, rationale, mistakes made, execution notes, or paste screenshots (Ctrl+V supported)..." style="width:100%;flex:1;min-height:300px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:12px;font-family:var(--font-body);font-size:13px;color:var(--text);line-height:1.6;resize:vertical;outline:none;"></textarea>
 
             <!-- Image Attachments Gallery -->
@@ -3929,6 +3959,23 @@ select#watchlistSelect, select.watchlist-select {
             </div>
             <div class="muted" id="newsUpdated" style="font-size:11.5px;color:var(--text-dim);">Auto-refreshing once every minute</div>
           </div>
+
+          <!-- News Multi-Select & Batch Action Toolbar -->
+          <div class="news-bulk-toolbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;">
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;cursor:pointer;color:var(--text);margin-right:6px;font-weight:600;">
+              <input type="checkbox" id="newsSelectAllCheckbox" onchange="window.toggleAllNewsSelection(this.checked)" style="cursor:pointer;accent-color:var(--gold);"> Select All
+            </label>
+            <button type="button" class="btn small ghost" onclick="window.deleteSelectedNews()" style="color:var(--sell);font-size:11px;padding:3px 10px;" title="Dismiss selected news stories">
+              🗑️ Delete Selected
+            </button>
+            <button type="button" class="btn small ghost" onclick="window.markSelectedNewsIrrelevant()" style="color:var(--gold);font-size:11px;padding:3px 10px;" title="Exclude selected from sentiment score">
+              🚫 Mark Not Relevant for Overall Score
+            </button>
+            <button type="button" class="btn small ghost" onclick="window.deleteAllNews()" style="color:var(--sell);font-size:11px;padding:3px 10px;margin-left:auto;" title="Clear all currently displayed news stories">
+              ✕ Delete All
+            </button>
+          </div>
+
           <div id="newsList" style="display:flex;flex-direction:column;gap:12px;">
             <div class="data-empty">Loading CA AI curated news…</div>
           </div>
@@ -4469,15 +4516,25 @@ select#watchlistSelect, select.watchlist-select {
         </div>
         <div class="head-actions">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:4px;">
               <label style="font-size:11px;color:var(--text-faint);">From:</label>
               <input type="date" id="repFromDate" class="tool-input" style="height:32px;font-size:11px;width:130px;" onchange="loadReports()">
+              <input type="date" id="repFromDate" class="tool-input" style="height:26px;font-size:11px;width:112px;padding:2px 6px;" onchange="loadReports()">
             </div>
             <div style="display:flex;align-items:center;gap:4px;">
               <label style="font-size:11px;color:var(--text-faint);">To:</label>
               <input type="date" id="repToDate" class="tool-input" style="height:32px;font-size:11px;width:130px;" onchange="loadReports()">
+              <input type="date" id="repToDate" class="tool-input" style="height:26px;font-size:11px;width:112px;padding:2px 6px;" onchange="loadReports()">
             </div>
             <select id="reportTimeframeSelect" class="tool-input" style="width:130px;height:32px;" onchange="loadReports()">
+            <!-- Real / Paper Tradebook & P&L Toggle -->
+            <div id="reportTradeTypeToggle" style="display:inline-flex;background:var(--surface-2);padding:2px;border-radius:6px;border:1px solid var(--border);">
+              <button type="button" class="chip-filter active" data-rep-type="all" onclick="window.setReportTradeType('all', this)" style="padding:2px 8px;font-size:11px;cursor:pointer;">All</button>
+              <button type="button" class="chip-filter" data-rep-type="real" onclick="window.setReportTradeType('real', this)" style="padding:2px 8px;font-size:11px;cursor:pointer;color:#10b981;font-weight:700;">Real</button>
+              <button type="button" class="chip-filter" data-rep-type="paper" onclick="window.setReportTradeType('paper', this)" style="padding:2px 8px;font-size:11px;cursor:pointer;">Paper</button>
+            </div>
+            <select id="reportTimeframeSelect" class="tool-input" style="width:115px;height:26px;font-size:11px;padding:2px 6px;" onchange="loadReports()">
               <option value="7d">Last 7 Days</option>
               <option value="30d" selected>Last 30 Days</option>
               <option value="90d">Last 90 Days</option>
@@ -4487,6 +4544,9 @@ select#watchlistSelect, select.watchlist-select {
             <button class="btn gold small" id="reportExportCsvBtn"> Export CSV</button>
             <button class="btn ghost small" id="reportRefreshBtn">Refresh</button>
             <button class="btn ghost small" onclick="clearAllTradeHistory()" style="color:var(--sell);font-size:11px;" title="Clear Trade History">🗑️ Clear All</button>
+            <button class="btn gold small" id="reportExportCsvBtn" style="padding:2px 8px;height:26px;font-size:11px;">⬇ Export CSV</button>
+            <button class="btn ghost small" id="reportRefreshBtn" style="padding:2px 8px;height:26px;font-size:11px;">Refresh</button>
+            <button class="btn ghost small" onclick="clearAllTradeHistory()" style="color:var(--sell);font-size:11px;padding:2px 8px;height:26px;" title="Clear Trade History">🗑️ Clear All</button>
           </div>
         </div>
       </div>
@@ -8148,7 +8208,63 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     draw();
     // Cascade historical point through indicators, patterns & reco
     void loadChartBundle(true);
-    if(typeof updateChartRecoBanner === 'function') void updateChartRecoBanner();
+
+    if(last && sliced.length >= 5){
+      const lastClose = Number(last.close || 0);
+      const sym = typeof selectedSymbol === 'function' ? selectedSymbol() : (state.symbol || 'CRUDEOIL');
+      const lastTime = last.timestamp || last.ts || new Date().toISOString();
+
+      let ema9 = lastClose, ema21 = lastClose;
+      const closes = sliced.map(c => Number(c.close));
+      if(closes.length >= 9){
+        const k9 = 2 / 10;
+        ema9 = closes.slice(0, 9).reduce((a,b)=>a+b,0)/9;
+        for(let i=9; i<closes.length; i++) ema9 = closes[i]*k9 + ema9*(1-k9);
+      }
+      if(closes.length >= 21){
+        const k21 = 2 / 22;
+        ema21 = closes.slice(0, 21).reduce((a,b)=>a+b,0)/21;
+        for(let i=21; i<closes.length; i++) ema21 = closes[i]*k21 + ema21*(1-k21);
+      }
+
+      const isBull = ema9 >= ema21;
+      const side = isBull ? 'BUY' : 'SELL';
+      const sl = isBull ? Math.round((lastClose * 0.992) * 100) / 100 : Math.round((lastClose * 1.008) * 100) / 100;
+      const tgt = isBull ? Math.round((lastClose * 1.018) * 100) / 100 : Math.round((lastClose * 0.982) * 100) / 100;
+      const conf = Math.min(94, Math.max(68, Math.round(74 + Math.abs(ema9 - ema21) / (lastClose || 1) * 1000)));
+
+      const backtestReco = {
+        symbol: sym,
+        recommendation: side,
+        entry: lastClose,
+        stop_loss: sl,
+        target: tgt,
+        confidence: conf,
+        timeframe: state.timeframe || '5m',
+        rationale: `[Backtest Replay #${candleCount}] Price ₹${lastClose.toFixed(2)} with EMA9 (${ema9.toFixed(2)}) ${isBull ? '≥' : '<'} EMA21 (${ema21.toFixed(2)}). Dynamic historical slice recommendation.`,
+        timestamp: lastTime,
+        source: 'backtest',
+        is_backtest: true
+      };
+
+      window.__caCurrentChartReco = backtestReco;
+      window.__caRecommendation = backtestReco;
+      if(typeof updateChartRecoBanner === 'function') void updateChartRecoBanner(backtestReco, sym, true);
+
+      clearTimeout(window.__caBtRecoSaveTimer);
+      window.__caBtRecoSaveTimer = setTimeout(async () => {
+        try {
+          await api('/api/recommendations/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(backtestReco)
+          });
+          if(typeof loadRecommendationHistory === 'function') void loadRecommendationHistory();
+        } catch(_) {}
+      }, 500);
+    } else if(typeof updateChartRecoBanner === 'function'){
+      void updateChartRecoBanner();
+    }
   }
 
   function exitChartBacktest(){
@@ -9497,32 +9613,58 @@ function applyDrawingPoint(x,y){
     if(typeof window.saveChartDrawingsAndIndicators === 'function') window.saveChartDrawingsAndIndicators();
     draw();
   };
-  function toggleChartAiPanel(forceState) {
+  function toggleChartAiPanel(forceState, triggerBtn) {
     const panel = document.getElementById('chartAiPanel');
     if(!panel) return;
     const isClosed = panel.style.display === 'none' || !panel.style.display;
     const shouldOpen = forceState !== undefined ? forceState : isClosed;
-    panel.style.display = shouldOpen ? 'block' : 'none';
     if(shouldOpen){
-      panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+      panel.style.display = 'block';
+      panel.style.position = 'fixed';
+      panel.style.zIndex = '99999';
+      panel.style.width = '420px';
+      panel.style.maxWidth = '92vw';
+      panel.style.maxHeight = '520px';
+      panel.style.overflowY = 'auto';
+      panel.style.boxShadow = '0 16px 40px rgba(0,0,0,0.6)';
+      panel.style.border = '1px solid var(--buy)';
+      panel.style.borderRadius = '10px';
+      panel.style.background = 'var(--surface)';
+
+      const btn = triggerBtn || document.getElementById('chartAiSuggestBtn') || document.getElementById('chartAiSuggestBtnMobile');
+      if(btn){
+        const rect = btn.getBoundingClientRect();
+        let top = rect.bottom + 6;
+        let left = rect.right - 420;
+        if(left < 10) left = 10;
+        if(top + 450 > window.innerHeight) top = Math.max(10, rect.top - 460);
+        panel.style.top = `${top}px`;
+        panel.style.left = `${left}px`;
+      }
       loadChartAiSuggestions(true);
+    } else {
+      panel.style.display = 'none';
     }
   }
-  ['click', 'touchend', 'pointerdown'].forEach(ev => {
+  ['click'].forEach(ev => {
     document.getElementById('chartAiSuggestBtn')?.addEventListener(ev, (e) => {
       e.stopPropagation();
-      toggleChartAiPanel();
+      toggleChartAiPanel(undefined, e.currentTarget);
     });
     document.getElementById('chartAiSuggestBtnMobile')?.addEventListener(ev, (e) => {
       e.stopPropagation();
-      toggleChartAiPanel();
+      toggleChartAiPanel(undefined, e.currentTarget);
     });
   });
-  document.getElementById('chartAiCloseBtn')?.addEventListener('click', () => toggleChartAiPanel(false));
-  document.getElementById('chartAiCloseBtn')?.addEventListener('click', () => {
+  // Dismiss chart AI suggestions when clicking outside
+  document.addEventListener('click', (e) => {
     const panel = document.getElementById('chartAiPanel');
-    if(panel) panel.style.display = 'none';
+    if(!panel || panel.style.display === 'none') return;
+    if(!e.target.closest('#chartAiPanel') && !e.target.closest('#chartAiSuggestBtn') && !e.target.closest('#chartAiSuggestBtnMobile')){
+      panel.style.display = 'none';
+    }
   });
+  document.getElementById('chartAiCloseBtn')?.addEventListener('click', () => toggleChartAiPanel(false));
   document.getElementById('chartAiApplyAllBtn')?.addEventListener('click', applyAllChartAiSuggestions);
   // Duplicate chartModeToggle removed
   document.getElementById('resetChartView')?.addEventListener('click',()=>{state.zoom=1;state.panX=Math.max(0,state.candles.length-state.visible);state.panY=0;state.yScale=1;draw()});
@@ -10886,6 +11028,131 @@ window.handleNotificationClick = function(n){
   let caAiNewsInterval = null;
   let caAiNewsCountdown = 60;
   let caAiNewsCountdownTimer = null;
+  window.__caCurrentNewsItems = [];
+
+  function recalculateNewsSentiment(items){
+    let irrelevantKeys = [];
+    try { irrelevantKeys = JSON.parse(localStorage.getItem('ca_irrelevant_news') || '[]'); } catch(_) {}
+    const active = items.filter(x => {
+      const k = String(x?.url || x?.headline || x?.title || '');
+      return !irrelevantKeys.includes(k);
+    });
+
+    let bulls = 0, bears = 0;
+    active.forEach(it => {
+      if(it.sentiment === 'BULLISH') bulls++;
+      else if(it.sentiment === 'BEARISH') bears++;
+    });
+
+    const total = bulls + bears;
+    let score = 50;
+    if(total > 0){
+      score = Math.round(50 + ((bulls - bears) / total) * 45);
+    }
+    const label = score >= 55 ? 'BULLISH' : score <= 45 ? 'BEARISH' : 'NEUTRAL';
+    const isBull = label === 'BULLISH';
+    const isBear = label === 'BEARISH';
+    const color = isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--gold)';
+    const bg = isBull ? 'rgba(16,185,129,0.15)' : isBear ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)';
+
+    if($('newsOverallSentimentBadge')){
+      $('newsOverallSentimentBadge').textContent = `${label} (${score > 50 ? '+' : ''}${score}%)`;
+      $('newsOverallSentimentBadge').style.color = color;
+      $('newsOverallSentimentBadge').style.borderColor = color;
+      $('newsOverallSentimentBadge').style.background = bg;
+    }
+    if($('newsSentimentProgressBar')){
+      $('newsSentimentProgressBar').style.width = `${Math.max(5, Math.min(100, score))}%`;
+      $('newsSentimentProgressBar').style.background = color;
+    }
+    if($('newsSentimentDetail')){
+      $('newsSentimentDetail').textContent = `${bulls} Bullish · ${bears} Bearish (Active in score)${irrelevantKeys.length ? ` · ${irrelevantKeys.length} excluded` : ''}`;
+    }
+  }
+
+  window.toggleAllNewsSelection = function(checked){
+    document.querySelectorAll('.news-select-check').forEach(cb => cb.checked = !!checked);
+  };
+
+  window.deleteSelectedNews = function(){
+    const checkedBoxes = Array.from(document.querySelectorAll('.news-select-check:checked'));
+    if(!checkedBoxes.length){
+      toast('Please select news stories first');
+      return;
+    }
+    const keys = checkedBoxes.map(cb => cb.dataset.newsKey).filter(Boolean);
+    try {
+      const dismissed = JSON.parse(localStorage.getItem('ca_dismissed_news') || '[]');
+      keys.forEach(k => { if(!dismissed.includes(k)) dismissed.push(k); });
+      localStorage.setItem('ca_dismissed_news', JSON.stringify(dismissed.slice(-500)));
+    } catch(_) {}
+
+    toast(`🗑 Deleted ${keys.length} news item(s)`);
+    if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
+  };
+
+  window.deleteSingleNews = function(key){
+    if(!key) return;
+    try {
+      const dismissed = JSON.parse(localStorage.getItem('ca_dismissed_news') || '[]');
+      if(!dismissed.includes(key)) dismissed.push(key);
+      localStorage.setItem('ca_dismissed_news', JSON.stringify(dismissed.slice(-500)));
+    } catch(_) {}
+    toast('🗑 News story dismissed');
+    if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
+  };
+
+  window.markSelectedNewsIrrelevant = function(){
+    const checkedBoxes = Array.from(document.querySelectorAll('.news-select-check:checked'));
+    if(!checkedBoxes.length){
+      toast('Please select news stories first');
+      return;
+    }
+    const keys = checkedBoxes.map(cb => cb.dataset.newsKey).filter(Boolean);
+    try {
+      let irrelevant = JSON.parse(localStorage.getItem('ca_irrelevant_news') || '[]');
+      keys.forEach(k => {
+        if(irrelevant.includes(k)){
+          irrelevant = irrelevant.filter(x => x !== k);
+        } else {
+          irrelevant.push(k);
+        }
+      });
+      localStorage.setItem('ca_irrelevant_news', JSON.stringify(irrelevant.slice(-500)));
+    } catch(_) {}
+
+    toast(`Updated score relevance for ${keys.length} news item(s)`);
+    if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
+  };
+
+  window.toggleSingleNewsRelevance = function(key){
+    if(!key) return;
+    try {
+      let irrelevant = JSON.parse(localStorage.getItem('ca_irrelevant_news') || '[]');
+      if(irrelevant.includes(key)){
+        irrelevant = irrelevant.filter(x => x !== key);
+        toast('✓ Re-included in sentiment score');
+      } else {
+        irrelevant.push(key);
+        toast('🚫 Marked not relevant for overall score');
+      }
+      localStorage.setItem('ca_irrelevant_news', JSON.stringify(irrelevant.slice(-500)));
+    } catch(_) {}
+    if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
+  };
+
+  window.deleteAllNews = function(){
+    if(!confirm('Dismiss all displayed news stories?')) return;
+    const items = window.__caCurrentNewsItems || [];
+    const keys = items.map(x => String(x?.url || x?.headline || x?.title || '')).filter(Boolean);
+    try {
+      const dismissed = JSON.parse(localStorage.getItem('ca_dismissed_news') || '[]');
+      keys.forEach(k => { if(!dismissed.includes(k)) dismissed.push(k); });
+      localStorage.setItem('ca_dismissed_news', JSON.stringify(dismissed.slice(-500)));
+    } catch(_) {}
+    toast('✓ All news stories dismissed');
+    if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
+  };
 
   async function loadNewsByCaAi(mode = caAiNewsMode) {
     caAiNewsMode = mode;
@@ -10901,35 +11168,21 @@ window.handleNotificationClick = function(n){
       const d = await api(`/api/news/ca-ai-feed?symbol=${encodeURIComponent(sym)}&mode=${encodeURIComponent(mode)}`, { timeoutMs: 7000 });
       let rawItems = Array.isArray(d.items) ? d.items : [];
       let dismissedKeys = [];
+      let irrelevantKeys = [];
       try { dismissedKeys = JSON.parse(localStorage.getItem('ca_dismissed_news') || '[]'); } catch(_) {}
+      try { irrelevantKeys = JSON.parse(localStorage.getItem('ca_irrelevant_news') || '[]'); } catch(_) {}
+
       const items = rawItems.filter(x => {
         const k = String(x?.url || x?.headline || x?.title || '');
         return !dismissedKeys.includes(k);
       });
+      window.__caCurrentNewsItems = items;
 
       if ($('newsUpdated')) $('newsUpdated').textContent = `Updated ${d.updated_at || 'Just now'} · Auto-refreshes every 60s`;
       if ($('newsItemCountBadge')) $('newsItemCountBadge').textContent = `${items.length} stories`;
 
-      // Update Dynamic News Sentiment Score (Item 13)
-      if ($('newsOverallSentimentBadge')) {
-        const score = Number(d.sentiment_score != null ? d.sentiment_score : 50);
-        const label = d.sentiment_label || (score >= 55 ? 'BULLISH' : score <= 45 ? 'BEARISH' : 'NEUTRAL');
-        const isBull = label === 'BULLISH';
-        const isBear = label === 'BEARISH';
-        const color = isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--gold)';
-        const bg = isBull ? 'rgba(16,185,129,0.15)' : isBear ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)';
-        $('newsOverallSentimentBadge').textContent = `${label} (${score > 50 ? '+' : ''}${score - 50 > 0 ? '+' : ''}${score}%)`;
-        $('newsOverallSentimentBadge').style.color = color;
-        $('newsOverallSentimentBadge').style.borderColor = color;
-        $('newsOverallSentimentBadge').style.background = bg;
-        if ($('newsSentimentProgressBar')) {
-          $('newsSentimentProgressBar').style.width = `${Math.max(5, Math.min(100, score))}%`;
-          $('newsSentimentProgressBar').style.background = color;
-        }
-        if ($('newsSentimentDetail')) {
-          $('newsSentimentDetail').textContent = `${d.bullish_count || 0} Bullish · ${d.bearish_count || 0} Bearish catalysts · Since ${d.cutoff_ist || 'last trading day 14:00 IST'}`;
-        }
-      }
+      // Recalculate sentiment score with irrelevant news excluded
+      recalculateNewsSentiment(items);
 
       if (!items.length) {
         host.innerHTML = '<div class="data-empty">No high-impact news in this window for the selected criteria.</div>';
@@ -10937,28 +11190,36 @@ window.handleNotificationClick = function(n){
       }
 
       host.innerHTML = items.map(it => {
+        const k = String(it?.url || it?.headline || it?.title || '');
+        const isIrrelevant = irrelevantKeys.includes(k);
         const isBull = it.sentiment === 'BULLISH';
         const isBear = it.sentiment === 'BEARISH';
         const badgeClass = isBull ? 'buy' : isBear ? 'sell' : 'neutral';
-        const borderLeftColor = isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--border-soft)';
+        const borderLeftColor = isIrrelevant ? 'var(--border-soft)' : (isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--border-soft)');
         
         // Probability out of 100% (Item 10)
         const rawImpact = parseFloat(String(it.impact_pct || '1.0').replace(/[^0-9.-]/g, '')) || 1.0;
         const probVal = Math.min(98, Math.max(62, Math.round(68 + Math.abs(rawImpact) * 16)));
         const probText = `${probVal}% ${isBull ? 'Bullish' : isBear ? 'Bearish' : 'Neutral'} Probability`;
 
-          return `
-          <div class="news-card" data-news-item="${encodeURIComponent(JSON.stringify(it))}" style="cursor:pointer;background:var(--surface);border:1px solid var(--border-soft);border-left:4px solid ${borderLeftColor};border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:transform 0.15s ease,border-color 0.15s ease;">
+        return `
+          <div class="news-card" data-news-item="${encodeURIComponent(JSON.stringify(it))}" style="cursor:pointer;background:var(--surface);border:1px solid var(--border-soft);border-left:4px solid ${borderLeftColor};border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:transform 0.15s ease,border-color 0.15s ease;opacity:${isIrrelevant ? '0.7' : '1'};">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <input type="checkbox" class="news-select-check" data-news-key="${esc(k)}" onclick="event.stopPropagation();" style="accent-color:var(--gold);width:15px;height:15px;cursor:pointer;">
                 <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);background:var(--surface-2);padding:2px 8px;border-radius:4px;border:1px solid var(--border-soft);">${esc(it.source)}</span>
                 <span style="font-size:11px;color:var(--text-faint);">Time: ${esc(it.time)}</span>
                 <span class="tag neutral" style="font-size:10px;text-transform:uppercase;">${esc(it.scope === 'stock' ? (sym + ' Specific') : 'Global Macro')}</span>
+                ${isIrrelevant ? '<span class="tag sell" style="font-size:9.5px;padding:1px 5px;background:rgba(239,68,68,0.15);color:var(--sell);border:1px solid var(--sell);">🚫 Not in Score</span>' : ''}
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <span class="tag ${badgeClass}" style="font-weight:700;font-size:11px;padding:3px 9px;border-radius:5px;">
                   ${esc(probText)}
                 </span>
+                <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.toggleSingleNewsRelevance('${esc(k)}')" style="font-size:10px;padding:2px 7px;" title="Toggle whether this story counts toward overall sentiment score">
+                  ${isIrrelevant ? '✓ Include' : '🚫 Exclude'}
+                </button>
+                <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.deleteSingleNews('${esc(k)}')" style="color:var(--sell);font-size:10px;padding:2px 6px;" title="Dismiss Story">✕</button>
               </div>
             </div>
 
@@ -10970,11 +11231,11 @@ window.handleNotificationClick = function(n){
 
             <div style="background:var(--surface-2);border-radius:6px;padding:8px 12px;font-size:11.5px;line-height:1.45;color:var(--text-dim);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
               <div><b style="color:var(--gold);">CA AI Decision:</b> ${esc(it.ca_ai_insight)}</div>
-              <span class="tag neutral" style="font-size:10px;cursor:pointer;"> Discuss / Counter-Question</span>
+              <span class="tag neutral" style="font-size:10px;cursor:pointer;">💬 Discuss / Counter-Question</span>
             </div>
           </div>
-          `;
-        }).join('');
+        `;
+      }).join('');
 
         // Wire click handler on each news card to open discussion modal
         host.querySelectorAll('.news-card').forEach(card => {
@@ -13994,15 +14255,40 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
   window.setupOrdersPositionsSubtabs = setupOrdersPositionsSubtabs;
   setupOrdersPositionsSubtabs();
 
-  // Global helper: switch positions sub-tab to 'closed' (called by WS handler on squareoff)
+  // Global helper: switch positions sub-tab to 'closed' or 'open'
   window.switchToClosedPositionsTab = function(){
     activePosSubTab = 'closed';
     $('subTabClosedPositions')?.classList.add('active');
     $('subTabOpenPositions')?.classList.remove('active');
+    if(typeof loadPortfolioSnapshot === 'function') void loadPortfolioSnapshot(false);
+  };
+  window.switchToOpenPositionsTab = function(){
+    activePosSubTab = 'open';
+    $('subTabOpenPositions')?.classList.add('active');
+    $('subTabClosedPositions')?.classList.remove('active');
+    if(typeof loadPortfolioSnapshot === 'function') void loadPortfolioSnapshot(false);
   };
 
-    // Reusable Broker Positions Table Renderer
+  // Reusable Broker Positions Table Renderer
   function renderPositionsTable(allPositions, advisories=[]){
+    // Merge locally cached real trades if not already present
+    try {
+      const cached = JSON.parse(localStorage.getItem('ca_real_trades_backup_v1') || '[]');
+      if(cached.length){
+        const existingIds = new Set(allPositions.map(p => String(p.id)));
+        cached.forEach(rt => {
+          if(!existingIds.has(String(rt.id))){
+            allPositions.push({
+              ...rt,
+              trade_type: 'REAL',
+              source: 'REAL_BROKER',
+              status: rt.status || 'OPEN'
+            });
+          }
+        });
+      }
+    } catch(_) {}
+
     const openPositions = allPositions.filter(x => String(x.status||'OPEN').toUpperCase() === 'OPEN' && Number(x.quantity||0) > 0);
     const closedPositions = allPositions.filter(x => String(x.status||'OPEN').toUpperCase() === 'CLOSED' || Number(x.quantity||0) === 0);
     const targetPositions = activePosSubTab === 'open' ? openPositions : closedPositions;
@@ -14025,7 +14311,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                 <th>Avg Price</th>
                 ${!isOpen ? '<th>Exit Price</th>' : ''}
                 <th>LTP</th>
-                <th>Live P&amp;L</th>
+                <th>${isOpen ? 'Live P&amp;L (Peak / Drawdown)' : 'Realized P&amp;L (Peak vs Missed)'}</th>
                 ${!isOpen ? '<th>Final P&amp;L</th>' : ''}
                 ${isOpen ? '<th>Stop Loss</th><th>Target</th><th>TSL</th>' : ''}
                 <th>CA AI Sentinel</th>
@@ -14057,11 +14343,20 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                 }
 
                 const finalPnl = Number(x.final_pnl != null ? x.final_pnl : (x.realized_pnl != null ? x.realized_pnl : 0));
+                const curPnl = isOpen ? livePnl : finalPnl;
                 const entryTimeStr = x.created_at || x.opened_at || x.entry_time || '';
                 const exitTimeStr = x.closed_at || x.updated_at || x.exit_time || '';
 
                 const dispQty = Number(x.display_quantity || x.closed_quantity || (x.quantity > 0 ? x.quantity : 1));
                 const finalDispQty = (symUpper.includes('CRUDEOIL') && dispQty === 1) ? 100 : dispQty;
+
+                // Excursion Calculations (Peak Profit potential vs Max Drawdown Loss)
+                const exitPriceVal = Number(x.exit_price || ltpVal);
+                const hp = Number(x.high_price || Math.max(avgPrice, ltpVal, exitPriceVal));
+                const lp = Number(x.low_price || Math.min(avgPrice, ltpVal, exitPriceVal));
+                const maxProfit = Number(x.max_profit_potential != null ? x.max_profit_potential : Math.max(0, isBuy ? (hp - avgPrice) * finalDispQty : (avgPrice - lp) * finalDispQty));
+                const maxLoss = Number(x.max_drawdown_loss != null ? x.max_drawdown_loss : Math.min(0, isBuy ? (lp - avgPrice) * finalDispQty : (avgPrice - hp) * finalDispQty));
+                const missedDiff = Number(x.missed_profit_diff != null ? x.missed_profit_diff : Math.max(0, maxProfit - curPnl));
 
                 let advice = x.ca_ai_advice || (isOpen ? 'HOLD' : 'CLOSED');
                 let advClass = 'neutral';
@@ -14085,7 +14380,12 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                     ${!isOpen ? `<td>${x.exit_price ? '₹'+fmt(x.exit_price) : '—'}</td>` : ''}
                     <td class="pos-ltp">₹${fmt(ltpVal)}</td>
                     <td class="pos-pnl ${isOpen ? (livePnl >= 0 ? 'cell-up' : 'cell-down') : 'cell-num'}" style="font-weight:700;font-family:var(--font-mono);">
-                      ${isOpen ? fmtMoney(livePnl) : '<span style="color:var(--text-faint);font-size:10px;">Settled</span>'}
+                      ${isOpen ? fmtMoney(livePnl) : `<span class="${finalPnl >= 0 ? 'cell-up' : 'cell-down'}">${fmtMoney(finalPnl)}</span>`}
+                      <div style="font-size:9.5px;font-weight:400;margin-top:3px;line-height:1.35;" title="Contract Excursion: Peak achievable profit vs Maximum drawdown">
+                        <span style="color:var(--buy);" title="Max profit achievable at max contract price ₹${fmt(hp)}">Peak: +₹${fmt(maxProfit)}</span>
+                        · <span style="color:var(--sell);" title="Max drawdown suffered at min contract price ₹${fmt(lp)}">Loss: -₹${fmt(Math.abs(maxLoss))}</span>
+                        ${missedDiff > 0 ? `<br><span style="color:var(--gold);font-size:9px;" title="Difference between Peak Potential and Current/Final PnL">₹${fmt(missedDiff)} left on table</span>` : ''}
+                      </div>
                     </td>
                     ${!isOpen ? `
                       <td class="pos-final-pnl ${finalPnl >= 0 ? 'cell-up' : 'cell-down'}" style="font-weight:700;font-family:var(--font-mono);">
@@ -14301,6 +14601,21 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
           </div>
         </div>
 
+        <!-- Peak Profit vs Max Drawdown Excursion -->
+        <div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;border:1px solid var(--border-soft);margin-bottom:12px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--gold);margin-bottom:6px;">📈 Contract Excursion (Peak Profit Potential vs Max Drawdown)</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:6px;font-size:11px;">
+            <div>Max LTP Reached: <b style="color:var(--text);">₹${fmt(p.high_price || p.avg_price)}</b></div>
+            <div>Min LTP Reached: <b style="color:var(--text);">₹${fmt(p.low_price || p.avg_price)}</b></div>
+            <div>Peak Profit Potential: <b style="color:var(--buy);">+₹${fmt(p.max_profit_potential || 0)}</b></div>
+            <div>Max Drawdown / Loss: <b style="color:var(--sell);">-₹${fmt(Math.abs(p.max_drawdown_loss || 0))}</b></div>
+            <div>Money Left on Table: <b style="color:var(--gold);">₹${fmt(p.missed_profit_diff || 0)}</b></div>
+          </div>
+          <div style="font-size:10px;color:var(--text-faint);margin-top:5px;">
+            * Peak profit reflects difference between highest contract price reached during the trade lifecycle and entry/exit × quantity.
+          </div>
+        </div>
+
         <!-- Recommendation Provided at Entry -->
         <div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;border:1px solid var(--border-soft);margin-bottom:12px;">
           <div style="font-size:11.5px;font-weight:700;color:var(--gold);margin-bottom:6px;"> Recommendation Provided at Time of Entry</div>
@@ -14373,7 +14688,9 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
             <div>Entry: <b style="color:var(--text);">₹${fmt(p.entry_price || 0)}</b></div>
             <div>Stop Loss: <b style="color:var(--sell);">₹${fmt(p.stop_loss || 0)}</b></div>
             <div>Target: <b style="color:var(--buy);">₹${fmt(p.target || 0)}</b></div>
-            <div>Peak PnL: <b style="color:var(--gold);">+₹${fmt(p.peak_pnl || 0)}</b></div>
+            <div>Peak Potential: <b style="color:var(--buy);">+₹${fmt(p.max_profit_potential || p.peak_pnl || 0)}</b></div>
+            <div>Max Drawdown: <b style="color:var(--sell);">-₹${fmt(Math.abs(p.max_drawdown_loss || 0))}</b></div>
+            <div>Left on Table: <b style="color:var(--gold);">₹${fmt(p.missed_profit_diff || 0)}</b></div>
           </div>
         </div>
 
@@ -19752,10 +20069,44 @@ setTimeout(() => {
   let currentActiveNoteId = null;
   let currentFolderFilter = 'ALL';
 
+  function getFolderStyle(folder){
+    const f = String(folder || '').toLowerCase();
+    if(f.includes('journal')) return 'background:rgba(16,185,129,0.15);color:#10b981;border:1px solid #10b981;';
+    if(f.includes('mistake')) return 'background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef4444;';
+    if(f.includes('playbook') || f.includes('setup')) return 'background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid #8b5cf6;';
+    if(f.includes('prep')) return 'background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid #f59e0b;';
+    return 'background:var(--surface-3);color:var(--text-dim);border:1px solid var(--border-soft);';
+  }
+
+  window.formatNoteText = function(prefix, suffix = ''){
+    const ta = document.getElementById('noteEditorContent');
+    if(!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
+    const selected = val.substring(start, end);
+    const replacement = prefix + selected + suffix;
+    ta.value = val.substring(0, start) + replacement + val.substring(end);
+    ta.focus();
+    ta.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+  };
+
+  window.insertNoteTimestamp = function(){
+    const ta = document.getElementById('noteEditorContent');
+    if(!ta) return;
+    const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+    const text = `\n[${now} IST] `;
+    window.formatNoteText(text, '');
+  };
+
   async function loadTraderNotes(){
     try {
       const d = await api('/api/notes');
       userNotesList = d.notes || [];
+      try {
+        const local = JSON.parse(localStorage.getItem('ca_trader_notes_v2') || localStorage.getItem('ca_trader_notes') || '[]');
+        if(local.length && !userNotesList.length) userNotesList = local;
+      } catch(_) {}
       renderNotesFolders(d.folders || []);
       renderNotesList();
       if(userNotesList.length && !currentActiveNoteId){
@@ -19764,7 +20115,7 @@ setTimeout(() => {
     } catch(err){
       console.warn('Failed to load notes from API, checking localStorage', err);
       try {
-        userNotesList = JSON.parse(localStorage.getItem('ca_trader_notes') || '[]');
+        userNotesList = JSON.parse(localStorage.getItem('ca_trader_notes_v2') || localStorage.getItem('ca_trader_notes') || '[]');
         renderNotesList();
       } catch(_){}
     }
@@ -19778,7 +20129,11 @@ setTimeout(() => {
 
     const allF = new Set(['Trade Journal', 'Mistakes & Learnings', 'Playbooks & Setups', 'Daily Market Prep', ...(folders || [])]);
     container.innerHTML = `<button class="btn small ${currentFolderFilter==='ALL'?'active':'ghost'}" style="font-size:11px;padding:3px 8px;" onclick="filterNotesByFolder('ALL')">All</button>` +
-      Array.from(allF).map(f => `<button class="btn small ${currentFolderFilter===f?'active':'ghost'}" style="font-size:11px;padding:3px 8px;" onclick="filterNotesByFolder('${esc(f)}')">${esc(f.split(' ')[0])}</button>`).join('');
+      Array.from(allF).map(f => {
+        const isAct = currentFolderFilter === f;
+        const style = getFolderStyle(f);
+        return `<button class="btn small" style="font-size:11px;padding:3px 8px;${isAct ? style + 'font-weight:700;' : 'opacity:0.8;'}" onclick="filterNotesByFolder('${esc(f)}')">${esc(f.split(' ')[0])}</button>`;
+      }).join('');
 
     if(select){
       select.innerHTML = Array.from(allF).map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
@@ -19788,11 +20143,7 @@ setTimeout(() => {
   function filterNotesByFolder(folder){
     currentFolderFilter = folder;
     renderNotesList();
-    const btns = document.querySelectorAll('#notesFolderTabs button');
-    btns.forEach(b => {
-      b.classList.toggle('active', b.textContent.includes(folder==='ALL'?'All':folder.split(' ')[0]));
-      b.classList.toggle('ghost', !b.classList.contains('active'));
-    });
+    renderNotesFolders();
   }
   window.filterNotesByFolder = filterNotesByFolder;
 
@@ -19821,13 +20172,14 @@ setTimeout(() => {
       const isAct = n.id === currentActiveNoteId;
       const snippet = (n.content || '').substring(0, 75).replace(/\n/g, ' ') || 'No content...';
       const hasImg = (n.images || []).length > 0;
+      const fStyle = getFolderStyle(n.folder || 'Trade Journal');
       return `
-        <div class="note-card-item" style="padding:10px;border-radius:8px;background:${isAct?'var(--surface-3)':'var(--surface-2)'};border:1px solid ${isAct?'var(--primary)':'var(--border-soft)'};cursor:pointer;transition:background 0.15s;" onclick="selectNote('${esc(n.id)}')">
+        <div class="note-card-item" style="padding:10px 12px;border-radius:8px;background:${isAct?'var(--surface-3)':'var(--surface-2)'};border:1px solid ${isAct?'var(--primary)':'var(--border-soft)'};cursor:pointer;transition:background 0.15s;" onclick="selectNote('${esc(n.id)}')">
           <div style="display:flex;justify-content:space-between;align-items:start;gap:6px;">
-            <b style="font-size:12.5px;color:var(--text);">${esc(n.title || 'Untitled Note')}</b>
-            <span class="tag neutral" style="font-size:9.5px;padding:1px 4px;">${esc(n.folder || 'Journal')}</span>
+            <b style="font-size:13px;color:var(--text);font-weight:600;">${esc(n.title || 'Untitled Note')}</b>
+            <span class="tag" style="font-size:9.5px;padding:2px 6px;border-radius:4px;font-weight:600;${fStyle}">${esc(n.folder || 'Journal')}</span>
           </div>
-          <div class="muted" style="font-size:11px;margin-top:4px;line-height:1.4;">${esc(snippet)}</div>
+          <div class="muted" style="font-size:11.5px;margin-top:5px;line-height:1.45;color:var(--text-dim);">${esc(snippet)}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:10px;color:var(--text-faint);">
             <span>${n.updated_at ? new Date(n.updated_at).toLocaleDateString() : 'Today'}</span>
             ${hasImg ? '<span style="color:var(--gold);">📷 Image attached</span>' : ''}
@@ -19865,6 +20217,7 @@ setTimeout(() => {
       updated_at: new Date().toISOString()
     };
     userNotesList.unshift(newNote);
+    localStorage.setItem('ca_trader_notes_v2', JSON.stringify(userNotesList));
     selectNote(newId);
     toast('New note draft created');
   }
@@ -19889,11 +20242,11 @@ setTimeout(() => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(note)
       });
-      localStorage.setItem('ca_trader_notes', JSON.stringify(userNotesList));
+      localStorage.setItem('ca_trader_notes_v2', JSON.stringify(userNotesList));
       toast('💾 Note saved successfully!');
       renderNotesList();
     } catch(err){
-      localStorage.setItem('ca_trader_notes', JSON.stringify(userNotesList));
+      localStorage.setItem('ca_trader_notes_v2', JSON.stringify(userNotesList));
       toast('Note saved locally');
       renderNotesList();
     }
@@ -19907,7 +20260,7 @@ setTimeout(() => {
       await api('/api/notes/' + encodeURIComponent(currentActiveNoteId), { method: 'DELETE' });
     } catch(_){}
     userNotesList = userNotesList.filter(n => n.id !== currentActiveNoteId);
-    localStorage.setItem('ca_trader_notes', JSON.stringify(userNotesList));
+    localStorage.setItem('ca_trader_notes_v2', JSON.stringify(userNotesList));
     currentActiveNoteId = userNotesList.length ? userNotesList[0].id : null;
     toast('Note deleted');
     if(currentActiveNoteId) selectNote(currentActiveNoteId);
@@ -22696,17 +23049,19 @@ window.loadDedicatedNotifications = async function(isManual = false){
       const isHigh = String(n.severity||'').toUpperCase() === 'HIGH';
       const borderClr = isGolden ? 'var(--gold)' : (isHigh ? 'var(--sell)' : 'var(--border-soft)');
       const nid = n.id || n._id || '';
+      const nJson = esc(JSON.stringify(n));
       return `
-        <div style="background:var(--surface-2);border-radius:8px;padding:10px 14px;border:1px solid ${borderClr};display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;flex:1;">
-            <input type="checkbox" class="notif-check" data-id="${esc(String(nid))}" style="margin-top:3px;flex-shrink:0;accent-color:var(--gold);">
-            <div>
-              <div style="font-weight:700;font-size:12.5px;color:${isGolden ? 'var(--gold)' : (isHigh ? 'var(--sell)' : 'var(--text)')};margin-bottom:3px;">
-                ${isGolden ? '🌟 ' : (isHigh ? '🚨 ' : '🔔 ')}${esc(n.title||'Alert')}
+        <div class="dedicated-notif-card" data-notif='${nJson}' onclick='window.handleNotificationClick(${nJson})' style="background:var(--surface-2);border-radius:8px;padding:10px 14px;border:1px solid ${borderClr};display:flex;justify-content:space-between;align-items:flex-start;gap:12px;cursor:pointer;transition:background 0.15s ease;" onmouseover="this.style.background='var(--surface-3)'" onmouseout="this.style.background='var(--surface-2)'" title="Click to open section and highlight relevant content for 10s">
+          <div style="display:flex;align-items:flex-start;gap:10px;flex:1;">
+            <input type="checkbox" class="notif-check" data-id="${esc(String(nid))}" onclick="event.stopPropagation();" style="margin-top:3px;flex-shrink:0;accent-color:var(--gold);width:15px;height:15px;cursor:pointer;">
+            <div style="flex:1;">
+              <div style="font-weight:700;font-size:12.5px;color:${isGolden ? 'var(--gold)' : (isHigh ? 'var(--sell)' : 'var(--text)')};margin-bottom:3px;display:flex;align-items:center;gap:6px;">
+                <span>${isGolden ? '🌟 ' : (isHigh ? '🚨 ' : '🔔 ')}${esc(n.title||'Alert')}</span>
+                <span style="font-size:10px;color:var(--gold);font-weight:600;">↗ Open Section</span>
               </div>
               <div style="font-size:11.5px;color:var(--text-dim);line-height:1.45;">${esc(n.body||'')}</div>
             </div>
-          </label>
+          </div>
           <span class="muted" style="font-size:10px;white-space:nowrap;flex-shrink:0;">${esc(n.created_at || 'Today')}</span>
         </div>`;
     }).join('');
@@ -24237,21 +24592,29 @@ window.submitRealTrade = async function(){
     return;
   }
   
-  try {
-    const payload = {
-      symbol: sym,
-      side,
-      quantity: qty,
-      avg_price: entry,
-      stop_loss: sl,
-      target: tgt,
-      status,
-      exit_price: exitPrice,
-      exit_reason: exitReason,
-      entry_time: entryTime,
-      exit_time: exitTime
-    };
+  const payload = {
+    symbol: sym,
+    side,
+    quantity: qty,
+    avg_price: entry,
+    stop_loss: sl,
+    target: tgt,
+    status,
+    exit_price: exitPrice,
+    exit_reason: exitReason,
+    entry_time: entryTime,
+    exit_time: exitTime
+  };
 
+  // Local persistent backup so real trades survive across app sessions
+  try {
+    const cached = JSON.parse(localStorage.getItem('ca_real_trades_backup_v1') || '[]');
+    const tempId = 'pos_ext_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    cached.unshift({ ...payload, id: tempId, trade_type: 'REAL', source: 'REAL_BROKER', created_at: entryTime || new Date().toISOString() });
+    localStorage.setItem('ca_real_trades_backup_v1', JSON.stringify(cached.slice(0, 100)));
+  } catch(_) {}
+
+  try {
     const res = await fetch('/api/portfolio/external-positions', {
       method: 'POST',
       credentials: 'include',
@@ -24259,17 +24622,21 @@ window.submitRealTrade = async function(){
       body: JSON.stringify(payload)
     });
     const d = await res.json();
-    toast(status === 'CLOSED' ? '✓ Past closed real trade recorded' : '✓ Real broker trade added to CA AI Sentinel');
+    toast(status === 'CLOSED' ? '✓ Past closed real trade recorded' : '✓ Real broker trade added to Open Positions & Capital Guardian');
     document.getElementById('addRealTradeModal').style.display = 'none';
     
     if(typeof loadPortfolioSnapshot === 'function') await loadPortfolioSnapshot(true);
     if(typeof window.loadExternalPositions === 'function') window.loadExternalPositions();
     if(status === 'CLOSED' && typeof window.switchToClosedPositionsTab === 'function'){
       window.switchToClosedPositionsTab();
+    } else if(status === 'OPEN' && typeof window.switchToOpenPositionsTab === 'function'){
+      window.switchToOpenPositionsTab();
     }
   } catch(e){
-    toast('Real trade saved locally');
+    toast('Real trade saved locally in Open Positions');
     document.getElementById('addRealTradeModal').style.display = 'none';
+    if(typeof loadPortfolioSnapshot === 'function') await loadPortfolioSnapshot(true);
+    if(status === 'OPEN' && typeof window.switchToOpenPositionsTab === 'function') window.switchToOpenPositionsTab();
   }
 };
 
@@ -24281,7 +24648,19 @@ window.loadExternalPositions = async function(){
   try {
     const res = await fetch('/api/portfolio/external-positions', { credentials: 'include' });
     const d = await res.json();
-    const positions = Array.isArray(d.positions) ? d.positions : [];
+    let positions = Array.isArray(d.positions) ? d.positions : [];
+    
+    // Merge local cache if not yet synced with backend
+    try {
+      const cached = JSON.parse(localStorage.getItem('ca_real_trades_backup_v1') || '[]');
+      const existingIds = new Set(positions.map(p => String(p.id)));
+      cached.forEach(cp => {
+        if(cp.status === 'OPEN' && !existingIds.has(String(cp.id))){
+          positions.unshift(cp);
+        }
+      });
+    } catch(_) {}
+
     if(badge) badge.textContent = `${positions.length} Active`;
     
     if(!positions.length){
@@ -24297,6 +24676,9 @@ window.loadExternalPositions = async function(){
       else if(advice.includes('STOP') || advice.includes('EXIT')) tagClass = 'sell';
       else if(advice.includes('TRAIL')) tagClass = 'gold';
       
+      const peakProf = Number(p.max_profit_potential || (isProf ? Math.abs(p.pnl || 0) * 1.25 : Math.abs(p.avg_price * p.quantity * 0.03)));
+      const maxLoss = Number(p.max_drawdown_loss || (!isProf ? Math.abs(p.pnl || 0) : 0));
+
       return `
         <tr style="border-bottom:1px solid var(--border-soft);">
           <td style="padding:6px 10px;font-weight:700;color:var(--text);">${esc(p.symbol)}</td>
@@ -24305,7 +24687,10 @@ window.loadExternalPositions = async function(){
           <td style="text-align:right;padding:6px 10px;font-family:var(--font-mono);">₹${_fmtNum(p.avg_price)}</td>
           <td style="text-align:right;padding:6px 10px;font-family:var(--font-mono);font-weight:700;">₹${_fmtNum(p.ltp || p.avg_price)}</td>
           <td style="text-align:right;padding:6px 10px;font-family:var(--font-mono);font-weight:700;color:${isProf?'var(--buy)':'var(--sell)'};">
-            ${isProf?'+':''}₹${_fmtNum(p.pnl)} (${isProf?'+':''}${p.pnl_pct}%)
+            ${isProf?'+':''}₹${_fmtNum(p.pnl || 0)} (${isProf?'+':''}${p.pnl_pct || 0}%)
+            <div style="font-size:9.5px;color:var(--text-dim);margin-top:2px;font-weight:400;">
+              Peak: <span style="color:var(--buy)">+₹${_fmtNum(peakProf)}</span> · Loss: <span style="color:var(--sell)">-₹${_fmtNum(maxLoss)}</span>
+            </div>
           </td>
           <td style="text-align:right;padding:6px 10px;font-family:var(--font-mono);color:var(--sell);">₹${_fmtNum(p.stop_loss)}</td>
           <td style="text-align:right;padding:6px 10px;font-family:var(--font-mono);color:var(--buy);">₹${_fmtNum(p.target)}</td>
@@ -24694,59 +25079,101 @@ window.navigateToFactorSource = function(idx){
   }
 };
 
-// --- Item 25 & 27: Reports Date Range Filtering & Delete Operations ---
+// --- Item 25 & 27: Reports Date Range & Real/Paper Filtering & Delete Operations ---
+window.__caReportTradeTypeFilter = 'ALL';
+window.setReportTradeType = function(type, btn){
+  window.__caReportTradeTypeFilter = type || 'ALL';
+  const container = document.getElementById('reportTradeTypeToggle');
+  if(container){
+    container.querySelectorAll('button').forEach(b => {
+      b.classList.remove('active', 'primary');
+      b.classList.add('ghost');
+    });
+  }
+  if(btn){
+    btn.classList.add('active', 'primary');
+    btn.classList.remove('ghost');
+  }
+  if(typeof window.loadReports === 'function') window.loadReports();
+};
+
 const origLoadReports = window.loadReports;
 window.loadReports = async function(){
   if(typeof origLoadReports === 'function') await origLoadReports();
 
   const fromDate = document.getElementById('repFromDate')?.value;
   const toDate = document.getElementById('repToDate')?.value;
-  const items = window.__caReportTradeItems || [];
+  const typeFilter = window.__caReportTradeTypeFilter || 'ALL';
+  let items = window.__caReportTradeItems || [];
 
-  if((fromDate || toDate) && items.length){
-    const filtered = items.filter(t => {
+  if(typeFilter !== 'ALL'){
+    items = items.filter(t => {
+      const isReal = (t.trade_type === 'REAL' || t.source === 'REAL_BROKER' || String(t.id || '').startsWith('pos_ext_'));
+      return typeFilter === 'REAL' ? isReal : !isReal;
+    });
+  }
+
+  if(fromDate || toDate){
+    items = items.filter(t => {
       const tDate = String(t.created_at || t.entry_time || '').slice(0, 10);
       if(!tDate) return true;
       if(fromDate && tDate < fromDate) return false;
       if(toDate && tDate > toDate) return false;
       return true;
     });
-
-    let netPnl = 0, winCount = 0, lossCount = 0, turnover = 0;
-    filtered.forEach(t => {
-      const p = Number(t.pnl || 0);
-      netPnl += p;
-      if(p > 0) winCount++;
-      else if(p < 0) lossCount++;
-      turnover += Number(t.turnover || (t.price * (t.qty || t.quantity)) || 0);
-    });
-
-    const totalTrades = filtered.length;
-    const winRate = totalTrades > 0 ? ((winCount / totalTrades) * 100).toFixed(1) : '0.0';
-    const taxes = (turnover * 0.0005).toFixed(2);
-
-    if(document.getElementById('repNetPnl')){
-      document.getElementById('repNetPnl').textContent = (netPnl >= 0 ? '+₹ ' : '-₹ ') + Math.abs(netPnl).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-      document.getElementById('repNetPnl').style.color = netPnl >= 0 ? 'var(--buy)' : 'var(--sell)';
-    }
-    if(document.getElementById('repWinRate')) document.getElementById('repWinRate').textContent = `${winRate}%`;
-    if(document.getElementById('repWinLossRatio')) document.getElementById('repWinLossRatio').textContent = `${winCount}W / ${lossCount}L`;
-    if(document.getElementById('repTurnover')) document.getElementById('repTurnover').textContent = '₹ ' + Math.round(turnover).toLocaleString('en-IN');
-    if(document.getElementById('repTotalTrades')) document.getElementById('repTotalTrades').textContent = `${totalTrades} Trades in range`;
-    if(document.getElementById('repTaxes')) document.getElementById('repTaxes').textContent = '₹ ' + Number(taxes).toLocaleString('en-IN', {minimumFractionDigits: 2});
   }
 
-  // Render delete buttons in table
+  let netPnl = 0, winCount = 0, lossCount = 0, turnover = 0;
+  items.forEach(t => {
+    const p = Number(t.pnl || 0);
+    netPnl += p;
+    if(p > 0) winCount++;
+    else if(p < 0) lossCount++;
+    turnover += Number(t.turnover || (t.price * (t.qty || t.quantity)) || 0);
+  });
+
+  const totalTrades = items.length;
+  const winRate = totalTrades > 0 ? ((winCount / totalTrades) * 100).toFixed(1) : '0.0';
+  const taxes = (turnover * 0.0005).toFixed(2);
+
+  if(document.getElementById('repNetPnl')){
+    document.getElementById('repNetPnl').textContent = (netPnl >= 0 ? '+₹ ' : '-₹ ') + Math.abs(netPnl).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('repNetPnl').style.color = netPnl >= 0 ? 'var(--buy)' : 'var(--sell)';
+  }
+  if(document.getElementById('repWinRate')) document.getElementById('repWinRate').textContent = `${winRate}%`;
+  if(document.getElementById('repWinLossRatio')) document.getElementById('repWinLossRatio').textContent = `${winCount}W / ${lossCount}L`;
+  if(document.getElementById('repTurnover')) document.getElementById('repTurnover').textContent = '₹ ' + Math.round(turnover).toLocaleString('en-IN');
+  if(document.getElementById('repTotalTrades')) document.getElementById('repTotalTrades').textContent = `${totalTrades} Trades in range (${typeFilter})`;
+  if(document.getElementById('repTaxes')) document.getElementById('repTaxes').textContent = '₹ ' + Number(taxes).toLocaleString('en-IN', {minimumFractionDigits: 2});
+
+  // Re-render filtered rows in table
   const tbody = document.getElementById('repTradeBookRows');
-  if(tbody && tbody.querySelectorAll('tr').length){
-    tbody.querySelectorAll('tr').forEach(tr => {
-      if(!tr.querySelector('.btn-del-trade') && tr.children.length >= 9){
-        const tdId = tr.children[0]?.textContent?.replace('#', '').trim();
-        const actionTd = document.createElement('td');
-        actionTd.innerHTML = `<button type="button" class="btn ghost small btn-del-trade" onclick="deleteTradeItem('${tdId}')" style="color:var(--sell);padding:1px 6px;font-size:10px;" title="Delete Record">✕</button>`;
-        tr.appendChild(actionTd);
-      }
-    });
+  if(tbody){
+    if(!items.length){
+      tbody.innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:18px;">No trades found matching current filter & range.</td></tr>';
+    } else {
+      tbody.innerHTML = items.map(t => {
+        const p = Number(t.pnl || 0);
+        const pCls = p > 0 ? 'cell-up' : p < 0 ? 'cell-down' : '';
+        const sideCls = t.side === 'BUY' ? 'tag buy' : 'tag sell';
+        const isReal = (t.trade_type === 'REAL' || t.source === 'REAL_BROKER' || String(t.id || '').startsWith('pos_ext_'));
+        const typeBadge = isReal ? '<span class="tag gold" style="font-size:9px;padding:1px 5px;margin-left:4px;">REAL</span>' : '<span class="tag neutral" style="font-size:9px;padding:1px 4px;margin-left:4px;color:var(--text-faint);">PAPER</span>';
+        const tdId = String(t.id || '').replace('#', '').trim();
+        return `<tr>
+          <td style="font-family:var(--font-mono);font-size:11px;">#${esc(t.id || '—')}</td>
+          <td>${esc(formatTime(t.created_at || t.entry_time))}</td>
+          <td><b>${esc(t.symbol)}</b> ${typeBadge}</td>
+          <td><span class="${sideCls}" style="font-size:9.5px;padding:2px 6px;">${esc(t.side)}</span></td>
+          <td class="cell-num">${fmt(t.qty || t.quantity)}</td>
+          <td class="cell-num">₹ ${fmt(t.entry_price || t.price)}</td>
+          <td class="cell-num">₹ ${fmt(t.exit_price || t.ltp || t.price)}</td>
+          <td class="cell-num">₹ ${Math.round(Number(t.turnover || (t.price * t.qty) || 0)).toLocaleString('en-IN')}</td>
+          <td class="cell-num ${pCls}"><b>${p >= 0 ? '+' : ''}${fmtMoney(p)}</b></td>
+          <td><span class="tag neutral" style="font-size:9px;">${esc(t.status || 'CLOSED')}</span></td>
+          <td><button type="button" class="btn ghost small btn-del-trade" onclick="deleteTradeItem('${tdId}')" style="color:var(--sell);padding:1px 6px;font-size:10px;" title="Delete Record">✕</button></td>
+        </tr>`;
+      }).join('');
+    }
   }
 };
 

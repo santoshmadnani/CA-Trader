@@ -902,6 +902,14 @@ def init_db() -> None:
             with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE positions ADD COLUMN trade_type TEXT DEFAULT 'PAPER'")
             with contextlib.suppress(Exception):
+                conn.execute("ALTER TABLE positions ADD COLUMN high_price REAL")
+            with contextlib.suppress(Exception):
+                conn.execute("ALTER TABLE positions ADD COLUMN low_price REAL")
+            with contextlib.suppress(Exception):
+                conn.execute("ALTER TABLE positions ADD COLUMN max_profit_potential REAL")
+            with contextlib.suppress(Exception):
+                conn.execute("ALTER TABLE positions ADD COLUMN max_drawdown_loss REAL")
+            with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE orders ADD COLUMN is_backtest INTEGER NOT NULL DEFAULT 0")
             with contextlib.suppress(Exception):
                 conn.execute("ALTER TABLE orders ADD COLUMN entry_reco_json TEXT")
@@ -6428,7 +6436,6 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel()
         auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await auto_task
@@ -9266,6 +9273,8 @@ async def news_ca_ai_feed(
                 insight = f"CA AI Decision: Bearish headwind ({prob}% Sell Signal). Downside pressure confirmed. Defensive trailing stops recommended."
         elif is_bull or is_high_bull:
             sentiment = "BULLISH"
+     
+... [truncated for diff preview]
             if is_high_bull:
                 prob = 100
                 impact_pct = "100% Buy Signal"
@@ -9291,8 +9300,6 @@ async def news_ca_ai_feed(
             "impact": impact_pct,
             "relevance": "High" if (is_bull or is_bear or sym.lower() in t_low) else "Medium",
             "ca_ai_insight": insight,
-            "url": (item.get("url") if item.get("url") and item.get("url") !
-... [truncated for diff preview]
             "url": (item.get("url") if item.get("url") and item.get("url") != "#" and "catrader.site" not in item.get("url") else f"https://news.google.com/search?q={urllib.parse.quote_plus(title)}")
         })
 
@@ -11032,6 +11039,24 @@ async def positions(request: Request, user: dict[str, Any] = Depends(require_use
         peak_pnl = float(d_p.get("peak_pnl") or max(0, pnl))
         theta_hourly = round((max(6.0, entry * 0.12) / 6.25) * qty, 2)
         
+        # High/low contract price excursion calculations
+        high_p = float(d_p.get("high_price") or d_p.get("exit_price") or entry)
+        low_p = float(d_p.get("low_price") or d_p.get("exit_price") or entry)
+        if side == "BUY":
+            max_profit = round(max(0.0, (high_p - entry) * qty), 2)
+            max_loss = round(max(0.0, (entry - low_p) * qty), 2)
+        else:
+            max_profit = round(max(0.0, (entry - low_p) * qty), 2)
+            max_loss = round(max(0.0, (high_p - entry) * qty), 2)
+        
+        missed_profit = round(max(0.0, max_profit - pnl), 2)
+        
+        d_p["high_price"] = high_p
+        d_p["low_price"] = low_p
+        d_p["max_profit_potential"] = max_profit
+        d_p["max_drawdown_loss"] = max_loss
+        d_p["missed_profit_diff"] = missed_profit
+        
         is_open = str(d_p.get("status") or "OPEN").upper() == "OPEN" and qty > 0
         if is_open:
             if pnl <= -500:
@@ -11048,7 +11073,7 @@ async def positions(request: Request, user: dict[str, Any] = Depends(require_use
                 advice_reason = f"Momentum and volume shelf aligned. Intraday target is ₹{tgt:,.2f}."
         else:
             advice = "CLOSED"
-            advice_reason = f"Trade closed with final P&L of {pnl:+,.2f}."
+            advice_reason = f"Trade closed with final P&L of {pnl:+,.2f}. Peak achievable profit was +₹{max_profit:,.2f} (diff ₹{missed_profit:,.2f})."
 
         d_p["ca_ai_advice"] = advice
         d_p["advice_reason"] = advice_reason
@@ -11061,6 +11086,11 @@ async def positions(request: Request, user: dict[str, Any] = Depends(require_use
             "target": tgt,
             "pnl": pnl,
             "peak_pnl": peak_pnl,
+            "high_price": high_p,
+            "low_price": low_p,
+            "max_profit_potential": max_profit,
+            "max_drawdown_loss": max_loss,
+            "missed_profit_diff": missed_profit,
             "theta_hourly": theta_hourly,
             "trade_type": d_p["trade_type"],
             "status": "OPEN" if is_open else "CLOSED"
@@ -11289,6 +11319,8 @@ async def save_recommendation_to_history_api(payload: dict[str, Any], user: dict
     rat = str(payload.get("rationale") or payload.get("reason") or "Institutional trade setup manually saved by trader.")
     conf = float(payload.get("confidence") or 82.0)
     ev = payload.get("evidence") or {}
+    source_val = str(payload.get("source") or ("backtest" if payload.get("is_backtest") else "on-demand")).strip().lower()
+    created_val = str(payload.get("timestamp") or payload.get("created_at") or now)
     
     db_exec(
         """INSERT INTO recommendations (
@@ -11298,15 +11330,15 @@ async def save_recommendation_to_history_api(payload: dict[str, Any], user: dict
             outcome, final_pnl, success, exit_reason, created_at, status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
-            reco_id, user["id"], "on-demand", sym, und, act,
+            reco_id, user["id"], source_val, sym, und, act,
             tf, entry, tgt, sl, rat,
             json.dumps(ev.get("technical") or {}),
             json.dumps(ev.get("news") or {}),
             json.dumps(ev.get("options") or {}),
-            conf, "ACTIVE", 0.0, 0, None, now, "ACTIVE"
+            conf, "ACTIVE", 0.0, 0, None, created_val, "ACTIVE"
         ]
     )
-    return {"success": True, "id": reco_id, "message": "Recommendation successfully saved to history!"}
+    return {"success": True, "id": reco_id, "source": source_val, "message": "Recommendation successfully saved to history!"}
 
 
 
@@ -11613,6 +11645,25 @@ async def position_ai_analysis(position_id: str, request: Request, user: dict[st
     side = str(pos.get("side") or "BUY").upper()
     symbol = str(pos.get("symbol") or "")
     underlying = str(pos.get("underlying") or symbol).split()[0].upper()
+
+    exit_p = float(pos.get("exit_price") or entry)
+    hp = float(pos.get("high_price") or 0.0)
+    lp = float(pos.get("low_price") or 0.0)
+    if hp <= 0:
+        hp = max(entry, exit_p)
+    if lp <= 0:
+        lp = min(entry, exit_p)
+    pos["high_price"] = hp
+    pos["low_price"] = lp
+    if side == "BUY":
+        max_profit = max(0.0, (hp - entry) * qty)
+        max_loss = min(0.0, (lp - entry) * qty)
+    else:
+        max_profit = max(0.0, (entry - lp) * qty)
+        max_loss = min(0.0, (entry - hp) * qty)
+    pos["max_profit_potential"] = round(max_profit, 2)
+    pos["max_drawdown_loss"] = round(max_loss, 2)
+    pos["missed_profit_diff"] = round(max(0.0, max_profit - pnl), 2)
     
     # Calculate duration
     created_at = pos.get("created_at") or now_iso()
@@ -12696,6 +12747,8 @@ async def _monitor_paper_positions_once() -> None:
             user_max_loss = 500.0
 
         for p in positions:
+            if str(p.get("trade_type") or "").upper() == "REAL" or str(p.get("id") or "").startswith("pos_ext_") or p.get("source") == "REAL_BROKER":
+                continue  # Real broker trades are managed externally; never auto-squareoff via paper engine
             key=str(p.get("instrument_key") or p.get("symbol")); q=qmap.get(key.upper()) or qmap.get(str(p.get("symbol") or "").upper())
             price=float(q.get("ltp") or 0) if q else 0
             if price<=0:
@@ -14326,6 +14379,7 @@ async def ai_chat_alias(request: Request, user: dict[str, Any] = Depends(require
 async def reports_pnl(
     range: str | None = None,
     timeframe: str = Query("all"),
+    trade_type: str | None = None,
     user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
     """Generates comprehensive P&L reports matching institutional trading terminals."""
@@ -14348,9 +14402,20 @@ async def reports_pnl(
     records = []
     for p in positions:
         pnl = float(p.get("final_pnl") if p.get("final_pnl") is not None else (p.get("realized_pnl") or 0))
+        is_real = (str(p.get("trade_type") or "").upper() == "REAL" or 
+                   str(p.get("source") or "").upper() == "REAL_BROKER" or 
+                   str(p.get("id") or "").startswith("pos_ext_"))
+        t_type = "REAL" if is_real else "PAPER"
+        if trade_type and trade_type.upper() != "ALL":
+            if trade_type.upper() == "REAL" and not is_real:
+                continue
+            if trade_type.upper() == "PAPER" and is_real:
+                continue
+
         if str(p.get("status") or "").upper() == "CLOSED" or pnl != 0:
             records.append({
-                "source": "PAPER_POSITION",
+                "source": "REAL_BROKER" if is_real else "PAPER_POSITION",
+                "trade_type": t_type,
                 "symbol": p.get("symbol"),
                 "side": p.get("side"),
                 "quantity": int(p.get("quantity") or 1),
@@ -14361,20 +14426,22 @@ async def reports_pnl(
                 "closed_at": p.get("updated_at")
             })
 
-    for r in recos:
-        pnl = float(r.get("final_pnl") if r.get("final_pnl") is not None else (r.get("pnl") or 0))
-        if pnl != 0:
-            records.append({
-                "source": "CA_AI_RECO",
-                "symbol": r.get("symbol"),
-                "side": r.get("recommendation"),
-                "quantity": 1,
-                "entry_price": float(r.get("entry") or 0),
-                "exit_price": float(r.get("exit_price") or r.get("target") or 0),
-                "pnl": pnl,
-                "created_at": r.get("created_at"),
-                "closed_at": r.get("updated_at")
-            })
+    if not trade_type or trade_type.upper() in ("ALL", "PAPER"):
+        for r in recos:
+            pnl = float(r.get("final_pnl") if r.get("final_pnl") is not None else (r.get("pnl") or 0))
+            if pnl != 0:
+                records.append({
+                    "source": "CA_AI_RECO",
+                    "trade_type": "PAPER",
+                    "symbol": r.get("symbol"),
+                    "side": r.get("recommendation"),
+                    "quantity": 1,
+                    "entry_price": float(r.get("entry") or 0),
+                    "exit_price": float(r.get("exit_price") or r.get("target") or 0),
+                    "pnl": pnl,
+                    "created_at": r.get("created_at"),
+                    "closed_at": r.get("updated_at")
+                })
 
     total_trades = len(records)
     wins = [r for r in records if r["pnl"] > 0]
@@ -14442,6 +14509,7 @@ async def reports_pnl(
 @app.get("/api/reports/trades")
 async def reports_trades(
     symbol: str | None = None,
+    trade_type: str | None = None,
     user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
     """Returns granular order book and executed trade log."""
@@ -14464,6 +14532,16 @@ async def reports_trades(
             qty = 100
         avg_p = float(p.get("avg_price") or 0)
         exit_p = float(p.get("exit_price") or avg_p)
+        is_real = (str(p.get("trade_type") or "").upper() == "REAL" or 
+                   str(p.get("source") or "").upper() == "REAL_BROKER" or 
+                   str(p.get("id") or "").startswith("pos_ext_"))
+        t_type = "REAL" if is_real else "PAPER"
+        if trade_type and trade_type.upper() != "ALL":
+            if trade_type.upper() == "REAL" and not is_real:
+                continue
+            if trade_type.upper() == "PAPER" and is_real:
+                continue
+
         trade_items.append({
             "id": p.get("id"),
             "created_at": p.get("created_at") or p.get("opened_at"),
@@ -14476,28 +14554,33 @@ async def reports_trades(
             "exit_price": exit_p,
             "turnover": round((avg_p + exit_p) * qty, 2),
             "pnl": pnl,
-            "status": p.get("status") or "CLOSED"
+            "status": p.get("status") or "CLOSED",
+            "trade_type": t_type,
+            "source": "REAL_BROKER" if is_real else "PAPER_POSITION"
         })
 
-    for o in orders:
-        if not any(t["id"] == o.get("id") for t in trade_items):
-            qty = int(o.get("quantity") or 1)
-            pr = float(o.get("price") or 0)
-            trade_items.append({
-                "id": o.get("id"),
-                "created_at": o.get("created_at"),
-                "symbol": o.get("symbol"),
-                "side": o.get("side") or "BUY",
-                "quantity": qty,
-                "qty": qty,
-                "price": pr,
-                "entry_price": pr,
-                "exit_price": pr,
-                "turnover": round(pr * qty, 2),
-                "pnl": 0.0,
-                "status": o.get("status") or "FILLED",
-                "is_backtest": bool(o.get("is_backtest"))
-            })
+    if not trade_type or trade_type.upper() in ("ALL", "PAPER"):
+        for o in orders:
+            if not any(t["id"] == o.get("id") for t in trade_items):
+                qty = int(o.get("quantity") or 1)
+                pr = float(o.get("price") or 0)
+                trade_items.append({
+                    "id": o.get("id"),
+                    "created_at": o.get("created_at"),
+                    "symbol": o.get("symbol"),
+                    "side": o.get("side") or "BUY",
+                    "quantity": qty,
+                    "qty": qty,
+                    "price": pr,
+                    "entry_price": pr,
+                    "exit_price": pr,
+                    "turnover": round(pr * qty, 2),
+                    "pnl": 0.0,
+                    "status": o.get("status") or "FILLED",
+                    "is_backtest": bool(o.get("is_backtest")),
+                    "trade_type": "PAPER",
+                    "source": "PAPER_ORDER"
+                })
 
     return {
         "orders_count": len(orders),
