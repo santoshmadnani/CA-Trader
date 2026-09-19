@@ -9277,7 +9277,6 @@ async def news_ca_ai_feed(
                 "sentiment": "BULLISH",
                 "impact_pct": "90% Buy Signal",
                 "impact": "90% Buy Signal",
-                "relevance": "High",
                 "ca_ai_insight": f"CA AI Assessment: High delivery volume at support base signals institutional accumulation for {sym}.",
                 "url": f"https://news.google.com/search?q={quote_plus(sym)}+NSE+Institutional+Flow"
             },
