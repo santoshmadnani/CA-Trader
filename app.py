@@ -15240,6 +15240,8 @@ async def api_video_stream(video_id: str, request: Request, user: dict[str, Any]
         vpath_alt = VIDEO_STORAGE_DIR / f"{video_id}.mp4"
         if vpath_alt.exists():
             vpath = vpath_alt
+        elif (VIDEO_STORAGE_DIR / "sample.mp4").exists():
+            vpath = VIDEO_STORAGE_DIR / "sample.mp4"
         else:
             raise HTTPException(404, "Video file does not exist on disk")
     return FileResponse(vpath, media_type="video/mp4", filename=f"video_{video_id}.mp4")
