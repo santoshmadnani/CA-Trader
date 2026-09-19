@@ -346,7 +346,11 @@ AVAILABLE_AI_MODELS = list(dict.fromkeys([
     "gemini-2.0-flash",
     "gemini-1.5-flash",
     "gemini-2.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
     "gemini-flash-latest",
+    "gemini-3.7-flash",
+    "gemini-2.5-pro",
     "antigravity-deep-trader"
 ]))
 USDA_API_KEY = os.getenv("USDA_API_KEY", "DEMO_KEY")
@@ -1084,6 +1088,7 @@ def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] 
             resp = requests.post(url, headers=headers, json=body, timeout=4.5)
             resp = requests.post(url, headers=headers, json=body, timeout=6.0)
             resp = requests.post(url, headers=headers, json=body, timeout=15.0)
+            resp = requests.post(url, headers=headers, json=body, timeout=12.0)
             if resp.status_code == 429 or resp.status_code >= 500:
                 continue
             if resp.status_code >= 400:

@@ -3229,6 +3229,7 @@ select#watchlistSelect, select.watchlist-select {
           </div>
 
           <!-- Note Content Area -->
+          <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
           <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
             <!-- Note Formatting Toolbar -->
             <div class="note-format-toolbar" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:5px 8px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:6px;">
@@ -8208,6 +8209,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     draw();
     // Cascade historical point through indicators, patterns & reco
     void loadChartBundle(true);
+    if(typeof updateChartRecoBanner === 'function') void updateChartRecoBanner();
 
     if(last && sliced.length >= 5){
       const lastClose = Number(last.close || 0);
@@ -8294,6 +8296,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
 
   function computeLocalChartAiSuggestions(candles){
     if(!candles || candles.length < 10) return { trendlines: [], horizontal_levels: [], indicators: [], summary: 'Insufficient candles for AI chart analysis' };
+    const n = candles.length
+... [truncated for diff preview]
     const n = candles.length;
     const windowLen = Math.min(n, 70);
     const offset = n - windowLen;
@@ -21877,7 +21881,7 @@ window.loadChartReplaySession = async function(){
     if(!apiFn) throw new Error('API client not initialized');
     const targetDate = new Date(chosenDate + 'T00:00:00');
     const now = new Date();
-    const diffDays = Math.max(15, Math.ceil((now - targetDate) / (1000 * 60 * 60 * 24)) + 10);
+    const diffDays = Math.max(30, Math.ceil((now - targetDate) / (1000 * 60 * 60 * 24)) + 30);
     const fetchDays = Math.min(365, diffDays);
     const res = await apiFn(`/api/market/candles/${encodeURIComponent(sym)}?timeframe=${tf}&days=${fetchDays}`);
     const candles = res?.candles || [];
@@ -21886,98 +21890,157 @@ window.loadChartReplaySession = async function(){
       return;
     }
 
-    // Filter strictly to the chosen trading day session in IST
-    const dayCandles = candles.filter(c => {
+    candles.sort((a, b) => new Date(a.timestamp || a.ts || 0) - new Date(b.timestamp || b.ts || 0));
+
+    // Preserve prior candles so user can pan back in time and compute indicators accurately!
+    let priorCandles = [];
+    let sessionCandles = [];
+    candles.forEach(c => {
       const d = new Date(c.timestamp || c.ts || 0);
       const istDateStr = d.toLocaleDateString('en-CA', {timeZone: 'Asia/Kolkata'});
-      return istDateStr === chosenDate;
+      if(istDateStr < chosenDate){
+        priorCandles.push(c);
+      } else if(istDateStr === chosenDate){
+        sessionCandles.push(c);
+      }
     });
 
-    let replayCandles = dayCandles;
-    if(!replayCandles.length){
+    if(!sessionCandles.length){
       const availableDates = Array.from(new Set(candles.map(c => {
         const d = new Date(c.timestamp || c.ts || 0);
         return d.toLocaleDateString('en-CA', {timeZone: 'Asia/Kolkata'});
       }))).filter(Boolean).sort();
       const fallbackDate = availableDates[availableDates.length - 1];
       if(fallbackDate){
-        replayCandles = candles.filter(c => {
+        priorCandles = [];
+        sessionCandles = [];
+        candles.forEach(c => {
           const d = new Date(c.timestamp || c.ts || 0);
-          return d.toLocaleDateString('en-CA', {timeZone: 'Asia/Kolkata'}) === fallbackDate;
+          const istDateStr = d.toLocaleDateString('en-CA', {timeZone: 'Asia/Kolkata'});
+          if(istDateStr < fallbackDate) priorCandles.push(c);
+          else if(istDateStr === fallbackDate) sessionCandles.push(c);
         });
-        _toastMsg(`Trading data for ${chosenDate} unavailable (market holiday/weekend); loaded ${fallbackDate} (${replayCandles.length} candles)`);
+        _toastMsg(`Trading data for ${chosenDate} unavailable; loaded ${fallbackDate} (${sessionCandles.length} session candles)`);
       }
     }
 
-    if(!replayCandles.length){
+    if(!sessionCandles.length){
       _toastMsg('No trading session candles found for ' + chosenDate);
       return;
     }
 
-    replayCandles.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
-
     window.__caReplayState.active = true;
-    window.__caReplayState.allCandles = replayCandles;
-    // Start replay at candle 0 (09:15 AM IST)
+    window.__caReplayState.priorCandles = priorCandles;
+    window.__caReplayState.sessionCandles = sessionCandles;
+    window.__caReplayState.allCandles = sessionCandles;
     window.__caReplayState.currentIndex = 0;
     window.__caReplayState.date = chosenDate;
 
     const slider = document.getElementById('chartReplaySlider');
     if(slider){
       slider.min = 0;
-      slider.max = replayCandles.length - 1;
+      slider.max = sessionCandles.length - 1;
       slider.value = 0;
     }
 
     window.applyReplaySlice(0);
-    _toastMsg(`Replay ready: ${replayCandles.length} session candles for ${chosenDate} starting at 09:15 IST`);
+    _toastMsg(`Replay ready: ${sessionCandles.length} session candles for ${chosenDate} (+ ${priorCandles.length} earlier candles for indicators & panning)`);
   } catch(err) {
     _toastMsg(`Replay load error: ${err.message}`);
   }
 };
 
 window.applyReplaySlice = function(idx){
-  if(!window.__caReplayState.allCandles.length) return;
-  const targetIdx = Math.min(Math.max(0, idx), window.__caReplayState.allCandles.length - 1);
-  window.__caReplayState.currentIndex = targetIdx;
+  const s = window.__caReplayState;
+  if(!s.allCandles || !s.allCandles.length) return;
+  const targetIdx = Math.min(Math.max(0, idx), s.allCandles.length - 1);
+  s.currentIndex = targetIdx;
 
-  const currentSlice = window.__caReplayState.allCandles.slice(0, targetIdx + 1);
-  const curr = currentSlice[currentSlice.length - 1];
+  const sessionSlice = s.allCandles.slice(0, targetIdx + 1);
+  const curr = sessionSlice[sessionSlice.length - 1];
+  const fullVisibleHistory = [...(s.priorCandles || []), ...sessionSlice];
+
+  let replayTimeStr = '09:15 IST';
+  let replayDateTimeStr = '';
+  if(curr && curr.timestamp){
+    const d = new Date(curr.timestamp);
+    replayTimeStr = d.toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:false}) + ' IST';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    replayDateTimeStr = `${day}-${month}-${year} ${replayTimeStr}`;
+  } else {
+    replayDateTimeStr = `${s.date || 'Historical'} ${replayTimeStr}`;
+  }
+
+  s.lastReplayTimeStr = replayTimeStr;
+  s.lastReplayDateTimeStr = replayDateTimeStr;
 
   if(typeof state !== 'undefined'){
-    state.candles = currentSlice.map(c => ({...c}));
+    state.candles = fullVisibleHistory.map(c => ({...c}));
+    // Position viewport at replay head, while allowing user to drag/scroll back to earlier periods
+    const visibleCount = Math.floor(state.visible / state.zoom);
+    state.panX = Math.max(0, state.candles.length - visibleCount);
+
     if(curr){
       const ltp = Number(curr.close || curr.open);
       state.latestLive = ltp;
       const elLtp = document.getElementById('chartSymbolLtp');
       if(elLtp) elLtp.textContent = `₹${_fmtNum(ltp)}`;
       const timeBadge = document.getElementById('chartReplayTimeDisplay');
-      if(timeBadge && curr.timestamp){
-        const d = new Date(curr.timestamp);
-        timeBadge.textContent = d.toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:false}) + ' IST';
-      }
+      if(timeBadge) timeBadge.textContent = replayTimeStr;
       if(document.getElementById('chartOhlcO')) document.getElementById('chartOhlcO').textContent = _fmtNum(curr.open);
       if(document.getElementById('chartOhlcH')) document.getElementById('chartOhlcH').textContent = _fmtNum(curr.high);
       if(document.getElementById('chartOhlcL')) document.getElementById('chartOhlcL').textContent = _fmtNum(curr.low);
       if(document.getElementById('chartOhlcC')) document.getElementById('chartOhlcC').textContent = _fmtNum(curr.close);
 
-      // Check SL / Target / Max Loss for open backtest positions
       window.checkReplayPositions(curr, ltp);
     }
     if(typeof draw === 'function') draw();
   }
 
-  // Update recommendations for this replay timeframe
-  if(typeof window.renderDualRecoCards === 'function' && curr){
-    const ltp = Number(curr.close || 23346);
-    const sym = _getSym();
-    window.renderDualRecoCards({
-      recommendation: curr.close >= curr.open ? 'BUY CALL' : 'BUY PUT',
-      cmp: ltp,
-      call_option: { symbol: `${sym} CE`, cmp: _roundV(ltp * 0.0094), entry: _roundV(ltp * 0.0092), stop_loss: _roundV(ltp * 0.0083), target: _roundV(ltp * 0.011), lot_size: 25 },
-      put_option: { symbol: `${sym} PE`, cmp: _roundV(ltp * 0.0088), entry: _roundV(ltp * 0.0086), stop_loss: _roundV(ltp * 0.0078), target: _roundV(ltp * 0.0102), lot_size: 25 }
-    });
+  // Update subtitle on Dashboard: "Recommending for backtesting (date & time)"
+  const subEl = document.getElementById('dashRecoHeaderSub');
+  if(subEl) subEl.textContent = `Recommending for backtesting (${replayDateTimeStr})`;
+
+  const ltp = Number(curr?.close || 23346);
+  const sym = _getSym();
+  const isBull = curr ? (curr.close >= curr.open) : true;
+  const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
+  const step = root.includes('BANK') ? 100 : (root.includes('CRUDE') ? 50 : 50);
+  const strike = Math.round(ltp / step) * step;
+
+  const backtestRecoData = {
+    symbol: sym,
+    cmp: ltp,
+    signal: isBull ? 'BUY' : 'SELL',
+    recommendation: isBull ? 'BUY CALL' : 'BUY PUT',
+    timeStr: replayTimeStr,
+    dateTimeStr: replayDateTimeStr,
+    call_option: { symbol: `${root} ${strike} CE`, cmp: _roundV(ltp * 0.0094), entry: _roundV(ltp * 0.0092), stop_loss: _roundV(ltp * 0.0083), target: _roundV(ltp * 0.011), lot_size: 25 },
+    put_option: { symbol: `${root} ${strike} PE`, cmp: _roundV(ltp * 0.0088), entry: _roundV(ltp * 0.0086), stop_loss: _roundV(ltp * 0.0078), target: _roundV(ltp * 0.0102), lot_size: 25 },
+    is_backtest: true
+  };
+
+  if(typeof window.renderDualRecoCards === 'function'){
+    window.renderDualRecoCards(backtestRecoData);
   }
+
+  // Broadcast cross-window sync
+  const syncPayload = {
+    type: 'CA_BACKTEST_REPLAY_UPDATE',
+    active: true,
+    date: s.date,
+    timeStr: replayTimeStr,
+    dateTimeStr: replayDateTimeStr,
+    ltp: ltp,
+    sym: sym,
+    curr: curr
+  };
+  try {
+    if(window.__caSyncChannel) window.__caSyncChannel.postMessage(syncPayload);
+    localStorage.setItem('ca_backtest_sync_v1', JSON.stringify(syncPayload));
+  } catch(_) {}
 };
 
 window.placeBacktestOrder = function(side){
@@ -22015,94 +22078,73 @@ window.placeBacktestOrder = function(side){
 
   window.__caReplayPositions = window.__caReplayPositions || [];
   window.__caReplayPositions.push(pos);
-
-  _toastMsg(`✦ [Simulated Replay] Placed ${pos.side} order for ${qty} @ ₹${_fmtNum(entryPrice)} | SL: ₹${_fmtNum(sl)} | Target: ₹${_fmtNum(tgt)} | Max Loss: ₹${maxLoss}`);
+  _toastMsg(`Executed Backtest ${pos.side} ${pos.qty}x ${pos.symbol} @ ₹${_fmtNum(pos.entryPrice)}`);
   window.updateReplayPositionPill(entryPrice);
 };
 
-window.checkReplayPositions = function(currCandle, tickPrice){
+window.checkReplayPositions = function(currCandle, ltp){
   if(!window.__caReplayPositions || !window.__caReplayPositions.length) return;
-  const ltp = Number(tickPrice || currCandle.close);
-  const low = Number(currCandle.low !== undefined ? currCandle.low : ltp);
-  const high = Number(currCandle.high !== undefined ? currCandle.high : ltp);
+  const h = Number(currCandle.high || ltp);
+  const l = Number(currCandle.low || ltp);
 
-  const surviving = [];
-  for(const pos of window.__caReplayPositions){
-    let closed = false;
-    let exitPrice = ltp;
-    let reason = 'Square off';
+  for(let i = window.__caReplayPositions.length - 1; i >= 0; i--){
+    const p = window.__caReplayPositions[i];
+    let exitPrice = null;
+    let reason = '';
 
-    const pnl = pos.side === 'BUY' ? (ltp - pos.entryPrice) * pos.qty : (pos.entryPrice - ltp) * pos.qty;
-    pos.currentPnl = pnl;
-
-    if(pos.side === 'BUY'){
-      if(pos.sl && low <= pos.sl){
-        closed = true;
-        exitPrice = pos.sl;
-        reason = 'Stop Loss Hit';
-      } else if(pos.tgt && high >= pos.tgt){
-        closed = true;
-        exitPrice = pos.tgt;
-        reason = 'Target Hit';
-      } else if(pos.maxLoss && pnl <= -Math.abs(pos.maxLoss)){
-        closed = true;
-        exitPrice = ltp;
-        reason = 'Max Loss Threshold Hit';
+    if(p.side === 'BUY'){
+      if(l <= p.sl){ exitPrice = p.sl; reason = 'Stop Loss Hit'; }
+      else if(h >= p.tgt){ exitPrice = p.tgt; reason = 'Target Hit'; }
+      else {
+        const curLoss = (p.entryPrice - l) * p.qty;
+        if(curLoss >= p.maxLoss){ exitPrice = l; reason = `Max Loss Hit (-₹${p.maxLoss})`; }
       }
-    } else { // SELL
-      if(pos.sl && high >= pos.sl){
-        closed = true;
-        exitPrice = pos.sl;
-        reason = 'Stop Loss Hit';
-      } else if(pos.tgt && low <= pos.tgt){
-        closed = true;
-        exitPrice = pos.tgt;
-        reason = 'Target Hit';
-      } else if(pos.maxLoss && pnl <= -Math.abs(pos.maxLoss)){
-        closed = true;
-        exitPrice = ltp;
-        reason = 'Max Loss Threshold Hit';
+    } else {
+      if(h >= p.sl){ exitPrice = p.sl; reason = 'Stop Loss Hit'; }
+      else if(l <= p.tgt){ exitPrice = p.tgt; reason = 'Target Hit'; }
+      else {
+        const curLoss = (h - p.entryPrice) * p.qty;
+        if(curLoss >= p.maxLoss){ exitPrice = h; reason = `Max Loss Hit (-₹${p.maxLoss})`; }
       }
     }
 
-    if(closed){
-      const finalPnl = pos.side === 'BUY' ? (exitPrice - pos.entryPrice) * pos.qty : (pos.entryPrice - exitPrice) * pos.qty;
+    if(exitPrice !== null){
+      const pnl = p.side === 'BUY' ? (exitPrice - p.entryPrice) * p.qty : (p.entryPrice - exitPrice) * p.qty;
       window.__caReplayClosedTrades = window.__caReplayClosedTrades || [];
       window.__caReplayClosedTrades.push({
-        ...pos,
+        ...p,
         exitPrice,
-        pnl: finalPnl,
-        reason,
-        exitTime: currCandle.timestamp
+        exitTime: currCandle.timestamp,
+        pnl,
+        reason
       });
-      _toastMsg(`✦ [Replay Position Closed] ${pos.side} @ ₹${_fmtNum(exitPrice)} (${reason} · P&L: ${finalPnl >= 0 ? '+' : ''}₹${_fmtNum(finalPnl)})`);
-    } else {
-      surviving.push(pos);
+      window.__caReplayPositions.splice(i, 1);
+      _toastMsg(`⚡ Replay Exit: ${p.side} ${p.symbol} @ ₹${_fmtNum(exitPrice)} [${reason}] · PnL: ${pnl >= 0 ? '+' : ''}₹${_fmtNum(pnl)}`);
     }
   }
-
-  window.__caReplayPositions = surviving;
   window.updateReplayPositionPill(ltp);
 };
 
 window.updateReplayPositionPill = function(ltp){
   const pill = document.getElementById('btActivePosPill');
   if(!pill) return;
-  if(!window.__caReplayPositions || !window.__caReplayPositions.length){
+  const positions = window.__caReplayPositions || [];
+  if(!positions.length){
     pill.style.display = 'none';
     return;
   }
-  const pos = window.__caReplayPositions[window.__caReplayPositions.length - 1];
-  const pnl = pos.currentPnl || (pos.side === 'BUY' ? (ltp - pos.entryPrice) * pos.qty : (pos.entryPrice - ltp) * pos.qty);
   pill.style.display = 'inline-flex';
+  const pos = positions[positions.length - 1];
   const sideEl = document.getElementById('btActivePosSide');
+  const entryEl = document.getElementById('btActivePosEntry');
+  const pnlEl = document.getElementById('btActivePosPnl');
+
   if(sideEl){
-    sideEl.textContent = `${pos.side} (${pos.qty})`;
+    sideEl.textContent = `${pos.side} ${pos.qty}x`;
     sideEl.className = pos.side === 'BUY' ? 'tag buy' : 'tag sell';
   }
-  const entryEl = document.getElementById('btActivePosEntry');
-  if(entryEl) entryEl.textContent = `@ ₹${_fmtNum(pos.entryPrice)}`;
-  const pnlEl = document.getElementById('btActivePosPnl');
+  if(entryEl) entryEl.textContent = `₹${_fmtNum(pos.entryPrice)}`;
+  const pnl = pos.side === 'BUY' ? (ltp - pos.entryPrice) * pos.qty : (pos.entryPrice - ltp) * pos.qty;
   if(pnlEl){
     pnlEl.textContent = `${pnl >= 0 ? '+' : ''}₹${_fmtNum(pnl)}`;
     pnlEl.style.color = pnl >= 0 ? 'var(--buy)' : 'var(--sell)';
@@ -22110,10 +22152,11 @@ window.updateReplayPositionPill = function(ltp){
 };
 
 window.squareOffReplayPosition = function(){
-  if(!window.__caReplayPositions || !window.__caReplayPositions.length) return;
-  const pos = window.__caReplayPositions.pop();
-  const curr = window.__caReplayState.allCandles[window.__caReplayState.currentIndex];
-  const ltp = Number(curr?.close || pos.entryPrice);
+  const positions = window.__caReplayPositions || [];
+  if(!positions.length) return;
+  const pos = positions.pop();
+  const curr = (typeof state !== 'undefined' && state.candles?.length) ? state.candles[state.candles.length - 1] : null;
+  const ltp = curr ? Number(curr.close) : pos.entryPrice;
   const pnl = pos.side === 'BUY' ? (ltp - pos.entryPrice) * pos.qty : (pos.entryPrice - ltp) * pos.qty;
   _toastMsg(`Manual Exit: ${pos.side} @ ₹${_fmtNum(ltp)} (${pnl >= 0 ? '+' : ''}₹${_fmtNum(pnl)})`);
   window.updateReplayPositionPill(ltp);
@@ -22164,7 +22207,6 @@ window.toggleChartReplayPlay = function(forceRestart){
     if(!nextCandle) return;
 
     const o = Number(nextCandle.open), h = Number(nextCandle.high), l = Number(nextCandle.low), c = Number(nextCandle.close);
-    // Natural candle formation sequence: open -> dip/rally -> rally/dip -> close
     const isBull = c >= o;
     const microTicks = isBull ? [o, l, h, c] : [o, h, l, c];
     s.microTickStep = (s.microTickStep || 0) + 1;
@@ -22177,47 +22219,37 @@ window.toggleChartReplayPlay = function(forceRestart){
       window.applyReplaySlice(s.currentIndex);
     } else {
       const rawPrice = microTicks[s.microTickStep];
-      // Defensive clamp: ensure tick price is strictly bounded to [min(o,l,h,c), max(o,l,h,c)]
       const tickPrice = Math.max(Math.min(o, l, h, c), Math.min(Math.max(o, l, h, c), rawPrice));
 
       if(typeof state !== 'undefined' && state.candles?.length){
-        // Ensure state.candles contains the forming candle at currentIndex + 1
-        if(state.candles.length <= s.currentIndex + 1){
-          state.candles.push({ ...nextCandle, open: o, high: o, low: o, close: o });
+        const formingCandle = { ...nextCandle, open: o, high: tickPrice, low: tickPrice, close: tickPrice };
+        state.candles = [...(s.priorCandles || []), ...s.allCandles.slice(0, s.currentIndex + 1), formingCandle];
+        state.latestLive = tickPrice;
+
+        const elLtp = document.getElementById('chartSymbolLtp');
+        if(elLtp){
+          const oldP = Number(elLtp.dataset.prevLtp || tickPrice);
+          elLtp.dataset.prevLtp = tickPrice;
+          elLtp.textContent = `₹${_fmtNum(tickPrice)}`;
+          if(typeof window.triggerPriceFlicker === 'function') window.triggerPriceFlicker(elLtp, tickPrice, oldP);
         }
-        const forming = state.candles[state.candles.length - 1];
-        if(forming){
-          forming.close = tickPrice;
-          forming.high = Math.max(forming.high, tickPrice);
-          forming.low = Math.min(forming.low, tickPrice);
-          state.latestLive = tickPrice;
+        if(document.getElementById('chartOhlcO')) document.getElementById('chartOhlcO').textContent = _fmtNum(formingCandle.open);
+        if(document.getElementById('chartOhlcH')) document.getElementById('chartOhlcH').textContent = _fmtNum(formingCandle.high);
+        if(document.getElementById('chartOhlcL')) document.getElementById('chartOhlcL').textContent = _fmtNum(formingCandle.low);
+        if(document.getElementById('chartOhlcC')) document.getElementById('chartOhlcC').textContent = _fmtNum(formingCandle.close);
 
-          const elLtp = document.getElementById('chartSymbolLtp');
-          if(elLtp){
-            const oldP = Number(elLtp.dataset.prevLtp || tickPrice);
-            elLtp.dataset.prevLtp = tickPrice;
-            elLtp.textContent = `₹${_fmtNum(tickPrice)}`;
-            if(typeof window.triggerPriceFlicker === 'function') window.triggerPriceFlicker(elLtp, tickPrice, oldP);
-          }
-          if(document.getElementById('chartOhlcO')) document.getElementById('chartOhlcO').textContent = _fmtNum(forming.open);
-          if(document.getElementById('chartOhlcH')) document.getElementById('chartOhlcH').textContent = _fmtNum(forming.high);
-          if(document.getElementById('chartOhlcL')) document.getElementById('chartOhlcL').textContent = _fmtNum(forming.low);
-          if(document.getElementById('chartOhlcC')) document.getElementById('chartOhlcC').textContent = _fmtNum(forming.close);
-
-          const timeBadge = document.getElementById('chartReplayTimeDisplay');
-          if(timeBadge && nextCandle.timestamp){
-            const d = new Date(nextCandle.timestamp);
-            timeBadge.textContent = d.toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:false}) + ' IST';
-          }
-
-          if(typeof draw === 'function') draw();
-          window.checkReplayPositions(forming, tickPrice);
+        const timeBadge = document.getElementById('chartReplayTimeDisplay');
+        if(timeBadge && nextCandle.timestamp){
+          const d = new Date(nextCandle.timestamp);
+          timeBadge.textContent = d.toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:false}) + ' IST';
         }
+
+        if(typeof draw === 'function') draw();
+        window.checkReplayPositions(formingCandle, tickPrice);
       }
     }
   }, baseDelay);
 };
-// Backtest order placement is handled by window.placeBacktestOrder above
 
 window.resetLiveChartMode = function(){
   window.__caReplayState.playing = false;
@@ -22226,9 +22258,78 @@ window.resetLiveChartMode = function(){
   const btn = document.getElementById('btnChartReplayPlayPause');
   if(btn) btn.textContent = '▶ Play';
   _toastMsg('Exited Backtest Replay. Reconnected to live market stream.');
+
+  try {
+    const exitPayload = { type: 'CA_BACKTEST_REPLAY_EXIT', active: false };
+    if(window.__caSyncChannel) window.__caSyncChannel.postMessage(exitPayload);
+    localStorage.setItem('ca_backtest_sync_v1', JSON.stringify(exitPayload));
+  } catch(_) {}
+
+  window.handleBacktestReplayExit();
   if(typeof loadChart === 'function') loadChart(true);
   else if(typeof CATraderAnalysis?.loadChart === 'function') CATraderAnalysis.loadChart();
 };
+
+window.handleBacktestReplaySync = function(payload){
+  if(!payload) return;
+  window.__caReplayState = window.__caReplayState || {};
+  window.__caReplayState.active = Boolean(payload.active);
+  window.__caReplayState.lastReplayTimeStr = payload.timeStr;
+  window.__caReplayState.lastReplayDateTimeStr = payload.dateTimeStr;
+
+  const subEl = document.getElementById('dashRecoHeaderSub');
+  if(subEl) subEl.textContent = `Recommending for backtesting (${payload.dateTimeStr})`;
+
+  const ltp = Number(payload.ltp || 23346);
+  const sym = payload.sym || _getSym();
+  const curr = payload.curr;
+  const isBull = curr ? (curr.close >= curr.open) : true;
+  const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
+  const step = root.includes('BANK') ? 100 : (root.includes('CRUDE') ? 50 : 50);
+  const strike = Math.round(ltp / step) * step;
+
+  if(typeof window.renderDualRecoCards === 'function'){
+    window.renderDualRecoCards({
+      symbol: sym,
+      cmp: ltp,
+      signal: isBull ? 'BUY' : 'SELL',
+      recommendation: isBull ? 'BUY CALL' : 'BUY PUT',
+      timeStr: payload.timeStr,
+      dateTimeStr: payload.dateTimeStr,
+      call_option: { symbol: `${root} ${strike} CE`, cmp: _roundV(ltp * 0.0094), entry: _roundV(ltp * 0.0092), stop_loss: _roundV(ltp * 0.0083), target: _roundV(ltp * 0.011), lot_size: 25 },
+      put_option: { symbol: `${root} ${strike} PE`, cmp: _roundV(ltp * 0.0088), entry: _roundV(ltp * 0.0086), stop_loss: _roundV(ltp * 0.0078), target: _roundV(ltp * 0.0102), lot_size: 25 },
+      is_backtest: true
+    });
+  }
+};
+
+window.handleBacktestReplayExit = function(){
+  if(window.__caReplayState) window.__caReplayState.active = false;
+  const subEl = document.getElementById('dashRecoHeaderSub');
+  if(subEl) subEl.textContent = 'Autonomous mathematical screening across option chain. Best CE & Best PE computed simultaneously.';
+  if(typeof loadDashboard === 'function') loadDashboard();
+};
+
+// Setup Cross-Window Sync Channel for Multi-Tab Backtesting
+try {
+  if(typeof BroadcastChannel !== 'undefined'){
+    window.__caSyncChannel = window.__caSyncChannel || new BroadcastChannel('ca_trader_sync_channel');
+    window.__caSyncChannel.onmessage = function(ev){
+      if(ev.data && ev.data.type === 'CA_BACKTEST_REPLAY_UPDATE') window.handleBacktestReplaySync(ev.data);
+      else if(ev.data && ev.data.type === 'CA_BACKTEST_REPLAY_EXIT') window.handleBacktestReplayExit();
+    };
+  }
+} catch(_) {}
+
+window.addEventListener('storage', (e) => {
+  if(e.key === 'ca_backtest_sync_v1' && e.newValue){
+    try {
+      const data = JSON.parse(e.newValue);
+      if(data.type === 'CA_BACKTEST_REPLAY_UPDATE') window.handleBacktestReplaySync(data);
+      else if(data.type === 'CA_BACKTEST_REPLAY_EXIT') window.handleBacktestReplayExit();
+    } catch(_) {}
+  }
+});
 
 
 
