@@ -1154,7 +1154,7 @@
       const banner = document.getElementById('statusBanner');
       banner.className = `status-banner ${type}`;
       banner.innerHTML = type === 'generating' ? `<div class="spinner"></div> <div>${msgHtml}</div>` : msgHtml;
-      banner.style.display = 'flex';
+      banner.style.display = type === 'generating' ? 'flex' : 'block';
     }
 
     function loadVideoIntoPlayer(videoUrl, prompt, aspect, model, duration) {
