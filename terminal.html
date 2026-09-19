@@ -2423,11 +2423,59 @@ select#watchlistSelect, select.watchlist-select {
 .navtabs::-webkit-scrollbar-thumb:hover {
   background: #363c4e !important;
 }
+
+/* CA Trader Unified Static Header (Top Bar + Navtabs stay fixed on scroll) */
+:root {
+  --top-header-height: 86px;
+}
+.app-header-static {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 2500 !important;
+  background: var(--bg) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+}
+.app-header-static .topbar {
+  position: relative !important;
+  top: auto !important;
+  z-index: 2 !important;
+  border-bottom: 1px solid var(--border-soft) !important;
+}
+.app-header-static .navtabs {
+  position: relative !important;
+  top: auto !important;
+  z-index: 1 !important;
+  border-bottom: 1px solid var(--border-soft) !important;
+  background: var(--bg) !important;
+}
+.layout {
+  padding-top: var(--top-header-height, 86px) !important;
+}
+@media (min-width: 761px) {
+  .sidebar {
+    position: sticky !important;
+    top: var(--top-header-height, 86px) !important;
+    height: calc(100vh - var(--top-header-height, 86px)) !important;
+  }
+}
+@media (max-width: 760px) {
+  :root {
+    --top-header-height: 84px;
+  }
+  .layout {
+    padding-top: var(--top-header-height, 84px) !important;
+  }
+}
 </style>
 
 </head>
 <body data-theme="ivory">
 
+<!-- APP HEADER: STATIC TOP BAR & NAVIGATION -->
+<header class="app-header-static" id="appHeaderStatic">
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="topbar-left">
@@ -2509,7 +2557,6 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
     Dashboard
   </div>
-  <div class="navtab active" data-tab="charts" role="button" tabindex="0" onclick="showTab('charts')">
   <div class="navtab" data-tab="charts" role="button" tabindex="0" onclick="showTab('charts')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 5-7"/></svg>
     Chart &amp; Technicals
@@ -2556,6 +2603,7 @@ select#watchlistSelect, select.watchlist-select {
     Notifications
   </div>
   </div>
+</header>
 
 <div class="layout">
 
@@ -2638,8 +2686,6 @@ select#watchlistSelect, select.watchlist-select {
         </div>
 
         <!-- Two Distinct Side-by-Side Cards: CALL (CE) on Left, PUT (PE) on Right -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;box-sizing:border-box;">
-        <div id="dashDualRecoContainer" class="dash-dual-reco-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;box-sizing:border-box;">
         <div id="dashDualRecoContainer" class="dash-dual-reco-grid" style="display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);gap:16px;width:100%;box-sizing:border-box;">
           <!-- LEFT CARD: CALL OPTION (CE) -->
           <div class="card" id="dashCardCe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;">
@@ -21184,6 +21230,10 @@ window.checkPopoutChartMode = function(){
     if(sidebar) sidebar.style.display = 'none';
     const topbar = document.querySelector('.topbar');
     if(topbar) topbar.style.display = 'none';
+    const headerStatic = document.getElementById('appHeaderStatic');
+    if(headerStatic) headerStatic.style.display = 'none';
+    const layout = document.querySelector('.layout');
+    if(layout) layout.style.setProperty('padding-top', '0px', 'important');
     const popoutBtn = document.getElementById('chartPopoutBtn');
     if(popoutBtn) popoutBtn.style.display = 'none';
     if(typeof showTab === 'function') showTab('charts');
