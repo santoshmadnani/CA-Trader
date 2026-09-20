@@ -124,20 +124,33 @@
     if(window.__CA_SHIELD_DELEGATION__) return;
     window.__CA_SHIELD_DELEGATION__ = true;
 
+    window.switchTab = function(name){
+      if(typeof window.showTab === 'function') {
+        window.showTab(name);
+      }
+    };
+
     document.addEventListener('click', function(e){
       // 1. Tab switches
-      var tabBtn = e.target.closest('.tab-btn, [data-tab]');
+      var tabBtn = e.target.closest('.navtab, .tab-btn, [data-tab]');
       if(tabBtn){
         var tabId = tabBtn.getAttribute('data-tab') || (tabBtn.textContent || '').trim().toLowerCase();
-        if(tabId && typeof window.switchTab === 'function'){
+        if(tabId === 'watchlist' || tabId === 'ai') return;
+        if(tabId && typeof window.showTab === 'function'){
+          window.showTab(tabId);
+        } else if(tabId && typeof window.switchTab === 'function'){
           window.switchTab(tabId);
         } else if(tabId) {
           var panels = document.querySelectorAll('.panel');
           panels.forEach(function(p){ p.classList.remove('active'); p.style.display = 'none'; });
           var targetPanel = document.getElementById('panel-' + tabId) || document.getElementById(tabId);
           if(targetPanel){
+            var panels = document.querySelectorAll('.panel');
+            panels.forEach(function(p){ p.classList.remove('active'); p.style.display = 'none'; });
             targetPanel.classList.add('active');
             targetPanel.style.display = 'block';
+            document.querySelectorAll('.navtab, .tab-btn').forEach(function(b){ b.classList.remove('active'); });
+            tabBtn.classList.add('active');
           }
           document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
           tabBtn.classList.add('active');
@@ -1805,6 +1818,53 @@ select, .select-box select, .tool-input select, #noteEditorFolder, #chartRecoOpt
   border-radius: 6px !important;
 }
 
+/* Dashboard & Factors Filter Button Group Styling (Timeframe-selection UI style) */
+#excelMatrixFilterTabs.dash-filter-button-group,
+#otherFactorsFilterTabs {
+  display: inline-flex !important;
+  gap: 4px !important;
+  background: var(--surface-2, #181c24) !important;
+  padding: 3px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border, #2a2e39) !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+}
+
+#excelMatrixFilterTabs .chip-filter,
+#otherFactorsFilterTabs .chip-filter {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 6px !important;
+  padding: 3px 10px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  height: 26px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+  transition: all 0.15s ease-in-out !important;
+  user-select: none !important;
+}
+
+#excelMatrixFilterTabs .chip-filter:hover,
+#otherFactorsFilterTabs .chip-filter:hover {
+  border-color: #00d2ff !important;
+  color: #ffffff !important;
+  background: #111111 !important;
+}
+
+#excelMatrixFilterTabs .chip-filter.active,
+#otherFactorsFilterTabs .chip-filter.active {
+  background: #00d2ff !important;
+  color: #000000 !important;
+  border-color: #00d2ff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.5) !important;
+}
 </style>
 
 <!-- ===== polish pass: micro-interactions + iPhone/mobile fit ===== -->
@@ -2168,10 +2228,28 @@ body.light-theme .market-box *,
   padding: 0 !important;
   border-radius: 6px !important;
   font-size: 12px !important;
+  display: none;
+  position: fixed !important;
+  bottom: 30px !important;
+  right: 24px !important;
+  z-index: 99999 !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border-radius: 50% !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border-soft) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5) !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
   cursor: pointer !important;
+  color: var(--gold) !important;
+  transition: opacity 0.2s, transform 0.2s !important;
+}
+#moveTopBtn:hover{
+  transform: translateY(-2px) !important;
+  border-color: var(--gold) !important;
 }
 
 #notificationBtn{
@@ -2254,6 +2332,7 @@ body.light-theme .market-box *,
   .topbar-left{gap: 3px !important;}
   .topbar-right{gap: 3px !important;}
   .market-box{padding: 2px 4px !important; font-size: 8px !important;}
+  .market-box{padding: 2px 4px !important; font-size: 8px !important; flex-shrink: 0 !important; white-space: nowrap !important;}
   .market-box .market-label{font-size: 8px !important;}
   .market-box .market-state{font-size: 8px !important;}
   .market-time-box{padding: 2px 4px !important; font-size: 8.5px !important;}
@@ -2699,10 +2778,15 @@ select#watchlistSelect, select.watchlist-select {
             <button class="notif-tab active" data-notif-filter="all">All</button>
             <button class="notif-tab" data-notif-filter="news">News</button>
             <button class="notif-tab" data-notif-filter="orders_reco">Orders &amp; Recos</button>
+            <button type="button" class="notif-tab active" data-notif-filter="all" onclick="window.selectNotifFilter(this, 'all')">All</button>
+            <button type="button" class="notif-tab" data-notif-filter="news" onclick="window.selectNotifFilter(this, 'news')">News</button>
+            <button type="button" class="notif-tab" data-notif-filter="orders_reco" onclick="window.selectNotifFilter(this, 'orders_reco')">Orders &amp; Recos</button>
           </div>
           <div style="display:flex;align-items:center;gap:4px;">
             <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">✓ Read</button>
             <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification retention and pruning settings">⚙</button>
+            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:22px;" title="Mark all notifications as read">✓ Read</button>
+            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙ Settings</button>
           </div>
         </div>
         <div class="notification-list" id="notificationListBody" style="max-height:360px;overflow-y:auto;"></div>
@@ -3023,15 +3107,15 @@ select#watchlistSelect, select.watchlist-select {
 
         <!-- Excel Matrix Filter Bar with Dedicated Live vs Macro Sections -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-          <div id="excelMatrixFilterTabs" style="display:inline-flex;gap:4px;flex-wrap:wrap;">
-            <button type="button" class="chip-filter active" data-ef-cat="all" onclick="filterExcelFactors('all', this)" style="padding:2px 8px;font-size:10.5px;">All (40)</button>
-            <button type="button" class="chip-filter" data-ef-cat="live_app" onclick="filterExcelFactors('live_app', this)" style="padding:2px 8px;font-size:10.5px;font-weight:700;color:var(--buy);">⚡ In-App Live Stream (22)</button>
-            <button type="button" class="chip-filter" data-ef-cat="macro_feed" onclick="filterExcelFactors('macro_feed', this)" style="padding:2px 8px;font-size:10.5px;font-weight:700;color:#40a9ff;">🌐 Macro &amp; Exchange Verified (18)</button>
-            <button type="button" class="chip-filter" data-ef-cat="options" onclick="filterExcelFactors('options', this)" style="padding:2px 8px;font-size:10.5px;">Options &amp; Greeks (10)</button>
-            <button type="button" class="chip-filter" data-ef-cat="flow" onclick="filterExcelFactors('flow', this)" style="padding:2px 8px;font-size:10.5px;">Order Flow &amp; Liquidity (7)</button>
-            <button type="button" class="chip-filter" data-ef-cat="tech" onclick="filterExcelFactors('tech', this)" style="padding:2px 8px;font-size:10.5px;">Technicals &amp; Levels (6)</button>
-            <button type="button" class="chip-filter" data-ef-cat="macro" onclick="filterExcelFactors('macro', this)" style="padding:2px 8px;font-size:10.5px;">Macro &amp; Global (7)</button>
-            <button type="button" class="chip-filter" data-ef-cat="fund" onclick="filterExcelFactors('fund', this)" style="padding:2px 8px;font-size:10.5px;">Fundamentals &amp; Events (10)</button>
+          <div id="excelMatrixFilterTabs" class="dash-filter-button-group">
+            <button type="button" class="chip-filter active" data-ef-cat="all" onclick="filterExcelFactors('all', this)">All (40)</button>
+            <button type="button" class="chip-filter" data-ef-cat="live_app" onclick="filterExcelFactors('live_app', this)">⚡ In-App Live Stream (22)</button>
+            <button type="button" class="chip-filter" data-ef-cat="macro_feed" onclick="filterExcelFactors('macro_feed', this)">🌐 Macro &amp; Exchange Verified (18)</button>
+            <button type="button" class="chip-filter" data-ef-cat="options" onclick="filterExcelFactors('options', this)">Options &amp; Greeks (10)</button>
+            <button type="button" class="chip-filter" data-ef-cat="flow" onclick="filterExcelFactors('flow', this)">Order Flow &amp; Liquidity (7)</button>
+            <button type="button" class="chip-filter" data-ef-cat="tech" onclick="filterExcelFactors('tech', this)">Technicals &amp; Levels (6)</button>
+            <button type="button" class="chip-filter" data-ef-cat="macro" onclick="filterExcelFactors('macro', this)">Macro &amp; Global (7)</button>
+            <button type="button" class="chip-filter" data-ef-cat="fund" onclick="filterExcelFactors('fund', this)">Fundamentals &amp; Events (10)</button>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:11px;padding:3px 10px;font-weight:700;">✦ Factors Math &amp; Formulas Suite</button>
@@ -3100,6 +3184,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
       </div>
     </div>
+  </div>
 
 
         <!-- ==================== RECOMMENDATION HISTORY PANEL (Item 1 & 11) ==================== -->
@@ -3251,6 +3336,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
       </div>
     </div>
+  </div>
 
     <div class="panel" id="panel-charts">
       <div class="page-head">
@@ -3305,8 +3391,9 @@ select#watchlistSelect, select.watchlist-select {
 
           <!-- Saved Views (Cloud Icon) -->
           <div style="position:relative;">
-            <button type="button" class="tf-btn" id="btnSavedViews" title="Saved Views" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+            <button type="button" class="tf-btn" id="btnSavedViews" title="Saved Views" style="display:inline-flex;align-items:center;gap:3px;padding:4px 8px;font-size:11px;font-weight:600;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+              <span>Views</span>
             </button>
             <div id="savedViewsDropdownMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,0.35);padding:8px;min-width:175px;">
               <div style="font-size:10px;font-weight:700;color:var(--text-faint);margin-bottom:6px;text-transform:uppercase;">Saved Views</div>
@@ -3323,8 +3410,9 @@ select#watchlistSelect, select.watchlist-select {
           <button type="button" class="tf-btn" id="btnChartZoomOut" title="Zoom Out (−)" style="font-size:14px;font-weight:700;padding:4px 9px;">−</button>
 
           <!-- Fullscreen Button (Release 47 - Item 7 & 13) -->
-          <button type="button" class="tf-btn" id="chartFullscreenToolbarBtn" title="Full Screen (Auto Landscape)" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5"/></svg>
+          <button type="button" class="tf-btn" id="chartFullscreenToolbarBtn" title="Full Screen (Auto Landscape)" style="display:inline-flex;align-items:center;gap:3px;padding:4px 8px;font-size:11px;font-weight:600;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5"/></svg>
+            <span>Full</span>
           </button>
 
           <button type="button" class="tf-btn" id="btnOpenIndicatorsModal" title="Technical Indicators (110+ available)" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 9px;font-weight:700;">
@@ -3338,18 +3426,21 @@ select#watchlistSelect, select.watchlist-select {
             <span>Lock</span>
           </button>
 
-          <button type="button" class="tf-btn" id="btnToggleDrawingsToolbar" title="Toggle Drawing Tools (Trendline, Fib, Channel, etc.)" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+          <button type="button" class="tf-btn" id="btnToggleDrawingsToolbar" title="Toggle Drawing Tools (Trendline, Fib, Channel, etc.)" style="display:inline-flex;align-items:center;gap:3px;padding:4px 8px;font-size:11px;font-weight:600;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            <span>Draw</span>
           </button>
 
-          <!-- Pan / Crosshair Switch (Shows Opposite Icon: Pan Hand when in Crosshair mode) -->
-          <button type="button" class="tf-btn" id="chartModeToggle" title="Switch to Pan Drag mode" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 7px;">
-            <span id="chartModeToggleIcon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></span>
+          <!-- Pan / Crosshair Switch -->
+          <button type="button" class="tf-btn" id="chartModeToggle" title="Toggle Pan Drag / Crosshair mode" style="display:inline-flex;align-items:center;gap:3px;padding:4px 8px;font-size:11px;font-weight:600;">
+            <span id="chartModeToggleIcon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></span>
+            <span id="chartModeLabel">Pan</span>
           </button>
 
           <!-- Clear Drawings -->
-          <button type="button" class="tf-btn" id="clearDrawings" title="Clear All Drawings" style="padding:4px 7px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          <button type="button" class="tf-btn" id="clearDrawings" title="Clear All Drawings" style="display:inline-flex;align-items:center;gap:3px;padding:4px 8px;font-size:11px;font-weight:600;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            <span>Clear</span>
           </button>
         </div>
 
@@ -4607,6 +4698,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
       </div>
     </div>
+  </div>
 
     <!-- ============ TRADER QUIZ (Item 23) ============ -->
     <div class="panel" id="panel-quiz" style="display:none !important;">
@@ -5166,8 +5258,10 @@ select#watchlistSelect, select.watchlist-select {
   </div>
 </div>
 <div class="tool-modal" id="newsAnalysisModal" aria-hidden="true"><div class="tool-modal-card"><div class="card-head"><div class="card-title">CA AI News Analysis</div><button class="btn ghost small" id="newsAnalysisClose">Close</button></div><div id="newsAnalysisBody"></div></div></div>
+<div class="tool-modal" id="newsAnalysisModal" aria-hidden="true"><div class="tool-modal-card"><div class="card-head"><div class="card-title">CA AI News Analysis</div><button class="btn ghost small" id="newsAnalysisClose" onclick="closeModal('newsAnalysisModal')">Close</button></div><div id="newsAnalysisBody"></div></div></div>
 <div class="tool-modal" id="greekModal" aria-hidden="true"><div class="tool-modal-card" style="width:min(560px,calc(100vw - 28px));max-width:560px;"><div class="card-head"><div class="card-title" id="greekModalTitle">Option Greek Explanation & Movement Simulator</div><button class="btn ghost small" id="greekModalClose">Close</button></div><div id="greekModalBody" style="margin-top:12px;display:flex;flex-direction:column;gap:12px;"></div></div></div>
 <div class="tool-modal" id="externalNewsModal" aria-hidden="true"><div class="tool-modal-card"><div class="card-head"><div class="card-title">Add External News</div><button class="btn ghost small" id="externalNewsClose">Close</button></div><div class="muted" style="margin-bottom:10px">Enter any one or more of headline, summary or URL. CA Trader will find 4–5 relevant articles for you to choose from.</div><div class="grid grid-2"><div class="field"><label>Headline</label><input id="externalNewsHeadline" class="tool-input" placeholder="News headline or key event"></div><div class="field"><label>Selected stock (optional)</label><input id="externalNewsTarget" class="tool-input" placeholder="INFY / RELIANCE"><label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:10px"><input id="externalNewsGlobal" type="checkbox"> Add as global news for all stocks</label></div></div><div class="field"><label>Summary / description</label><textarea id="externalNewsSummary" class="tool-input" style="height:82px;padding:9px;resize:vertical" placeholder="Paste any part of the news you have"></textarea></div><div class="field"><label>Article URL</label><input id="externalNewsUrl" class="tool-input" placeholder="https://..."></div><div class="tool-modal-actions"><button class="btn gold" id="externalNewsSearchBtn">Find relevant news</button></div><div id="externalNewsStatus" class="muted" style="margin-top:8px"></div><div id="externalNewsResults" class="external-news-results" style="margin-top:10px"></div><div class="tool-modal-actions"><button class="btn gold" id="externalNewsAddBtn" disabled>Add selected news</button></div></div></div>
+<div class="tool-modal" id="externalNewsModal" aria-hidden="true"><div class="tool-modal-card"><div class="card-head"><div class="card-title">Add External News</div><button class="btn ghost small" id="externalNewsClose" onclick="closeModal('externalNewsModal')">Close</button></div><div class="muted" style="margin-bottom:10px">Enter any one or more of headline, summary or URL. CA Trader will find 4–5 relevant articles for you to choose from.</div><div class="grid grid-2"><div class="field"><label>Headline</label><input id="externalNewsHeadline" class="tool-input" placeholder="News headline or key event"></div><div class="field"><label>Selected stock (optional)</label><input id="externalNewsTarget" class="tool-input" placeholder="INFY / RELIANCE"><label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:10px"><input id="externalNewsGlobal" type="checkbox"> Add as global news for all stocks</label></div></div><div class="field"><label>Summary / description</label><textarea id="externalNewsSummary" class="tool-input" style="height:82px;padding:9px;resize:vertical" placeholder="Paste any part of the news you have"></textarea></div><div class="field"><label>Article URL</label><input id="externalNewsUrl" class="tool-input" placeholder="https://..."></div><div class="tool-modal-actions"><button class="btn gold" id="externalNewsSearchBtn">Find relevant news</button></div><div id="externalNewsStatus" class="muted" style="margin-top:8px"></div><div id="externalNewsResults" class="external-news-results" style="margin-top:10px"></div><div class="tool-modal-actions"><button class="btn gold" id="externalNewsAddBtn" disabled>Add selected news</button></div></div></div>
 <div class="tool-modal" id="orderModal" aria-hidden="true"><div class="tool-modal-card"><div class="card-head"><div class="card-title" id="orderModalTitle">Place Order</div><button class="btn ghost small" id="orderModalClose">Close</button></div><div id="orderLiveQuote" class="basis-item" style="margin-top:10px">LTP — · Change —</div><div class="grid grid-2" style="margin-top:10px"><div class="field"><label id="orderQtyLabel">Quantity / Lots</label><input id="orderQty" class="tool-input" type="number" min="1" step="1" value="1"><div class="muted" id="orderReferenceShares" style="margin-top:4px">Reference shares —</div></div><div class="field"><label>Order Type</label><select id="orderType" class="tool-input"><option>MARKET</option><option>LIMIT</option><option>SL</option><option>SL-M</option></select></div><div class="field"><label>Limit / Trigger Price</label><input id="orderPrice" class="tool-input" type="number" step="0.01"></div><div class="field"><label>Stop Loss</label><input id="orderSL" class="tool-input" type="number" step="0.01"></div><div class="field"><label>Target</label><input id="orderTarget" class="tool-input" type="number" step="0.01"></div><div class="field"><label>Trailing SL (Points)</label><input id="orderTrailingSl" class="tool-input" type="number" step="0.5" placeholder="Optional TSL"></div><div class="field"><label>Product</label><select id="orderProduct" class="tool-input"><option value="D">Delivery</option><option value="I">Intraday</option></select></div><div class="field"><label>Fund Account</label><select id="orderFundAccount" class="tool-input"><option value="trading">Trading Funds</option><option value="testing">Testing / Paper Funds</option><option value="auto_trade">Auto Trade Funds</option></select></div></div><div style="display:flex;gap:14px;align-items:center;margin-top:10px;flex-wrap:wrap;">
       <label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;"><input type="checkbox" id="orderAmo"> AMO — queue after market hours</label>
       <label style="display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer;color:var(--gold);font-weight:600;"><input type="checkbox" id="orderIsBacktest" style="accent-color:var(--gold);"> <span>Backtest Simulation Order</span></label>
@@ -5513,52 +5607,77 @@ window.isInstrumentMarketOpen = function(sym) {
 
 function showTab(name){
   if(!name) return;
-  if(window.navIsDragging) { window.navIsDragging = false; return; }
-  // window.navIsDragging check removed to ensure reliable tab switching
-  const panelName = name; // 'reco' and 'notes' map directly to their panels
+  const panelName = name;
   document.querySelectorAll('.navtab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+panelName));
-  // Ensure active panels are visible
-  document.querySelectorAll('.panel.active').forEach(p=>{
-    p.style.minHeight = p.style.minHeight || '';
-    p.style.display = '';
+  document.querySelectorAll('.mobile-dock-item').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>{
+    const isActive = (p.id === 'panel-' + panelName || p.id === panelName);
+    p.classList.toggle('active', isActive);
+    if(isActive){
+      p.style.setProperty('display', 'block', 'important');
+      p.style.visibility = 'visible';
+    } else {
+      p.style.display = 'none';
+    }
   });
   try {
     if(name === 'reco'){
       if(typeof loadRecommendations === 'function') loadRecommendations(false);
       if(typeof loadRecommendationHistory === 'function') loadRecommendationHistory();
+      (window.loadRecommendations || (typeof loadRecommendations === 'function' ? loadRecommendations : null))?.(false);
+      (window.loadRecommendationHistory || (typeof loadRecommendationHistory === 'function' ? loadRecommendationHistory : null))?.();
     } else if(name === 'backtesting'){
       if(typeof initBacktestingTab === 'function') initBacktestingTab();
+      (window.initBacktestingTab || (typeof initBacktestingTab === 'function' ? initBacktestingTab : null))?.();
     } else if(name === 'dashboard'){
       if(typeof loadDashboard === 'function') loadDashboard();
+      (window.loadDashboard || (typeof loadDashboard === 'function' ? loadDashboard : null))?.();
     } else if(name === 'charts'){
       if(typeof loadChart === 'function') loadChart();
+      if(typeof ensureChartLayout === 'function') ensureChartLayout();
+      (window.loadChart || (typeof loadChart === 'function' ? loadChart : null))?.();
+      (window.ensureChartLayout || (typeof ensureChartLayout === 'function' ? ensureChartLayout : null))?.(true);
+      setTimeout(()=>{ (window.ensureChartLayout || (typeof ensureChartLayout === 'function' ? ensureChartLayout : null))?.(true); }, 120);
     } else if(name === 'options'){
       if(typeof loadOptions === 'function') loadOptions();
+      (window.loadOptions || (typeof loadOptions === 'function' ? loadOptions : null))?.();
     } else if(name === 'news'){
       if(typeof loadNewsByCaAi === 'function') loadNewsByCaAi();
+      const curNewsMode = document.querySelector('[data-ca-news-mode].active')?.dataset.caNewsMode || 'all';
+      (window.loadNewsByCaAi || window.loadNews || (typeof loadNewsByCaAi === 'function' ? loadNewsByCaAi : null))?.(curNewsMode);
     } else if(name === 'fundamentals'){
       if(typeof loadFundamentals === 'function') loadFundamentals();
+      (window.loadFundamentals || (typeof loadFundamentals === 'function' ? loadFundamentals : null))?.();
     } else if(name === 'other-factors'){
       if(typeof loadOtherFactorsSuite === 'function') loadOtherFactorsSuite(false);
+      (window.loadOtherFactorsSuite || (typeof loadOtherFactorsSuite === 'function' ? loadOtherFactorsSuite : null))?.(false);
     } else if(name === 'movers'){
       if(typeof loadMovers === 'function') loadMovers();
+      (window.loadMovers || (typeof loadMovers === 'function' ? loadMovers : null))?.();
     } else if(name === 'orders'){
       if(typeof loadPortfolioSnapshot === 'function') loadPortfolioSnapshot(false);
+      (window.loadPortfolioSnapshot || (typeof loadPortfolioSnapshot === 'function' ? loadPortfolioSnapshot : null))?.(false);
     } else if(name === 'funds'){
       if(typeof loadFundsTab === 'function') loadFundsTab();
+      (window.loadFundsTab || (typeof loadFundsTab === 'function' ? loadFundsTab : null))?.();
     } else if(name === 'notifications'){
       if(typeof loadDedicatedNotifications === 'function') loadDedicatedNotifications(false);
+      (window.loadDedicatedNotifications || (typeof loadDedicatedNotifications === 'function' ? loadDedicatedNotifications : null))?.(false);
     } else if(name === 'api-passbook'){
       if(typeof loadAdminApiPassbook === 'function') loadAdminApiPassbook();
+      (window.loadAdminApiPassbook || (typeof loadAdminApiPassbook === 'function' ? loadAdminApiPassbook : null))?.();
     } else if(name === 'console'){
       if(typeof loadServerConsole === 'function') loadServerConsole();
+      (window.loadServerConsole || (typeof loadServerConsole === 'function' ? loadServerConsole : null))?.();
     } else if(name === 'reports'){
       if(typeof loadReports === 'function') loadReports();
+      (window.loadReports || (typeof loadReports === 'function' ? loadReports : null))?.();
     } else if(name === 'quiz'){
       if(typeof loadQuiz === 'function') loadQuiz();
+      (window.loadQuiz || (typeof loadQuiz === 'function' ? loadQuiz : null))?.();
     } else if(name === 'tutorial'){
       if(typeof setupTutorialTrees === 'function') setupTutorialTrees();
+      (window.setupTutorialTrees || (typeof setupTutorialTrees === 'function' ? setupTutorialTrees : null))?.();
     }
   } catch(_) {}
   try { document.querySelector('.sidebar')?.classList.remove('mobile-open'); } catch(_) {}
@@ -5569,6 +5688,7 @@ function showTab(name){
   }
 }
 window.showTab = showTab;
+window.switchTab = showTab;
 ['click', 'pointerdown'].forEach(evtName => {
   document.querySelectorAll('.navtab').forEach(t=>{
     t.addEventListener(evtName, (e)=>{
@@ -5865,7 +5985,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   const signalClass = s => String(s||'').toUpperCase().includes('BUY') || String(s||'').toUpperCase().includes('POSITIVE') ? 'buy' : String(s||'').toUpperCase().includes('SELL') || String(s||'').toUpperCase().includes('NEGATIVE') ? 'sell' : 'neutral';
   const toast=(m)=>{const el=document.getElementById('toast')||(()=>{const x=document.createElement('div');x.id='toast';x.style.cssText='position:fixed;right:18px;bottom:18px;z-index:300;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:11px;box-shadow:0 12px 30px rgba(0,0,0,.25);opacity:0;transition:.2s';document.body.appendChild(x);return x})();el.textContent=m;el.style.opacity='1';clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity='0',2200)};
   const fmt=v=>v==null||!isFinite(Number(v))?'—':Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const css=n=>getComputedStyle(document.body).getPropertyValue(n)||getComputedStyle(document.documentElement).getPropertyValue(n);
+  const css=n=>{try{const v=((document.body&&getComputedStyle(document.body).getPropertyValue(n))||(document.documentElement&&getComputedStyle(document.documentElement).getPropertyValue(n))||'').trim();if(v)return v;}catch(e){}if(n==='--buy')return'#26D9A6';if(n==='--sell')return'#FF5C72';if(n==='--surface-2')return'#171C27';if(n==='--surface-3')return'#212836';if(n==='--surface')return'#0e131d';if(n==='--text-faint')return'#525A6C';if(n==='--text-dim')return'#8B949E';if(n==='--text')return'#E6EDF3';if(n==='--gold')return'#E8B84B';return'#808A9B';};
   const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
   const state={candles:[],tf:'5m',history:30,visible:90,zoom:1,panX:0,panY:0,yScale:1,cross:null,drag:null,panArmed:false,yPanArmed:false,pendingDrawing:null,drawingStage:[],drawings:[],appliedIndicators:[],indicatorValues:{},currentKey:null,latestLive:null,fullscreen:false,interactionMode:'crosshair',hoverDrawing:null,dragDrawing:null};
   window.__CA_TRADER_STATE = state;
@@ -5886,11 +6006,111 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   function closeModal(id){const m=document.getElementById(id);if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true')}}
   window.openModal = openModal;
   window.closeModal = closeModal;
+
+  // External News Modal Wiring (Search & Ingest)
+  let selectedExternalArticle = null;
+  document.addEventListener('DOMContentLoaded', () => {
+    const extSearchBtn = document.getElementById('externalNewsSearchBtn');
+    const extAddBtn = document.getElementById('externalNewsAddBtn');
+    const extStatus = document.getElementById('externalNewsStatus');
+    const extResults = document.getElementById('externalNewsResults');
+
+    extSearchBtn?.addEventListener('click', async () => {
+      const headline = document.getElementById('externalNewsHeadline')?.value?.trim() || '';
+      const summary = document.getElementById('externalNewsSummary')?.value?.trim() || '';
+      const url = document.getElementById('externalNewsUrl')?.value?.trim() || '';
+      const target = document.getElementById('externalNewsTarget')?.value?.trim() || '';
+      if(!headline && !summary && !url){
+        if(extStatus) extStatus.textContent = 'Please enter a headline, summary or URL';
+        return;
+      }
+      if(extStatus) extStatus.textContent = 'Searching relevant news articles…';
+      extSearchBtn.disabled = true;
+      try {
+        const res = await A('/api/news/external/search', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({headline, summary, url, target})
+        });
+        const items = res?.results || [];
+        if(!items.length){
+          if(extStatus) extStatus.textContent = 'No matching web articles found. You can still add your text directly.';
+          if(extAddBtn) extAddBtn.disabled = false;
+          selectedExternalArticle = {headline, summary, url, target};
+          return;
+        }
+        if(extStatus) extStatus.textContent = `Found ${items.length} relevant articles. Click one to select:`;
+        if(extResults){
+          extResults.innerHTML = items.map((art, idx) => `
+            <div class="external-news-result" data-idx="${idx}" style="padding:8px 10px;border:1px solid var(--border-soft);border-radius:6px;cursor:pointer;margin-bottom:6px;background:var(--surface);">
+              <div style="font-weight:700;font-size:11.5px;color:var(--text);">${esc(art.headline || art.title || '')}</div>
+              <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px;">${esc(art.summary || art.description || '')}</div>
+              <div style="font-size:9.5px;color:var(--gold);margin-top:3px;">${esc(art.source || 'News')} · ${esc(art.published_at || '')}</div>
+            </div>
+          `).join('');
+          extResults.querySelectorAll('.external-news-result').forEach(el => {
+            el.addEventListener('click', () => {
+              extResults.querySelectorAll('.external-news-result').forEach(x => x.style.borderColor = 'var(--border-soft)');
+              el.style.borderColor = 'var(--buy)';
+              const idx = Number(el.dataset.idx);
+              selectedExternalArticle = items[idx];
+              if(extAddBtn) extAddBtn.disabled = false;
+            });
+          });
+        }
+      } catch(err) {
+        if(extStatus) extStatus.textContent = 'Search error: ' + (err.message || 'Unavailable');
+      } finally {
+        extSearchBtn.disabled = false;
+      }
+    });
+
+    extAddBtn?.addEventListener('click', async () => {
+      if(!selectedExternalArticle) return;
+      const target = document.getElementById('externalNewsTarget')?.value?.trim() || '';
+      const isGlobal = document.getElementById('externalNewsGlobal')?.checked || !target;
+      extAddBtn.disabled = true;
+      if(extStatus) extStatus.textContent = 'Adding news to feed…';
+      try {
+        await A('/api/news/external/add', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({article: selectedExternalArticle, target, is_global: isGlobal})
+        });
+        if(extStatus) extStatus.textContent = '✓ News article added successfully!';
+        closeModal('externalNewsModal');
+        if(typeof toast === 'function') toast('✓ External news article ingested into CA Trader');
+        if(typeof loadNews === 'function') loadNews();
+      } catch(err){
+        if(extStatus) extStatus.textContent = 'Add error: ' + (err.message || 'Failed');
+        extAddBtn.disabled = false;
+      }
+    });
+  });
   function openToolModal(name,kind,defaults){return new Promise(resolve=>{const m=document.getElementById('toolModal'),field=document.getElementById('toolParameterField'),label=document.getElementById('toolParameterLabel'),input=document.getElementById('toolParams'),color=document.getElementById('toolColor'); const originalParent=m.parentElement; if(document.fullscreenElement&&document.fullscreenElement.id==='chartShell') document.fullscreenElement.appendChild(m);document.getElementById('toolModalTitle').textContent=`Configure ${name}`;field.style.display=kind==='indicator'?'block':'none';document.getElementById('toolColorField').style.display='block';label.textContent='Simple parameter';input.placeholder=kind==='indicator'?'e.g. 20 or 12,26,9':'';input.value=defaults||'';color.value='#E8B84B';m.classList.add('open');m.setAttribute('aria-hidden','false');const done=v=>{closeModal('toolModal'); if(originalParent&&!originalParent.contains(m)) originalParent.appendChild(m); ['toolModalSave','toolModalCancel','toolModalClose'].forEach(id=>document.getElementById(id).onclick=null);resolve(v)};document.getElementById('toolModalSave').onclick=()=>done({params:input.value.trim(),color:color.value});document.getElementById('toolModalCancel').onclick=()=>done(null);document.getElementById('toolModalClose').onclick=()=>done(null)})}
 
   function resizeCanvas(){const c=document.getElementById('upstoxCandles'),v=document.getElementById('chartViewport');if(!c||!v)return;const d=devicePixelRatio||1;c.width=Math.max(1,v.clientWidth)*d;c.height=Math.max(1,v.clientHeight)*d;c.style.width=v.clientWidth+'px';c.style.height=v.clientHeight+'px'}
-  let __chartLayoutRetry=0;
-  function ensureChartLayout(){const v=document.getElementById('chartViewport'),c=document.getElementById('upstoxCandles');if(!v||!c)return false;const ok=v.clientWidth>20&&v.clientHeight>120;if(ok){resizeCanvas();return true;}if(__chartLayoutRetry<12){__chartLayoutRetry++;setTimeout(()=>{ensureChartLayout();if(state.candles.length)draw()},150)}return false;}
+  let __chartLayoutRetry = 0;
+  function ensureChartLayout(reset = false){
+    if(reset) __chartLayoutRetry = 0;
+    const v = document.getElementById('chartViewport'), c = document.getElementById('upstoxCandles');
+    if(!v || !c) return false;
+    const ok = v.clientWidth > 20 && v.clientHeight > 120;
+    if(ok){
+      resizeCanvas();
+      return true;
+    }
+    if(__chartLayoutRetry < 15){
+      __chartLayoutRetry++;
+      setTimeout(()=>{
+        if(ensureChartLayout(false)){
+          if(window.state && window.state.candles && window.state.candles.length && typeof draw === 'function') draw();
+        }
+      }, 100);
+    }
+    return false;
+  }
+  window.ensureChartLayout = ensureChartLayout;
   if(window.ResizeObserver){const ro=new ResizeObserver(()=>{if(ensureChartLayout()&&state.candles.length)draw()});const v0=document.getElementById('chartViewport');if(v0)ro.observe(v0);}
 
   function candleIntervalMs(){if(state.tf==='1D')return 86400000;if(state.tf==='60m')return 3600000;return Number(state.tf.replace('m',''))*60000}
@@ -6107,7 +6327,19 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     return null;
   }
 
-  function draw(){const c=document.getElementById('upstoxCandles'),v=document.getElementById('chartViewport');if(!c||!v)return;ensureChartLayout();resizeCanvas();const x=c.getContext('2d'),d=devicePixelRatio||1,w=v.clientWidth,h=v.clientHeight;x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,w,h);const view=getView(),a=view.data;if(!a.length){x.fillStyle=css('--text-dim');x.font='12px IBM Plex Sans, sans-serif';x.fillText('Candlestick data unavailable',24,30);hideAxisLabels();return}
+  let __isDrawing = false;
+  function draw(){
+    if(__isDrawing) return;
+    __isDrawing = true;
+    try {
+      const c=document.getElementById('upstoxCandles'),v=document.getElementById('chartViewport');
+      if(!c||!v)return;
+      resizeCanvas();
+      const x=c.getContext('2d'),d=devicePixelRatio||1,w=v.clientWidth,h=v.clientHeight;
+      x.setTransform(d,0,0,d,0,0);
+      x.clearRect(0,0,w,h);
+      const view=getView(),a=view.data;
+      if(!a.length){x.fillStyle=css('--text-dim');x.font='12px IBM Plex Sans, sans-serif';x.fillText('Candlestick data unavailable',24,30);hideAxisLabels();return}
   // Update live OHLC values (Item 8: crosshair hover or latest candle)
   const hoverCandle = (state.cross && state.cross.index != null && state.candles && state.candles[state.cross.index])
     ? state.candles[state.cross.index]
@@ -6589,6 +6821,9 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     updateFastForward(view);
     if(typeof drawBacktestOptionCanvas === 'function') drawBacktestOptionCanvas();
     if(typeof updateBacktestOptionHeader === 'function') updateBacktestOptionHeader();
+    } finally {
+      __isDrawing = false;
+    }
   }
 
   function updateCross(e){const r=document.getElementById('chartViewport').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,view=getView();if(!view.data.length)return;const i=indexFromX(x,view),c=view.data[i];const price=priceFromY(y,view);state.cross={x:Math.max(12,Math.min(r.width-72,x)),y:Math.max(18,Math.min(r.height-36,y)),price,label:xLabel(c?.timestamp||Date.now()),index:view.start+i};draw()}
@@ -6602,10 +6837,10 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     const isPan = mode === 'pan';
     if(b){
       b.innerHTML = isPan
-        ? `<span id="chartModeToggleIcon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="12" cy="12" r="9"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/></svg></span>`
-        : `<span id="chartModeToggleIcon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></span>`;
+        ? `<span id="chartModeToggleIcon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="12" cy="12" r="9"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/></svg></span><span>Cross</span>`
+        : `<span id="chartModeToggleIcon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></span><span>Pan</span>`;
       b.classList.toggle('active', isPan);
-      b.title = isPan ? 'Currently in Pan mode — Click to switch to Crosshair' : 'Currently in Crosshair mode — Click to switch to Pan Drag';
+      b.title = isPan ? 'Currently in Pan mode · Click to switch to Crosshair' : 'Currently in Crosshair mode · Click to switch to Pan Drag';
     }
     vp.classList.toggle('pan-mode', isPan);
     vp.style.cursor = isPan ? 'grab' : 'crosshair';
@@ -8296,8 +8531,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
 
   function computeLocalChartAiSuggestions(candles){
     if(!candles || candles.length < 10) return { trendlines: [], horizontal_levels: [], indicators: [], summary: 'Insufficient candles for AI chart analysis' };
-    const n = candles.length
-... [truncated for diff preview]
     const n = candles.length;
     const windowLen = Math.min(n, 70);
     const offset = n - windowLen;
@@ -9979,6 +10212,11 @@ window.handleNotificationClick = function(n){
     });
   }
   window.applyNotifFilter = applyNotifFilter;
+  window.selectNotifFilter = function(btn, filter){
+    document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    applyNotifFilter(filter);
+  };
 
   // Notifications and move-to-top.
   document.getElementById('notificationBtn').onclick=async()=>{
@@ -10017,7 +10255,19 @@ window.handleNotificationClick = function(n){
       listBody.innerHTML='<div class="muted" style="padding:12px;">Notifications unavailable.</div>';
     }
   };
-  document.getElementById('moveTopBtn').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+  const moveTopBtnEl = document.getElementById('moveTopBtn');
+  if(moveTopBtnEl){
+    moveTopBtnEl.onclick = () => {
+      window.scrollTo({top: 0, behavior: 'smooth'});
+      document.querySelector('.main')?.scrollTo({top: 0, behavior: 'smooth'});
+      document.documentElement.scrollTo({top: 0, behavior: 'smooth'});
+      document.body.scrollTo({top: 0, behavior: 'smooth'});
+    };
+    window.addEventListener('scroll', () => {
+      const sc = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      moveTopBtnEl.style.setProperty('display', sc > 250 ? 'flex' : 'none', 'important');
+    }, {passive: true});
+  }
 
   // Profile initials/name.
   function initials(name){const p=String(name||'').trim().split(/\s+/).filter(Boolean);return p.length>1?(p[0][0]+p[p.length-1][0]).toUpperCase():((p[0]||'S').slice(0,2)).toUpperCase()}
@@ -14823,7 +15073,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       if(widget){
         widget.style.display = 'block';
         if(bodyWrapper) bodyWrapper.style.display = 'flex';
-        if(minBtn) minBtn.textContent = '_';
+        if(minBtn) minBtn.textContent = '▼ Minimize';
         if(typeof isFloatingPosMinimized !== 'undefined') isFloatingPosMinimized = false;
         window.__caUserManuallyOpenedSentinel = true;
         window.__caUserManuallyClosedSentinel = false;
@@ -20388,7 +20638,7 @@ setTimeout(() => {
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <b id="fpTotalPnlBadge" style="font-family:var(--font-mono);font-size:12px;color:var(--text);">₹0.00</b>
-      <button type="button" class="btn ghost small" style="padding:1px 6px;height:20px;font-size:11px;line-height:1;" id="fpMinBtn" onclick="toggleFloatingPositionsWidget(event)" title="Minimize / Expand Sentinel">▢</button>
+      <button type="button" class="btn ghost small" style="padding:2px 8px;height:22px;font-size:10.5px;line-height:1;font-weight:700;display:inline-flex;align-items:center;gap:3px;" id="fpMinBtn" onclick="toggleFloatingPositionsWidget(event)" title="Expand Sentinel">▲ Expand</button>
     </div>
   </div>
 
@@ -20632,7 +20882,7 @@ setTimeout(() => {
       bodyWrapper.style.display = isFloatingPosMinimized ? 'none' : 'flex';
     }
     if(btn){
-      btn.textContent = isFloatingPosMinimized ? '▢' : '_';
+      btn.textContent = isFloatingPosMinimized ? '▲ Expand' : '▼ Minimize';
       btn.title = isFloatingPosMinimized ? 'Expand Sentinel' : 'Minimize Sentinel';
     }
     if(widget){
@@ -22846,14 +23096,14 @@ window.updateFloatingPositionsWidget = async function(){
       if(!window.__caUserManuallyOpenedSentinel && bodyWrapper && bodyWrapper.style.display !== 'none'){
         isFloatingPosMinimized = true;
         bodyWrapper.style.display = 'none';
-        if(minBtn){ minBtn.textContent = '▢'; minBtn.title = 'Expand Sentinel'; }
+        if(minBtn){ minBtn.textContent = '▲ Expand'; minBtn.title = 'Expand Sentinel'; }
       }
     } else {
       // Open positions active -> auto-expand if user didn't explicitly close it
       if(bodyWrapper && bodyWrapper.style.display === 'none' && !window.__caUserManuallyClosedSentinel){
         isFloatingPosMinimized = false;
         bodyWrapper.style.display = 'flex';
-        if(minBtn){ minBtn.textContent = '_'; minBtn.title = 'Minimize Sentinel'; }
+        if(minBtn){ minBtn.textContent = '▼ Minimize'; minBtn.title = 'Minimize Sentinel'; }
       }
     }
 
