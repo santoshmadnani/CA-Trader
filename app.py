@@ -7582,6 +7582,18 @@ def analysis_candles_robust(instrument: str, timeframe: str, days: int) -> list[
     if out:
         _save_last_good_candles(f"{instrument}:{tf}", copy.deepcopy(out))
 
+    # Fallback for Futures contracts (e.g. CRUDEOIL FUT 19 OCT 26, BANKNIFTY FUT, etc.)
+    if not out and ("FUT" in instrument.upper() or any(k in instrument.upper() for k in ("CRUDE", "GOLD", "SILVER", "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"))):
+        und_candidate = instrument.split()[0].upper()
+        if und_candidate != instrument.upper():
+            try:
+                und_candles = analysis_candles_robust(und_candidate, tf, days)
+                if und_candles:
+                    out = copy.deepcopy(und_candles)
+                    _save_last_good_candles(f"{instrument}:{tf}", copy.deepcopy(out))
+            except Exception as ef:
+                log.warning("Futures candle fallback failed for %s -> %s: %s", instrument, und_candidate, safe_text(ef))
+
     if not out:
         opt_info = parse_option_contract(instrument)
         if opt_info:
@@ -9278,8 +9290,6 @@ async def news_ca_ai_feed(
                 insight = f"CA AI Decision: Bearish headwind ({prob}% Sell Signal). Downside pressure confirmed. Defensive trailing stops recommended."
         elif is_bull or is_high_bull:
             sentiment = "BULLISH"
-     
-... [truncated for diff preview]
             if is_high_bull:
                 prob = 100
                 impact_pct = "100% Buy Signal"

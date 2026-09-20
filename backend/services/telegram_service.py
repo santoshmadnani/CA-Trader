@@ -531,7 +531,6 @@ async def process_inbound_telegram_update(
     text_lower = text.lower()
 
     # 1. Start / Help command
-    if text_lower in ("/start", "/help", "hi", "hello", "help"):
     if text_lower in ("/start", "/help", "hi", "hello", "help", "menu", "commands"):
         welcome_text = (
             "🚀 <b>CA-TRADER AI & QUANT BOT</b>\n"
