@@ -2780,6 +2780,71 @@ select#watchlistSelect, select.watchlist-select {
     min-width: 30px !important;
     margin-right: 0 !important;
   }
+
+  /* Timeframe bar containment & horizontal scroll on mobile */
+  .dash-reco-head {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .dash-reco-controls {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+  #recoTimeframeButtonGroup {
+    display: inline-flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+    scrollbar-width: none !important;
+    flex-shrink: 1 !important;
+  }
+  #recoTimeframeButtonGroup::-webkit-scrollbar {
+    display: none !important;
+  }
+  .reco-tf-btn {
+    padding: 2px 5px !important;
+    font-size: 10px !important;
+    height: 22px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Metric boxes: Entry, SL, Target, R:R mobile fit */
+  .metric-clickable-box {
+    padding: 4px 1px !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  #dashCardUnderlying .metric-clickable-box,
+  #dashCardCe .metric-clickable-box,
+  #dashCardPe .metric-clickable-box {
+    padding: 4px 1px !important;
+    min-width: 0 !important;
+  }
+  #dashCardUnderlying .metric-clickable-box div:first-child,
+  #dashCardCe .metric-clickable-box div:first-child,
+  #dashCardPe .metric-clickable-box div:first-child {
+    font-size: 7.5px !important;
+    letter-spacing: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  #dashCardUnderlying .metric-clickable-box div:last-child,
+  #dashCardCe .metric-clickable-box div:last-child,
+  #dashCardPe .metric-clickable-box div:last-child {
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
 }
 @media (max-width: 540px) {
   .market-boxes {
@@ -2787,6 +2852,22 @@ select#watchlistSelect, select.watchlist-select {
   }
   .brand {
     display: flex !important;
+  }
+  #dashDualRecoCard {
+    padding: 10px 8px !important;
+  }
+  #dashCardUnderlying, #dashCardCe, #dashCardPe {
+    padding: 10px 8px !important;
+  }
+  #dashCardUnderlying .metric-clickable-box div:last-child,
+  #dashCardCe .metric-clickable-box div:last-child,
+  #dashCardPe .metric-clickable-box div:last-child {
+    font-size: 9.5px !important;
+  }
+  #dashCardUnderlying .metric-clickable-box div:first-child,
+  #dashCardCe .metric-clickable-box div:first-child,
+  #dashCardPe .metric-clickable-box div:first-child {
+    font-size: 7px !important;
   }
 }
 </style>
@@ -2993,7 +3074,7 @@ select#watchlistSelect, select.watchlist-select {
       <!-- ============ DUAL RECOMMENDATION ENGINE (BEST CE & BEST PE) ============ -->
       <div class="card" id="dashDualRecoCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid rgba(232,184,75,0.3);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.2);">
         <!-- Top Bar: Title & Multi-Timeframe Controls -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
+        <div class="dash-reco-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:rgba(232,184,75,0.15);color:var(--gold);font-size:16px;font-weight:700;">✦</span>
             <div>
@@ -3001,7 +3082,7 @@ select#watchlistSelect, select.watchlist-select {
               <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening across option chain. Best CE &amp; Best PE computed simultaneously.</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div class="dash-reco-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div id="recoTimeframeButtonGroup" style="display:inline-flex;gap:3px;background:var(--surface-2);padding:3px;border-radius:6px;border:1px solid var(--border);">
               <button type="button" class="btn small ghost reco-tf-btn" data-tf="1m" onclick="setRecoTimeframe('1m')" style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;">1m</button>
               <button type="button" class="btn small ghost reco-tf-btn" data-tf="3m" onclick="setRecoTimeframe('3m')" style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;">3m</button>
