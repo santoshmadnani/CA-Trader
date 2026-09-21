@@ -1917,6 +1917,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.b
   input,select,textarea,.tool-input,.finder-field input,.wl-search input,.search-box input,
   .top-search input,.chart-selects select,.pattern-controls input,.pattern-controls select{
     font-size:16px !important;}
+  .user-menu select,#fontStyleSelect,#userMenu select{
+    font-size:11.5px !important;height:28px !important;padding:4px 7px !important;}
 
   /* comfortable 44px+ tap targets */
   .icon-btn{width:38px;height:38px;}
@@ -2776,12 +2778,6 @@ select#watchlistSelect, select.watchlist-select {
     </button>
     
     <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
-    <button class="btn small gold" id="turboLoadBtn" title="⚡ Turbo Refresh (Immediate instant live reload of all data feeds)" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;font-weight:600;margin-right:4px;">⚡ Turbo</button>
-    <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active (Click to mute)" style="font-size:13px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin-right:4px;">🔊</button>
-    <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="✈️ Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:600;margin-right:4px;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
-      <span>Telegram</span>
-    </button>
     <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;">🚨 Panic Exit</button>
     <div class="top-icon-wrap"><button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button><div class="notification-menu" id="notificationMenu">
         <div class="notification-tabs" id="notifTabs" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-soft);padding:4px 8px;">
@@ -2816,12 +2812,12 @@ select#watchlistSelect, select.watchlist-select {
         <button class="btn ghost small" id="editUIBtn" style="margin-top:10px;width:100%;justify-content:center;">Edit UI</button>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);">
           <div style="font-size:10px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;">Font Style</div>
-          <select id="fontStyleSelect" class="form-input" style="width:100%;font-size:11.5px;padding:4px 7px;border-radius:4px;background:var(--bg-card);color:var(--text);border:1px solid var(--border-soft);cursor:pointer;">
-            <option value="system" selected>Segoe UI / SF Pro (System Clean)</option>
-            <option value="inter">Inter UI</option>
-            <option value="roboto">Roboto Clean</option>
-            <option value="segoe">Segoe UI (Windows)</option>
-            <option value="mono">JetBrains Mono</option>
+          <select id="fontStyleSelect" class="form-input" style="width:100%;font-size:11.5px !important;height:28px !important;padding:4px 7px !important;border-radius:4px;background:var(--bg-card);color:var(--text);border:1px solid var(--border-soft);cursor:pointer;">
+            <option value="system" selected style="font-size:11.5px;">Segoe UI / SF Pro (System Clean)</option>
+            <option value="inter" style="font-size:11.5px;">Inter UI</option>
+            <option value="roboto" style="font-size:11.5px;">Roboto Clean</option>
+            <option value="segoe" style="font-size:11.5px;">Segoe UI (Windows)</option>
+            <option value="mono" style="font-size:11.5px;">JetBrains Mono</option>
           </select>
         </div>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);">
