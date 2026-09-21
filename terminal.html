@@ -2743,6 +2743,51 @@ select#watchlistSelect, select.watchlist-select {
   .layout {
     padding-top: var(--top-header-height, 84px) !important;
   }
+  .topbar {
+    padding: 0 6px !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+  .topbar-left {
+    gap: 4px !important;
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+    overflow: hidden !important;
+  }
+  .topbar-right {
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+  }
+  #marketClock {
+    display: none !important;
+  }
+  .market-box:nth-child(2) {
+    display: none !important;
+  }
+  .ai-btn-text, .panic-btn-text {
+    display: none !important;
+  }
+  #caAiOpen {
+    padding: 2px 7px !important;
+    font-size: 13px !important;
+    height: 28px !important;
+    min-width: 30px !important;
+  }
+  #panicKillSwitchBtn {
+    padding: 2px 7px !important;
+    font-size: 13px !important;
+    height: 28px !important;
+    min-width: 30px !important;
+    margin-right: 0 !important;
+  }
+}
+@media (max-width: 540px) {
+  .market-boxes {
+    display: none !important;
+  }
+  .brand {
+    display: flex !important;
+  }
 }
 </style>
 
@@ -2770,11 +2815,11 @@ select#watchlistSelect, select.watchlist-select {
       <div class="top-search-suggestions" id="topSearchSuggestions"></div>
     </div>
     <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:4px 11px;height:30px;font-size:11.5px;cursor:pointer;border-radius:6px;" title="Chat with CA AI">
-      ✦ Ask CA AI
+      <span class="ai-btn-icon">✦</span> <span class="ai-btn-text">Ask CA AI</span>
     </button>
     
     <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
-    <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;">🚨 Panic Exit</button>
+    <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;"><span class="panic-btn-icon">🚨</span> <span class="panic-btn-text">Panic Exit</span></button>
     <div class="top-icon-wrap"><button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button><div class="notification-menu" id="notificationMenu">
         <div class="notification-tabs" id="notifTabs" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-soft);padding:4px 8px;">
           <div style="display:flex;gap:4px;">
