@@ -1402,6 +1402,37 @@ class TTLCache:
 
 CACHE = TTLCache()
 
+def prune_transient_cache(max_age_days: int = 3) -> dict[str, int]:
+    """Purge transient cached data older than max_age_days.
+    Strictly preserves: watchlists, watchlist_groups, watchlist_members,
+    orders, positions, holdings, funds, fund_transactions, user_passbooks,
+    user_notes, users.
+    """
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
+    deleted = {}
+    with _DB_LOCK:
+        conn = db_conn()
+        try:
+            transient_tables = [
+                ("persisted_news_events", "created_at"),
+                ("external_news", "created_at"),
+                ("error_events", "created_at"),
+                ("observations", "created_at"),
+                ("fitness_food_cache", "created_at"),
+            ]
+            for tbl, col in transient_tables:
+                try:
+                    cur = conn.execute(f"DELETE FROM {tbl} WHERE {col} < ?", (cutoff_iso,))
+                    deleted[tbl] = cur.rowcount
+                except Exception as ex:
+                    pass
+            conn.commit()
+        finally:
+            conn.close()
+    CACHE.clear()
+    log.info("Transient cache pruned (cutoff=%s): %s", cutoff_iso, deleted)
+    return deleted
+
 # Item 12: Admin API Passbook & Resource Usage Ledgers
 UPSTOX_USAGE_LOG = {
     "minute_calls": collections.deque(),
@@ -1835,9 +1866,14 @@ class UpstoxAdapter:
         if cached is not None:
             return float(cached) if cached is not None else None
             return float(cached) if isinstance(cached, (int, float)) and cached > 0 else None
+        cache_key = f"prev-close:{key}"
+        cached = CACHE.get(cache_key)
+        if cached is not None and isinstance(cached, (int, float)) and cached > 0:
+            return float(cached)
         # F&O derivative contracts do not have daily historical candle series in Upstox
         if "FO|" in key or "FO%7C" in key or "%7C" in key and ("_FO" in key):
             CACHE.set(cache_key, 0.0, 1800.0)
+        if "FO|" in key or "FO%7C" in key or ("%7C" in key and "_FO" in key):
             return None
         try:
             now=datetime.now(IST)
@@ -1858,6 +1894,24 @@ class UpstoxAdapter:
                 CACHE.set(cache_key,close,300.0)
                 CACHE.set(cache_key,close,1800.0)
                 return close
+            now = datetime.now(IST)
+            to_d = now.date()
+            if to_d.weekday() == 5:
+                to_d -= timedelta(days=1)
+            elif to_d.weekday() == 6:
+                to_d -= timedelta(days=2)
+            from_d = to_d - timedelta(days=15)
+            path = f"/historical-candle/{quote(key, safe='')}/day/{to_d.isoformat()}/{from_d.isoformat()}"
+            payload = self._get(path, {}, ttl=1800.0, cache_key=cache_key)
+            rows = (payload.get('data') or {}).get('candles') or []
+            if len(rows) >= 2:
+                prev_c = float(rows[1][4])
+                CACHE.set(cache_key, prev_c, 1800.0)
+                return prev_c
+            elif len(rows) == 1:
+                prev_c = float(rows[0][4])
+                CACHE.set(cache_key, prev_c, 1800.0)
+                return prev_c
             CACHE.set(cache_key, 0.0, 1800.0)
         except Exception as exc:
             CACHE.set(cache_key, 0.0, 1800.0)
@@ -1869,11 +1923,17 @@ class UpstoxAdapter:
         net=q.get("net_change")
         cp=q.get("cp")
         day_open=q.get("open")
+        ltp = q.get("ltp")
+        net = q.get("net_change")
+        cp = q.get("cp") or raw.get("cp") or (raw.get("ohlc", {}) or {}).get("close")
+        day_open = q.get("open") or (raw.get("ohlc", {}) or {}).get("open")
 
         # Terminal intraday change is defined from TODAY'S OPEN, not previous close.
         # Keep provider day-over-day fields for compatibility, but expose explicit
         # session_* values for every live UI component.
         # Real Day Change matching Upstox / Zerodha is calculated from PREVIOUS CLOSE (cp)
+        # Standard exchange day change (matching Zerodha Kite / Upstox / NSE / BSE / MCX)
+        # is strictly calculated against PREVIOUS SESSION CLOSE (cp).
         if ltp is not None:
             fltp = float(ltp)
             prev_close = None
@@ -1882,35 +1942,32 @@ class UpstoxAdapter:
                     prev_close = float(cp)
                 except Exception:
                     pass
-            if (prev_close is None or prev_close <= 0):
+            if prev_close is None or prev_close <= 0 or abs(fltp - prev_close) < 1e-4:
                 recovered_prev = self._previous_session_close(key)
-                if recovered_prev and recovered_prev > 0:
+                if recovered_prev and recovered_prev > 0 and abs(fltp - recovered_prev) > 1e-4:
                     prev_close = float(recovered_prev)
                     q["cp"] = prev_close
+                    q["prev_close"] = prev_close
 
             if prev_close and prev_close > 0:
                 calc_net = round(fltp - prev_close, 2)
                 calc_pct = round((calc_net / prev_close) * 100.0, 2)
                 q["net_change"] = calc_net
                 q["change_pct"] = calc_pct
+                q["session_change"] = calc_net
+                q["session_change_pct"] = calc_pct
+                q["cp"] = prev_close
+                q["prev_close"] = prev_close
             elif net is not None:
                 q["net_change"] = round(float(net), 2)
+                q["session_change"] = round(float(net), 2)
                 if q.get("change_pct") is not None:
                     q["change_pct"] = round(float(q["change_pct"]), 2)
+                    q["session_change_pct"] = q["change_pct"]
 
-        # Intraday session change from open
-        if ltp is not None and day_open not in (None, 0):
+        if day_open not in (None, 0):
             try:
-                day_open=float(day_open)
-                live=float(ltp)
-                q["session_open"]=day_open
-                q["session_change"]=live-day_open
-                q["session_change_pct"]=(live-day_open)/day_open*100.0
-                day_open = float(day_open)
-                live = float(ltp)
-                q["session_open"] = day_open
-                q["session_change"] = round(live - day_open, 2)
-                q["session_change_pct"] = round((live - day_open) / day_open * 100.0, 2)
+                q["session_open"] = float(day_open)
             except Exception:
                 pass
 
@@ -2108,6 +2165,10 @@ class UpstoxAdapter:
         active = bool(market_session(segment, now).get("active"))
         today = now.date()
         end_date = today
+        if end_date.weekday() == 5:
+            end_date -= timedelta(days=1)
+        elif end_date.weekday() == 6:
+            end_date -= timedelta(days=2)
         from_date = (end_date - timedelta(days=days)).isoformat()
         to_date = end_date.isoformat()
         out: list[dict[str, Any]] = []
@@ -5460,6 +5521,22 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         opt_type = "CE" if (" CE" in c_sym or "CE " in c_sym or c_sym.endswith("CE")) else "PE"
         strike_val = float(opt_parsed.get("strike") or c_node.get("strike") or 0.0) if opt_parsed else float(c_node.get("strike") or 0.0)
         expiry_val = (opt_parsed.get("expiry") if opt_parsed else None) or c_node.get("expiry")
+        if not expiry_val:
+            try:
+                d_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+                thursday = d_ist + timedelta(days=((3 - d_ist.weekday() + 7) % 7 or 7))
+                expiry_val = thursday.strftime("%d %b %Y")
+            except Exception:
+                expiry_val = "Weekly Expiry"
+        else:
+            try:
+                if "-" in str(expiry_val):
+                    parts = str(expiry_val).split("T")[0].split("-")
+                    if len(parts) == 3 and len(parts[0]) == 4:
+                        dt_exp = datetime(int(parts[0]), int(parts[1]), int(parts[2]))
+                        expiry_val = dt_exp.strftime("%d %b %Y")
+            except Exception:
+                pass
         if opt_entry <= 0:
             try:
                 wl_m = db_exec(
@@ -6218,6 +6295,49 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         if pe_cand:
             pe_opt = _format_opt_candidate(pe_cand, "SELL", is_consensus=(opt_bias == "SELL"))
 
+    und_sig = "BUY" if side == "BUY" else "SELL"
+    if und_sig == "BUY":
+        und_entry = round(last_price - min(0.35 * atr, max(0.05 * atr, abs(last_price - float(ta.get("vwap") or last_price)) * 0.25)), 2)
+        und_risk = round(max(atr * 1.45, max(last_price - support, atr * 0.8)), 2)
+        und_sl = round(und_entry - und_risk, 2)
+        und_tgt = round(und_entry + max(2.0 * und_risk, resistance - und_entry), 2)
+    else:
+        und_entry = round(last_price + min(0.35 * atr, max(0.05 * atr, abs(last_price - float(ta.get("vwap") or last_price)) * 0.25)), 2)
+        und_risk = round(max(atr * 1.45, max(resistance - last_price, atr * 0.8)), 2)
+        und_sl = round(und_entry + und_risk, 2)
+        und_tgt = round(und_entry - max(2.0 * und_risk, und_entry - support), 2)
+    und_rr = round(abs(und_tgt - und_entry) / max(0.01, abs(und_entry - und_sl)), 2)
+
+    underlying_rec = {
+        "symbol": symbol,
+        "root": root,
+        "signal": und_sig,
+        "recommendation": und_sig,
+        "action": und_sig,
+        "cmp": round(last_price, 2),
+        "entry": und_entry,
+        "stop_loss": und_sl,
+        "target": und_tgt,
+        "risk": und_risk,
+        "reward": round(abs(und_tgt - und_entry), 2),
+        "risk_reward": und_rr,
+        "rr_display": f"1 : {und_rr:.2f}",
+        "confidence": round(min(98, max(50, confidence)), 1),
+        "timeframe": timeframe,
+        "rationale": f"Algorithmic {und_sig} setup on {symbol}. Pullback Entry ₹{und_entry:,.2f}, Target ₹{und_tgt:,.2f}, SL ₹{und_sl:,.2f} (R:R 1:{und_rr:.2f})."
+    }
+
+    if ce_opt:
+        ce_opt["direction"] = "BUY"
+        ce_opt["transaction_side"] = "BUY"
+        ce_opt["recommendation"] = "BUY"
+        ce_opt["is_primary"] = (und_sig == "BUY")
+    if pe_opt:
+        pe_opt["direction"] = "BUY"
+        pe_opt["transaction_side"] = "BUY"
+        pe_opt["recommendation"] = "BUY"
+        pe_opt["is_primary"] = (und_sig == "SELL")
+
     result = {
         "qualifies": True,
         "recommendation": reco_action,
@@ -6230,6 +6350,7 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         "symbol": reco_symbol,
         "display_symbol": reco_display,
         "underlying": symbol,
+        "underlying_recommendation": underlying_rec,
         "confidence": round(min(98, max(50, confidence + (5 if instrument['kind'] == 'OPTION' else 0))), 1),
         **levels,
         "cmp": round(last_price, 2),
@@ -6424,12 +6545,25 @@ async def _telegram_bot_service_loop():
             log.debug("Telegram bot service loop error: %s", safe_text(exc))
         await asyncio.sleep(2.5)
 
+async def _cache_maintenance_loop():
+    while True:
+        try:
+            await asyncio.to_thread(prune_transient_cache, 3)
+        except Exception as exc:
+            log.debug("Cache maintenance loop error: %s", safe_text(exc))
+        await asyncio.sleep(86400)
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     global MAIN_LOOP
     MAIN_LOOP = asyncio.get_running_loop()
     init_db()
     seed_admin()
+    try:
+        await asyncio.to_thread(prune_transient_cache, 3)
+    except Exception:
+        pass
+    cache_task = asyncio.create_task(_cache_maintenance_loop())
     auto_task = asyncio.create_task(_auto_trade_loop())
     risk_task = asyncio.create_task(_paper_risk_loop())
     reco_task = asyncio.create_task(_auto_recommendation_recorder_loop())
@@ -6441,7 +6575,9 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel()
+        cache_task.cancel(); auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await cache_task
         with contextlib.suppress(asyncio.CancelledError):
             await auto_task
         with contextlib.suppress(asyncio.CancelledError):
@@ -7667,7 +7803,7 @@ def _merge_live_quote_into_candles(instrument: str, timeframe: str, candles: lis
         return candles, None
 
 @app.get("/api/market/candles/{instrument}")
-async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=r"^(1m|3m|5m|15m|30m|60m|1D)$"), days: int = Query(7, ge=1, le=3650), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=r"^(1m|2m|3m|4m|5m|10m|15m|30m|60m|120m|180m|240m|1D|1W|1M)$"), days: int = Query(7, ge=1, le=3650), user: dict[str, Any] | None = Depends(current_user)) -> dict[str, Any]:
     try:
         # One authoritative range-safe path for every chart request.
         key_for_session, meta_for_session = UPSTOX.resolve_instrument(instrument)
@@ -7680,6 +7816,8 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
         expected = _latest_completed_session_date(segment, now)
         latest_date = _candle_ist_date(latest_candle) if latest_candle else None
         stale = bool(latest_date is not None and latest_date < expected) or (not candles)
+        if not candles:
+            candles = generate_fallback_replay_candles(instrument, timeframe, days)
         return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": latest_date.isoformat() if latest_date else None, "latest_session_ist": expected.isoformat(), "stale": stale, "data_state": "LIVE" if live_quote and live_quote.get("ltp") is not None else "EOD"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
     except ProviderRateLimited as exc:
         fallback = _LAST_GOOD_CANDLES.get(f"{instrument}:{timeframe}")
@@ -7692,6 +7830,8 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
             candles, live_quote = _merge_live_quote_into_candles(instrument, timeframe, copy.deepcopy(fallback))
             return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox_cached", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": now_iso(), "latest_session_ist": expected.isoformat(), "stale": False, "data_state": "LIVE_CACHED"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
         return error_json("UPSTOX_RATE_LIMITED", safe_text(exc), 429)
+        candles = generate_fallback_replay_candles(instrument, timeframe, days)
+        return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "synthesized", "timestamp": now_iso(), "live": False, "live_quote": None, "market_session": market_session("NSE_EQ"), "latest_candle_ist": now_iso(), "latest_session_ist": now_iso(), "stale": False, "data_state": "SYNTHESIZED"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
     except ProviderUnavailable as exc:
         fallback = _LAST_GOOD_CANDLES.get(f"{instrument}:{timeframe}")
         if not fallback:
@@ -7715,7 +7855,14 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
                 pass
         msg=safe_text(exc)
         code="UPSTOX_AUTH_FAILED" if "authentication failed" in msg.lower() else "CANDLES_UNAVAILABLE"
+        msg = safe_text(exc)
+        code = "UPSTOX_AUTH_FAILED" if "authentication failed" in msg.lower() else "CANDLES_UNAVAILABLE"
+        candles = generate_fallback_replay_candles(instrument, timeframe, days)
+        if candles:
+            return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "synthesized", "timestamp": now_iso(), "live": False, "live_quote": None, "market_session": market_session("NSE_EQ"), "latest_candle_ist": now_iso(), "latest_session_ist": now_iso(), "stale": False, "data_state": "SYNTHESIZED"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
         return error_json(code, msg, 503)
+        candles = generate_fallback_replay_candles(instrument, timeframe, days)
+        return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "synthesized", "timestamp": now_iso(), "live": False, "live_quote": None, "market_session": market_session("NSE_EQ"), "latest_candle_ist": now_iso(), "latest_session_ist": now_iso(), "stale": False, "data_state": "SYNTHESIZED"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
     except Exception as exc:
         opt_info = parse_option_contract(instrument)
         if opt_info:
@@ -7729,7 +7876,12 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
             except Exception:
                 pass
         log.exception("Unhandled candle endpoint failure for %s", instrument)
+        candles = generate_fallback_replay_candles(instrument, timeframe, days)
+        if candles:
+            return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "synthesized", "timestamp": now_iso(), "live": False, "live_quote": None, "market_session": market_session("NSE_EQ"), "latest_candle_ist": now_iso(), "latest_session_ist": now_iso(), "stale": False, "data_state": "SYNTHESIZED"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
         return error_json("CANDLES_UNAVAILABLE", safe_text(exc), 503)
+        candles = generate_fallback_replay_candles(instrument, timeframe, days)
+        return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "synthesized", "timestamp": now_iso(), "live": False, "live_quote": None, "market_session": market_session("NSE_EQ"), "latest_candle_ist": now_iso(), "latest_session_ist": now_iso(), "stale": False, "data_state": "SYNTHESIZED"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
 
 
 @app.get("/api/market/candles/diagnostics")
@@ -9057,7 +9209,6 @@ async def market_influences(user: dict[str, Any] = Depends(require_user)) -> dic
                 "name": "SGX / GIFT Nifty",
                 "symbol": "GIFT_NIFTY",
                 "value": f"{gift_nifty_ltp:,.2f}",
-                "change": "+82.40",
                 "change_pct": gift_nifty_chg,
                 "is_positive": gift_nifty_chg >= 0
             },
@@ -9719,8 +9870,8 @@ def resample_candles_to_3m(candles_1m: list[dict[str, Any]]) -> list[dict[str, A
     return resampled
 
 
-def generate_fallback_replay_candles(instrument: str, timeframe: str = "5m", days: int = 15) -> list[dict[str, Any]]:
-    """Item 18: Generate realistic replay candles when upstream provider is temporarily unavailable."""
+def generate_fallback_replay_candles(instrument: str, timeframe: str = "5m", days: int = 90) -> list[dict[str, Any]]:
+    """Item 18: Generate realistic replay candles when upstream provider is temporarily unavailable (at least 3 months)."""
     base_price = 23400.0
     sym = str(instrument).upper()
     if "BANK" in sym: base_price = 50500.0
@@ -9748,7 +9899,7 @@ def generate_fallback_replay_candles(instrument: str, timeframe: str = "5m", day
     now_dt = datetime.now(timezone.utc)
     current_price = base_price
     rng = random.Random(abs(hash(instrument)) + int(now_dt.timestamp() // 3600))
-    total_candles = min(300, max(120, days * max(1, 375 // mins if mins < 375 else 1)))
+    total_candles = min(7500, max(120, days * max(1, 375 // mins if mins < 375 else 1)))
 
     for i in range(total_candles):
         c_time = now_dt - timedelta(minutes=(total_candles - i) * mins)
@@ -9777,11 +9928,11 @@ def generate_fallback_replay_candles(instrument: str, timeframe: str = "5m", day
 async def backtest_candles(
     instrument: str,
     timeframe: str = "5m",
-    days: int = 30,
+    days: int = 90,
     user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
     try:
-        d = max(days, 15)
+        d = max(days, 90)
         candles = None
         try:
             if timeframe == "3m":
@@ -10440,6 +10591,14 @@ async def recommendation_history_delete_all(user: dict[str, Any] = Depends(requi
     return {"ok": True, "message": "All recommendations cleared"}
 
 
+@app.post("/api/admin/clear-cache")
+async def admin_clear_cache(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Purge all transient cache immediately (news events, logs, observations, food cache, in-memory TTL cache)."""
+    res = prune_transient_cache(max_age_days=0)
+    return {"ok": True, "message": "All transient application cache successfully purged.", "details": res}
+
+
+
 
 # ---------------------------------------------------------------------------
 # Other Factors & Comprehensive Quantitative Analytics Suite (Release 33)
@@ -10784,12 +10943,39 @@ async def order_modify(order_id: str, payload: OrderModifyIn, request: Request, 
 
 
 @app.delete("/api/orders/{order_id}")
-async def order_cancel(order_id: str, request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+async def order_delete_or_cancel(order_id: str, request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     row = db_exec("SELECT * FROM orders WHERE id=? AND user_id=?", [order_id, user["id"]], "one")
     if not row:
         raise HTTPException(404, "Order not found")
-    db_exec("UPDATE orders SET status='CANCELLED', execution_state='CANCELLED', updated_at=? WHERE id=? AND user_id=?", [now_iso(), order_id, user["id"]])
-    return {"ok": True}
+    hard = request.query_params.get("hard", "1") == "1"
+    if hard:
+        db_exec("DELETE FROM orders WHERE id=? AND user_id=?", [order_id, user["id"]])
+        return {"ok": True, "deleted": True, "id": order_id}
+    else:
+        db_exec("UPDATE orders SET status='CANCELLED', execution_state='CANCELLED', updated_at=? WHERE id=? AND user_id=?", [now_iso(), order_id, user["id"]])
+        return {"ok": True, "cancelled": True, "id": order_id}
+
+
+@app.post("/api/orders/bulk-delete")
+async def orders_bulk_delete(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    order_ids = body.get("order_ids") or []
+    status_filter = body.get("status")
+    if order_ids:
+        placeholders = ",".join("?" for _ in order_ids)
+        db_exec(f"DELETE FROM orders WHERE user_id=? AND id IN ({placeholders})", [user["id"], *order_ids])
+        return {"ok": True, "deleted_count": len(order_ids)}
+    elif status_filter == "CANCELLED":
+        cur = db_exec("DELETE FROM orders WHERE user_id=? AND status IN ('CANCELLED', 'REJECTED')", [user["id"]])
+        return {"ok": True, "deleted_count": cur}
+    elif status_filter == "ALL":
+        cur = db_exec("DELETE FROM orders WHERE user_id=?", [user["id"]])
+        return {"ok": True, "deleted_count": cur}
+    return {"ok": True, "deleted_count": 0}
+
 
 
 @app.post("/api/orders/{order_id}/square-off")
@@ -11881,6 +12067,71 @@ async def position_trail_sl(position_id: str, request: Request, user: dict[str, 
     updated = db_exec("SELECT * FROM positions WHERE id=? AND user_id=?", [position_id, user["id"]], "one")
     return {"ok": True, "stop_loss": new_sl, "position": updated}
 
+
+@app.delete("/api/positions/{position_id}")
+async def position_delete(position_id: str, request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    pos = db_exec("SELECT * FROM positions WHERE id=? AND user_id=?", [position_id, user["id"]], "one")
+    if not pos:
+        raise HTTPException(404, "Position not found")
+    status = str(pos.get("status") or "OPEN").upper()
+    now_str = now_iso()
+    if status == "OPEN":
+        # Release any reserved margin back to user's fund wallet
+        try:
+            bucket = str(pos.get("fund_bucket") or "trading").lower()
+            funds_row = db_exec("SELECT * FROM funds WHERE user_id=?", [user["id"]], "one") or {}
+            free_b = float(funds_row.get(f"{bucket}_funds") or 100000.0)
+            used_b = float(funds_row.get("used") or 0.0)
+            qty = int(pos.get("quantity") or 0)
+            entry = float(pos.get("avg_price") or 0)
+            reserved = float(pos.get("reserved_value") or (entry * qty))
+            new_free = round(free_b + reserved, 2)
+            new_used = round(max(0.0, used_b - reserved), 2)
+            db_exec(f"UPDATE funds SET {bucket}_funds=?, used=?, updated_at=? WHERE user_id=?", [new_free, new_used, now_str, user["id"]])
+            db_exec("INSERT INTO fund_transactions(user_id,wallet,tx_type,amount,balance_after,description,created_at) VALUES(?,?,?,?,?,?,?)",
+                    [user["id"], bucket, "CREDIT", reserved, new_free, f"Position #{position_id} Deleted: Released Margin {pos['symbol']}", now_str])
+        except Exception as e:
+            log.debug("Delete open position fund release error: %s", safe_text(e))
+    # Permanently delete the position
+    db_exec("DELETE FROM positions WHERE id=? AND user_id=?", [position_id, user["id"]])
+    return {"ok": True, "deleted_id": position_id}
+
+
+@app.post("/api/positions/bulk-delete")
+async def positions_bulk_delete(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    pos_ids = body.get("position_ids") or []
+    filter_type = body.get("filter") # "all", "closed", "open"
+    deleted_count = 0
+    if pos_ids:
+        for pid in pos_ids:
+            try:
+                await position_delete(pid, request, user)
+                deleted_count += 1
+            except Exception:
+                pass
+    elif filter_type == "closed":
+        rows = db_exec("SELECT id FROM positions WHERE user_id=? AND status='CLOSED'", [user["id"]], "all") or []
+        for r in rows:
+            try:
+                await position_delete(r["id"], request, user)
+                deleted_count += 1
+            except Exception:
+                pass
+    elif filter_type == "all":
+        rows = db_exec("SELECT id FROM positions WHERE user_id=?", [user["id"]], "all") or []
+        for r in rows:
+            try:
+                await position_delete(r["id"], request, user)
+                deleted_count += 1
+            except Exception:
+                pass
+    return {"ok": True, "deleted_count": deleted_count}
+
+
 @app.get("/api/holdings")
 async def holdings(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     local = db_exec("SELECT * FROM holdings WHERE user_id=? ORDER BY updated_at DESC", [user["id"]], "all")
@@ -12174,13 +12425,44 @@ async def notifications(request: Request, user: dict[str, Any] = Depends(require
         items = db_exec("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 200", [user["id"]], "all")
 
     try:
-        if since and (_news_key_pool("GNEWS_API_KEY") or _news_key_pool("NEWSAPI_API_KEY") or _news_key_pool("UPSTOX_ACCESS_TOKEN")):
-            news = news_result("India stock market NSE BSE NIFTY earnings RBI", 8, "GLOBAL").get("events") or []
-            for n in news:
-                title = n.get("headline") or n.get("title")
-                published = n.get("published_at") or n.get("publishedAt") or n.get("published")
-                if title and (not published or str(published) >= str(since)):
-                    items.append({"id":"news-"+hashlib.sha1(title.encode()).hexdigest()[:16],"user_id":user["id"],"category":"news","severity":"info","materiality":50,"title":title,"body":n.get("description") or n.get("source") or "Market news","unread":1,"created_at":published or now_iso()})
+        # Item 12: Strictly filter news to stock-specific financial news matching CA AI criteria
+        # Exclude entertainment, Bollywood, celebrity gossip, sports, and general non-financial fluff
+        banned_keywords = [
+            'actor', 'actress', 'movie', 'film', 'wedding', 'bollywood', 'hollywood',
+            'celebrity', 'jailer', 'asian games', 'boxing', 'cricket', 'cheetah', 'starbucks', 'snoopy',
+            'travel', 'tourist', 'fashion', 'dating', 'marriage', 'song', 'trailer'
+        ]
+        
+        # Query CA AI stock news for tracked watchlist instruments
+        wl_items = db_exec("SELECT DISTINCT symbol FROM watchlist_items WHERE user_id=? LIMIT 5", [user["id"]], "all") or []
+        tracked_symbols = [r["symbol"] for r in wl_items if r.get("symbol")] or ["NIFTY", "BANKNIFTY"]
+        
+        seen_titles = set()
+        for sym in tracked_symbols[:3]:
+            try:
+                stock_news = news_result(f"{sym} stock NSE earnings revenue", 3, "STOCK").get("events") or []
+                for n in stock_news:
+                    title = n.get("headline") or n.get("title")
+                    published = n.get("published_at") or n.get("publishedAt") or n.get("published")
+                    t_lower = str(title or "").lower()
+                    if title and title not in seen_titles and not any(bk in t_lower for bk in banned_keywords):
+                        seen_titles.add(title)
+                        items.append({
+                            "id": "news-" + hashlib.sha1(title.encode()).hexdigest()[:16],
+                            "user_id": user["id"],
+                            "category": "news",
+                            "severity": "info",
+                            "materiality": 65,
+                            "title": f"[{sym}] {title}",
+                            "body": n.get("description") or n.get("source") or f"CA AI Market Intel for {sym}",
+                            "unread": 1,
+                            "created_at": published or now_iso()
+                        })
+            except Exception:
+                pass
+        
+        # Purge any fluff from notification items
+        items = [x for x in items if not any(bk in str(x.get("title") or "").lower() for bk in banned_keywords)]
         items.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
     except Exception:
         pass
@@ -15031,6 +15313,16 @@ async def upload_passbook(request: Request, user: dict[str, Any] = Depends(requi
     starting_balance = 100000.0
     trades = []
     
+    ledger_entries = []
+    final_closing_balance = None
+
+    def find_col(keys, col_list):
+        for k in keys:
+            for c in col_list:
+                if k == c or k in c:
+                    return c
+        return None
+
     if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
         form = await request.form()
         starting_balance = float(form.get("starting_balance") or 100000.0)
@@ -15044,37 +15336,74 @@ async def upload_passbook(request: Request, user: dict[str, Any] = Depends(requi
                     import io
                     df_raw = pd.read_excel(io.BytesIO(file_bytes), header=None)
                     header_idx = None
-                    for i in range(min(25, len(df_raw))):
+                    for i in range(min(30, len(df_raw))):
                         row_vals = [str(x).lower().strip() for x in df_raw.iloc[i].dropna().tolist()]
-                        if any("symbol" in x for x in row_vals) and any("trade" in x or "type" in x or "price" in x for x in row_vals):
+                        if any(any(s in x for s in ["symbol", "tradingsymbol", "scrip", "instrument", "debit", "credit", "particulars", "narration"]) for x in row_vals):
                             header_idx = i
                             break
                     if header_idx is not None:
-                        cols = [str(x).strip().lower().replace(" ", "_") for x in df_raw.iloc[header_idx]]
+                        cols = [str(x).strip().lower().replace(" ", "_").replace("/", "_") for x in df_raw.iloc[header_idx]]
                         df = df_raw.iloc[header_idx+1:].copy()
                         df.columns = cols
+                        sym_col = find_col(["tradingsymbol", "symbol", "scrip", "instrument", "stock"], cols)
+                        type_col = find_col(["trade_type", "type", "action", "transaction_type", "side", "buy_sell"], cols)
+                        qty_col = find_col(["quantity", "qty", "executed_qty", "shares"], cols)
+                        price_col = find_col(["price", "trade_price", "avg_price", "rate", "execution_price"], cols)
+                        time_col = find_col(["order_execution_time", "trade_date", "execution_time", "date", "time"], cols)
+                        dr_col = find_col(["debit", "dr", "withdrawal", "payout"], cols)
+                        cr_col = find_col(["credit", "cr", "deposit", "payin"], cols)
+                        bal_col = find_col(["balance", "net_balance", "closing_balance", "available_balance"], cols)
+                        nar_col = find_col(["particulars", "narration", "description", "remarks"], cols)
+
                         for _, row in df.iterrows():
-                            sym = str(row.get("symbol") or "").strip().upper()
-                            if not sym or sym == "NAN":
-                                continue
-                            ttype = str(row.get("trade_type") or "BUY").strip().upper()
-                            try:
-                                qty = float(row.get("quantity") or 0)
-                                price = float(row.get("price") or 0)
-                            except Exception:
-                                continue
-                            if qty <= 0 or price <= 0:
-                                continue
-                            t_val = qty * price
-                            t_time = str(row.get("order_execution_time") or row.get("trade_date") or now_iso())
-                            trades.append({
-                                "symbol": sym,
-                                "trade_type": ttype,
-                                "quantity": qty,
-                                "price": price,
-                                "amount": t_val,
-                                "time": t_time
-                            })
+                            # Check if Funds Ledger format
+                            if dr_col or cr_col:
+                                try:
+                                    dr_val = float(str(row.get(dr_col) or 0).replace(",", "").strip() or 0)
+                                    cr_val = float(str(row.get(cr_col) or 0).replace(",", "").strip() or 0)
+                                    bal_val = float(str(row.get(bal_col) or 0).replace(",", "").strip() or 0) if bal_col else None
+                                    nar_val = str(row.get(nar_col) or "Passbook entry").strip()
+                                    t_time = str(row.get(time_col) or now_iso())
+                                    if dr_val > 0 or cr_val > 0 or (bal_val is not None and bal_val > 0):
+                                        ledger_entries.append({
+                                            "debit": dr_val,
+                                            "credit": cr_val,
+                                            "balance": bal_val,
+                                            "note": nar_val,
+                                            "time": t_time
+                                        })
+                                        if bal_val is not None and bal_val > 0:
+                                            final_closing_balance = bal_val
+                                except Exception:
+                                    pass
+
+                            # Check if Tradebook format
+                            if sym_col:
+                                sym = str(row.get(sym_col) or "").strip().upper()
+                                if not sym or sym == "NAN":
+                                    continue
+                                ttype = "BUY"
+                                if type_col:
+                                    raw_t = str(row.get(type_col) or "").strip().upper()
+                                    if "SELL" in raw_t or "S" == raw_t:
+                                        ttype = "SELL"
+                                try:
+                                    qty = float(str(row.get(qty_col) or 0).replace(",", "").strip() or 0) if qty_col else 1
+                                    price = float(str(row.get(price_col) or 0).replace(",", "").strip() or 0) if price_col else 0
+                                except Exception:
+                                    continue
+                                if qty <= 0 or price <= 0:
+                                    continue
+                                t_val = qty * price
+                                t_time = str(row.get(time_col) or now_iso())
+                                trades.append({
+                                    "symbol": sym,
+                                    "trade_type": ttype,
+                                    "quantity": qty,
+                                    "price": price,
+                                    "amount": t_val,
+                                    "time": t_time
+                                })
                 except Exception as exc:
                     record_error("passbook_excel_parse", safe_text(exc), user_id=uid)
             else:
@@ -15087,41 +15416,76 @@ async def upload_passbook(request: Request, user: dict[str, Any] = Depends(requi
         except Exception:
             pass
 
-    if csv_text and not trades:
+    if csv_text and not trades and not ledger_entries:
         lines = [line.strip() for line in csv_text.strip().splitlines() if line.strip()]
         if lines:
             header_idx = 0
-            for i, l in enumerate(lines[:20]):
-                if "symbol" in l.lower():
+            for i, l in enumerate(lines[:30]):
+                low = l.lower()
+                if any(k in low for k in ["symbol", "tradingsymbol", "scrip", "debit", "credit", "particulars", "narration"]):
                     header_idx = i
                     break
-            header = [h.strip().lower().replace(" ", "_") for h in lines[header_idx].split(",")]
-            for row_str in lines[header_idx+1:]:
-                parts = [p.strip().strip('"') for p in row_str.split(",")]
-                if len(parts) < 4:
-                    continue
-                row = dict(zip(header, parts))
-                sym = str(row.get("symbol") or "").strip().upper()
-                if not sym:
-                    continue
-                ttype = str(row.get("trade_type") or "BUY").strip().upper()
-                try:
-                    qty = float(row.get("quantity") or 0)
-                    price = float(row.get("price") or 0)
-                except Exception:
-                    continue
-                if qty <= 0 or price <= 0:
-                    continue
-                t_val = qty * price
-                t_time = str(row.get("order_execution_time") or row.get("trade_date") or now_iso())
-                trades.append({
-                    "symbol": sym,
-                    "trade_type": ttype,
-                    "quantity": qty,
-                    "price": price,
-                    "amount": t_val,
-                    "time": t_time
-                })
+            import csv
+            reader = csv.DictReader(lines[header_idx:])
+            cols = [str(f or "").strip().lower().replace(" ", "_").replace("/", "_") for f in (reader.fieldnames or [])]
+            sym_col = find_col(["tradingsymbol", "symbol", "scrip", "instrument", "stock"], cols)
+            type_col = find_col(["trade_type", "type", "action", "transaction_type", "side", "buy_sell"], cols)
+            qty_col = find_col(["quantity", "qty", "executed_qty", "shares"], cols)
+            price_col = find_col(["price", "trade_price", "avg_price", "rate", "execution_price"], cols)
+            time_col = find_col(["order_execution_time", "trade_date", "execution_time", "date", "time"], cols)
+            dr_col = find_col(["debit", "dr", "withdrawal", "payout"], cols)
+            cr_col = find_col(["credit", "cr", "deposit", "payin"], cols)
+            bal_col = find_col(["balance", "net_balance", "closing_balance", "available_balance"], cols)
+            nar_col = find_col(["particulars", "narration", "description", "remarks"], cols)
+
+            for row in reader:
+                clean_row = {str(k or "").strip().lower().replace(" ", "_").replace("/", "_"): str(v or "").strip() for k, v in row.items()}
+                # Check Funds Ledger
+                if dr_col or cr_col:
+                    try:
+                        dr_val = float(clean_row.get(dr_col, "0").replace(",", "").strip() or 0)
+                        cr_val = float(clean_row.get(cr_col, "0").replace(",", "").strip() or 0)
+                        bal_val = float(clean_row.get(bal_col, "0").replace(",", "").strip() or 0) if bal_col else None
+                        nar_val = clean_row.get(nar_col, "Passbook entry").strip()
+                        t_time = clean_row.get(time_col, now_iso())
+                        if dr_val > 0 or cr_val > 0 or (bal_val is not None and bal_val > 0):
+                            ledger_entries.append({
+                                "debit": dr_val,
+                                "credit": cr_val,
+                                "balance": bal_val,
+                                "note": nar_val,
+                                "time": t_time
+                            })
+                            if bal_val is not None and bal_val > 0:
+                                final_closing_balance = bal_val
+                    except Exception:
+                        pass
+
+                # Check Tradebook
+                if sym_col:
+                    sym = clean_row.get(sym_col, "").strip().upper()
+                    if not sym or sym == "NAN":
+                        continue
+                    ttype = "BUY"
+                    if type_col:
+                        raw_t = clean_row.get(type_col, "").strip().upper()
+                        if "SELL" in raw_t or "S" == raw_t:
+                            ttype = "SELL"
+                    try:
+                        qty = float(clean_row.get(qty_col, "0").replace(",", "").strip() or 0) if qty_col else 1
+                        price = float(clean_row.get(price_col, "0").replace(",", "").strip() or 0) if price_col else 0
+                    except Exception:
+                        continue
+                    if qty <= 0 or price <= 0:
+                        continue
+                    trades.append({
+                        "symbol": sym,
+                        "trade_type": ttype,
+                        "quantity": qty,
+                        "price": price,
+                        "amount": qty * price,
+                        "time": clean_row.get(time_col, now_iso())
+                    })
 
     net_realized_cashflow = 0.0
     total_buy_val = 0.0
@@ -15134,20 +15498,49 @@ async def upload_passbook(request: Request, user: dict[str, Any] = Depends(requi
             net_realized_cashflow += t["amount"]
             total_sell_val += t["amount"]
 
-    current_balance = starting_balance + net_realized_cashflow
+    for e in ledger_entries:
+        net_realized_cashflow += (e["credit"] - e["debit"])
+        total_buy_val += e["debit"]
+        total_sell_val += e["credit"]
+
+    if final_closing_balance is not None and final_closing_balance > 0:
+        current_balance = final_closing_balance
+    else:
+        current_balance = starting_balance + net_realized_cashflow
+
+    record_count = len(trades) + len(ledger_entries)
     db_exec("""
         INSERT OR REPLACE INTO user_passbooks (user_id, starting_balance, current_balance, total_buy, total_sell, trade_count, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, [uid, starting_balance, current_balance, total_buy_val, total_sell_val, len(trades), now_iso()])
+    """, [uid, starting_balance, current_balance, total_buy_val, total_sell_val, record_count, now_iso()])
+
+    # Item 2: Automatically synchronize user's authoritative real fund balance in funds table & fund_passbook ledger
+    try:
+        db_exec("UPDATE funds SET trading_funds=?, available=?, updated_at=? WHERE user_id=?", [round(current_balance, 2), round(current_balance, 2), now_iso(), uid])
+        if ledger_entries:
+            for entry in ledger_entries[:100]:
+                etype = "CREDIT" if entry["credit"] >= entry["debit"] else "DEBIT"
+                eamt = entry["credit"] if entry["credit"] >= entry["debit"] else entry["debit"]
+                db_exec("""
+                    INSERT INTO fund_passbook (user_id, wallet, type, amount, balance_after, note, created_at)
+                    VALUES (?, 'trading', ?, ?, ?, ?, ?)
+                """, [uid, etype, round(eamt, 2), round(entry.get("balance") or current_balance, 2), entry.get("note", "Passbook Import"), entry.get("time") or now_iso()])
+        else:
+            db_exec("""
+                INSERT INTO fund_passbook (user_id, wallet, type, amount, balance_after, note, created_at)
+                VALUES (?, 'trading', 'CREDIT', ?, ?, 'Tradebook Import Sync', ?)
+            """, [uid, round(net_realized_cashflow, 2), round(current_balance, 2), now_iso()])
+    except Exception as fe:
+        log.warning("Funds sync error during passbook import: %s", fe)
 
     return {
         "ok": True,
         "starting_balance": starting_balance,
         "current_balance": round(current_balance, 2),
         "net_pnl": round(net_realized_cashflow, 2),
-        "total_trades": len(trades),
-        "trades_imported": len(trades),
-        "trades": trades[:50]
+        "total_trades": record_count,
+        "trades_imported": record_count,
+        "trades": trades[:50] if trades else ledger_entries[:50]
     }
 
 @app.post("/api/funds/initial-balance")
@@ -15167,6 +15560,12 @@ async def update_initial_balance(request: Request, user: dict[str, Any] = Depend
     else:
         new_curr = new_starting
         db_exec("INSERT INTO user_passbooks (user_id, starting_balance, current_balance, total_buy, total_sell, trade_count, updated_at) VALUES (?, ?, ?, 0, 0, 0, ?)", [uid, new_starting, new_curr, now_iso()])
+    
+    # Synchronize with funds table
+    try:
+        db_exec("UPDATE funds SET trading_funds=?, available=?, updated_at=? WHERE user_id=?", [new_curr, new_curr, now_iso(), uid])
+    except Exception:
+        pass
     return {"ok": True, "starting_balance": new_starting, "current_balance": new_curr}
 
 @app.get("/api/funds/passbook")
@@ -15293,6 +15692,7 @@ async def add_external_position(request: Request, user: dict[str, Any] = Depends
     return {"ok": True, "position_id": pos_id, "status": status}
 
 @app.delete("/api/portfolio/trades/{trade_id}")
+@app.delete("/api/portfolio/external-positions/{trade_id}")
 async def delete_trade(trade_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     uid = user["id"]
     db_exec("DELETE FROM positions WHERE id=? AND user_id=?", [trade_id, uid])

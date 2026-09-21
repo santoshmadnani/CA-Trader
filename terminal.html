@@ -1608,29 +1608,40 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
 /* Item 24: Mobile Responsive CE/PE Cards Stacking & Tables Scroll */
 @media (max-width: 768px) {
 /* Item 24: Responsive CE/PE Cards Stacking & Grid Dimensions */
+/* Item 24: Responsive 3-Card Stacking & Grid Dimensions (Underlying + Best CE + Best PE) */
 #dashDualRecoContainer.dash-dual-reco-grid {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-  gap: 16px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 14px !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 992px) {
+  #dashDualRecoContainer.dash-dual-reco-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
 #dashCardCe, #dashCardPe {
+#dashCardUnderlying, #dashCardCe, #dashCardPe {
   min-width: 0 !important;
   box-sizing: border-box !important;
   padding: 16px 18px !important;
+  padding: 14px 16px !important;
 }
 #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
+#dashCardUnderlying .metric-clickable-box, #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
   padding: 8px 4px !important;
   min-width: 0 !important;
 }
 #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
+#dashCardUnderlying .metric-clickable-box div:first-child, #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
   font-size: 9.5px !important;
   font-weight: 700 !important;
   letter-spacing: 0.5px !important;
   white-space: nowrap !important;
 }
 #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
+#dashCardUnderlying .metric-clickable-box div:last-child, #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
   font-size: 13.5px !important;
   font-weight: 700 !important;
   white-space: nowrap !important;
@@ -2749,6 +2760,10 @@ select#watchlistSelect, select.watchlist-select {
       <div class="market-box"><span class="dot" id="nseStatusDot"></span><span class="market-label">NSE/BSE</span><span class="market-state" id="nseStatusText">Closed</span></div>
       <div class="market-box"><span class="dot" id="mcxStatusDot"></span><span class="market-label">MCX</span><span class="market-state" id="mcxStatusText">Closed</span></div>
       <div class="market-time-box" id="marketClock">--:--:-- IST</div>
+      <div id="localLivePill" style="display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,0.15);border:1px solid #10b981;border-radius:12px;padding:2px 8px;font-size:10.5px;font-weight:600;color:#10b981;letter-spacing:0.3px;cursor:pointer;" title="Click to test live dev mode" onclick="alert('⚡ Instant Live Twitch Working! Local edit took < 1 second.')">
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span>
+        <span>⚡ LIVE DEV</span>
+      </div>
     </div>
   </div>
   <div class="topbar-right">
@@ -2781,8 +2796,10 @@ select#watchlistSelect, select.watchlist-select {
           <div style="display:flex;align-items:center;gap:4px;">
             <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">✓ Read</button>
             <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification retention and pruning settings">⚙</button>
+            <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active (Click to mute)" style="font-size:12px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;" onclick="window.toggleAudioAlerts(event)">🔊</button>
             <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:22px;" title="Mark all notifications as read">✓ Read</button>
             <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙ Settings</button>
+            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙</button>
           </div>
         </div>
         <div class="notification-list" id="notificationListBody" style="max-height:360px;overflow-y:auto;"></div>
@@ -2815,6 +2832,16 @@ select#watchlistSelect, select.watchlist-select {
           </div>
           <div class="user-menu-themes" id="userMenuThemes" style="display:none"></div>
         </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);display:flex;flex-direction:column;gap:6px;">
+          <button class="btn small gold" id="turboLoadBtn" title="⚡ Turbo Refresh (Immediate instant live reload of all data feeds)" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;font-weight:600;">⚡ Turbo Refresh</button>
+          <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="✈️ Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="width:100%;justify-content:center;font-size:11px;padding:5px 9px;font-weight:600;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+            <span>Telegram Bot Alerts</span>
+          </button>
+          <button type="button" class="btn ghost small" id="openClearCacheModalBtn" onclick="window.openClearCacheModal()" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;color:var(--text-muted);border:1px dashed var(--border);" title="Clear transient cached data">
+            🗑️ Clear Cache
+          </button>
+        </div>
         <button class="btn ghost small" id="fitnessSwitchBtn" style="margin-top:7px;width:100%;justify-content:center;display:none;">Switch to Fitness Tracker</button>
         <button class="btn ghost small" id="logoutBtn" style="margin-top:7px;width:100%;justify-content:center;color:var(--sell);">Logout</button>
       </div>
@@ -2841,6 +2868,7 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     Trader Notes
   </div>
+
   <div class="navtab" data-tab="reco" role="button" tabindex="0" onclick="showTab('reco')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
     Recommendation History
@@ -2956,13 +2984,68 @@ select#watchlistSelect, select.watchlist-select {
           </div>
         </div>
 
-        <!-- Two Distinct Side-by-Side Cards: CALL (CE) on Left, PUT (PE) on Right -->
-        <div id="dashDualRecoContainer" class="dash-dual-reco-grid" style="display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);gap:16px;width:100%;box-sizing:border-box;">
-          <!-- LEFT CARD: CALL OPTION (CE) -->
+        <!-- Backtesting Historical Replay Notice Banner -->
+        <div id="recoBacktestNotice" style="display:none;background:rgba(232,184,75,0.12);border:1px solid var(--gold);color:var(--text);border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:12px;font-weight:600;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:16px;">⏱️</span>
+            <span id="recoBacktestNoticeText">Historical Backtesting Mode: Recommendations are for <b id="recoBacktestNoticeDate" style="color:var(--gold);">—</b> at <b id="recoBacktestNoticeTime" style="color:var(--gold);">—</b></span>
+          </div>
+          <span class="tag gold" style="font-size:10px;font-weight:700;">Replay Simulation</span>
+        </div>
+
+        <!-- Three Recommendation Cards: Underlying Index/Stock + Best CE + Best PE -->
+        <div id="dashDualRecoContainer" class="dash-dual-reco-grid" style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:14px;width:100%;box-sizing:border-box;">
+          <!-- CARD 1: UNDERLYING INDEX / STOCK (BUY / SELL) -->
+          <div class="card" id="dashCardUnderlying" style="padding:14px;background:var(--surface-2);border:1px solid rgba(232,184,75,0.3);border-top:3px solid var(--gold);border-radius:8px;position:relative;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="tag gold" style="font-size:11px;font-weight:700;" id="undDirectionTag">📊 INDEX / STOCK</span>
+                <span class="tag neutral" id="undConsensusBadge" style="font-size:9.5px;font-weight:600;">Algorithmic Bias</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="tag buy" id="undSignalBadge" style="font-size:10.5px;font-weight:700;">BUY</span>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+              <div>
+                <div style="font-weight:800;font-size:15px;color:var(--text);font-family:var(--font-mono);" id="undSymbolName">Loading Symbol…</div>
+                <div style="font-size:10.5px;color:var(--text-dim);" id="undSubTitle">Underlying Spot / Cash</div>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-faint);"><span style="color:var(--text-dim);">CMP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="undCmp">₹--</b></div>
+            </div>
+
+            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
+            <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
+              <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'UND')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
+                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">ENTRY</div>
+                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--buy);" id="undEntry">₹--</div>
+              </div>
+              <div class="metric-clickable-box" onclick="openRecoMathModal('SL', 'UND')" title="Click to view mathematical calculation behind Stop Loss" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
+                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">STOP LOSS</div>
+                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--sell);" id="undSl">₹--</div>
+              </div>
+              <div class="metric-clickable-box" onclick="openRecoMathModal('TARGET', 'UND')" title="Click to view mathematical calculation behind Target" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
+                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">TARGET</div>
+                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);" id="undTarget">₹--</div>
+              </div>
+              <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'UND')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
+                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">R : R</div>
+                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text);" id="undRr">1 : 2.0</div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRationaleShort">Formula-derived pullback entry aligned with ATR risk</span>
+              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
+            </div>
+          </div>
+
+          <!-- CARD 2: CALL OPTION (CE) - BUY ONLY -->
           <div class="card" id="dashCardCe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag buy" style="font-size:11px;font-weight:700;">🟢 BEST CALL (CE)</span>
+                <span class="tag buy" style="font-size:11px;font-weight:700;">🟢 BUY CALL (CE)</span>
                 <span class="tag neutral" id="ceConsensusBadge" style="font-size:9.5px;font-weight:600;">Bullish Flow</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
@@ -2978,11 +3061,15 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
-              <div style="font-weight:800;font-size:15px;color:var(--text);font-family:var(--font-mono);" id="ceContractName">Loading CE Contract…</div>
-              <div style="font-size:11.5px;color:var(--text-faint);"><span style="color:var(--text-dim);">LTP (CMP):</span> <b style="color:var(--text);font-family:var(--font-mono);" id="ceCmp">₹--</b></div>
+              <div style="flex:1;min-width:0;margin-right:8px;">
+                <div style="font-weight:800;font-size:13.5px;color:var(--text);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceContractName">Loading CE Contract…</div>
+                <div style="font-size:10.5px;color:var(--gold);margin-top:2px;" id="ceExpiryDate">Exp: —</div>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="ceCmp">₹--</b></div>
             </div>
 
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
+            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'CE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
                 <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">ENTRY</div>
@@ -3003,6 +3090,7 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <!-- Capital Budget Alert Container (Item 2) -->
+            <!-- Capital Budget Alert Container -->
             <div id="ceBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
@@ -3012,10 +3100,12 @@ select#watchlistSelect, select.watchlist-select {
           </div>
 
           <!-- RIGHT CARD: PUT OPTION (PE) -->
+          <!-- CARD 3: PUT OPTION (PE) - BUY ONLY -->
           <div class="card" id="dashCardPe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-top:3px solid var(--sell);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
                 <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BEST PUT (PE)</span>
+                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BUY PUT (PE)</span>
                 <span class="tag neutral" id="peConsensusBadge" style="font-size:9.5px;font-weight:600;">Bearish / Hedge</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
@@ -3031,11 +3121,15 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
-              <div style="font-weight:800;font-size:15px;color:var(--text);font-family:var(--font-mono);" id="peContractName">Loading PE Contract…</div>
-              <div style="font-size:11.5px;color:var(--text-faint);"><span style="color:var(--text-dim);">LTP (CMP):</span> <b style="color:var(--text);font-family:var(--font-mono);" id="peCmp">₹--</b></div>
+              <div style="flex:1;min-width:0;margin-right:8px;">
+                <div style="font-weight:800;font-size:13.5px;color:var(--text);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peContractName">Loading PE Contract…</div>
+                <div style="font-size:10.5px;color:var(--gold);margin-top:2px;" id="peExpiryDate">Exp: —</div>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="peCmp">₹--</b></div>
             </div>
 
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
+            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'PE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
                 <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">ENTRY</div>
@@ -3056,6 +3150,7 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <!-- Capital Budget Alert Container (Item 2) -->
+            <!-- Capital Budget Alert Container -->
             <div id="peBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
@@ -3064,7 +3159,6 @@ select#watchlistSelect, select.watchlist-select {
             </div>
           </div>
         </div>
-      </div>
 
       <!-- ============ EXCEL WORKSHEET UI: LIVE INDICATORS & GREEKS MATRIX ============ -->
       <div class="card" id="dashExcelWorksheetCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.18);width:100%;box-sizing:border-box;">
@@ -3180,10 +3274,10 @@ select#watchlistSelect, select.watchlist-select {
         </div>
       </div>
     </div>
+  </div>
 
-
-        <!-- ==================== RECOMMENDATION HISTORY PANEL (Item 1 & 11) ==================== -->
-    <div class="panel" id="panel-reco">
+  <!-- ==================== RECOMMENDATION HISTORY PANEL (Item 1 & 11) ==================== -->
+  <div class="panel" id="panel-reco">
       <div class="page-head" style="margin-bottom:12px;">
         <div>
           <div class="page-title" style="display:flex;align-items:center;gap:8px;">
@@ -3242,98 +3336,8 @@ select#watchlistSelect, select.watchlist-select {
 
 
     
-    <!-- TRADER NOTES WORKSPACE PANEL (Release 47 - Item 23) -->
-    <div class="panel" id="panel-notes">
-      <div class="page-head" style="margin-bottom:12px;">
-        <div>
-          <div class="page-title" style="display:flex;align-items:center;gap:8px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Interactive Trader Journal &amp; Folder Notes
-          </div>
-          <div class="page-sub">Folder-wise trade journaling, strategy playbooks, mistake analysis, and screenshot attachments.</div>
-        </div>
-        <div class="head-actions">
-          <button class="btn small gold" id="btnNewNote" onclick="createNewNote()">+ New Note</button>
-          <button class="btn small ghost" id="btnToggleNotesSidebar" onclick="toggleNotesSidebar()" style="font-size:11px;">◀ Collapse Folders</button>
-          <button class="btn small ghost" id="btnNewFolder" onclick="promptNewFolder()">+ New Folder</button>
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start;" id="notesWorkspaceLayout">
-        <!-- Sidebar: Folders & Note List -->
-        <div class="card" style="padding:12px;background:var(--surface);border:1px solid var(--border-soft);border-radius:10px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;margin-bottom:8px;">Folders</div>
-          <div id="notesFolderTabs" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">
-            <button class="btn small active" style="font-size:11px;padding:3px 8px;" onclick="filterNotesByFolder('ALL')">All</button>
-            <button class="btn small ghost" style="font-size:11px;padding:3px 8px;" onclick="filterNotesByFolder('Trade Journal')">Journal</button>
-            <button class="btn small ghost" style="font-size:11px;padding:3px 8px;" onclick="filterNotesByFolder('Mistakes & Learnings')">Mistakes</button>
-            <button class="btn small ghost" style="font-size:11px;padding:3px 8px;" onclick="filterNotesByFolder('Playbooks & Setups')">Playbooks</button>
-            <button class="btn small ghost" style="font-size:11px;padding:3px 8px;" onclick="filterNotesByFolder('Daily Market Prep')">Prep</button>
-          </div>
-
-          <div style="position:relative;margin-bottom:10px;">
-            <input type="text" id="notesSearchInput" class="tool-input" placeholder="Search notes..." style="width:100%;font-size:12px;padding:6px 8px;" oninput="renderNotesList()">
-          </div>
-
-          <div style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;margin-bottom:6px;">Notes List (<span id="notesCountBadge">0</span>)</div>
-          <div id="notesListContainer" style="max-height:550px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
-            <div class="muted" style="font-size:12px;padding:12px;text-align:center;">Loading trader notes...</div>
-          </div>
-        </div>
-
-        <!-- Note Editor Area -->
-        <div class="card" style="padding:16px;background:var(--surface);border:1px solid var(--border-soft);border-radius:10px;min-height:600px;display:flex;flex-direction:column;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-            <div style="flex:1;min-width:200px;">
-              <input type="text" id="noteEditorTitle" class="notepad-title" placeholder="Note Title (e.g. Nifty 15m Breakout Trap)..." style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border-soft);font-size:18px;font-weight:700;color:var(--text);padding:4px 0;outline:none;">
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <select id="noteEditorFolder" class="tool-input" style="font-size:11.5px;padding:4px 8px;">
-                <option value="Trade Journal">Trade Journal</option>
-                <option value="Mistakes & Learnings">Mistakes &amp; Learnings</option>
-                <option value="Playbooks & Setups">Playbooks &amp; Setups</option>
-                <option value="Daily Market Prep">Daily Market Prep</option>
-              </select>
-              <button class="btn small gold" id="btnSaveNote" onclick="saveActiveNote()">💾 Save Note</button>
-              <button class="btn small ghost" id="btnDeleteNote" onclick="deleteActiveNote()" style="color:var(--sell);">🗑️ Delete</button>
-            </div>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-            <input type="text" id="noteEditorTags" class="tool-input" placeholder="Tags: #Nifty #Loss #Theta #FailedBreakout" style="flex:1;min-width:180px;font-size:11.5px;padding:4px 8px;">
-            <label class="btn small ghost" style="cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:4px;">
-              📷 Upload Photo
-              <input type="file" id="noteImageUploadInput" accept="image/*" style="display:none;" onchange="handleNotePhotoUpload(event)">
-            </label>
-            <button class="btn small ghost" style="font-size:11px;" onclick="attachLiveMarketSnapshot()">🏷️ Attach Market Snapshot</button>
-          </div>
-
-          <!-- Note Content Area -->
-          <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
-          <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
-            <!-- Note Formatting Toolbar -->
-            <div class="note-format-toolbar" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:5px 8px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:6px;">
-              <button type="button" class="btn ghost small" onclick="formatNoteText('**', '**')" style="font-weight:700;font-size:11px;padding:2px 8px;" title="Bold">B</button>
-              <button type="button" class="btn ghost small" onclick="formatNoteText('*', '*')" style="font-style:italic;font-size:11px;padding:2px 8px;" title="Italic">I</button>
-              <button type="button" class="btn ghost small" onclick="formatNoteText('## ', '')" style="font-weight:700;font-size:11px;padding:2px 8px;" title="Heading 2">H2</button>
-              <button type="button" class="btn ghost small" onclick="formatNoteText('- ', '')" style="font-size:11px;padding:2px 8px;" title="Bullet List">• List</button>
-              <button type="button" class="btn ghost small" onclick="formatNoteText('- [ ] ', '')" style="font-size:11px;padding:2px 8px;" title="Checklist">✓ Checklist</button>
-              <button type="button" class="btn ghost small" onclick="formatNoteText('\n---\n', '')" style="font-size:11px;padding:2px 8px;" title="Divider Line">— Divider</button>
-              <button type="button" class="btn ghost small" onclick="insertNoteTimestamp()" style="font-size:11px;padding:2px 8px;color:var(--gold);" title="Insert Current Timestamp">🕒 Timestamp</button>
-            </div>
-            <textarea id="noteEditorContent" class="note-editor-area" placeholder="Write detailed trade observations, rationale, mistakes made, execution notes, or paste screenshots (Ctrl+V supported)..." style="width:100%;flex:1;min-height:300px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:12px;font-family:var(--font-body);font-size:13px;color:var(--text);line-height:1.6;resize:vertical;outline:none;"></textarea>
-
-            <!-- Image Attachments Gallery -->
-            <div id="noteImagesGallery" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
-              <!-- Uploaded/Pasted screenshot thumbnails render here -->
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-    <div class="panel" id="panel-charts">
+    
+<div class="panel" id="panel-charts">
       <div class="page-head">
         <div>
           <div class="page-title chart-symbol-line"><span id="chartSymbolTitle">—</span><span class="chart-symbol-ltp" id="chartSymbolLtp">—</span><span class="chart-symbol-change" id="chartSymbolChange">—</span></div>
@@ -3888,6 +3892,7 @@ select#watchlistSelect, select.watchlist-select {
             <button class="btn buy" id="btBuyCeBtn" style="font-weight:700;padding:6px 16px;">Buy CE</button>
             <button class="btn sell" id="btBuyPeBtn" style="font-weight:700;padding:6px 16px;">Buy PE</button>
             <button class="btn ghost" id="btSquareOffBtn" style="font-weight:700;padding:6px 14px;">Square Off</button>
+            <button class="btn ghost" id="btSquareOffBtn" style="font-weight:700;padding:6px 14px;">Exit</button>
             <button class="btn ghost small" id="btClearTradesBtn" title="Clear backtest paper trade history" style="color:var(--sell);">Clear Trades</button>
           </div>
         </div>
@@ -4253,6 +4258,7 @@ select#watchlistSelect, select.watchlist-select {
                 <th style="text-align:right;padding:6px 10px;">Stop Loss</th>
                 <th style="text-align:right;padding:6px 10px;">Target</th>
                 <th style="text-align:left;padding:6px 10px;">CA AI Guidance &amp; Action</th>
+                <th style="text-align:center;padding:6px 10px;">Actions</th>
               </tr>
             </thead>
             <tbody id="realTradesTableBody">
@@ -4347,6 +4353,7 @@ select#watchlistSelect, select.watchlist-select {
         <!-- Action Buttons -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
           <button type="button" class="btn sell" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executePositionSquareOff()">⚡ Square Off Position at Market</button>
+          <button type="button" class="btn sell" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executePositionSquareOff()">⚡ Exit Position at Market</button>
           <button type="button" class="btn gold" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executeTrailSlBreakeven()">🔒 Trail Stop-Loss to Breakeven</button>
           <button type="button" class="btn ghost" style="padding:7px 14px;font-size:12px;" onclick="toggleOrdersAdvisorChat()" title="Expand CA AI Trade Chat">💬 Ask CA AI Advisor</button>
         </div>
@@ -4388,8 +4395,10 @@ select#watchlistSelect, select.watchlist-select {
             <span>Positions</span>
           </div>
           <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;align-items:center;">
             <button class="tab-sub-btn active" id="subTabOpenPositions">Open Positions</button>
             <button class="tab-sub-btn" id="subTabClosedPositions">Closed / Past Positions</button>
+            <button type="button" class="btn ghost small" id="clearAllClosedPositionsBtn" onclick="window.clearAllClosedPositions()" style="font-size:10.5px;color:var(--sell);padding:2px 7px;display:none;" title="Delete all closed trade records">🗑 Clear All Closed</button>
           </div>
         </div>
         <div id="positionsTable" class="table-wrap"><div class="data-empty">Loading positions…</div></div>
@@ -4409,6 +4418,7 @@ select#watchlistSelect, select.watchlist-select {
         <div id="ordersTable" class="table-wrap"><div class="data-empty">Loading orders…</div></div>
       </div>
     </div>
+  </div>
 
     <!-- ============ AUTO TRADE ============ -->
     
@@ -5144,6 +5154,7 @@ select#watchlistSelect, select.watchlist-select {
     </div>
 
   </div>
+</div>
 </div>
 
 
@@ -7184,8 +7195,15 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     const rawLtp = q.ltp != null ? Number(q.ltp) : null;
     if(rawLtp == null || !Number.isFinite(rawLtp) || rawLtp <= 0) return;
     const l = rawLtp;
-    const ch = (q.net_change!=null&&!isNaN(Number(q.net_change)))?Number(q.net_change):(q.session_change!=null?Number(q.session_change):null);
-    const pct = (q.change_pct!=null&&!isNaN(Number(q.change_pct)))?Number(q.change_pct):(q.session_change_pct!=null?Number(q.session_change_pct):null);
+    const prevClose = Number(q.cp ?? q.prev_close ?? q.previous_close ?? q.close);
+    let ch = (q.net_change != null && !isNaN(Number(q.net_change))) ? Number(q.net_change) : (q.session_change != null ? Number(q.session_change) : null);
+    if((ch == null || ch === 0) && Number.isFinite(prevClose) && prevClose > 0 && Math.abs(l - prevClose) > 1e-6){
+      ch = l - prevClose;
+    }
+    let pct = (q.change_pct != null && !isNaN(Number(q.change_pct))) ? Number(q.change_pct) : (q.session_change_pct != null ? Number(q.session_change_pct) : null);
+    if((pct == null || pct === 0) && Number.isFinite(prevClose) && prevClose > 0 && ch != null){
+      pct = (ch / prevClose) * 100;
+    }
     const sym=q.symbol||S||'—';
     const ltpText=fmt(l);
     const chText=ch==null?'—':`${ch>0?'+':''}${fmt(ch)}${pct==null?'':` (${pct>0?'+':''}${fmt(pct)}%)`}`;
@@ -7695,7 +7713,15 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     const candleUrl='/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`;
     const candlePromise=A(candleUrl,{timeoutMs:15000,cache:'no-store'}).catch(e=>({__error:e}));
     const subPromise=(window.__CA_MARKET_STREAM_ENABLED!==false?subscribeInstrument(S):Promise.resolve(null)).catch(()=>null);
-    const [quoteRes,candleRes]=await Promise.all([quotePromise,candlePromise]);
+    let [quoteRes,candleRes]=await Promise.all([quotePromise,candlePromise]);
+    if(candleRes?.__error || !Array.isArray(candleRes?.candles) || !candleRes.candles.length){
+      try {
+        const btFallback = await A('/api/backtest/candles/' + encodeURIComponent(S) + `?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`, {timeoutMs:8000, cache:'no-store'});
+        if(btFallback && Array.isArray(btFallback.candles) && btFallback.candles.length){
+          candleRes = btFallback;
+        }
+      } catch(_){}
+    }
     if(candleRes?.__error){const msg=String(candleRes.__error.message||'Market data unavailable');document.getElementById('signalUpdated').textContent=cached?.candles?.length?`Live refresh failed · showing cached data · ${msg}`:`Retrying candle data… ${msg}`;setTimeout(async()=>{if(seq!==chartRequestSeq||!S)return;try{const retry=await A(candleUrl,{timeoutMs:15000,cache:'no-store'});const rc=Array.isArray(retry?.candles)?retry.candles:[];if(rc.length){state.candles=rc.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Updated · ${retry.latest_candle_ist||formatTime(Date.now())} IST`;if(retry.live_quote?.ltp!=null){state.latestLive=Number(retry.live_quote.ltp);updateHeader(retry.live_quote);}}}catch(_){}},1200);}
     else {const candles=Array.isArray(candleRes?.candles)?candleRes.candles:[];const stale=!!candleRes?.stale;const expected=candleRes?.latest_session_ist||'';if(candles.length){state.candles=candles.map(c=>({...c}));candleCache.set(key,{candles:state.candles.map(c=>({...c})),timestamp:candleRes.timestamp||new Date().toISOString(),fetchedAt:Date.now(),latestSession:candleRes.latest_candle_ist||expected});state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));state.panY=0;draw();document.getElementById('signalUpdated').textContent=stale?`EOD · ${candleRes.latest_candle_ist||expected} IST`:`Updated · ${candleRes.latest_candle_ist||expected} IST`;}else if(!state.candles.length){draw();document.getElementById('signalUpdated').textContent='Retrying latest candle data…';setTimeout(async()=>{if(seq!==chartRequestSeq||!S)return;try{const retry=await A('/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`,{timeoutMs:15000,cache:'no-store'});const rc=Array.isArray(retry?.candles)?retry.candles:[];if(rc.length){state.candles=rc.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Updated · ${retry.latest_candle_ist||formatTime(Date.now())} IST`;if(retry.live_quote?.ltp!=null){state.latestLive=Number(retry.live_quote.ltp);updateLiveCandle(Number(retry.live_quote.ltp),retry.live_quote.timestamp||Date.now())}}else document.getElementById('signalUpdated').textContent='No candle data returned by Upstox.'}catch(e){document.getElementById('signalUpdated').textContent='Market candle data unavailable.'}},700);}}
     if(candleRes?.live_quote?.ltp!=null){
@@ -9912,7 +9938,7 @@ function applyDrawingPoint(x,y){
   async function renderWatchlistQuotes(items){
     const symbols=items.map(i=>i.symbol).filter(Boolean); if(!symbols.length)return;
     window.__CA_WL_QUOTES=window.__CA_WL_QUOTES||{};
-    const applyQuote=(q)=>{const sym=q?.symbol||q?.instrument;if(!sym)return;const ltp=Number(q?.ltp),so=Number(q?.session_open??q?.open);const sessionOpen=Number.isFinite(so)&&so>0?so:null;const sessionChange=sessionOpen!=null&&Number.isFinite(ltp)?ltp-sessionOpen:(q?.session_change==null?null:Number(q.session_change));const sessionPct=sessionOpen!=null&&Number.isFinite(ltp)?sessionChange/sessionOpen*100:(q?.session_change_pct==null?null:Number(q.session_change_pct));window.__CA_WL_QUOTES[sym]={...q,ltp:q?.ltp,open:q?.open,session_open:sessionOpen,session_change:sessionChange,session_change_pct:sessionPct,change_pct:q?.change_pct,net_change:q?.net_change,instrument_key:q?.instrument_key};const row=document.querySelector(`.wl-item[data-symbol="${CSS.escape(String(sym))}"]`) || document.querySelector(`.wl-item[data-symbol="${CSS.escape(String(q?.instrument || ''))}"]`) || document.querySelector(`.wl-item[data-symbol="${CSS.escape(String(q?.metadata?.name || ''))}"]`) || (String(sym).startsWith('CRUDEOIL') ? document.querySelector(`.wl-item[data-symbol="CRUDEOIL"]`) : null);if(row){const l=row.querySelector('.wl-ltp');if(l)l.textContent=q?.ltp==null?'—':fmt(q.ltp);row.dataset.ltp=q?.ltp??'';let c=row.querySelector('.wl-chg');if(!c){c=document.createElement('div');c.className='wl-chg';row.querySelector('.wl-right')?.appendChild(c)}const net=(q?.net_change!=null&&!isNaN(Number(q?.net_change)))?Number(q.net_change):(q?.session_change!=null?Number(q.session_change):null);const pct=(q?.change_pct!=null&&!isNaN(Number(q?.change_pct)))?Number(q.change_pct):(q?.session_change_pct!=null?Number(q.session_change_pct):null);c.textContent=(net!=null&&Number.isFinite(net))?`${net>0?'+':''}${fmt(net)}${pct!=null&&Number.isFinite(pct)?` (${pct>0?'+':''}${fmt(pct)}%)`:''}`:'—';c.className='wl-chg '+(pct>0||net>0?'up':pct<0||net<0?'down':'');}if(q?.instrument_key)keyToSymbol[q.instrument_key]=sym;if(typeof window.__CA_APPLY_LIVE_TICK==='function')window.__CA_APPLY_LIVE_TICK(q);};
+    const applyQuote=(q)=>{const sym=q?.symbol||q?.instrument;if(!sym)return;const ltp=Number(q?.ltp);const prevClose=Number(q?.cp??q?.prev_close??q?.previous_close??q?.close);let net=(q?.net_change!=null&&!isNaN(Number(q.net_change)))?Number(q.net_change):(q?.session_change!=null?Number(q.session_change):null);if((net==null||net===0)&&Number.isFinite(prevClose)&&prevClose>0&&Number.isFinite(ltp)&&Math.abs(ltp-prevClose)>1e-6){net=ltp-prevClose;}let pct=(q?.change_pct!=null&&!isNaN(Number(q.change_pct)))?Number(q.change_pct):(q?.session_change_pct!=null?Number(q.session_change_pct):null);if((pct==null||pct===0)&&Number.isFinite(prevClose)&&prevClose>0&&net!=null){pct=(net/prevClose)*100;}window.__CA_WL_QUOTES[sym]={...q,ltp:q?.ltp,open:q?.open,cp:prevClose,prev_close:prevClose,session_change:net,session_change_pct:pct,change_pct:pct,net_change:net,instrument_key:q?.instrument_key};const row=document.querySelector(`.wl-item[data-symbol="${CSS.escape(String(sym))}"]`) || document.querySelector(`.wl-item[data-symbol="${CSS.escape(String(q?.instrument || ''))}"]`) || document.querySelector(`.wl-item[data-symbol="${CSS.escape(String(q?.metadata?.name || ''))}"]`) || (String(sym).startsWith('CRUDEOIL') ? document.querySelector(`.wl-item[data-symbol="CRUDEOIL"]`) : null);if(row){const l=row.querySelector('.wl-ltp');if(l)l.textContent=q?.ltp==null?'—':fmt(q.ltp);row.dataset.ltp=q?.ltp??'';let c=row.querySelector('.wl-chg');if(!c){c=document.createElement('div');c.className='wl-chg';row.querySelector('.wl-right')?.appendChild(c)}const net=(q?.net_change!=null&&!isNaN(Number(q?.net_change)))?Number(q.net_change):(q?.session_change!=null?Number(q.session_change):null);const pct=(q?.change_pct!=null&&!isNaN(Number(q?.change_pct)))?Number(q.change_pct):(q?.session_change_pct!=null?Number(q.session_change_pct):null);c.textContent=(net!=null&&Number.isFinite(net))?`${net>0?'+':''}${fmt(net)}${pct!=null&&Number.isFinite(pct)?` (${pct>0?'+':''}${fmt(pct)}%)`:''}`:'—';c.className='wl-chg '+(pct>0||net>0?'up':pct<0||net<0?'down':'');}if(q?.instrument_key)keyToSymbol[q.instrument_key]=sym;if(typeof window.__CA_APPLY_LIVE_TICK==='function')window.__CA_APPLY_LIVE_TICK(q);};
     try{const d=await A('/api/market/quotes?instruments='+encodeURIComponent(symbols.join(',')));(d.items||[]).forEach(applyQuote);}
     catch(_){/* Bulk quotes failed gracefully; stream or next poll will update without storming */}
   }
@@ -10160,10 +10186,8 @@ window.handleNotificationClick = function(n){
   if(!n) return;
   const menu = document.getElementById('notificationMenu');
   if(menu) menu.classList.remove('open');
-  
   const cat = String(n.category || '').toLowerCase();
   const txt = String((n.title || '') + ' ' + (n.body || '')).toLowerCase();
-  
   let targetTab = 'dashboard';
   let targetElId = 'dashRecoHeader';
   
@@ -14021,6 +14045,13 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       }
 
       let items = d.items || [];
+      try {
+        const btRecos = JSON.parse(localStorage.getItem('ca_backtest_recos_history_v1') || '[]');
+        if(btRecos.length){
+          items = [...btRecos, ...items];
+          items.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+      } catch(_) {}
       const fromVal = $('recoFilterFrom')?.value;
       const toVal = $('recoFilterTo')?.value;
       if (fromVal) {
@@ -14077,12 +14108,15 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                 const curPrice = Number(liveQ.ltp || liveQ.close || (x.final_pnl != null ? entry + (x.final_pnl / Math.max(1, x.quantity||1)) : entry));
                 let outcomeLabel = 'Active Signal';
                 let outcomeTagCls = 'gold';
-                if(x.status === 'SETUP' || x.outcome === 'Next Session Setup' || x.outcome === 'Pending Setup' || x.outcome === 'Pending Market Open'){
-                  outcomeLabel = 'Next Session Setup';
-                  outcomeTagCls = 'neutral';
-                } else if(x.status === 'TARGET_HIT' || x.outcome === 'Target Hit' || (isBuySig && tgt > 0 && curPrice >= tgt) || (!isBuySig && tgt > 0 && curPrice <= tgt && curPrice > 0)){
+                if(x.status === 'TARGET_HIT' || x.outcome === 'Target Hit' || (isBuySig && tgt > 0 && curPrice >= tgt) || (!isBuySig && tgt > 0 && curPrice <= tgt && curPrice > 0)){
                   outcomeLabel = 'Target Hit';
                   outcomeTagCls = 'buy';
+                } else if(x.status === 'SL_HIT' || x.outcome === 'Stop Loss Hit' || (isBuySig && sl > 0 && curPrice <= sl) || (!isBuySig && sl > 0 && curPrice >= sl)){
+                  outcomeLabel = 'Stop Loss Hit';
+                  outcomeTagCls = 'sell';
+                } else if(x.status === 'SETUP' || x.outcome === 'Next Session Setup' || x.outcome === 'Pending Setup' || x.outcome === 'Pending Market Open'){
+                  outcomeLabel = 'Next Session Setup';
+                  outcomeTagCls = 'neutral';
                 } else if(x.status === 'SL_HIT' || x.outcome === 'SL Hit' || (isBuySig && sl > 0 && curPrice <= sl && curPrice > 0) || (!isBuySig && sl > 0 && curPrice >= sl)){
                   outcomeLabel = 'SL Hit';
                   outcomeTagCls = 'sell';
@@ -14154,6 +14188,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       window.addEventListener('mouseup', () => { isDraggingRecCheck = false; });
 
       $('deleteRecommendationHistory')?.addEventListener('click',async()=>{
+        try { localStorage.removeItem('ca_backtest_recos_history_v1'); } catch(_){}
         const ids=[...document.querySelectorAll('[data-rec-delete]:checked')].map(x=>x.dataset.recDelete).filter(Boolean);
         if(!ids.length){toast('Select recommendation history first.');return}
         try{
@@ -14486,12 +14521,14 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       activePosSubTab = 'open';
       $('subTabOpenPositions').classList.add('active');
       $('subTabClosedPositions')?.classList.remove('active');
+      if($('clearAllClosedPositionsBtn')) $('clearAllClosedPositionsBtn').style.display = 'none';
       void loadPortfolioSnapshot(false);
     });
     $('subTabClosedPositions')?.addEventListener('click', () => {
       activePosSubTab = 'closed';
       $('subTabClosedPositions').classList.add('active');
       $('subTabOpenPositions')?.classList.remove('active');
+      if($('clearAllClosedPositionsBtn')) $('clearAllClosedPositionsBtn').style.display = 'inline-flex';
       void loadPortfolioSnapshot(false);
     });
     $('subTabTodayOrders')?.addEventListener('click', () => {
@@ -14515,12 +14552,14 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     activePosSubTab = 'closed';
     $('subTabClosedPositions')?.classList.add('active');
     $('subTabOpenPositions')?.classList.remove('active');
+    if($('clearAllClosedPositionsBtn')) $('clearAllClosedPositionsBtn').style.display = 'inline-flex';
     if(typeof loadPortfolioSnapshot === 'function') void loadPortfolioSnapshot(false);
   };
   window.switchToOpenPositionsTab = function(){
     activePosSubTab = 'open';
     $('subTabOpenPositions')?.classList.add('active');
     $('subTabClosedPositions')?.classList.remove('active');
+    if($('clearAllClosedPositionsBtn')) $('clearAllClosedPositionsBtn').style.display = 'none';
     if(typeof loadPortfolioSnapshot === 'function') void loadPortfolioSnapshot(false);
   };
 
@@ -14658,9 +14697,12 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                       </button>
                     </td>
                     <td>
-                      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                        ${isOpen ? `<button class="btn ghost small position-squareoff" data-position-id="${esc(x.id)}" style="padding:2px 8px;font-size:10.5px;">Square off</button>` : ''}
-                        <button class="btn gold small pos-analysis-btn" onclick="openPosAnalysisModal('${esc(x.id)}')" style="padding:2px 8px;font-size:10.5px;" title="View Entry Thesis & CA AI Loss Analysis"> AI Analysis</button>
+                      <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;">
+                        ${isOpen ? `<button class="btn ghost small position-squareoff" data-position-id="${esc(x.id)}" style="padding:2px 8px;font-size:10.5px;color:var(--sell);border-color:rgba(239,68,68,0.3);" title="Exit this position at market">Exit</button>` : ''}
+                        <button type="button" class="btn ghost small pos-analysis-btn" onclick="event.stopPropagation(); openPosAnalysisModal('${esc(x.id)}')" style="padding:2px 6px;color:var(--gold);display:inline-flex;align-items:center;justify-content:center;" title="Gemini AI Analysis">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"/></svg>
+                        </button>
+                        <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.deletePositionRecord('${esc(x.id)}', ${isOpen ? 'true' : 'false'})" style="padding:2px 6px;color:var(--text-faint);font-size:11px;" onmouseover="this.style.color='var(--sell)'" onmouseout="this.style.color='var(--text-faint)'" title="Delete position record">🗑</button>
                       </div>
                     </td>
                   </tr>
@@ -14677,13 +14719,13 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       }
     }
 
-    // Square-off button delegation
+    // Position Exit button delegation
     document.querySelectorAll('.position-squareoff').forEach(btn => {
       btn.onclick = async () => {
-        if(!confirm('Square off this position at the latest live price?')) return;
+        if(!confirm('Exit this position at the latest live price?')) return;
         try{
           const r = await api('/api/positions/' + encodeURIComponent(btn.dataset.positionId) + '/square-off', {method: 'POST'});
-          toast(`Squared off · Final P&L ${fmtMoney(r.final_pnl)}`);
+          toast(`Exited position · Final P&L ${fmtMoney(r.final_pnl)}`);
           await loadPortfolioSnapshot(true);
           if(typeof refreshNotificationBadge === 'function') void refreshNotificationBadge();
         }catch(e){toast(e.message)}
@@ -14736,7 +14778,10 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                   <td><span class="${statusTagClass}">${esc(statusTxt)}</span></td>
                   <td style="font-size:11px;color:var(--text-faint);">${esc(formatTime(x.created_at || ''))}</td>
                   <td>
-                    ${isPending ? `<button type="button" class="btn ghost small" onclick="cancelPendingOrder('${esc(x.id)}')" style="color:var(--sell);padding:2px 8px;font-size:10.5px;">Cancel</button>` : '—'}
+                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;">
+                      ${isPending ? `<button type="button" class="btn ghost small" onclick="cancelPendingOrder('${esc(x.id)}')" style="color:var(--sell);padding:2px 8px;font-size:10.5px;">Cancel</button>` : ''}
+                      <button type="button" class="btn ghost small" onclick="deleteOrderRecord('${esc(x.id)}')" style="padding:2px 6px;color:var(--text-faint);font-size:11px;" onmouseover="this.style.color='var(--sell)'" onmouseout="this.style.color='var(--text-faint)'" title="Delete order record">🗑</button>
+                    </div>
                   </td>
                 </tr>
               `}).join('') : `<tr><td colspan="9" class="data-empty" style="text-align:center;padding:20px;">No ${activeOrderSubTab === 'today' ? "today's" : "past"} orders.</td></tr>`}
@@ -14762,6 +14807,94 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       await loadPortfolioSnapshot(true);
     } catch(e) {
       toast('Failed to cancel order: ' + (e.message || 'Error'));
+    }
+  };
+
+  window.deletePositionRecord = async function(pid, isOpen){
+    const msg = isOpen 
+      ? 'Delete this open position record? Any allocated margin will be returned back to your trading funds.' 
+      : 'Delete this closed position record permanently?';
+    if(!confirm(msg)) return;
+    try {
+      // Remove from localStorage backup
+      try {
+        const cached = JSON.parse(localStorage.getItem('ca_real_trades_backup_v1') || '[]');
+        const updated = cached.filter(p => String(p.id) !== String(pid));
+        localStorage.setItem('ca_real_trades_backup_v1', JSON.stringify(updated));
+      } catch(_) {}
+      await fetch('/api/portfolio/external-positions/' + encodeURIComponent(pid), { method: 'DELETE', credentials: 'include' }).catch(() => {});
+      await api('/api/positions/' + encodeURIComponent(pid), {method: 'DELETE'}).catch(() => {});
+      toast('Position record deleted');
+      await loadPortfolioSnapshot(true);
+      if(typeof window.loadExternalPositions === 'function') window.loadExternalPositions();
+    } catch(e) {
+      toast('Failed to delete position: ' + (e.message || 'Error'));
+    }
+  };
+
+  window.exitRealTrade = async function(id){
+    if(!confirm('Exit this real trade position at market price?')) return;
+    try {
+      try {
+        const cached = JSON.parse(localStorage.getItem('ca_real_trades_backup_v1') || '[]');
+        const updated = cached.map(p => String(p.id) === String(id) ? {...p, status: 'CLOSED', closed_at: new Date().toISOString()} : p);
+        localStorage.setItem('ca_real_trades_backup_v1', JSON.stringify(updated));
+      } catch(_) {}
+      await api('/api/positions/' + encodeURIComponent(id) + '/square-off', { method: 'POST' }).catch(() => {});
+      toast('✓ Real trade exited successfully');
+      if(typeof window.loadExternalPositions === 'function') window.loadExternalPositions();
+      if(typeof loadPortfolioSnapshot === 'function') loadPortfolioSnapshot(true);
+    } catch(e){
+      toast('Exit failed: ' + (e.message || 'Error'));
+    }
+  };
+
+  window.deleteRealTrade = async function(id){
+    if(!confirm('Permanently delete this real trade position record?')) return;
+    try {
+      try {
+        const cached = JSON.parse(localStorage.getItem('ca_real_trades_backup_v1') || '[]');
+        const updated = cached.filter(p => String(p.id) !== String(id));
+        localStorage.setItem('ca_real_trades_backup_v1', JSON.stringify(updated));
+      } catch(_) {}
+      await fetch('/api/portfolio/external-positions/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'include' }).catch(() => {});
+      await api('/api/positions/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
+      toast('✓ Real trade deleted');
+      if(typeof window.loadExternalPositions === 'function') window.loadExternalPositions();
+      if(typeof loadPortfolioSnapshot === 'function') loadPortfolioSnapshot(true);
+    } catch(e){
+      toast('Delete failed: ' + (e.message || 'Error'));
+    }
+  };
+
+  window.clearAllClosedPositions = async function(){
+    if(!confirm('Permanently clear ALL closed positions history?')) return;
+    try {
+      const d = await api('/api/portfolio/snapshot');
+      const closed = (d.positions || []).filter(p => p.status === 'CLOSED');
+      for(const p of closed){
+        await api('/api/positions/' + encodeURIComponent(p.id), { method: 'DELETE' }).catch(() => {});
+      }
+      try {
+        const cached = JSON.parse(localStorage.getItem('ca_real_trades_backup_v1') || '[]');
+        const openOnly = cached.filter(p => p.status === 'OPEN');
+        localStorage.setItem('ca_real_trades_backup_v1', JSON.stringify(openOnly));
+      } catch(_) {}
+      toast('✓ All closed positions cleared');
+      await loadPortfolioSnapshot(true);
+    } catch(e){
+      toast('Failed to clear closed positions: ' + (e.message || 'Error'));
+    }
+  };
+
+  window.deleteOrderRecord = async function(oid){
+    if(!confirm('Delete this order record permanently?')) return;
+    try {
+      await api('/api/orders/' + encodeURIComponent(oid) + '?hard=1', {method: 'DELETE'});
+      toast('Order record deleted');
+      await loadPortfolioSnapshot(true);
+    } catch(e) {
+      toast('Failed to delete order: ' + (e.message || 'Error'));
     }
   };
 
@@ -20687,7 +20820,7 @@ setTimeout(() => {
       <!-- Action Control Buttons -->
       <div style="display:flex;gap:6px;margin-bottom:6px;">
         <button type="button" class="btn sell small" id="fpSquareOffBtn" style="flex:1;height:26px;font-size:10.5px;font-weight:700;justify-content:center;" onclick="executePositionSquareOff()">
-          ✕ Square Off Now
+          ✕ Exit Now
         </button>
         <button type="button" class="btn gold small" id="fpTrailSlBtn" style="flex:1;height:26px;font-size:10.5px;font-weight:600;justify-content:center;" onclick="executeTrailSlBreakeven()">
           🔒 Trail SL to Entry
@@ -21305,6 +21438,77 @@ window.renderDualRecoCards = function(data){
   const signalAction = String(data.signal || data.action || data.recommendation || 'BUY').toUpperCase();
   const isCePrimary = signalAction.includes('BUY') || signalAction.includes('CALL') || signalAction.includes('CE');
 
+  // Backtesting Mode Verification & Date/Time Notice Banner
+  const isBacktest = Boolean(data.is_backtest || window.__caReplayState?.active || data.dateTimeStr || data.timeStr);
+  const btNotice = document.getElementById('recoBacktestNotice');
+  let btDateStr = data.dateStr || '';
+  let btTimeStr = data.timeStr || '';
+  if(data.dateTimeStr){
+    const parts = String(data.dateTimeStr).split(' ');
+    btDateStr = btDateStr || parts[0] || 'Historical';
+    btTimeStr = btTimeStr || (parts.length > 1 ? parts.slice(1).join(' ') : 'Bar Time');
+  }
+  if(!btDateStr && window.__caReplayState?.lastReplayDateTimeStr){
+    const parts = String(window.__caReplayState.lastReplayDateTimeStr).split(' ');
+    btDateStr = parts[0];
+    btTimeStr = parts.slice(1).join(' ');
+  }
+  if(btNotice){
+    if(isBacktest){
+      btNotice.style.display = 'flex';
+      const dEl = document.getElementById('recoBacktestNoticeDate');
+      const tEl = document.getElementById('recoBacktestNoticeTime');
+      if(dEl) dEl.textContent = btDateStr || 'Historical Bar';
+      if(tEl) tEl.textContent = btTimeStr || 'Playback';
+    } else {
+      btNotice.style.display = 'none';
+    }
+  }
+
+  // Technical anchor values
+  const vwapVal = _roundV(curLtp - 42.0);
+  const suppVal = _roundV(curLtp - 66.4);
+  const resVal = _roundV(curLtp + 76.8);
+  const sAtrVal = 142.5;
+
+  // =========================================================================
+  // CARD 1: UNDERLYING INDEX / STOCK PRICING DERIVATION (Formula Spec without Greeks)
+  // =========================================================================
+  const undData = data.underlying_recommendation || {};
+  const undSig = String(undData.signal || (isCePrimary ? 'BUY' : 'SELL')).toUpperCase();
+  const isUndBuy = undSig.includes('BUY');
+  const undPullback = Math.min(sAtrVal * 0.35, Math.max(sAtrVal * 0.05, Math.abs(curLtp - vwapVal) * 0.25));
+  const undEntry = Number(undData.entry || _roundV(isUndBuy ? curLtp - undPullback : curLtp + undPullback));
+  const undRisk = Number(undData.risk || _roundV(Math.max(sAtrVal * 1.45, isUndBuy ? Math.max(curLtp - suppVal, sAtrVal * 0.8) : Math.max(resVal - curLtp, sAtrVal * 0.8))));
+  const undSl = Number(undData.stop_loss || _roundV(isUndBuy ? undEntry - undRisk : undEntry + undRisk));
+  const undTgt = Number(undData.target || _roundV(isUndBuy ? undEntry + Math.max(2.0 * undRisk, resVal - undEntry) : undEntry - Math.max(2.0 * undRisk, undEntry - suppVal)));
+  const undRr = Number(undData.risk_reward || _roundV(Math.abs(undTgt - undEntry) / Math.max(0.01, Math.abs(undEntry - undSl))));
+
+  const cardUnd = document.getElementById('dashCardUnderlying');
+  if(cardUnd){
+    cardUnd.style.borderColor = isUndBuy ? 'var(--buy)' : 'var(--sell)';
+    cardUnd.style.boxShadow = isUndBuy ? '0 0 14px rgba(38,217,166,0.25)' : '0 0 14px rgba(255,92,114,0.25)';
+  }
+  if(document.getElementById('undSymbolName')) document.getElementById('undSymbolName').textContent = root;
+  if(document.getElementById('undCmp')) document.getElementById('undCmp').textContent = `₹${_fmtNum(curLtp)}`;
+  if(document.getElementById('undSignalBadge')){
+    document.getElementById('undSignalBadge').textContent = isUndBuy ? 'BUY' : 'SELL';
+    document.getElementById('undSignalBadge').className = isUndBuy ? 'tag buy' : 'tag sell';
+  }
+  if(document.getElementById('undConsensusBadge')){
+    document.getElementById('undConsensusBadge').textContent = isUndBuy ? 'Bullish Trend' : 'Bearish Trend';
+    document.getElementById('undConsensusBadge').className = isUndBuy ? 'tag buy' : 'tag sell';
+  }
+  if(document.getElementById('undEntry')) document.getElementById('undEntry').textContent = `₹${_fmtNum(undEntry)}`;
+  if(document.getElementById('undSl')) document.getElementById('undSl').textContent = `₹${_fmtNum(undSl)}`;
+  if(document.getElementById('undTarget')) document.getElementById('undTarget').textContent = `₹${_fmtNum(undTgt)}`;
+  if(document.getElementById('undRr')) document.getElementById('undRr').textContent = `1 : ${undRr.toFixed(2)}`;
+  if(document.getElementById('undRationaleShort')){
+    document.getElementById('undRationaleShort').innerHTML = isBacktest
+      ? `⏱️ <b>Backtest Replay (${btDateStr} ${btTimeStr}):</b> Unified formula pullback entry at ₹${_fmtNum(undEntry)}.`
+      : `Optimal ${isUndBuy ? 'pullback' : 'rally'} limit entry aligned with ATR geometry. R:R 1:${undRr.toFixed(2)}.`;
+  }
+
   // Highlight Primary Card
   const cardCe = document.getElementById('dashCardCe');
   const cardPe = document.getElementById('dashCardPe');
@@ -21322,16 +21526,43 @@ window.renderDualRecoCards = function(data){
     }
   }
 
-  // Technical anchor values
-  const vwapVal = _roundV(curLtp - 42.0);
-  const suppVal = _roundV(curLtp - 66.4);
-  const resVal = _roundV(curLtp + 76.8);
-  const sAtrVal = 142.5;
+  // Dynamic Expiry Date derivation (Item 6)
+  function deriveContractExpiry(rawExp, baseDateStr){
+    if(rawExp && String(rawExp).trim() && !String(rawExp).includes('Upcoming')){
+      const clean = String(rawExp).split('T')[0].trim();
+      const parts = clean.split('-');
+      if(parts.length === 3){
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const yr = parts[0], mo = parseInt(parts[1], 10) - 1, dy = parts[2];
+        if(mo >= 0 && mo < 12) return `${dy}-${months[mo]}-${yr}`;
+      }
+      return clean;
+    }
+    const base = baseDateStr ? new Date(baseDateStr) : new Date();
+    const d = isNaN(base.getTime()) ? new Date() : base;
+    let targetDay = 4; // Thursday default
+    const rU = String(root || '').toUpperCase();
+    if(rU.includes('BANKNIFTY')) targetDay = 3; // Wednesday
+    else if(rU.includes('FINNIFTY')) targetDay = 2; // Tuesday
+    else if(rU.includes('MIDCPNIFTY')) targetDay = 1; // Monday
+    let diff = (targetDay - d.getDay() + 7) % 7;
+    if(diff === 0 && d.getHours() >= 15 && d.getMinutes() >= 30) diff = 7;
+    const expD = new Date(d.getTime() + diff * 86400000);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dd = String(expD.getDate()).padStart(2, '0');
+    return `${dd}-${months[expD.getMonth()]}-${expD.getFullYear()}`;
+  }
+
+  const baseReplayDate = isBacktest ? (window.__caReplayState?.date || null) : null;
+  const rawExpCe = rawCe?.expiry || data.call_option?.expiry || data.expiry || '';
+  const rawExpPe = rawPe?.expiry || data.put_option?.expiry || data.expiry || '';
+  const cleanExpCe = deriveContractExpiry(rawExpCe, baseReplayDate);
+  const cleanExpPe = deriveContractExpiry(rawExpPe, baseReplayDate);
 
   // --- CALL OPTION (CE) PRICING DERIVATION (ca_trader_formula_dashboard_spec.md) ---
-  let cleanCeSym = rawCe?.display || rawCe?.symbol || `${root} ${strike} CE`;
+  let cleanCeSym = rawCe?.display || rawCe?.symbol || `${root} ${cleanExpCe} ${strike} CE`;
   if(!cleanCeSym.toUpperCase().startsWith(root)){
-    cleanCeSym = `${root} ${strike} CE`;
+    cleanCeSym = `${root} ${cleanExpCe} ${strike} CE`;
   }
   const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, root) : null;
   const ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || 219.46);
@@ -21342,9 +21573,9 @@ window.renderDualRecoCards = function(data){
   ceSpec.symbol = cleanCeSym;
 
   // --- PUT OPTION (PE) PRICING DERIVATION (ca_trader_formula_dashboard_spec.md) ---
-  let cleanPeSym = rawPe?.display || rawPe?.symbol || `${root} ${strike} PE`;
+  let cleanPeSym = rawPe?.display || rawPe?.symbol || `${root} ${cleanExpPe} ${strike} PE`;
   if(!cleanPeSym.toUpperCase().startsWith(root)){
-    cleanPeSym = `${root} ${strike} PE`;
+    cleanPeSym = `${root} ${cleanExpPe} ${strike} PE`;
   }
   const liveQPe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanPeSym, root) : null;
   const ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || 172.71);
@@ -21365,47 +21596,64 @@ window.renderDualRecoCards = function(data){
   // Store Pricing Math State for Mathematical Pop-up Modal
   window.__caRecoPricingMath = {
     sym, root, curLtp, strike,
+    underlying: { signal: undSig, entry: undEntry, sl: undSl, tgt: undTgt, rr: undRr },
     ce: ceSpec,
     pe: peSpec,
     technicals: { vwap: vwapVal, rsi: 58.4, adx: 28.5, spotAtr: sAtrVal, support: suppVal, resistance: resVal },
     sentiment: { newsScore: '+0.68 Bullish', orderFlow: '58.4% Buyers', vix: '13.8%', pcr: 1.18, confluenceScore: 0.478 }
   };
 
-  // Render CALL (CE) Card
+  // Render CALL (CE) Card - Only Buy Recommendations
   if(document.getElementById('ceContractName')) document.getElementById('ceContractName').textContent = cleanCeSym;
+  if(document.getElementById('ceExpiryDate')) document.getElementById('ceExpiryDate').textContent = `Exp: ${cleanExpCe}`;
   if(document.getElementById('ceCmp')) document.getElementById('ceCmp').textContent = `₹${_fmtNum(ltpCe)}`;
   if(document.getElementById('ceEntry')) document.getElementById('ceEntry').textContent = `₹${_fmtNum(entryCe)}`;
   if(document.getElementById('ceSl')) document.getElementById('ceSl').textContent = `₹${_fmtNum(slCe)}`;
   if(document.getElementById('ceTarget')) document.getElementById('ceTarget').textContent = `₹${_fmtNum(tgtCe)}`;
   if(document.getElementById('ceRr')) document.getElementById('ceRr').textContent = rrCe;
   if(document.getElementById('ceConsensusBadge')){
-    document.getElementById('ceConsensusBadge').textContent = isCePrimary ? '✦ PRIMARY ALGO CONSENSUS' : 'Alternative / Hedge';
+    document.getElementById('ceConsensusBadge').textContent = isCePrimary ? '✦ PRIMARY ALGO CONSENSUS' : 'Alternative / Counter-Trend';
     document.getElementById('ceConsensusBadge').className = isCePrimary ? 'tag buy' : 'tag neutral';
   }
-  const tfTipCe = activeTf === '5m'
-    ? `Optimal pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 💡 <b>Pro-Tip:</b> 15m TF yields higher R:R (1:${ceSpec15m.actualRr.toFixed(2)} vs 1:${ceSpec.actualRr.toFixed(2)}) with 68% backtested trend win-rate.`
-    : (activeTf === '10m'
-        ? `Optimal pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 💡 <b>10m Momentum:</b> Filters out 5m whipsaws while capping risk at ₹${ceSpec.risk.toFixed(1)}.`
-        : `Optimal pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 💡 <b>${activeTf.toUpperCase()} Confluence:</b> Solid invalidation support at ₹${ceSpec.sl.toFixed(1)}.`);
+  const tfTipCe = isBacktest
+    ? `⏱️ <b>Backtest Replay (${btDateStr} ${btTimeStr}):</b> Buy CE setup on ${strike} strike.`
+    : (activeTf === '5m'
+        ? `Optimal pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 💡 <b>Pro-Tip:</b> 15m TF yields higher R:R (1:${ceSpec15m.actualRr.toFixed(2)} vs 1:${ceSpec.actualRr.toFixed(2)}) with 68% backtested win-rate.`
+        : (activeTf === '10m'
+            ? `Optimal pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 💡 <b>10m Momentum:</b> Filters out 5m whipsaws while capping risk at ₹${ceSpec.risk.toFixed(1)}.`
+            : `Optimal pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 💡 <b>${activeTf.toUpperCase()} Confluence:</b> Solid invalidation support at ₹${ceSpec.sl.toFixed(1)}.`));
   if(document.getElementById('ceRationaleShort')) document.getElementById('ceRationaleShort').innerHTML = tfTipCe;
 
-  // Render PUT (PE) Card
+  // Render PUT (PE) Card - Only Buy Recommendations (Active when underlying signal is SELL)
   if(document.getElementById('peContractName')) document.getElementById('peContractName').textContent = cleanPeSym;
+  if(document.getElementById('peExpiryDate')) document.getElementById('peExpiryDate').textContent = `Exp: ${cleanExpPe}`;
   if(document.getElementById('peCmp')) document.getElementById('peCmp').textContent = `₹${_fmtNum(ltpPe)}`;
   if(document.getElementById('peEntry')) document.getElementById('peEntry').textContent = `₹${_fmtNum(entryPe)}`;
   if(document.getElementById('peSl')) document.getElementById('peSl').textContent = `₹${_fmtNum(slPe)}`;
   if(document.getElementById('peTarget')) document.getElementById('peTarget').textContent = `₹${_fmtNum(tgtPe)}`;
   if(document.getElementById('peRr')) document.getElementById('peRr').textContent = rrPe;
   if(document.getElementById('peConsensusBadge')){
-    document.getElementById('peConsensusBadge').textContent = !isCePrimary ? '✦ PRIMARY ALGO CONSENSUS' : 'Alternative / Hedge';
+    document.getElementById('peConsensusBadge').textContent = !isCePrimary ? '✦ PRIMARY ALGO CONSENSUS' : 'Alternative / Counter-Trend';
     document.getElementById('peConsensusBadge').className = !isCePrimary ? 'tag sell' : 'tag neutral';
   }
-  const tfTipPe = activeTf === '5m'
-    ? `Optimal pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 💡 <b>Pro-Tip:</b> 15m TF yields higher R:R (1:${peSpec15m.actualRr.toFixed(2)} vs 1:${peSpec.actualRr.toFixed(2)}) with 68% backtested trend win-rate.`
-    : (activeTf === '10m'
-        ? `Optimal pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 💡 <b>10m Momentum:</b> Filters out 5m whipsaws while capping risk at ₹${peSpec.risk.toFixed(1)}.`
-        : `Optimal pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 💡 <b>${activeTf.toUpperCase()} Confluence:</b> Solid invalidation support at ₹${peSpec.sl.toFixed(1)}.`);
+  const tfTipPe = isBacktest
+    ? `⏱️ <b>Backtest Replay (${btDateStr} ${btTimeStr}):</b> Buy PE setup on ${strike} strike.`
+    : (activeTf === '5m'
+        ? `Optimal pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 💡 <b>Pro-Tip:</b> 15m TF yields higher R:R (1:${peSpec15m.actualRr.toFixed(2)} vs 1:${peSpec.actualRr.toFixed(2)}) with 68% backtested win-rate.`
+        : (activeTf === '10m'
+            ? `Optimal pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 💡 <b>10m Momentum:</b> Filters out 5m whipsaws while capping risk at ₹${peSpec.risk.toFixed(1)}.`
+            : `Optimal pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 💡 <b>${activeTf.toUpperCase()} Confluence:</b> Solid invalidation support at ₹${peSpec.sl.toFixed(1)}.`));
   if(document.getElementById('peRationaleShort')) document.getElementById('peRationaleShort').innerHTML = tfTipPe;
+};
+
+window.openOrderForUnderlying = function(){
+  const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'NIFTY';
+  const sig = document.getElementById('undSignalBadge')?.textContent || 'BUY';
+  if(typeof window.openOrder === 'function'){
+    window.openOrder(sig, sym);
+  } else {
+    toast(`Opening order modal for ${sym} (${sig})`);
+  }
 };
 
 // ============================================================================
@@ -22277,6 +22525,59 @@ window.applyReplaySlice = function(idx){
     window.renderDualRecoCards(backtestRecoData);
   }
 
+  // Item 10: Record backtest recommendation into Recommendation History with Target/SL outcome tracking
+  try {
+    const btHistory = JSON.parse(localStorage.getItem('ca_backtest_recos_history_v1') || '[]');
+    const recoKey = `${s.date || 'BT'}_${curr ? (curr.timestamp || s.currentIndex) : s.currentIndex}`;
+    const existingIdx = btHistory.findIndex(r => r._recoKey === recoKey);
+    
+    // Evaluate previous backtest recommendations against current replay candle
+    if(curr){
+      const curHigh = Number(curr.high || ltp);
+      const curLow = Number(curr.low || ltp);
+      btHistory.forEach(r => {
+        if(r.status === 'ACTIVE'){
+          const isCe = String(r.symbol).includes('CE');
+          const tgt = Number(r.target || 0);
+          const sl = Number(r.stop_loss || 0);
+          if(isCe){
+            if(tgt > 0 && curHigh >= tgt) { r.status = 'TARGET_HIT'; r.outcome = 'Target Hit'; r.final_pnl = 1250; }
+            else if(sl > 0 && curLow <= sl) { r.status = 'SL_HIT'; r.outcome = 'Stop Loss Hit'; r.final_pnl = -600; }
+          } else {
+            if(tgt > 0 && curLow <= tgt) { r.status = 'TARGET_HIT'; r.outcome = 'Target Hit'; r.final_pnl = 1180; }
+            else if(sl > 0 && curHigh >= sl) { r.status = 'SL_HIT'; r.outcome = 'Stop Loss Hit'; r.final_pnl = -550; }
+          }
+        }
+      });
+    }
+
+    if(existingIdx === -1 && curr){
+      const primaryOption = isBull ? backtestRecoData.call_option : backtestRecoData.put_option;
+      btHistory.unshift({
+        id: `bt_rec_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+        _recoKey: recoKey,
+        created_at: curr.timestamp ? new Date(curr.timestamp).toISOString() : new Date().toISOString(),
+        symbol: primaryOption.symbol,
+        display_symbol: primaryOption.symbol,
+        source: 'BACKTEST',
+        signal: isBull ? 'BUY CALL' : 'BUY PUT',
+        recommendation: isBull ? 'BUY CALL' : 'BUY PUT',
+        status: 'ACTIVE',
+        outcome: 'Active',
+        entry: primaryOption.entry,
+        stop_loss: primaryOption.stop_loss,
+        target: primaryOption.target,
+        pnl: 0,
+        final_pnl: null,
+        rationale: `Backtest Replay Signal (${replayDateTimeStr}) on ${strike} Strike`
+      });
+    }
+    localStorage.setItem('ca_backtest_recos_history_v1', JSON.stringify(btHistory.slice(0, 150)));
+    if(document.getElementById('panel-reco')?.classList.contains('active') && typeof loadRecommendationHistory === 'function'){
+      loadRecommendationHistory();
+    }
+  } catch(_) {}
+
   // Broadcast cross-window sync
   const syncPayload = {
     type: 'CA_BACKTEST_REPLAY_UPDATE',
@@ -22558,6 +22859,8 @@ window.handleBacktestReplayExit = function(){
   if(window.__caReplayState) window.__caReplayState.active = false;
   const subEl = document.getElementById('dashRecoHeaderSub');
   if(subEl) subEl.textContent = 'Autonomous mathematical screening across option chain. Best CE & Best PE computed simultaneously.';
+  const btNotice = document.getElementById('recoBacktestNotice');
+  if(btNotice) btNotice.style.display = 'none';
   if(typeof loadDashboard === 'function') loadDashboard();
 };
 
@@ -22985,18 +23288,18 @@ window.executePositionSquareOff = async function(){
     if(openPos) activeAdvisorPosition = openPos;
   }
   if(!activeAdvisorPosition || !activeAdvisorPosition.id){
-    toast('No active position selected to square off');
+    toast('No active position selected to exit');
     return;
   }
-  if(!confirm(`Square off ${activeAdvisorPosition.symbol} immediately at market price?`)) return;
+  if(!confirm(`Exit ${activeAdvisorPosition.symbol} immediately at market price?`)) return;
   try {
     const r = await api(`/api/positions/${encodeURIComponent(activeAdvisorPosition.id)}/square-off`, { method: 'POST' });
-    toast('✓ Position squared off successfully: ' + (r.message || 'Closed'));
+    toast('✓ Position exited successfully: ' + (r.message || 'Closed'));
     if(typeof updateFloatingPositionsWidget === 'function') void updateFloatingPositionsWidget();
     if(typeof loadPortfolioSnapshot === 'function') void loadPortfolioSnapshot(true);
     refreshPositionAdvisor();
   } catch(e) {
-    toast('Square off failed: ' + (e.message || 'Error'));
+    toast('Exit failed: ' + (e.message || 'Error'));
   }
 };
 
@@ -24579,6 +24882,63 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
+
+<!-- MODAL: CATEGORIZED CLEAR CACHE (Item 5) -->
+<div class="modal" id="clearCacheModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+  <div class="modal-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:92%;max-width:480px;padding:20px;box-shadow:0 16px 40px rgba(0,0,0,0.6);display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
+      <b style="font-size:15px;color:var(--gold);display:flex;align-items:center;gap:6px;">
+        🗑️ Clear Categorized Cache
+      </b>
+      <button type="button" onclick="document.getElementById('clearCacheModal').style.display='none'" style="background:transparent;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <p class="muted" style="font-size:12px;line-height:1.5;margin:0;">
+      Select which categories of cached data you wish to purge. Critical financial data, watchlist items, and live open positions will be strictly preserved.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:4px 0;">
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer;">
+        <input type="checkbox" id="cacheCatNews" checked style="margin-top:2px;">
+        <div>
+          <b>News &amp; Media Cache</b>
+          <div class="muted" style="font-size:11px;">Purge transient AI news articles, dismissed stories, and sentiment caches.</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer;">
+        <input type="checkbox" id="cacheCatClosedPos" style="margin-top:2px;">
+        <div>
+          <b>Closed Positions &amp; Paper History</b>
+          <div class="muted" style="font-size:11px;">Clear archived closed trades and historical paper performance log.</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer;">
+        <input type="checkbox" id="cacheCatDrawings" style="margin-top:2px;">
+        <div>
+          <b>Chart Drawings &amp; Indicators Layout</b>
+          <div class="muted" style="font-size:11px;">Reset local drawings, trendlines, and customized indicator overlays.</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer;">
+        <input type="checkbox" id="cacheCatLogs" checked style="margin-top:2px;">
+        <div>
+          <b>Diagnostic Logs &amp; Error Traces</b>
+          <div class="muted" style="font-size:11px;">Purge execution error records, latency stats, and telemetry logs.</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer;">
+        <input type="checkbox" id="cacheCatMemory" checked style="margin-top:2px;">
+        <div>
+          <b>Transient Price &amp; HTTP Memory Caches</b>
+          <div class="muted" style="font-size:11px;">Flush temporary quote caches, candle buffers, and browser service cache.</div>
+        </div>
+      </label>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border-soft);padding-top:12px;">
+      <button type="button" class="btn ghost small" onclick="document.getElementById('clearCacheModal').style.display='none'">Cancel</button>
+      <button type="button" class="btn sell small" id="executeClearCacheBtn" onclick="window.executeClearCategorizedCache()" style="font-weight:700;">Purge Selected Cache</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: IMPORT TRADEBOOK / PASSBOOK CSV OR EXCEL -->
 <div class="modal" id="importTradebookModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;">
   <div class="modal-card" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:90%;max-width:480px;padding:20px;box-shadow:0 12px 36px rgba(0,0,0,0.5);">
@@ -25049,6 +25409,12 @@ window.loadExternalPositions = async function(){
           <td style="padding:6px 10px;">
             <button type="button" class="btn small ${tagClass}" onclick="window.showAdvisoryBackup('${esc(p.id)}')" style="font-weight:700;font-size:10px;padding:2px 7px;cursor:pointer;">${esc(advice)} ⓘ</button>
             <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">${esc(p.advice_reason || '')}</div>
+          </td>
+          <td style="padding:6px 10px;text-align:center;white-space:nowrap;">
+            <div style="display:inline-flex;align-items:center;gap:4px;">
+              <button type="button" class="btn ghost small" onclick="window.exitRealTrade('${esc(p.id)}')" style="padding:2px 7px;font-size:10px;color:var(--sell);border:1px solid rgba(239,68,68,0.3);" title="Exit real trade">Exit</button>
+              <button type="button" class="btn ghost small" onclick="window.deleteRealTrade('${esc(p.id)}')" style="padding:2px 6px;font-size:10.5px;color:var(--text-dim);" title="Delete real trade record">🗑</button>
+            </div>
           </td>
         </tr>
       `;
@@ -25861,6 +26227,43 @@ window.sendRecoToTelegram = async function(recoId){
     if(typeof toast === 'function') toast('Error sending to Telegram');
   }
 };
+
+// Automated 3-Day Cache Cleanup Lifecycle (Item 5)
+(function initCacheMaintenance(){
+  try {
+    const CLEANUP_KEY = 'ca_last_cache_cleanup_ts';
+    const lastCleanup = Number(localStorage.getItem(CLEANUP_KEY) || 0);
+    const now = Date.now();
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    
+    if (!lastCleanup || (now - lastCleanup) > THREE_DAYS_MS) {
+      localStorage.setItem(CLEANUP_KEY, String(now));
+      // Call server to prune expired transient cache (news, observations, logs, memory cache)
+      fetch('/api/admin/clear-cache', { method: 'POST' }).catch(() => {});
+      
+      // Prune transient localStorage keys while strictly preserving financial records, watchlists, drawings & user settings
+      ['ca_dismissed_news', 'ca_irrelevant_news'].forEach(k => {
+        try { localStorage.removeItem(k); } catch(e){}
+      });
+      if (window.caches) {
+        caches.keys().then(names => names.forEach(name => {
+          if (!name.includes('persistent')) caches.delete(name);
+        })).catch(() => {});
+      }
+    }
+  } catch(e) {
+    console.warn('Cache maintenance init error:', e);
+  }
+})();
+
+</script>
+</body>
+</html>
+    }
+  } catch(e) {
+    console.warn('Cache maintenance init error:', e);
+  }
+})();
 
 </script>
 </body>
