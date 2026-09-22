@@ -1886,6 +1886,7 @@ class UpstoxAdapter:
             end=(now.date()-timedelta(days=1))
             start=end-timedelta(days=7)
             path=f"/historical-candle/{quote(key,safe='')}/day/{end.isoformat()}/{start.isoformat()}"
+            payload=self._get(path,{},ttl=300.0,cache_key=cache_key,base_url=UPSTOX_V3_BASE_URL)
             payload=self._get(path,{},ttl=1800.0,cache_key=cache_key)
             rows=(payload.get('data') or {}).get('candles') or []
             vals=[]
@@ -2159,6 +2160,7 @@ class UpstoxAdapter:
         # Single path segment interval: e.g. /historical-candle/intraday/{key}/1minute
         interval_str, _ = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/intraday/{quote(key, safe='')}/{interval_str}"
+        payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}", base_url=UPSTOX_V3_BASE_URL)
         payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}")
         return self._parse_candle_rows((payload.get("data") or {}).get("candles") or [])
 
@@ -2180,6 +2182,7 @@ class UpstoxAdapter:
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
         hist_path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date}/{from_date}"
         try:
+            payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}", base_url=UPSTOX_V3_BASE_URL)
             payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}")
             out.extend(self._parse_candle_rows((payload.get("data") or {}).get("candles") or []))
         except Exception as exc:
@@ -2210,6 +2213,7 @@ class UpstoxAdapter:
         key, meta = self.resolve_instrument(instrument)
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date.isoformat()}/{from_date.isoformat()}"
+        payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}", base_url=UPSTOX_V3_BASE_URL)
         payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}")
         data = payload.get("data") or {}
         candles = data.get("candles") or []
@@ -8162,6 +8166,7 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
         stale = bool(latest_date is not None and latest_date < expected) or (not candles)
         if not candles:
             candles = generate_fallback_replay_candles(instrument, timeframe, days)
+        return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": latest_date.isoformat() if latest_date else None, "latest_session_ist": expected.isoformat(), "stale": stale, "data_state": "LIVE" if live_quote and live_quote.get("ltp") is not None else "EOD"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
         payload = {"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": latest_date.isoformat() if latest_date else None, "latest_session_ist": expected.isoformat(), "stale": stale, "data_state": "LIVE" if live_quote and live_quote.get("ltp") is not None else "EOD"}
         CACHE.set(ck, payload, 30.0)
         return JSONResponse(payload, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
@@ -9277,6 +9282,8 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
     data = None
     if not is_mcx:
         try:
+            raw = await asyncio.wait_for(async
+... [truncated for diff preview]
             raw = await asyncio.wait_for(asyncio.to_thread(UPSTOX.option_chain, root, expiry), timeout=3.5)
             if raw and isinstance(raw, dict) and raw.get("strikes"):
                 data = raw
