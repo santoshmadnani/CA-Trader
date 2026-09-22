@@ -11,3 +11,4 @@
 3. **Token Conservation**:
    - Do not re-read entire multi-megabyte files when targeting specific sections.
    - Avoid launching headless browser automation or heavy multi-step verification scripts for simple CSS/HTML tweaks.
+
