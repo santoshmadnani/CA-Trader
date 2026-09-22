@@ -6716,6 +6716,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
 <script>
 (async()=>{
   const A=async(u,o={})=>{const timeoutMs=Math.max(1200,Number(o.timeoutMs||4500)),ctrl=o.signal?null:new AbortController(),timer=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs):null;try{const r=await fetch(u,{credentials:'include',headers:{'Content-Type':'application/json',...(o.headers||{})},...o,signal:o.signal||ctrl?.signal});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b?.error?.message||b?.detail?.message||b?.detail||`HTTP ${r.status}`);return b}catch(e){if(e?.name==='AbortError'){if(!o._retried)return A(u,{...o,_retried:true,timeoutMs:4000,headers:{...(o.headers||{}),'Cache-Control':'no-cache'}});throw new Error(`Request timed out after ${Math.round(timeoutMs/1000)} seconds`);}throw e}finally{if(timer)clearTimeout(timer)}};
+  const A=async(u,o={})=>{const timeoutMs=Math.max(1200,Number(o.timeoutMs||4500)),ctrl=o.signal?null:new AbortController(),timer=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs):null;try{const r=await fetch(u,{credentials:'include',headers:{'Content-Type':'application/json',...(o.headers||{})},...o,signal:o.signal||ctrl?.signal});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b?.error?.message||b?.detail?.message||b?.detail||`HTTP ${r.status}`);return b}catch(e){if(e?.name==='AbortError'){if(!o._retried)return A(u,{...o,_retried:true,timeoutMs:Math.max(timeoutMs,8000),headers:{...(o.headers||{}),'Cache-Control':'no-cache'}});throw new Error(`Request timed out after ${Math.round(timeoutMs/1000)} seconds`);}throw e}finally{if(timer)clearTimeout(timer)}};
   window.A = A;
   const api = A;
 
@@ -8368,6 +8369,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
             <span class="tag ${String(p.prediction||'').startsWith('Bullish')?'buy':String(p.prediction||'').startsWith('Bearish')?'sell':'neutral'}">${fmt(p.confidence)}%</span>
           </div>
         `).join(''):'<div class="muted">No detected candlestick pattern in the current range.</div>';
+        if(typeof bindPatternClicks ===
+... [truncated for diff preview]
         if(typeof bindPatternClicks === 'function') bindPatternClicks();
         $('patternScanStatus').textContent=`Loaded ${patterns.length} candlestick pattern(s)`;
         const st=d.structure||{};
@@ -11729,7 +11732,7 @@ window.handleNotificationClick = function(n){
     } catch(e) {
       if (e?.name === 'AbortError') {
         if (!options._retried) {
-          return api(url, {...options, _retried: true, timeoutMs: 4000, headers: {...(options.headers || {}), 'Cache-Control': 'no-cache'}});
+          return api(url, {...options, _retried: true, timeoutMs: Math.max(timeoutMs, 8000), headers: {...(options.headers || {}), 'Cache-Control': 'no-cache'}});
         }
         throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds`);
       }

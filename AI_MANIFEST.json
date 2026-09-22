@@ -1,0 +1,164 @@
+{
+  "name": "CA Trader Architecture & Component Manifest",
+  "version": "2.0.0",
+  "branch": "CA-Trader-Bifurcated",
+  "description": "Authoritative map of frontend panels, DOM IDs, JavaScript controllers, and FastAPI endpoints to enable instant, zero-guesswork AI development.",
+  "core_files": {
+    "frontend": "terminal.html",
+    "backend": "app.py",
+    "login": "CA_Trader_Login.html"
+  },
+  "conventions": {
+    "upstox_api_urls": {
+      "historical_candles": "https://api.upstox.com/v2/historical-candle/{instrument_key}/{interval}/{to_date}/{from_date}",
+      "intraday_candles": "https://api.upstox.com/v2/historical-candle/intraday/{instrument_key}/{interval}",
+      "option_greeks": "https://api.upstox.com/v3/market-quote/option-greek",
+      "market_feed_v3": "https://api.upstox.com/v3/feed/market-data-feed/authorize"
+    },
+    "weekly_expiries": {
+      "NIFTY": "Tuesday (weekday index 1)",
+      "FINNIFTY": "Tuesday (weekday index 1)",
+      "BANKNIFTY": "Wednesday (weekday index 2)"
+    },
+    "price_change_calculation": "When Upstox net_change is 0 or null during closed market, calculate as: ltp - (session_open || open) and change_pct = (chg / open) * 100",
+    "global_state_objects": [
+      "window.state",
+      "window.APP_CACHE",
+      "window.CATraderSymbol",
+      "window.__caCurrentChartReco",
+      "window.__caCurrentOptionChain"
+    ]
+  },
+  "panels": {
+    "dashboard": {
+      "id": "panel-dashboard",
+      "navtab_data_tab": "dashboard",
+      "primary_functions": ["loadDashboard()", "renderDualRecoCards(data)"],
+      "key_dom_ids": {
+        "dual_reco_container": "dualRecoContainer",
+        "card_underlying_title": "undSymbol",
+        "card_underlying_price": "undPrice",
+        "card_underlying_change": "undChange",
+        "ce_reco_card": "cardCeContract",
+        "pe_reco_card": "cardPeContract"
+      },
+      "api_routes": [
+        "GET /api/recommendations/{symbol}",
+        "GET /api/market/quote/{symbol}",
+        "GET /api/options/{underlying}/summary"
+      ]
+    },
+    "charts": {
+      "id": "panel-charts",
+      "navtab_data_tab": "charts",
+      "primary_functions": ["loadChart()", "draw()", "ensureChartLayout(reset)", "resizeCanvas()"],
+      "key_dom_ids": {
+        "canvas": "upstoxCandles",
+        "viewport": "chartViewport",
+        "symbol_title": "chartSymbolTitle",
+        "ohlc_o": "chartOhlcO",
+        "ohlc_h": "chartOhlcH",
+        "ohlc_l": "chartOhlcL",
+        "ohlc_c": "chartOhlcC"
+      },
+      "api_routes": [
+        "GET /api/market/candles/{instrument}?timeframe={tf}&days={days}",
+        "GET /api/backtest/candles/{instrument}"
+      ]
+    },
+    "options": {
+      "id": "panel-options",
+      "navtab_data_tab": "options",
+      "primary_functions": ["loadOptions()", "renderZerodhaOptionChainTable()"],
+      "key_dom_ids": {
+        "table_host": "optionChainTable",
+        "expiry_select": "optExpirySelect",
+        "pcr_badge": "pcrRatioValue",
+        "max_pain_badge": "maxPainValue"
+      },
+      "api_routes": [
+        "GET /api/options/{underlying}",
+        "GET /api/options/{underlying}/expiries",
+        "GET /api/options/{underlying}/summary"
+      ]
+    },
+    "reco": {
+      "id": "panel-reco",
+      "navtab_data_tab": "reco",
+      "primary_functions": ["loadRecommendationHistory()"],
+      "key_dom_ids": { "table": "recoHistoryTable" },
+      "api_routes": ["GET /api/recommendations/history"]
+    },
+    "news": {
+      "id": "panel-news",
+      "navtab_data_tab": "news",
+      "primary_functions": ["loadNewsByCaAi(mode)"],
+      "key_dom_ids": { "container": "newsListContainer" },
+      "api_routes": ["GET /api/news"]
+    },
+    "fundamentals": {
+      "id": "panel-fundamentals",
+      "navtab_data_tab": "fundamentals",
+      "primary_functions": ["loadFundamentals()"],
+      "key_dom_ids": { "container": "fundamentalsContainer" },
+      "api_routes": ["GET /api/fundamentals/{symbol}"]
+    },
+    "movers": {
+      "id": "panel-movers",
+      "navtab_data_tab": "movers",
+      "primary_functions": ["loadMovers()"],
+      "key_dom_ids": { "container": "moversTableBody" },
+      "api_routes": ["GET /api/market/movers"]
+    },
+    "other_factors": {
+      "id": "panel-other-factors",
+      "navtab_data_tab": "other-factors",
+      "primary_functions": ["loadOtherFactorsSuite(force)"],
+      "key_dom_ids": { "container": "macroFactorsGrid" },
+      "api_routes": ["GET /api/market/macro-factors"]
+    },
+    "backtesting": {
+      "id": "panel-backtesting",
+      "navtab_data_tab": "backtesting",
+      "primary_functions": ["initBacktestingTab()", "runBacktest()"],
+      "key_dom_ids": { "canvas": "backtestCanvas" },
+      "api_routes": ["POST /api/backtest/run", "GET /api/backtest/candles/{instrument}"]
+    },
+    "orders": {
+      "id": "panel-orders",
+      "navtab_data_tab": "orders",
+      "primary_functions": ["loadPortfolioSnapshot()", "renderOrdersTable()"],
+      "key_dom_ids": { "orders_table": "ordersTable", "positions_table": "positionsTable" },
+      "api_routes": ["GET /api/orders", "GET /api/positions"]
+    },
+    "funds": {
+      "id": "panel-funds",
+      "navtab_data_tab": "funds",
+      "primary_functions": ["loadFundsTab()"],
+      "key_dom_ids": { "margin_avail": "availableCashMargin" },
+      "api_routes": ["GET /api/user/margins"]
+    },
+    "console": {
+      "id": "panel-console",
+      "navtab_data_tab": "console",
+      "primary_functions": ["loadServerStats()"],
+      "key_dom_ids": { "log_feed": "serverConsoleFeed" },
+      "api_routes": ["GET /api/server/stats"]
+    },
+    "reports": {
+      "id": "panel-reports",
+      "navtab_data_tab": "reports",
+      "primary_functions": ["loadReports()"],
+      "key_dom_ids": { "pnl_summary": "pnlSummaryGrid" },
+      "api_routes": ["GET /api/reports/pnl"]
+    },
+    "notifications": {
+      "id": "panel-notifications",
+      "navtab_data_tab": "notifications",
+      "primary_functions": ["loadDedicatedNotifications()"],
+      "key_dom_ids": { "list": "dedicatedNotificationsList" },
+      "api_routes": ["GET /api/notifications"]
+    }
+  }
+}
+

@@ -8156,7 +8156,7 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
         # One authoritative range-safe path for every chart request.
         key_for_session, meta_for_session = UPSTOX.resolve_instrument(instrument)
         segment = classify_instrument_segment(instrument, meta_for_session, key_for_session)
-        candles = analysis_candles_robust(instrument, timeframe, days)
+        candles = await asyncio.to_thread(analysis_candles_robust, instrument, timeframe, days)
         candles, live_quote = _merge_live_quote_into_candles(instrument, timeframe, candles)
         session = market_session(segment)
         latest_candle = candles[-1] if candles else None
@@ -8166,7 +8166,6 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
         stale = bool(latest_date is not None and latest_date < expected) or (not candles)
         if not candles:
             candles = generate_fallback_replay_candles(instrument, timeframe, days)
-        return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": latest_date.isoformat() if latest_date else None, "latest_session_ist": expected.isoformat(), "stale": stale, "data_state": "LIVE" if live_quote and live_quote.get("ltp") is not None else "EOD"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
         payload = {"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": latest_date.isoformat() if latest_date else None, "latest_session_ist": expected.isoformat(), "stale": stale, "data_state": "LIVE" if live_quote and live_quote.get("ltp") is not None else "EOD"}
         CACHE.set(ck, payload, 30.0)
         return JSONResponse(payload, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
@@ -9282,8 +9281,6 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
     data = None
     if not is_mcx:
         try:
-            raw = await asyncio.wait_for(async
-... [truncated for diff preview]
             raw = await asyncio.wait_for(asyncio.to_thread(UPSTOX.option_chain, root, expiry), timeout=3.5)
             if raw and isinstance(raw, dict) and raw.get("strikes"):
                 data = raw
