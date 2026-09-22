@@ -5369,17 +5369,11 @@ def normalize_signal(side: str, levels: dict[str, Any]) -> bool:
     return True
 
 
-def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | None = None, bearable_loss: float | None = None, risk_preferences: dict[str, Any] | None = None, option_preferences: dict[str, Any] | None = None, max_profit_mode: bool = False, user_id: int | None = None) -> dict[str, Any]:
-    cache_key=f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
 def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | None = None, bearable_loss: float | None = None, risk_preferences: dict[str, Any] | None = None, option_preferences: dict[str, Any] | None = None, max_profit_mode: bool = False, user_id: int | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
-    cache_key=f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{expiry_scalp}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
-    cached=CACHE.get(cache_key)
-    if cached is not None: return cached
-    risk_preferences=risk_preferences or {}; option_preferences=option_preferences or {}
+    risk_preferences = risk_preferences or {}; option_preferences = option_preferences or {}
     user_capital = None; user_max_loss = None; user_desired_profit = None
     if user_id:
         try:
-            cfg = db_exec("SELECT capital, max_loss, max_profit FROM auto_trades WHERE user_id=?", [user_id], "one") or {}
             cfg = db_exec("SELECT capital, max_loss, max_profit FROM auto_trade_configs WHERE user_id=?", [user_id], "one") or {}
             user_capital = float(cfg.get("capital") or 0) or None
             user_max_loss = float(cfg.get("max_loss") or 0) or None
@@ -5387,14 +5381,9 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         except Exception: pass
     if bearable_loss is None and user_max_loss: bearable_loss = user_max_loss
     if desired_profit is None and user_desired_profit: desired_profit = user_desired_profit
-    cache_key=f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{desired_profit}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
-    cache_key=f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{desired_profit}:{expiry_scalp}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
-    cached=CACHE.get(cache_key)
     cache_key = f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{desired_profit}:{expiry_scalp}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
     cached = CACHE.get(cache_key)
     if cached is not None: return cached
-    risk_preferences=risk_preferences or {}; option_preferences=option_preferences or {}
-    risk_preferences = risk_preferences or {}; option_preferences = option_preferences or {}
     opt_info = parse_option_contract(symbol)
     if opt_info:
         underlying = opt_info["underlying"]
@@ -8697,7 +8686,6 @@ async def analysis_overall(
     # recommendation and must not silently consume an AI request.
     try:
         rec = await asyncio.wait_for(
-            asyncio.to_thread(overall_recommendation, instrument, timeframe, dp_clean, bl_clean, None, {"enabled": True}, False, uid),
             asyncio.to_thread(overall_recommendation, instrument, timeframe, dp_clean, bl_clean, None, {"enabled": True}, False, uid, is_scalp),
             timeout=12.0
         )
@@ -10069,7 +10057,6 @@ def generate_demo_calibration_candles(symbol: str, count: int = 72) -> list[dict
     candles = []
     p = base_price
     rng = random.Random(42 + hash(root) % 1000)
-    
     for i in range(count):
         ts = (start_dt + timedelta(minutes=5 * i)).strftime("%Y-%m-%d %H:%M:%S")
         # Realistic commodity/equity random walk with trend pulses
