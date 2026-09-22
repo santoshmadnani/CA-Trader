@@ -2303,6 +2303,26 @@ body.light-theme .market-box *,
   box-sizing: border-box !important;
 }
 
+#optionsExpiryPills .chip-filter {
+  background: rgba(24, 144, 255, 0.12) !important;
+  color: #1890ff !important;
+  border: 1px solid rgba(24, 144, 255, 0.4) !important;
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+}
+#optionsExpiryPills .chip-filter:hover {
+  background: rgba(24, 144, 255, 0.25) !important;
+  color: #ffffff !important;
+  border-color: #1890ff !important;
+}
+#optionsExpiryPills .chip-filter.active {
+  background: #1890ff !important;
+  color: #ffffff !important;
+  border-color: #1890ff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 10px rgba(24, 144, 255, 0.5) !important;
+}
+
 .topbar-right{
   display: flex !important;
   flex-direction: row !important;
@@ -3065,41 +3085,24 @@ select#watchlistSelect, select.watchlist-select {
       <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="topSymbolSearch" autocomplete="off" placeholder="Search"></div>
       <div class="top-search-suggestions" id="topSearchSuggestions"></div>
     </div>
-    <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:4px 11px;height:30px;font-size:11.5px;cursor:pointer;border-radius:6px;" title="Chat with CA AI">
-      <span class="ai-btn-icon">✦</span> <span class="ai-btn-text">Ask CA AI</span>
-    <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:4px;font-weight:700;padding:3px 9px;height:26px;font-size:11px;cursor:pointer;border-radius:4px;" title="Chat with CA AI">
     <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:3px 9px;height:26px;font-size:11px;cursor:pointer;border-radius:4px;" title="Chat with CA AI">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/></svg>
       <span class="ai-btn-text">Ask CA AI</span>
     </button>
-    
-    <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
-    <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;"><span class="panic-btn-icon">🚨</span> <span class="panic-btn-text">Panic Exit</span></button>
-    <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
-    <button class="btn small sell" id="panicKillSwitchBtn" title="EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:2px 8px;height:26px;font-weight:700;margin-right:4px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;"><span class="panic-btn-text">Panic Exit</span></button>
     <button class="btn small sell" id="panicKillSwitchBtn" title="EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:2px 8px;height:26px;font-weight:700;margin-right:4px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;border-radius:4px;">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span class="panic-btn-text">Panic Exit</span>
     </button>
-    <div class="top-icon-wrap"><button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button><div class="notification-menu" id="notificationMenu">
+    <div class="top-icon-wrap">
+      <button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button>
+      <div class="notification-menu" id="notificationMenu">
         <div class="notification-tabs" id="notifTabs" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-soft);padding:4px 8px;">
           <div style="display:flex;gap:4px;">
-            <button class="notif-tab active" data-notif-filter="all">All</button>
-            <button class="notif-tab" data-notif-filter="news">News</button>
-            <button class="notif-tab" data-notif-filter="orders_reco">Orders &amp; Recos</button>
             <button type="button" class="notif-tab active" data-notif-filter="all" onclick="window.selectNotifFilter(this, 'all')">All</button>
             <button type="button" class="notif-tab" data-notif-filter="news" onclick="window.selectNotifFilter(this, 'news')">News</button>
             <button type="button" class="notif-tab" data-notif-filter="orders_reco" onclick="window.selectNotifFilter(this, 'orders_reco')">Orders &amp; Recos</button>
           </div>
           <div style="display:flex;align-items:center;gap:4px;">
-            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">✓ Read</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification retention and pruning settings">⚙</button>
-            <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active (Click to mute)" style="font-size:12px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;" onclick="window.toggleAudioAlerts(event)">🔊</button>
-            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:22px;" title="Mark all notifications as read">✓ Read</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙ Settings</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙</button>
-            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">Read</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification settings">Settings</button>
             <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Mark all notifications as read"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Read</button>
             <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
             <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active" style="font-size:12px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;" onclick="window.toggleAudioAlerts(event)">
@@ -3108,7 +3111,8 @@ select#watchlistSelect, select.watchlist-select {
           </div>
         </div>
         <div class="notification-list" id="notificationListBody" style="max-height:360px;overflow-y:auto;"></div>
-      </div></div>
+      </div>
+    </div>
     <div class="user-chip" id="userChip" tabindex="0" aria-label="Profile">
       <div class="avatar" id="userAvatar">SM</div>
       <div class="user-meta"><div class="name" id="userDisplayName">Santosh</div><div class="role">Paper Trading</div></div>
@@ -3181,11 +3185,6 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
     Option Chain
   </div>
-    <div class="navtab" data-tab="notes" role="button" tabindex="0" onclick="showTab('notes')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-    Trader Notes
-  </div>
-
 
   <div class="navtab" data-tab="reco" role="button" tabindex="0" onclick="showTab('reco')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
@@ -3196,8 +3195,6 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
     News by CA AI
   </div>
-  <div class="navtab" data-tab="fundamentals" role="button" tabindex="0" onclick="showTab('fundamentals')">Fundamentals</div>
-  <div class="navtab" data-tab="movers" role="button" tabindex="0" onclick="showTab('movers')">Market Movers</div>
   <div class="navtab" data-tab="fundamentals" role="button" tabindex="0" onclick="showTab('fundamentals')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
     Fundamentals
@@ -3218,7 +3215,6 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
     Funds
   </div>
-  <div class="navtab" data-tab="console" role="button" tabindex="0" onclick="showTab('console')">Server Console</div>
   <div class="navtab" data-tab="console" role="button" tabindex="0" onclick="showTab('console')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
     Server Console
@@ -3287,20 +3283,13 @@ select#watchlistSelect, select.watchlist-select {
       <div class="card" id="dashDualRecoCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid rgba(232,184,75,0.3);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.2);">
         <!-- Top Bar: Title & Multi-Timeframe Controls -->
         <div class="dash-reco-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:rgba(232,184,75,0.15);color:var(--gold);font-size:16px;font-weight:700;">✦</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:rgba(24,144,255,0.15);color:#1890ff;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
             </span>
             <div>
-              <b style="font-size:14.5px;color:var(--text);font-family:var(--font-display);">Algorithmic Dual-Engine · Multi-Timeframe Option Recommendations</b>
-              <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening across option chain. Best CE &amp; Best PE computed simultaneously.</div>
               <b style="font-size:14.5px;color:var(--text);font-family:var(--font-display);">Recommendations</b>
               <div style="font-size:11px;color:var(--text-dim);display:none;" id="dashRecoHeaderSub"></div>
-              <b style="font-size:13.5px;color:var(--text);font-family:var(--font-display);">Recommendations</b>
-              <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Dual-Engine Option Recommendations</b>
-              <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening across option chain · Best CE &amp; Best PE</div>
             </div>
           </div>
           <div class="dash-reco-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -3342,7 +3331,6 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardUnderlying" style="padding:14px;background:var(--surface-2);border:1px solid rgba(232,184,75,0.3);border-top:3px solid var(--gold);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag gold" style="font-size:11px;font-weight:700;" id="undDirectionTag">📊 INDEX / STOCK</span>
                 <span class="tag gold" style="font-size:11px;font-weight:700;" id="undDirectionTag">INDEX / STOCK</span>
                 <span class="tag neutral" id="undConsensusBadge" style="font-size:9.5px;font-weight:600;">Algorithmic Bias</span>
               </div>
@@ -3381,8 +3369,7 @@ select#watchlistSelect, select.watchlist-select {
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRationaleShort">Formula-derived pullback entry aligned with ATR risk</span>
-              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
-              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
+              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
             </div>
           </div>
 
@@ -3390,7 +3377,6 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardCe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag buy" style="font-size:11px;font-weight:700;">🟢 BUY CALL (CE)</span>
                 <span class="tag buy" style="font-size:11px;font-weight:700;">Call (CE)</span>
                 <span class="tag neutral" id="ceConsensusBadge" style="font-size:9.5px;font-weight:600;">Bullish Flow</span>
               </div>
@@ -3402,8 +3388,6 @@ select#watchlistSelect, select.watchlist-select {
                 <div style="display:inline-flex;gap:2px;">
                   <button type="button" class="btn small ghost" onclick="shiftStrike('CE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">▲ ITM</button>
                   <button type="button" class="btn small ghost" onclick="shiftStrike('CE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">▼ OTM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">ITM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">OTM</button>
                 </div>
               </div>
             </div>
@@ -3416,7 +3400,6 @@ select#watchlistSelect, select.watchlist-select {
               <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="ceCmp">₹--</b></div>
             </div>
 
-            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'CE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
@@ -3437,25 +3420,21 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
-            <!-- Capital Budget Alert Container (Item 2) -->
             <!-- Capital Budget Alert Container -->
             <div id="ceBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceRationaleShort">Pullback limit entry below CMP to prevent top buying</span>
-              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
-              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
+              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
             </div>
           </div>
 
           <!-- RIGHT CARD: PUT OPTION (PE) -->
           <!-- CARD 3: PUT OPTION (PE) - BUY ONLY -->
+          <!-- CARD 3: PUT OPTION (PE) - BUY ONLY -->
           <div class="card" id="dashCardPe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-top:3px solid var(--sell);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BEST PUT (PE)</span>
-                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BUY PUT (PE)</span>
-                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 Put (PE)</span>
                 <span class="tag sell" style="font-size:11px;font-weight:700;">Put (PE)</span>
                 <span class="tag neutral" id="peConsensusBadge" style="font-size:9.5px;font-weight:600;">Bearish / Hedge</span>
               </div>
@@ -3467,8 +3446,6 @@ select#watchlistSelect, select.watchlist-select {
                 <div style="display:inline-flex;gap:2px;">
                   <button type="button" class="btn small ghost" onclick="shiftStrike('PE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">▲ ITM</button>
                   <button type="button" class="btn small ghost" onclick="shiftStrike('PE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">▼ OTM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">ITM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">OTM</button>
                 </div>
               </div>
             </div>
@@ -3481,7 +3458,6 @@ select#watchlistSelect, select.watchlist-select {
               <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="peCmp">₹--</b></div>
             </div>
 
-            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'PE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
@@ -3502,14 +3478,12 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
-            <!-- Capital Budget Alert Container (Item 2) -->
             <!-- Capital Budget Alert Container -->
             <div id="peBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peRationaleShort">Pullback limit entry below CMP to protect capital</span>
-              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
-              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
+              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
             </div>
           </div>
         </div>
@@ -3517,12 +3491,9 @@ select#watchlistSelect, select.watchlist-select {
       <!-- ============ EXCEL WORKSHEET UI: LIVE INDICATORS & GREEKS MATRIX ============ -->
       <div class="card" id="dashExcelWorksheetCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.18);width:100%;box-sizing:border-box;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(38,217,166,0.15);color:var(--buy);font-weight:700;font-size:14px;">▦</span>
           <div style="display:flex;align-items:center;gap:8px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(38,217,166,0.15);color:var(--buy);font-weight:700;font-size:14px;">▦</span>
             <div>
-              <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Quantitative Confluence &amp; Valuation Matrix · Excel Worksheet UI</b>
-              <div style="font-size:11px;color:var(--text-dim);">Live streaming institutional factors. Click any Weightage % or Signal cell to calibrate algorithmic weighting.</div>
               <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Recommendation Rationale</b>
             </div>
           </div>
@@ -4360,14 +4331,6 @@ select#watchlistSelect, select.watchlist-select {
           <div id="optionsExpiryPills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
-            <input type="checkbox" id="chkOptColOI" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
-            <span>OI &amp; Vol</span>
-          </label>
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
-            <input type="checkbox" id="chkOptColGreeks" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
-            <span>Greeks (Δ, Γ, Θ, IV)</span>
-          </label>
           <button type="button" class="btn ghost small" id="optionsRefreshBtn">↻ Refresh</button>
         </div>
       </div>
