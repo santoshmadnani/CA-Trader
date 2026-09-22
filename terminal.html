@@ -1726,23 +1726,110 @@ select, .select-box select, .tool-input select, #noteEditorFolder, #chartRecoOpt
   padding: 4px 8px !important;
 }
 
-/* Item 23: Chart Mobile Forced Landscape Transformation */
-.chart-shell.chart-forced-landscape {
+/* Chart Video Player-like Full Screen & Landscape Overlay */
+.chart-shell:fullscreen,
+.chart-shell:-webkit-full-screen,
+.chart-shell.chart-forced-landscape,
+.chart-shell.chart-fullscreen-active {
   position: fixed !important;
+  inset: 0 !important;
   top: 0 !important;
   left: 0 !important;
-  width: 100vh !important;
-  height: 100vw !important;
-  transform: rotate(90deg) translateY(-100%) !important;
-  transform-origin: top left !important;
+  width: 100vw !important;
+  height: 100vh !important;
   z-index: 999999 !important;
   background: var(--bg) !important;
-  padding: 10px !important;
+  padding: 6px !important;
   box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transform: none !important;
 }
-.chart-shell.chart-forced-landscape .chart-area-pro {
-  height: calc(100vw - 110px) !important;
+.chart-shell:fullscreen .chart-area-pro,
+.chart-shell:-webkit-full-screen .chart-area-pro,
+.chart-shell.chart-forced-landscape .chart-area-pro,
+.chart-shell.chart-fullscreen-active .chart-area-pro {
+  flex: 1 1 auto !important;
+  height: calc(100vh - 46px) !important;
+  min-height: 0 !important;
 }
+
+/* Normal-sized fonts across all dropdowns (User Item 8) */
+select,
+.tool-input select,
+select.tool-input,
+select.form-input,
+.finder-field select,
+.navtab select,
+.filter-dropdown select,
+.dropdown-menu,
+.dropdown-menu *,
+select option {
+  font-size: 13px !important;
+}
+
+/* Mobile Responsive Chart Tools Panel & OHLC Bar (User Items 1 & 2) */
+@media (max-width: 768px) {
+  #chartOhlcBar {
+    top: 4px !important;
+    left: 4px !important;
+    padding: 2px 6px !important;
+    gap: 5px !important;
+    font-size: 8.5px !important;
+    border-radius: 4px !important;
+    max-width: calc(100% - 40px) !important;
+    white-space: nowrap !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
+  }
+  #chartOhlcBar span {
+    font-size: 8.5px !important;
+  }
+  #chartDrawingToolbox {
+    top: 26px !important;
+    left: 4px !important;
+    padding: 2px !important;
+    gap: 2px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3) !important;
+  }
+  .drawing-tb-btn {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    font-size: 11px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 4px !important;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .drawing-tb-btn.active {
+    background: var(--buy) !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+  }
+  .chart-toolbar {
+    padding: 3px 6px !important;
+    gap: 3px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+  }
+  .chart-toolbar .tf-btn {
+    padding: 2px 5px !important;
+    font-size: 10px !important;
+    height: 22px !important;
+    min-width: auto !important;
+  }
+  .chart-toolbar button {
+    height: 22px !important;
+    font-size: 10px !important;
+  }
+}
+
 
 
 /* ==========================================================================
@@ -2948,20 +3035,33 @@ select#watchlistSelect, select.watchlist-select {
       <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="topSymbolSearch" autocomplete="off" placeholder="Search"></div>
       <div class="top-search-suggestions" id="topSearchSuggestions"></div>
     </div>
+    <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:4px 11px;height:30px;font-size:11.5px;cursor:pointer;border-radius:6px;" title="Chat with CA AI">
+      <span class="ai-btn-icon">✦</span> <span class="ai-btn-text">Ask CA AI</span>
     <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:4px;font-weight:700;padding:3px 9px;height:26px;font-size:11px;cursor:pointer;border-radius:4px;" title="Chat with CA AI">
       <span class="ai-btn-text">Ask CA AI</span>
     </button>
     
+    <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
+    <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;"><span class="panic-btn-icon">🚨</span> <span class="panic-btn-text">Panic Exit</span></button>
     <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
     <button class="btn small sell" id="panicKillSwitchBtn" title="EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:2px 8px;height:26px;font-weight:700;margin-right:4px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;"><span class="panic-btn-text">Panic Exit</span></button>
     <div class="top-icon-wrap"><button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button><div class="notification-menu" id="notificationMenu">
         <div class="notification-tabs" id="notifTabs" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-soft);padding:4px 8px;">
           <div style="display:flex;gap:4px;">
+            <button class="notif-tab active" data-notif-filter="all">All</button>
+            <button class="notif-tab" data-notif-filter="news">News</button>
+            <button class="notif-tab" data-notif-filter="orders_reco">Orders &amp; Recos</button>
             <button type="button" class="notif-tab active" data-notif-filter="all" onclick="window.selectNotifFilter(this, 'all')">All</button>
             <button type="button" class="notif-tab" data-notif-filter="news" onclick="window.selectNotifFilter(this, 'news')">News</button>
             <button type="button" class="notif-tab" data-notif-filter="orders_reco" onclick="window.selectNotifFilter(this, 'orders_reco')">Orders &amp; Recos</button>
           </div>
           <div style="display:flex;align-items:center;gap:4px;">
+            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">✓ Read</button>
+            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification retention and pruning settings">⚙</button>
+            <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active (Click to mute)" style="font-size:12px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;" onclick="window.toggleAudioAlerts(event)">🔊</button>
+            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:22px;" title="Mark all notifications as read">✓ Read</button>
+            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙ Settings</button>
+            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙</button>
             <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">Read</button>
             <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification settings">Settings</button>
             <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active" style="font-size:12px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;" onclick="window.toggleAudioAlerts(event)">
@@ -2978,6 +3078,7 @@ select#watchlistSelect, select.watchlist-select {
         <div class="profile-name" id="profileMenuName">Profile</div>
         <div class="profile-email" id="profileMenuEmail">—</div>
         <div class="profile-role" id="profileMenuRole">Paper Trading</div>
+        
         
         <button class="btn ghost small" id="editUIBtn" style="margin-top:10px;width:100%;justify-content:center;">Edit UI</button>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);">
@@ -2999,12 +3100,15 @@ select#watchlistSelect, select.watchlist-select {
           <div class="user-menu-themes" id="userMenuThemes" style="display:none"></div>
         </div>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);display:flex;flex-direction:column;gap:6px;">
+          <button class="btn small gold" id="turboLoadBtn" title="⚡ Turbo Refresh (Immediate instant live reload of all data feeds)" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;font-weight:600;">⚡ Turbo Refresh</button>
+          <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="✈️ Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="width:100%;justify-content:center;font-size:11px;padding:5px 9px;font-weight:600;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;">
           <button class="btn small gold" id="turboLoadBtn" title="Turbo Refresh (Immediate instant live reload of all data feeds)" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;font-weight:600;">Turbo Refresh</button>
           <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="width:100%;justify-content:center;font-size:11px;padding:5px 9px;font-weight:600;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
             <span>Telegram Bot Alerts</span>
           </button>
           <button type="button" class="btn ghost small" id="openClearCacheModalBtn" onclick="window.openClearCacheModal()" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;color:var(--text-muted);border:1px dashed var(--border);" title="Clear transient cached data">
+            🗑️ Clear Cache
             Clear Cache
           </button>
         </div>
@@ -3030,10 +3134,7 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
     Option Chain
   </div>
-    <div class="navtab" data-tab="notes" role="button" tabindex="0" onclick="showTab('notes')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-    Trader Notes
-  </div>
+
 
   <div class="navtab" data-tab="reco" role="button" tabindex="0" onclick="showTab('reco')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
@@ -3123,8 +3224,14 @@ select#watchlistSelect, select.watchlist-select {
       <div class="card" id="dashDualRecoCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid rgba(232,184,75,0.3);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.2);">
         <!-- Top Bar: Title & Multi-Timeframe Controls -->
         <div class="dash-reco-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:rgba(232,184,75,0.15);color:var(--gold);font-size:16px;font-weight:700;">✦</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <div>
+              <b style="font-size:14.5px;color:var(--text);font-family:var(--font-display);">Algorithmic Dual-Engine · Multi-Timeframe Option Recommendations</b>
+              <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening across option chain. Best CE &amp; Best PE computed simultaneously.</div>
+              <b style="font-size:14.5px;color:var(--text);font-family:var(--font-display);">Recommendations</b>
+              <div style="font-size:11px;color:var(--text-dim);display:none;" id="dashRecoHeaderSub"></div>
               <b style="font-size:13.5px;color:var(--text);font-family:var(--font-display);">Recommendations</b>
             </div>
           </div>
@@ -3140,6 +3247,10 @@ select#watchlistSelect, select.watchlist-select {
               <button type="button" class="btn small ghost reco-tf-btn" data-tf="45m" onclick="setRecoTimeframe('45m')" style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;">45m</button>
               <button type="button" class="btn small ghost reco-tf-btn" data-tf="1h" onclick="setRecoTimeframe('1h')" style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;">1h</button>
             </div>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;padding:2px 8px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);" title="Toggle automatic algorithmic recommendations">
+              <input type="checkbox" id="toggleAutoRecoGlobalSwitch" checked onchange="window.toggleAutoRecoGlobal(this.checked)" style="cursor:pointer;accent-color:var(--gold);width:14px;height:14px;">
+              <span>Auto Recommendations</span>
+            </label>
             <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);cursor:pointer;user-select:none;margin-left:4px;">
               <input type="checkbox" id="chartRecoLockOptionCheckbox" style="cursor:pointer;accent-color:var(--gold);">
               <span>Pin Contract</span>
@@ -3163,6 +3274,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardUnderlying" style="padding:14px;background:var(--surface-2);border:1px solid rgba(232,184,75,0.3);border-top:3px solid var(--gold);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
+                <span class="tag gold" style="font-size:11px;font-weight:700;" id="undDirectionTag">📊 INDEX / STOCK</span>
                 <span class="tag gold" style="font-size:11px;font-weight:700;" id="undDirectionTag">INDEX / STOCK</span>
                 <span class="tag neutral" id="undConsensusBadge" style="font-size:9.5px;font-weight:600;">Algorithmic Bias</span>
               </div>
@@ -3201,6 +3313,7 @@ select#watchlistSelect, select.watchlist-select {
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRationaleShort">Formula-derived pullback entry aligned with ATR risk</span>
+              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
               <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
             </div>
           </div>
@@ -3209,6 +3322,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardCe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
+                <span class="tag buy" style="font-size:11px;font-weight:700;">🟢 BUY CALL (CE)</span>
                 <span class="tag buy" style="font-size:11px;font-weight:700;">Call (CE)</span>
                 <span class="tag neutral" id="ceConsensusBadge" style="font-size:9.5px;font-weight:600;">Bullish Flow</span>
               </div>
@@ -3218,6 +3332,8 @@ select#watchlistSelect, select.watchlist-select {
                   <input type="checkbox" id="ceAutoTradeToggle" onchange="toggleSideAutoTrade('CE', this.checked)" style="accent-color:var(--buy);cursor:pointer;">
                 </label>
                 <div style="display:inline-flex;gap:2px;">
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">▲ ITM</button>
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">▼ OTM</button>
                   <button type="button" class="btn small ghost" onclick="shiftStrike('CE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">ITM</button>
                   <button type="button" class="btn small ghost" onclick="shiftStrike('CE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">OTM</button>
                 </div>
@@ -3232,6 +3348,7 @@ select#watchlistSelect, select.watchlist-select {
               <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="ceCmp">₹--</b></div>
             </div>
 
+            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'CE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
@@ -3252,19 +3369,25 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
+            <!-- Capital Budget Alert Container (Item 2) -->
             <!-- Capital Budget Alert Container -->
             <div id="ceBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceRationaleShort">Pullback limit entry below CMP to prevent top buying</span>
+              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
               <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
             </div>
           </div>
 
+          <!-- RIGHT CARD: PUT OPTION (PE) -->
           <!-- CARD 3: PUT OPTION (PE) - BUY ONLY -->
           <div class="card" id="dashCardPe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-top:3px solid var(--sell);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
+                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BEST PUT (PE)</span>
+                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BUY PUT (PE)</span>
+                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 Put (PE)</span>
                 <span class="tag sell" style="font-size:11px;font-weight:700;">Put (PE)</span>
                 <span class="tag neutral" id="peConsensusBadge" style="font-size:9.5px;font-weight:600;">Bearish / Hedge</span>
               </div>
@@ -3274,6 +3397,8 @@ select#watchlistSelect, select.watchlist-select {
                   <input type="checkbox" id="peAutoTradeToggle" onchange="toggleSideAutoTrade('PE', this.checked)" style="accent-color:var(--sell);cursor:pointer;">
                 </label>
                 <div style="display:inline-flex;gap:2px;">
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">▲ ITM</button>
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">▼ OTM</button>
                   <button type="button" class="btn small ghost" onclick="shiftStrike('PE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">ITM</button>
                   <button type="button" class="btn small ghost" onclick="shiftStrike('PE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">OTM</button>
                 </div>
@@ -3288,6 +3413,7 @@ select#watchlistSelect, select.watchlist-select {
               <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="peCmp">₹--</b></div>
             </div>
 
+            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'PE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
@@ -3308,11 +3434,13 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
+            <!-- Capital Budget Alert Container (Item 2) -->
             <!-- Capital Budget Alert Container -->
             <div id="peBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peRationaleShort">Pullback limit entry below CMP to protect capital</span>
+              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
               <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
             </div>
           </div>
@@ -3321,8 +3449,12 @@ select#watchlistSelect, select.watchlist-select {
       <!-- ============ EXCEL WORKSHEET UI: LIVE INDICATORS & GREEKS MATRIX ============ -->
       <div class="card" id="dashExcelWorksheetCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.18);width:100%;box-sizing:border-box;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(38,217,166,0.15);color:var(--buy);font-weight:700;font-size:14px;">▦</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <div>
+              <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Quantitative Confluence &amp; Valuation Matrix · Excel Worksheet UI</b>
+              <div style="font-size:11px;color:var(--text-dim);">Live streaming institutional factors. Click any Weightage % or Signal cell to calibrate algorithmic weighting.</div>
               <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Recommendation Rationale</b>
             </div>
           </div>
@@ -3335,6 +3467,16 @@ select#watchlistSelect, select.watchlist-select {
 
         <!-- Excel Table Container -->
         
+        <!-- Excel Matrix Filter Bar (All 40 Factors) -->
+        <!-- Data Origin Legend & Source Transparency Banner -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;margin-bottom:10px;font-size:11px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;color:var(--buy);">
+              <span class="pulse-dot green"></span> ⚡ Live Real-Time Streamed in App (22 Factors)
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;color:#40a9ff;">
+              <span class="pulse-dot blue"></span> 🌐 Exchange &amp; Macro Official Feeds (18 Factors)
+            </span>
         <!-- Excel Matrix Filter Bar with Dropdown Menu -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:6px;">
@@ -3350,14 +3492,40 @@ select#watchlistSelect, select.watchlist-select {
               <option value="fund">Fundamentals &amp; Events (10)</option>
             </select>
           </div>
+          <div style="color:var(--text-dim);font-size:10.5px;">
+            ✦ Click any <b style="color:var(--text);">Particulars Name</b> or <b style="color:var(--text);">Value</b> to jump directly to in-app feature or official external source.
+          </div>
+        </div>
+
+        <!-- Excel Matrix Filter Bar with Dedicated Live vs Macro Sections -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <div id="excelMatrixFilterTabs" class="dash-filter-button-group">
+            <button type="button" class="chip-filter active" data-ef-cat="all" onclick="filterExcelFactors('all', this)">All (40)</button>
+            <button type="button" class="chip-filter" data-ef-cat="live_app" onclick="filterExcelFactors('live_app', this)">⚡ In-App Live Stream (22)</button>
+            <button type="button" class="chip-filter" data-ef-cat="macro_feed" onclick="filterExcelFactors('macro_feed', this)">🌐 Macro &amp; Exchange Verified (18)</button>
+            <button type="button" class="chip-filter" data-ef-cat="options" onclick="filterExcelFactors('options', this)">Options &amp; Greeks (10)</button>
+            <button type="button" class="chip-filter" data-ef-cat="flow" onclick="filterExcelFactors('flow', this)">Order Flow &amp; Liquidity (7)</button>
+            <button type="button" class="chip-filter" data-ef-cat="tech" onclick="filterExcelFactors('tech', this)">Technicals &amp; Levels (6)</button>
+            <button type="button" class="chip-filter" data-ef-cat="macro" onclick="filterExcelFactors('macro', this)">Macro &amp; Global (7)</button>
+            <button type="button" class="chip-filter" data-ef-cat="fund" onclick="filterExcelFactors('fund', this)">Fundamentals &amp; Events (10)</button>
+          </div>
           <div style="display:flex;align-items:center;gap:6px;">
+            <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:11px;padding:3px 10px;font-weight:700;">✦ Factors Math &amp; Formulas Suite</button>
             <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:10px;padding:2px 8px;height:24px;font-weight:600;">Factors Math Suite</button>
           </div>
         </div>
 
         <div style="overflow-x:auto;border:1px solid var(--border-soft);border-radius:6px;width:100%;">
+          <table class="table" id="dashExcelMatrixTable" style="width:100%;margin:0;font-size:11.5px;border-collapse:collapse;">
           <table class="table" id="dashExcelMatrixTable" style="width:100%;margin:0;font-size:11px;border-collapse:collapse;">
             <thead>
+              <tr style="background:var(--surface-2);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;">
+                <th style="padding:8px 12px;text-align:left;min-width:180px;">Name / Indicator</th>
+                <th style="padding:8px 12px;text-align:center;width:100px;">Time</th>
+                <th style="padding:8px 12px;text-align:right;min-width:100px;">Value</th>
+                <th style="padding:8px 12px;text-align:center;width:120px;">Weightage %</th>
+                <th style="padding:8px 12px;text-align:center;width:130px;">Signal</th>
+                <th style="padding:8px 12px;text-align:right;width:140px;">% Bull / Bear</th>
               <tr style="background:var(--surface-2);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;">
                 <th style="padding:4px 8px;text-align:left;min-width:160px;">Name / Indicator</th>
                 <th style="padding:4px 8px;text-align:center;width:90px;">Time</th>
@@ -4124,14 +4292,6 @@ select#watchlistSelect, select.watchlist-select {
           <div id="optionsExpiryPills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
-            <input type="checkbox" id="chkOptColOI" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
-            <span>OI &amp; Vol</span>
-          </label>
-          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
-            <input type="checkbox" id="chkOptColGreeks" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
-            <span>Greeks (Δ, Γ, Θ, IV)</span>
-          </label>
           <button type="button" class="btn ghost small" id="optionsRefreshBtn">↻ Refresh</button>
         </div>
       </div>
@@ -5110,24 +5270,7 @@ select#watchlistSelect, select.watchlist-select {
           </div>
         </div>
 
-        <!-- 11. Trader Notes -->
-        <div class="tut-node">
-          <div class="tut-header">
-            <div class="tut-header-left">
-              <span class="tut-icon-badge">11</span>
-              <span>11. Trader Notes, Categorized Folders &amp; Screen Space Maximizer</span>
-            </div>
-            <span class="tut-toggle-btn">[+]</span>
-          </div>
-          <div class="tut-body">
-            Your personal quantitative trade journal stored safely in local-first encrypted SQLite storage.
-            <ul class="tut-sublist">
-              <li><b>Folder Management:</b> Organize notes across custom folders (Breakouts, Earnings, Post-Trade Analysis, Risk Journal).</li>
-              <li><b>[◀ Collapse Folders] Button:</b> Click the toggle button in the notes toolbar to hide the folder list and expand the note writing editor to 100% full screen width.</li>
-              <li><b>Chart Attachments:</b> One-click screenshot capture saves live chart setups directly into your trade notes.</li>
-            </ul>
-          </div>
-        </div>
+
 
         <!-- 12. Fullscreen Landscape & Shortcuts -->
         <div class="tut-node">
@@ -5349,9 +5492,15 @@ select#watchlistSelect, select.watchlist-select {
   <div class="tool-modal-card" style="max-width:680px;width:95%;">
     <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
       <div style="display:flex;align-items:center;gap:8px;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:rgba(232,184,75,0.18);color:var(--gold);font-weight:700;">✦</span>
+        <div>
+          <div class="card-title" style="font-size:14px;color:var(--text);">CA AI Companion</div>
+          <div style="font-size:10.5px;color:var(--text-dim);">Live quant intelligence, full app awareness &amp; multi-modal vision</div>
+        </div>
         <div class="card-title" style="font-size:13.5px;color:var(--text);font-weight:700;">CA AI Companion</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
+        <button type="button" class="btn ghost small" onclick="window.clearAiChatHistory()" title="Clear cached chat history" style="font-size:11px;padding:2px 7px;color:var(--text-dim);cursor:pointer;">🗑️ Clear</button>
         <button type="button" class="btn ghost small" onclick="window.clearAiChatHistory()" title="Clear cached chat history" style="font-size:10.5px;padding:2px 7px;color:var(--text-dim);cursor:pointer;">Clear</button>
         <button class="btn ghost small" id="caAiClose" onclick="closeModal('caAiModal')">✕</button>
       </div>
@@ -5360,14 +5509,20 @@ select#watchlistSelect, select.watchlist-select {
     
     <!-- File & Photo attachment preview bar -->
     <div id="caAiImagePreviewBar" style="display:none;padding:6px 8px;background:var(--surface-3);border:1px solid var(--border-soft);border-radius:6px;margin-top:6px;align-items:center;gap:8px;">
+      <div id="caAiPreviewIcon" style="font-size:18px;display:none;">📄</div>
+      <img id="caAiImageThumb" src="" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none;" alt="Upload preview">
       <div id="caAiPreviewIcon" style="font-size:14px;display:none;">File</div>
       <img id="caAiImageThumb" src="" style="width:32px;height:32px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none;" alt="Upload preview">
       <div style="flex:1;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="caAiImageFileName">Screenshot.png</div>
       <button type="button" onclick="window.clearAiAttachedImage()" style="background:transparent;border:none;color:var(--sell);font-weight:700;font-size:14px;cursor:pointer;">✕</button>
     </div>
 
+    <div class="ai-chat-row" style="display:flex;gap:7px;margin-top:8px;align-items:center;">
     <div class="ai-chat-row" style="display:flex;gap:6px;margin-top:8px;align-items:center;">
       <input type="file" id="caAiImageInput" accept="image/*,.pdf,.csv,.xlsx,.xls,.txt" style="display:none;" onchange="window.handleAiImageChosen(this)">
+      <button type="button" class="btn ghost small" onclick="document.getElementById('caAiImageInput').click()" title="Attach Photo / File (Image, PDF, CSV, Excel, TXT)" style="padding:0 10px;height:36px;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:3px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;">📎 📷</button>
+      <input id="aiChatInput" class="tool-input" placeholder="Ask CA AI about positions, funds, technicals, or upload chart/file..." style="flex:1;height:36px;">
+      <button class="btn gold" id="aiChatSend" style="height:36px;padding:0 14px;font-weight:700;">Send</button>
       <button type="button" class="btn ghost small" onclick="document.getElementById('caAiImageInput').click()" title="Attach Photo / File" style="padding:0 7px;height:28px;display:inline-flex;align-items:center;justify-content:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;border-radius:4px;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l7.88-7.88"/></svg>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -5746,6 +5901,7 @@ window.isInstrumentMarketOpen = function(sym) {
 
 function showTab(name){
   if(!name) return;
+  if(window.navIsDragging || (Date.now() - (window.__navDragEndTime || 0) < 350)) return;
   const panelName = name;
   document.querySelectorAll('.navtab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
   document.querySelectorAll('.mobile-dock-item').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
@@ -10110,7 +10266,7 @@ function applyDrawingPoint(x,y){
         x.className='wl-item'+(i.symbol===S?' selected':'');
         x.dataset.symbol=i.symbol;
         const prevQuote=(window.__CA_WL_QUOTES||{})[i.symbol]||{};
-        x.innerHTML=`<div class="wl-left"><div class="wl-sym">${i.symbol}</div><div class="wl-ex">${i.exchange||''} · ${i.instrument_type||t}</div></div><div class="wl-right"><div class="wl-ltp">${prevQuote.ltp==null?'—':fmt(prevQuote.ltp)}</div><div class="wl-chg">${(()=>{const n=(prevQuote.net_change!=null&&!isNaN(Number(prevQuote.net_change)))?Number(prevQuote.net_change):Number(prevQuote.session_change);const pc=(prevQuote.change_pct!=null&&!isNaN(Number(prevQuote.change_pct)))?Number(prevQuote.change_pct):Number(prevQuote.session_change_pct);return Number.isFinite(n)?`${n>0?'+':''}${fmt(n)}${Number.isFinite(pc)?` (${pc>0?'+':''}${fmt(pc)}%)`:''}`:'—';})()}</div><div class="wl-actions"><button type="button" class="wl-bs buy" data-wl-buy="${esc(i.symbol)}">B</button><button type="button" class="wl-bs sell" data-wl-sell="${esc(i.symbol)}">S</button><button type="button" class="wl-r-btn ${window.__caAutoRecoSymbols && window.__caAutoRecoSymbols.has(i.symbol) ? 'active' : ''}" data-auto-reco-sym="${esc(i.symbol)}" onclick="event.stopPropagation();toggleAutoRecoSymbol('${esc(i.symbol)}');" title="Toggle Auto Trade (AT)" style="min-width:24px;font-size:9.5px;font-weight:700;">AT</button><button type="button" class="wl-bs del" data-wl-del="${esc(i.symbol)}" title="Remove ${esc(i.symbol)} from watchlist">×</button></div></div>`;
+        x.innerHTML=`<div class="wl-left"><div class="wl-sym">${i.symbol}</div><div class="wl-ex">${i.exchange||''} · ${i.instrument_type||t}</div></div><div class="wl-right"><div class="wl-ltp">${prevQuote.ltp==null?'—':fmt(prevQuote.ltp)}</div><div class="wl-chg">${(()=>{const n=(prevQuote.net_change!=null&&!isNaN(Number(prevQuote.net_change)))?Number(prevQuote.net_change):Number(prevQuote.session_change);const pc=(prevQuote.change_pct!=null&&!isNaN(Number(prevQuote.change_pct)))?Number(prevQuote.change_pct):Number(prevQuote.session_change_pct);return Number.isFinite(n)?`${n>0?'+':''}${fmt(n)}${Number.isFinite(pc)?` (${pc>0?'+':''}${fmt(pc)}%)`:''}`:'—';})()}</div><div class="wl-actions"><button type="button" class="wl-bs buy" data-wl-buy="${esc(i.symbol)}">B</button><button type="button" class="wl-bs sell" data-wl-sell="${esc(i.symbol)}">S</button><button type="button" class="wl-r-btn ${window.__caAutoRecoSymbols && window.__caAutoRecoSymbols.has(i.symbol) ? 'active' : ''}" data-auto-reco-sym="${esc(i.symbol)}" onclick="event.stopPropagation();toggleAutoRecoSymbol('${esc(i.symbol)}');" title="Toggle Auto Recommendation (R)" style="min-width:20px;font-size:10px;font-weight:700;">R</button><button type="button" class="wl-bs del" data-wl-del="${esc(i.symbol)}" title="Remove ${esc(i.symbol)} from watchlist">×</button></div></div>`;
         x.onclick=async(e)=>{if(e.target.closest('.wl-actions'))return;S=i.symbol;window.CATraderSymbol=S;selectionSeq++;document.querySelectorAll('.wl-item').forEach(v=>v.classList.remove('selected'));x.classList.add('selected');await onSymbolChanged(S);};
         x.querySelector('[data-wl-at]')?.addEventListener('click',e=>{e.stopPropagation();if(!window.__CA_AT_ENABLED_SYMBOLS) window.__CA_AT_ENABLED_SYMBOLS=new Set(['RELIANCE','BANKNIFTY','NIFTY','CRUDEOIL']);if(window.__CA_AT_ENABLED_SYMBOLS.has(i.symbol)){window.__CA_AT_ENABLED_SYMBOLS.delete(i.symbol);e.currentTarget.classList.remove('active');toast(`Auto Trade OFF for ${i.symbol}`);}else{window.__CA_AT_ENABLED_SYMBOLS.add(i.symbol);e.currentTarget.classList.add('active');toast(`Auto Trade ON for ${i.symbol}`);}try{localStorage.setItem('ca_at_symbols',JSON.stringify(Array.from(window.__CA_AT_ENABLED_SYMBOLS)));}catch(_){}if(typeof updateAtUiForSymbol==='function') updateAtUiForSymbol(i.symbol);if(document.getElementById('wlAtOnlyFilter')?.checked)void R();});
         x.querySelector('[data-wl-buy]')?.addEventListener('click',e=>{e.stopPropagation();S=i.symbol;(window.openOrder||openOrder)('BUY',i.instrument_key||i.symbol,Number(i.lot_size)||1,i.symbol);});
@@ -17524,7 +17680,14 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       const recoTab=document.querySelector('.navtab[data-tab="reco"]'); if(recoTab) recoTab.textContent='Recommendation History';
     }
   })();
-document.querySelectorAll('.navtab').forEach(t=>t.addEventListener('click',(e)=>{const tab=t.dataset.tab||e.target.closest('.navtab')?.dataset.tab;showTab(tab);loadTabData(tab,true);}));
+document.querySelectorAll('.navtab').forEach(t=>t.addEventListener('click',(e)=>{
+  if(window.navIsDragging || (Date.now() - (window.__navDragEndTime || 0) < 350)) {
+    e.preventDefault(); e.stopPropagation(); return;
+  }
+  const tab=t.dataset.tab||e.target.closest('.navtab')?.dataset.tab;
+  showTab(tab);
+  loadTabData(tab,true);
+}));
   // Make selected-symbol changes from the existing chart/watchlist code refresh dependent panels.
   const oldLoadChart = window.CATraderSelectSymbol;
   window.CATraderSelectSymbol = async sym => { window.CATraderSymbol=sym; const row=[...document.querySelectorAll('.wl-item')].find(x=>(x.dataset.symbol||'')===sym); if(row){row.click();} else {toast(`Load ${sym} from search/watchlist`)} };
@@ -19504,6 +19667,46 @@ setTimeout(() => {
     if (saved) window.__caAutoRecoSymbols = new Set(JSON.parse(saved));
   } catch(_) {}
 
+  // Global Auto-Reco Enable/Disable Toggle
+  window.__caAutoRecoGlobalEnabled = localStorage.getItem('ca_auto_reco_enabled') !== '0';
+  window.toggleAutoRecoGlobal = function(enabled) {
+    window.__caAutoRecoGlobalEnabled = !!enabled;
+    localStorage.setItem('ca_auto_reco_enabled', enabled ? '1' : '0');
+    toast(enabled ? 'Auto Recommendations enabled' : 'Auto Recommendations disabled');
+    if (enabled) runAutoRecoPoller();
+  };
+
+  async function triggerAutoRecoForSymbol(sym) {
+    if(!sym) return;
+    try {
+      const d = await fetchApi(`/api/recommendations/${encodeURIComponent(sym)}`, { timeoutMs: 5000 });
+      if(d && (d.recommendation || d.action)){
+        const recAction = String(d.recommendation || d.action).toUpperCase();
+        if(recAction === 'BUY' || recAction === 'SELL'){
+          await fetchApi('/api/recommendations/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              symbol: sym,
+              underlying: d.underlying || sym,
+              recommendation: recAction,
+              entry: d.entry || 0,
+              target: d.target || 0,
+              stop_loss: d.stop_loss || 0,
+              timeframe: d.timeframe || '5m',
+              rationale: d.rationale || d.reason || `Algorithmic auto recommendation for ${sym}`,
+              confidence: d.confidence || d.score || 80,
+              source: 'auto'
+            })
+          });
+          if(document.querySelector('.navtab.active')?.dataset.tab === 'reco' && typeof loadRecommendationHistory === 'function'){
+            loadRecommendationHistory();
+          }
+        }
+      }
+    } catch(_){}
+  }
+
   function toggleAutoRecoSymbol(sym) {
     if (!sym) return;
     if (window.__caAutoRecoSymbols.has(sym)) {
@@ -19512,6 +19715,7 @@ setTimeout(() => {
     } else {
       window.__caAutoRecoSymbols.add(sym);
       if (typeof toast === 'function') toast(`✦ Auto-Reco ACTIVE for ${sym} (monitoring 5-min intervals)`, 'success');
+      triggerAutoRecoForSymbol(sym);
     }
     try {
       localStorage.setItem('ca_auto_reco_symbols', JSON.stringify(Array.from(window.__caAutoRecoSymbols)));
@@ -19541,21 +19745,22 @@ setTimeout(() => {
   }
   window.updateAutoRecoDashboardStrip = updateAutoRecoDashboardStrip;
 
-  // 5-Min Background Auto-Reco Poller (Item 10)
+  // 5-Min Background Auto-Reco Poller (User Item 6)
   async function runAutoRecoPoller() {
+    if (window.__caAutoRecoGlobalEnabled === false) return;
     if (!window.__caAutoRecoSymbols || !window.__caAutoRecoSymbols.size) return;
     for (const s of window.__caAutoRecoSymbols) {
-      try {
-        const d = await fetchApi(`/api/recommendations/${encodeURIComponent(s)}`, { timeoutMs: 4000 });
-        if (d && (d.recommendation || d.action)) {
-          document.querySelectorAll(`[data-auto-reco-sym="${CSS.escape(s)}"]`).forEach(btn => {
-            btn.classList.add('active');
-          });
-        }
-      } catch(_) {}
+      await triggerAutoRecoForSymbol(s);
+      document.querySelectorAll(`[data-auto-reco-sym="${CSS.escape(s)}"]`).forEach(btn => {
+        btn.classList.add('active');
+      });
+    }
+    if (document.querySelector('.navtab.active')?.dataset.tab === 'reco' && typeof loadRecommendationHistory === 'function') {
+      loadRecommendationHistory();
     }
   }
   setInterval(runAutoRecoPoller, 300000);
+  setTimeout(runAutoRecoPoller, 3000);
 
   // Pure Greeks Price Sensitivity Simulator (Item 6)
   function wirePureGreeksSim() {
@@ -20304,6 +20509,7 @@ setTimeout(() => {
   // --------------------------------------------------------------------------
   let navTouchStartX = 0, navTouchStartY = 0;
   window.navIsDragging = false;
+  window.__navDragEndTime = 0;
   const navEl = document.getElementById('navtabs');
   if(navEl){
     navEl.addEventListener('touchstart', e => {
@@ -20318,17 +20524,24 @@ setTimeout(() => {
       if(e.touches.length === 1){
         const dx = Math.abs(e.touches[0].clientX - navTouchStartX);
         const dy = Math.abs(e.touches[0].clientY - navTouchStartY);
-        if(dx > 8 || dy > 8){
+        if(dx > 6 || dy > 6){
           window.navIsDragging = true;
+          window.__navDragEndTime = Date.now();
         }
       }
     }, { passive: true });
 
-    navEl.addEventListener('click', e => {
+    navEl.addEventListener('touchend', () => {
       if(window.navIsDragging){
+        window.__navDragEndTime = Date.now();
+        setTimeout(() => { window.navIsDragging = false; }, 350);
+      }
+    }, { passive: true });
+
+    navEl.addEventListener('click', e => {
+      if(window.navIsDragging || (Date.now() - (window.__navDragEndTime || 0) < 350)){
         e.stopPropagation();
         e.preventDefault();
-        window.navIsDragging = false;
         return false;
       }
     }, true);
@@ -21082,40 +21295,40 @@ setTimeout(() => {
     });
   }
 
-  // Item 23: Chart Mobile Landscape Rotation
+  // Chart Video Player Fullscreen in Landscape Mode (User Item 3)
   async function toggleMobileLandscapeFullscreen(){
     const shell = document.getElementById('chartShell') || document.getElementById('panel-charts');
     if(!shell) return;
-    const isMobile = window.innerWidth <= 768;
     
     try {
-      if(!document.fullscreenElement && !document.webkitFullscreenElement){
+      if(!document.fullscreenElement && !document.webkitFullscreenElement && !shell.classList.contains('chart-fullscreen-active')){
         if(shell.requestFullscreen) await shell.requestFullscreen();
         else if(shell.webkitRequestFullscreen) await shell.webkitRequestFullscreen();
+        else shell.classList.add('chart-fullscreen-active');
         if(screen.orientation && typeof screen.orientation.lock === 'function'){
           screen.orientation.lock('landscape').catch(() => {});
         }
-        if(isMobile) shell.classList.add('chart-forced-landscape');
-        else shell.classList.remove('chart-forced-landscape');
-        toast('📺 Fullscreen Activated');
+        toast('📺 Fullscreen Landscape Activated');
       } else {
-        if(document.exitFullscreen) await document.exitFullscreen();
-        else if(document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        if(document.fullscreenElement || document.webkitFullscreenElement){
+          if(document.exitFullscreen) await document.exitFullscreen();
+          else if(document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        }
+        shell.classList.remove('chart-fullscreen-active');
+        shell.classList.remove('chart-forced-landscape');
         if(screen.orientation && typeof screen.orientation.unlock === 'function'){
           screen.orientation.unlock().catch(() => {});
         }
-        shell.classList.remove('chart-forced-landscape');
         toast('Exited Fullscreen');
       }
     } catch(err){
-      if(isMobile){
-        const isForced = shell.classList.toggle('chart-forced-landscape');
-        toast(isForced ? '🔄 Rotated Landscape Mode' : 'Normal View');
-      } else {
-        shell.classList.remove('chart-forced-landscape');
-        toast('Fullscreen toggled');
+      const isFull = shell.classList.toggle('chart-fullscreen-active');
+      if(isFull && screen.orientation && typeof screen.orientation.lock === 'function'){
+        screen.orientation.lock('landscape').catch(() => {});
       }
+      toast(isFull ? '📺 Fullscreen Viewport Mode' : 'Normal View');
     }
+    setTimeout(()=>{ if(typeof draw === 'function') draw(); }, 100);
   }
   document.getElementById('chartFullscreenToolbarBtn')?.addEventListener('click', toggleMobileLandscapeFullscreen);
 
@@ -25809,21 +26022,21 @@ window.renderZerodhaOptionChainTable = function(){
   if(document.getElementById('optSummaryAtmIv')) document.getElementById('optSummaryAtmIv').textContent = `${Number(atmIv).toFixed(1)}%`;
 
   let html = `
-    <table style="width:100%;border-collapse:collapse;font-size:11.5px;text-align:right;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:right;">
       <thead>
         <tr style="background:var(--surface-2);border-bottom:1px solid var(--border);">
-          <th colspan="${showOI ? (showGreeks ? 8 : 4) : (showGreeks ? 5 : 2)}" style="text-align:center;color:var(--buy);font-weight:700;padding:6px;border-right:1px solid var(--border);">CALLS (CE)</th>
+          <th colspan="9" style="text-align:center;color:var(--buy);font-weight:700;padding:6px;border-right:1px solid var(--border);">CALLS (CE)</th>
           <th style="text-align:center;padding:6px;background:var(--surface-3);color:var(--gold);font-weight:700;">STRIKE</th>
-          <th colspan="${showOI ? (showGreeks ? 8 : 4) : (showGreeks ? 5 : 2)}" style="text-align:center;color:var(--sell);font-weight:700;padding:6px;border-left:1px solid var(--border);">PUTS (PE)</th>
+          <th colspan="9" style="text-align:center;color:var(--sell);font-weight:700;padding:6px;border-left:1px solid var(--border);">PUTS (PE)</th>
         </tr>
-        <tr style="background:var(--surface);border-bottom:2px solid var(--border);font-size:10px;text-transform:uppercase;color:var(--text-faint);">
-          ${showOI ? '<th>OI</th><th>Chg OI</th><th>Volume</th>' : ''}
-          ${showGreeks ? '<th class="col-greek-iv">IV</th><th class="col-greek-delta">Δ (Delta)</th><th class="col-greek-gamma">Γ (Gamma)</th><th class="col-greek-theta">Θ (Theta)</th>' : ''}
+        <tr style="background:var(--surface);border-bottom:2px solid var(--border);font-size:9.5px;text-transform:uppercase;color:var(--text-faint);">
+          <th>OI</th><th>Chg OI</th><th>Vol</th>
+          <th class="col-greek-iv">IV</th><th class="col-greek-delta">Δ</th><th class="col-greek-gamma">Γ</th><th class="col-greek-theta">Θ</th><th class="col-greek-vega">ν (Vega)</th>
           <th style="color:var(--buy);">LTP</th>
           <th style="text-align:center;background:var(--surface-2);color:var(--gold);font-weight:800;border-left:1px solid var(--border);border-right:1px solid var(--border);">STRIKE</th>
           <th style="color:var(--sell);text-align:left;">LTP</th>
-          ${showGreeks ? '<th class="col-greek-theta">Θ (Theta)</th><th class="col-greek-gamma">Γ (Gamma)</th><th class="col-greek-delta">Δ (Delta)</th><th class="col-greek-iv">IV</th>' : ''}
-          ${showOI ? '<th>Volume</th><th>Chg OI</th><th>OI</th>' : ''}
+          <th class="col-greek-vega" style="text-align:left;">ν (Vega)</th><th class="col-greek-theta" style="text-align:left;">Θ</th><th class="col-greek-gamma" style="text-align:left;">Γ</th><th class="col-greek-delta" style="text-align:left;">Δ</th><th class="col-greek-iv" style="text-align:left;">IV</th>
+          <th style="text-align:left;">Vol</th><th style="text-align:left;">Chg OI</th><th style="text-align:left;">OI</th>
         </tr>
       </thead>
       <tbody>
@@ -25843,6 +26056,8 @@ window.renderZerodhaOptionChainTable = function(){
     const pGamma = (p.gamma != null ? Number(p.gamma) : 0.0014).toFixed(4);
     const cTheta = (c.theta != null ? Number(c.theta) : -12.4).toFixed(1);
     const pTheta = (p.theta != null ? Number(p.theta) : -11.8).toFixed(1);
+    const cVega = (c.vega != null ? Number(c.vega) : 8.5).toFixed(1);
+    const pVega = (p.vega != null ? Number(p.vega) : 8.5).toFixed(1);
     const cIv = (c.iv != null ? Number(c.iv) : 14.2).toFixed(1);
     const pIv = (p.iv != null ? Number(p.iv) : 14.5).toFixed(1);
 
@@ -25858,35 +26073,29 @@ window.renderZerodhaOptionChainTable = function(){
 
     html += `
       <tr class="opt-chain-row ${isAtm ? 'atm-row strike-atm' : ''}" data-strike="${stk}" style="background:${rowBg};border-bottom:1px solid var(--border-soft);cursor:pointer;${atmBorder}">
-        ${showOI ? `
-          <td style="color:var(--text-faint);">${cOi}</td>
-          <td style="color:${String(cChgOi).includes('+')?'var(--buy)':'var(--sell)'};">${cChgOi}</td>
-          <td class="col-vol" style="color:var(--text-dim);">${cVol}</td>
-        ` : ''}
-        ${showGreeks ? `
-          <td class="col-greek-iv" style="color:var(--gold);">${cIv}%</td>
-          <td class="col-greek-delta" style="color:var(--buy);font-weight:600;">+${cDelta}</td>
-          <td class="col-greek-gamma" style="color:var(--text-faint);">${cGamma}</td>
-          <td class="col-greek-theta" style="color:var(--sell);">${cTheta}</td>
-        ` : ''}
+        <td style="color:var(--text-faint);">${cOi}</td>
+        <td style="color:${String(cChgOi).includes('+')?'var(--buy)':'var(--sell)'};">${cChgOi}</td>
+        <td class="col-vol" style="color:var(--text-dim);">${cVol}</td>
+        <td class="col-greek-iv" style="color:var(--gold);">${cIv}%</td>
+        <td class="col-greek-delta" style="color:var(--buy);font-weight:600;">+${cDelta}</td>
+        <td class="col-greek-gamma" style="color:var(--text-faint);">${cGamma}</td>
+        <td class="col-greek-theta" style="color:var(--sell);">${cTheta}</td>
+        <td class="col-greek-vega" style="color:var(--primary);">${cVega}</td>
         <td style="font-weight:700;color:var(--buy);font-family:var(--font-mono);">₹${fmt(cLtp)}</td>
         
-        <td style="text-align:center;font-weight:800;font-family:var(--font-mono);background:var(--surface-2);color:${isAtm?'var(--gold)':'var(--text)'};border-left:1px solid var(--border);border-right:1px solid var(--border);padding:6px 10px;">
+        <td style="text-align:center;font-weight:800;font-family:var(--font-mono);background:var(--surface-2);color:${isAtm?'var(--gold)':'var(--text)'};border-left:1px solid var(--border);border-right:1px solid var(--border);padding:6px 8px;">
           ${fmt(stk)} ${isAtm ? '<span class="tag gold" style="font-size:8.5px;padding:0 3px;">ATM</span>' : ''}
         </td>
 
         <td style="font-weight:700;color:var(--sell);font-family:var(--font-mono);text-align:left;">₹${fmt(pLtp)}</td>
-        ${showGreeks ? `
-          <td class="col-greek-theta" style="color:var(--sell);text-align:left;">${pTheta}</td>
-          <td class="col-greek-gamma" style="color:var(--text-faint);text-align:left;">${pGamma}</td>
-          <td class="col-greek-delta" style="color:var(--sell);font-weight:600;text-align:left;">${pDelta}</td>
-          <td class="col-greek-iv" style="color:var(--gold);text-align:left;">${pIv}%</td>
-        ` : ''}
-        ${showOI ? `
-          <td class="col-vol" style="color:var(--text-dim);text-align:left;">${pVol}</td>
-          <td style="color:${String(pChgOi).includes('+')?'var(--buy)':'var(--sell)'};text-align:left;">${pChgOi}</td>
-          <td style="color:var(--text-faint);text-align:left;">${pOi}</td>
-        ` : ''}
+        <td class="col-greek-vega" style="color:var(--primary);text-align:left;">${pVega}</td>
+        <td class="col-greek-theta" style="color:var(--sell);text-align:left;">${pTheta}</td>
+        <td class="col-greek-gamma" style="color:var(--text-faint);text-align:left;">${pGamma}</td>
+        <td class="col-greek-delta" style="color:var(--sell);font-weight:600;text-align:left;">${pDelta}</td>
+        <td class="col-greek-iv" style="color:var(--gold);text-align:left;">${pIv}%</td>
+        <td class="col-vol" style="color:var(--text-dim);text-align:left;">${pVol}</td>
+        <td style="color:${String(pChgOi).includes('+')?'var(--buy)':'var(--sell)'};text-align:left;">${pChgOi}</td>
+        <td style="color:var(--text-faint);text-align:left;">${pOi}</td>
       </tr>
     `;
   });

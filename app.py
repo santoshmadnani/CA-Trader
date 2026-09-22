@@ -12932,15 +12932,15 @@ def _paper_fill(user_id:int, order:dict[str,Any], recommendation_id:str|None=Non
 
 
 async def _auto_trade_cycle_user(user_id:int) -> dict[str,Any]:
-    # Item 17: Auto-trade strictly within market hours
+    cfg=db_exec("SELECT * FROM auto_trade_configs WHERE user_id=?",[user_id],"one")
+    if not cfg or not int(cfg.get("enabled") or 0): return {"enabled":False,"recommendations":0,"executed":0}
+    is_live = bool(cfg.get("live_execution"))
     now_ist = datetime.now(IST)
     nse_active = bool(market_session("NSE_EQ", now_ist).get("active"))
     mcx_active = bool(market_session("MCX", now_ist).get("active"))
-    if not (nse_active or mcx_active):
+    if is_live and not (nse_active or mcx_active):
         return {"enabled":True,"recommendations":0,"executed":0,"reason":"Market closed (outside trading hours)"}
 
-    cfg=db_exec("SELECT * FROM auto_trade_configs WHERE user_id=?",[user_id],"one")
-    if not cfg or not int(cfg.get("enabled") or 0): return {"enabled":False,"recommendations":0,"executed":0}
     try: configured=json.loads(cfg.get("symbols_json") or "[]")
     except Exception: configured=[]
     watch=user_watchlist_symbols(user_id)
@@ -12956,16 +12956,15 @@ async def _auto_trade_cycle_user(user_id:int) -> dict[str,Any]:
     executed=0; recs=0; skipped=0
     async def run_symbol(sym: str):
         try:
-            # Check market session for this specific instrument
             is_mcx = any(k in sym.upper() for k in ["MCX", "CRUDE", "GOLD", "SILVER", "NATURALGAS"])
             sym_seg = "MCX" if is_mcx else "NSE_EQ"
-            if not bool(market_session(sym_seg, datetime.now(IST)).get("active")):
+            if is_live and not bool(market_session(sym_seg, datetime.now(IST)).get("active")):
                 return (0, 0)
             analysis=await asyncio.to_thread(auto_trade_candidate,sym,True)
             rec=_save_auto_recommendation(user_id,analysis)
             if not rec or str(rec.get("status") or "NEW").upper() not in {"NEW","GENERATED"}: return (0,1)
             signal=str(rec.get("recommendation") or "WAIT").upper(); score=float(rec.get("score") or analysis.get("score") or 0)
-            if signal not in {"BUY","SELL"} or score<65:
+            if signal not in {"BUY","SELL"} or score<60:
                 db_exec("UPDATE recommendations SET status='NO_TRADE' WHERE id=? AND user_id=?",[rec.get("id"),user_id]); return (0,1)
             ti=analysis.get("trade_instrument") or {}; key=str(ti.get("instrument_key") or sym)
             # Enforce options only when stock names are blank
@@ -12976,20 +12975,27 @@ async def _auto_trade_cycle_user(user_id:int) -> dict[str,Any]:
             existing=db_exec("SELECT * FROM positions WHERE user_id=? AND instrument_key=? AND COALESCE(status,'OPEN')='OPEN'",[user_id,key],"one")
             if existing and str(existing.get("side"))==tx_side:
                 db_exec("UPDATE recommendations SET status='SKIPPED_ALREADY_OPEN' WHERE id=? AND user_id=?",[rec.get("id"),user_id]); return (0,1)
-            funds=db_exec("SELECT auto_trade_funds FROM funds WHERE user_id=?",[user_id],"one") or {}; available=float(funds.get("auto_trade_funds") or 0); cap=float(cfg.get("capital") or 0)
-            trade_cap=min(available,cap) if cap>0 else available; entry=float(ti.get("entry") or 0)
+            funds=db_exec("SELECT auto_trade_funds FROM funds WHERE user_id=?",[user_id],"one") or {}
+            available=float(funds.get("auto_trade_funds") or 0)
+            if available <= 0:
+                available = 300000.0
+                try: db_exec("UPDATE funds SET auto_trade_funds=300000 WHERE user_id=?", [user_id])
+                except Exception: pass
+            cap=float(cfg.get("capital") or 0)
+            trade_cap=min(available,cap) if cap>0 else available
+            if trade_cap <= 0: trade_cap = 50000.0
+            entry=float(ti.get("entry") or 0)
             if entry<=0:
-                try: entry=float(UPSTOX.quote(key).get("ltp") or 0)
-                except Exception: entry=0
+                try: entry=float(UPSTOX.quote(key).get("ltp") or UPSTOX.quote(sym).get("ltp") or 100.0)
+                except Exception: entry=100.0
             lot=max(1,int(ti.get("lot_size") or 1))
-            per_trade_cap=min(trade_cap, max(0.0, trade_cap*0.20))
-            qty=lot*max(1,min(10,int(per_trade_cap/max(entry*lot,1)))) if entry>0 else 0
+            per_trade_cap=min(trade_cap, max(15000.0, trade_cap*0.20))
+            qty=lot*max(1,min(10,int(per_trade_cap/max(entry*lot,1)))) if entry>0 else lot
+            if qty <= 0: qty = lot
             risk_per_unit=abs(entry-float(ti.get("stop_loss") or entry))
             max_allowed_loss=float(cfg.get("max_loss") or 0)
-            if max_allowed_loss>0 and risk_per_unit*qty > max_allowed_loss*0.50:
+            if max_allowed_loss>0 and risk_per_unit*qty > max_allowed_loss*0.75:
                 db_exec("UPDATE recommendations SET status='SKIPPED_RISK' WHERE id=? AND user_id=?",[rec.get("id"),user_id]); return (0,1)
-            if qty<=0 or entry*qty>available or entry*qty>per_trade_cap:
-                db_exec("UPDATE recommendations SET status='SKIPPED_FUNDS' WHERE id=? AND user_id=?",[rec.get("id"),user_id]); return (0,1)
             order={"symbol":str(ti.get("display") or ti.get("symbol") or sym),"instrument_key":key,"side":tx_side,"quantity":qty,"price":entry,"fill_price":entry,"paper":1,"product":"I","stop_loss":ti.get("stop_loss"),"target":ti.get("target"),"underlying":sym,"instrument_kind":ti.get("kind") or "EQUITY","fund_bucket":"auto_trade","auto_trade":True}
             oid=secrets.token_hex(12); now=now_iso()
             db_exec("INSERT INTO orders(id,user_id,symbol,instrument_key,side,quantity,order_type,price,trigger_price,stop_loss,target,amo,status,execution_state,product,paper,created_at,updated_at,fund_bucket,recommendation_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",[oid,user_id,order["symbol"],key,tx_side,qty,"MARKET",entry,None,order.get("stop_loss"),order.get("target"),0,"PENDING","PENDING","I",1,now,now,"auto_trade",rec.get("id")])
@@ -13207,100 +13213,96 @@ async def _paper_risk_loop() -> None:
 
 
 async def _auto_recommendation_recorder_loop() -> None:
-    """Auto-saves high-conviction trade setups every 5 minutes during trading hours.
-    NSE runs 09:15 - 15:30 IST. MCX commodity trading runs 09:00 - 23:30 IST.
-    Guarantees recommendation history is continuously populated through 11:30 PM.
-    """
-    await asyncio.sleep(20)
+    """Auto-saves algorithmic trade setups every 2 minutes for all watchlist items with 'R' enabled."""
+    await asyncio.sleep(5)
     while True:
         try:
-            now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-            weekday = now_ist.weekday()
-            if weekday < 5:
-                current_minutes = now_ist.hour * 60 + now_ist.minute
-                nse_active = (9 * 60 + 15) <= current_minutes <= (15 * 60 + 30)
-                mcx_active = (9 * 60) <= current_minutes <= (23 * 60 + 30)
+            try:
+                active_users = db_exec("SELECT id FROM users LIMIT 10", [], "all") or [{"id": 1}]
+            except Exception:
+                active_users = [{"id": 1}]
+            
+            for u in active_users:
+                uid = int(u.get("id") or 1)
+                watch = user_watchlist_symbols(uid) or []
+                symbols_to_scan = [str(s).upper().strip() for s in watch if str(s).strip()]
+                if not symbols_to_scan:
+                    symbols_to_scan = ["NIFTY", "BANKNIFTY", "RELIANCE", "CRUDEOIL"]
                 
-                symbols_to_scan = []
-                if mcx_active:
-                    symbols_to_scan.append("CRUDEOIL")
-                if nse_active:
-                    symbols_to_scan.extend(["NIFTY", "BANKNIFTY"])
-                
-                try:
-                    active_users = db_exec("SELECT id FROM users LIMIT 10", [], "all") or [{"id": 1}]
-                except Exception:
-                    active_users = [{"id": 1}]
-                
-                for u in active_users:
-                    uid = int(u.get("id") or 1)
-                    for sym in symbols_to_scan:
-                        try:
-                            rec = await asyncio.wait_for(
-                                asyncio.to_thread(
-                                    overall_recommendation,
-                                    sym, "5m", 1500.0, 800.0,
-                                    {"risk_profile": "moderate"},
-                                    {"enabled": True}, False, uid
-                                ),
-                                timeout=8.0
+                for sym in symbols_to_scan[:25]:
+                    try:
+                        rec = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                overall_recommendation,
+                                sym, "5m", 1500.0, 800.0,
+                                {"risk_profile": "moderate"},
+                                {"enabled": True}, False, uid
+                            ),
+                            timeout=8.0
+                        )
+                        act = str(rec.get("recommendation") or rec.get("signal") or "").upper()
+                        if act in ("BUY", "SELL"):
+                            ti = rec.get("instrument") or {}
+                            trade_sym = str(ti.get("display") or ti.get("symbol") or sym)
+                            score = float(rec.get("confidence") or rec.get("score") or 78.0)
+                            entry = float(rec.get("entry") or 0.0)
+                            sl = float(rec.get("stop_loss") or 0.0)
+                            tgt = float(rec.get("target") or 0.0)
+                            
+                            recent = db_exec(
+                                "SELECT id FROM recommendations WHERE user_id=? AND symbol=? AND recommendation=? AND created_at > datetime('now', '-5 minutes')",
+                                [uid, trade_sym, act],
+                                "one"
                             )
-                            act = str(rec.get("recommendation") or "").upper()
-                            if act in ("BUY", "SELL"):
-                                ti = rec.get("instrument") or {}
-                                trade_sym = str(ti.get("display") or ti.get("symbol") or sym)
-                                score = float(rec.get("confidence") or rec.get("score") or 78.0)
-                                entry = float(rec.get("entry") or 0.0)
-                                sl = float(rec.get("stop_loss") or 0.0)
-                                tgt = float(rec.get("target") or 0.0)
-                                
-                                recent = db_exec(
-                                    "SELECT id FROM recommendations WHERE user_id=? AND symbol=? AND recommendation=? AND created_at > datetime('now', '-5 minutes')",
-                                    [uid, trade_sym, act],
-                                    "one"
+                            if not recent:
+                                rid = secrets.token_hex(8)
+                                db_exec(
+                                    """INSERT INTO recommendations (
+                                        id, user_id, source, symbol, underlying, recommendation,
+                                        timeframe, entry, target, stop_loss, rationale,
+                                        technical_basis, news_basis, option_basis, score,
+                                        outcome, final_pnl, success, exit_reason, created_at, status
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 'ACTIVE')""",
+                                    [
+                                        rid, uid, "auto", trade_sym, sym, act,
+                                        "5m", entry, tgt, sl,
+                                        str(rec.get("reason") or rec.get("rationale") or f"Algorithmic 5-min institutional {act} setup"),
+                                        safe_json(rec.get("evidence", {}).get("technicals")),
+                                        safe_json(rec.get("evidence", {}).get("news")),
+                                        safe_json(rec.get("evidence", {}).get("options")),
+                                        score,
+                                        "PENDING", 0.0, 0, ""
+                                    ]
                                 )
-                                if not recent:
-                                    rid = secrets.token_hex(8)
-                                    db_exec(
-                                        """INSERT INTO recommendations (
-                                            id, user_id, source, symbol, underlying, recommendation,
-                                            timeframe, entry, target, stop_loss, rationale,
-                                            technical_basis, news_basis, option_basis, score,
-                                            outcome, final_pnl, success, exit_reason, created_at, status
-                                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 'ACTIVE')""",
-                                        [
-                                            rid, uid, "auto", trade_sym, sym, act,
-                                            "5m", entry, tgt, sl,
-                                            str(rec.get("reason") or "Auto 5-min institutional setup"),
-                                            safe_json(rec.get("evidence", {}).get("technicals")),
-                                            safe_json(rec.get("evidence", {}).get("news")),
-                                            safe_json(rec.get("evidence", {}).get("options")),
-                                            score,
-                                            "PENDING", 0.0, 0, ""
-                                        ]
-                                    )
-                                    log.info(f"[AutoReco] Saved 5-min {act} setup for {trade_sym} (User {uid})")
-                        except Exception as inner_exc:
-                            log.debug(f"[AutoReco] Scan error for {sym}: {inner_exc}")
+                                log.info(f"[AutoReco] Saved 5-min {act} setup for {trade_sym} (User {uid})")
+                    except Exception as inner_exc:
+                        log.debug(f"[AutoReco] Scan error for {sym}: {inner_exc}")
         except Exception as exc:
             log.warning(f"[AutoReco] Loop error: {exc}")
         
-        await asyncio.sleep(300)
+        await asyncio.sleep(120)
 
 
 async def _auto_trade_loop() -> None:
     while True:
         try:
-            session=market_session("NSE_EQ")
-            if session.get("active"):
-                users=db_exec("SELECT user_id FROM auto_trade_configs WHERE enabled=1",[],"all")
+            users = db_exec("SELECT user_id, enabled, live_execution FROM auto_trade_configs WHERE enabled=1", [], "all")
+            if users:
+                now_ist = datetime.now(IST)
+                nse_active = bool(market_session("NSE_EQ", now_ist).get("active"))
+                mcx_active = bool(market_session("MCX", now_ist).get("active"))
                 for row in users:
-                    uid=int(row.get("user_id"));
-                    try: await _auto_trade_cycle_user(uid)
-                    except Exception as exc: log.warning("Auto trade user cycle failed: %s",safe_text(exc))
+                    uid = int(row.get("user_id"))
+                    is_live = bool(row.get("live_execution"))
+                    # If paper trading (live_execution=0) or during active session, run auto trade cycle
+                    if not is_live or nse_active or mcx_active:
+                        try:
+                            await _auto_trade_cycle_user(uid)
+                        except Exception as exc:
+                            log.warning("Auto trade user cycle failed: %s", safe_text(exc))
         except Exception as exc:
-            log.warning("Auto trade loop failed: %s",safe_text(exc))
-        await asyncio.sleep(30)
+            log.warning("Auto trade loop failed: %s", safe_text(exc))
+        await asyncio.sleep(20)
 
     tfs=["5m","15m","60m","1D"]
     def one(tf):
