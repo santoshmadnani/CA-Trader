@@ -547,14 +547,15 @@ button{font-family:inherit;cursor:pointer;}
 
 /* ===== NAV TABS ===== */
 .navtabs{
-  display:flex;align-items:center;gap:2px;
-  padding:0 14px;border-bottom:1px solid var(--border-soft);
-  background:var(--bg);overflow-x:auto;
+  display:flex;align-items:center;gap:1px;
+  padding:0 8px;border-bottom:1px solid var(--border-soft);
+  background:var(--bg);overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
   position:sticky;top:44px;z-index:998;
 }
+.navtabs::-webkit-scrollbar{display:none;width:0;height:0;}
 .navtab{
-  position:relative;display:flex;align-items:center;gap:7px;
-  padding:11px 14px;font-size:12.5px;font-weight:500;color:var(--text-dim);
+  position:relative;display:flex;align-items:center;gap:6px;
+  padding:9px 10px;font-size:11.8px;font-weight:500;color:var(--text-dim);
   border-bottom:2px solid transparent;white-space:nowrap;
   cursor:pointer !important;touch-action:manipulation;-webkit-tap-highlight-color:rgba(38,217,166,0.25);user-select:none;
 }
@@ -2983,23 +2984,14 @@ select#watchlistSelect, select.watchlist-select {
   color: var(--gold);
 }
 .navtabs {
-  scrollbar-width: thin !important;
-  scrollbar-color: #2a2e39 transparent !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
   scroll-behavior: smooth;
 }
 .navtabs::-webkit-scrollbar {
-  height: 5px !important;
-  display: block !important;
-  background: transparent;
-}
-.navtabs::-webkit-scrollbar-thumb {
-  background: #2a2e39 !important;
-  border: 1px solid rgba(0, 0, 0, 0.85) !important;
-  border-radius: 3px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-}
-.navtabs::-webkit-scrollbar-thumb:hover {
-  background: #363c4e !important;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* CA Trader Unified Static Header (Top Bar + Navtabs stay fixed on scroll) */
@@ -3795,7 +3787,6 @@ select#watchlistSelect, select.watchlist-select {
           <span id="chartSimSliderDisplay"></span><input id="chartSimSlider"><div id="chartSimDeltaImpact"></div><div id="chartSimGammaImpact"></div><div id="chartSimTotalImpact"></div><div id="chartSimLotPnl"></div><div id="chartSimLotNote"></div>
         </div>
       </div>
-    </div>
     </div> <!-- END panel-dashboard -->
 
   <div class="panel" id="panel-reco">
@@ -5875,7 +5866,6 @@ select#watchlistSelect, select.watchlist-select {
 
   </div>
 </div>
-</div>
 
 
 <div id="liveAlertStack" class="live-alert-stack"></div><div id="drawingTooltip" class="drawing-tooltip"></div>
@@ -6356,11 +6346,13 @@ function showTab(name){
       if(typeof loadDashboard === 'function') loadDashboard();
       (window.loadDashboard || (typeof loadDashboard === 'function' ? loadDashboard : null))?.();
     } else if(name === 'charts'){
-      if(typeof loadChart === 'function') loadChart();
-      if(typeof ensureChartLayout === 'function') ensureChartLayout();
-      (window.loadChart || (typeof loadChart === 'function' ? loadChart : null))?.();
-      (window.ensureChartLayout || (typeof ensureChartLayout === 'function' ? ensureChartLayout : null))?.(true);
-      setTimeout(()=>{ (window.ensureChartLayout || (typeof ensureChartLayout === 'function' ? ensureChartLayout : null))?.(true); }, 120);
+      const lc = window.loadChart || (typeof loadChart === 'function' ? loadChart : null);
+      const ecl = window.ensureChartLayout || (typeof ensureChartLayout === 'function' ? ensureChartLayout : null);
+      const dr = window.draw || (typeof draw === 'function' ? draw : null);
+      ecl?.(true);
+      lc?.();
+      dr?.();
+      setTimeout(()=>{ ecl?.(true); dr?.(); }, 120);
     } else if(name === 'options'){
       if(typeof loadOptions === 'function') loadOptions();
       (window.loadOptions || (typeof loadOptions === 'function' ? loadOptions : null))?.();
@@ -6426,6 +6418,15 @@ document.querySelectorAll('.wl-item').forEach(item=>{
     item.classList.add('selected');
   });
 });
+const nt = document.getElementById('navtabs');
+if(nt){
+  nt.addEventListener('wheel', (e) => {
+    if(e.deltaY !== 0){
+      e.preventDefault();
+      nt.scrollLeft += e.deltaY * 0.8;
+    }
+  }, {passive: false});
+}
 document.querySelectorAll('.switch').forEach(s=>{
   s.addEventListener('click', ()=>s.classList.toggle('on'));
 });
@@ -6728,8 +6729,10 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
   const state={candles:[],tf:'5m',history:30,visible:90,zoom:1,panX:0,panY:0,yScale:1,cross:null,drag:null,panArmed:false,yPanArmed:false,pendingDrawing:null,drawingStage:[],drawings:[],appliedIndicators:[],indicatorValues:{},currentKey:null,latestLive:null,fullscreen:false,interactionMode:'crosshair',hoverDrawing:null,dragDrawing:null};
   window.__CA_TRADER_STATE = state;
-  const APP_CACHE = window.__CA_TRADER_CACHE = window.__CA_TRADER_CACHE || {quote:null,technical:null,mtf:null,newsStock:null,newsGlobal:null,fundamentals:null,options:null,movers:null};
+  const APP_CACHE = window.APP_CACHE = window.__CA_TRADER_CACHE = window.__CA_TRADER_CACHE || {quote:null,technical:null,mtf:null,newsStock:null,newsGlobal:null,fundamentals:null,options:null,movers:null};
+  window.state = state;
   let W=[],G=null,S=window.CATraderSymbol||'NIFTY',F='all',market={nse:false,mcx:false};
+  window.S = S; window.W = W;
   let autoEnabled=false, autoOptions=true, autoSymbols=[];
   const subscribedSymbols=new Set();
   const indicators=[
@@ -7564,6 +7567,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       __isDrawing = false;
     }
   }
+  window.draw = draw;
 
   function updateCross(e){const r=document.getElementById('chartViewport').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,view=getView();if(!view.data.length)return;const i=indexFromX(x,view),c=view.data[i];const price=priceFromY(y,view);state.cross={x:Math.max(12,Math.min(r.width-72,x)),y:Math.max(18,Math.min(r.height-36,y)),price,label:xLabel(c?.timestamp||Date.now()),index:view.start+i};draw()}
   const vp=document.getElementById('chartViewport');
@@ -7927,9 +7931,14 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     if((ch == null || ch === 0) && Number.isFinite(prevClose) && prevClose > 0 && Math.abs(l - prevClose) > 1e-6){
       ch = l - prevClose;
     }
+    const openVal = Number(q.session_open ?? q.open);
+    if((ch == null || ch === 0) && Number.isFinite(openVal) && openVal > 0 && Math.abs(l - openVal) > 1e-6){
+      ch = l - openVal;
+    }
     let pct = (q.change_pct != null && !isNaN(Number(q.change_pct))) ? Number(q.change_pct) : (q.session_change_pct != null ? Number(q.session_change_pct) : null);
-    if((pct == null || pct === 0) && Number.isFinite(prevClose) && prevClose > 0 && ch != null){
-      pct = (ch / prevClose) * 100;
+    if((pct == null || pct === 0) && ch != null){
+      const refBase = (Number.isFinite(prevClose) && prevClose > 0 && Math.abs(l - prevClose) > 1e-6) ? prevClose : (Number.isFinite(openVal) && openVal > 0 ? openVal : null);
+      if(refBase) pct = (ch / refBase) * 100;
     }
     const sym=q.symbol||S||'—';
     const ltpText=fmt(l);
@@ -8470,6 +8479,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     if(seq===chartRequestSeq && q)updateOptionHeader(q);
     if(typeof updateOscSplitterPosition === 'function') updateOscSplitterPosition();
   }
+  window.loadChart = loadChart;
 
   // ================= GLOBAL & MACRO MARKET DRIVERS (Item 11) =================
   async function loadMacroFactors(force=false){
@@ -18501,11 +18511,17 @@ document.querySelectorAll('.navtab').forEach(t=>t.addEventListener('click',(e)=>
     });
 
     if (sym === String(window.CATraderSymbol || '').toUpperCase()) {
+      const titleEl = document.getElementById('chartSymbolTitle');
+      if (titleEl && (!titleEl.textContent || titleEl.textContent === '—' || titleEl.textContent === '-')) titleEl.textContent = sym;
       const h = document.getElementById('chartSymbolLtp');
       if (h) h.textContent = fmt(ltp);
       const c = document.getElementById('chartSymbolChange');
-      const net = q?.net_change == null ? null : Number(q.net_change);
-      if (c && Number.isFinite(net)) c.textContent = `${net > 0 ? '+' : ''}${fmt(net)}`;
+      let chVal = q?.net_change == null ? null : Number(q.net_change);
+      const openVal = Number(q.session_open ?? q.open);
+      if ((chVal == null || chVal === 0) && Number.isFinite(openVal) && openVal > 0 && Math.abs(ltp - openVal) > 1e-6) {
+        chVal = ltp - openVal;
+      }
+      if (c && Number.isFinite(chVal)) c.textContent = `${chVal > 0 ? '+' : ''}${fmt(chVal)}`;
     }
   };
 
@@ -20233,8 +20249,13 @@ setTimeout(() => {
     }
     if (!ltp) ltp = (baseSym.includes('BANK') ? 55794.75 : baseSym.includes('CRUDE') ? 10215 : 23118.60);
 
-    const chg = Number(q.net_change != null ? q.net_change : (q.session_change != null ? q.session_change : 0));
-    const chgPct = Number(q.change_pct != null ? q.change_pct : (q.session_change_pct != null ? q.session_change_pct : 0));
+    let chg = Number(q.net_change != null ? q.net_change : (q.session_change != null ? q.session_change : 0));
+    let chgPct = Number(q.change_pct != null ? q.change_pct : (q.session_change_pct != null ? q.session_change_pct : 0));
+    const openVal = Number(q.session_open ?? q.open);
+    if ((chg === 0 || !Number.isFinite(chg)) && Number.isFinite(openVal) && openVal > 0 && Math.abs(ltp - openVal) > 1e-6) {
+      chg = ltp - openVal;
+      chgPct = (chg / openVal) * 100;
+    }
 
     // Update Header
     if ($('dashSymbolTitle')) $('dashSymbolTitle').textContent = sym;
@@ -20252,6 +20273,9 @@ setTimeout(() => {
       baseSym.toUpperCase().includes(String(window.__caCurrentChartReco.symbol || '').toUpperCase())
     );
     let rec = curRecoMatches ? window.__caCurrentChartReco : {};
+    if (typeof window.renderDualRecoCards === 'function') {
+      try { window.renderDualRecoCards(rec); } catch(_) {}
+    }
     try {
       const rd = await fetchApi(`/api/recommendations/${encodeURIComponent(sym)}`, { timeoutMs: 12000 });
       if (rd && (rd.recommendation || rd.action)) {
@@ -22351,7 +22375,7 @@ window.renderDualRecoCards = function(data){
       return clean;
     }
     // Check cached option chain expiries from live API
-    const liveExp = (optionState && optionState.expiry) || (APP_CACHE?.options?.available_expiries && APP_CACHE.options.available_expiries[0]);
+    const liveExp = (window.optionState && window.optionState.expiry) || (window.APP_CACHE?.options?.available_expiries && window.APP_CACHE.options.available_expiries[0]);
     if(liveExp && String(liveExp).trim() && !String(liveExp).includes('Upcoming') && !String(liveExp).includes('current_week')){
       const clean = String(liveExp).split('T')[0].trim();
       const parts = clean.split('-');
@@ -25792,7 +25816,7 @@ window.onSymbolChanged = function(sym){
   ['ceSlPill', 'peSlPill', 'ceTgtPill', 'peTgtPill'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '—'; });
   if(document.getElementById('optSummarySpot')) document.getElementById('optSummarySpot').textContent = 'Loading…';
   if(typeof origOnSymbolChanged === 'function') origOnSymbolChanged(sym);
-  window.updateExcelFactorsFromSymbol(sym, APP_CACHE?.quote, APP_CACHE?.options, null);
+  window.updateExcelFactorsFromSymbol(sym, window.APP_CACHE?.quote, window.APP_CACHE?.options, null);
 };
 
 // 6. Notification Bell Handlers (3 Clean Tabs, Mark All Read)
@@ -26668,7 +26692,7 @@ window.renderDualRecoCards = function(data){
 
 // --- Item 10: Unified Multi-Column Option Chain Table (OI & Greeks) ---
 window.renderZerodhaOptionChainTable = function(){
-  const d = window.__caCurrentOptionChain || APP_CACHE?.options || (typeof optionState !== 'undefined' ? optionState.chain : null);
+  const d = window.__caCurrentOptionChain || window.APP_CACHE?.options || (typeof optionState !== 'undefined' ? optionState.chain : null);
   const host = document.getElementById('optionChainTable') || document.getElementById('zerodhaOptionChainContainer');
   if(!host || !d) return;
 

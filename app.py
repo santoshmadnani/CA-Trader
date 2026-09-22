@@ -150,6 +150,12 @@ the supplied CA Trader .env file (FLASK_HOST/FLASK_PORT, etc.).
 """
 
 import asyncio
+import sys
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 import base64
 import contextlib
 import hashlib
@@ -1880,7 +1886,6 @@ class UpstoxAdapter:
             end=(now.date()-timedelta(days=1))
             start=end-timedelta(days=7)
             path=f"/historical-candle/{quote(key,safe='')}/day/{end.isoformat()}/{start.isoformat()}"
-            payload=self._get(path,{},ttl=300.0,cache_key=cache_key,base_url=UPSTOX_V3_BASE_URL)
             payload=self._get(path,{},ttl=1800.0,cache_key=cache_key)
             rows=(payload.get('data') or {}).get('candles') or []
             vals=[]
@@ -2154,7 +2159,6 @@ class UpstoxAdapter:
         # Single path segment interval: e.g. /historical-candle/intraday/{key}/1minute
         interval_str, _ = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/intraday/{quote(key, safe='')}/{interval_str}"
-        payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}", base_url=UPSTOX_V3_BASE_URL)
         payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}")
         return self._parse_candle_rows((payload.get("data") or {}).get("candles") or [])
 
@@ -2176,7 +2180,6 @@ class UpstoxAdapter:
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
         hist_path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date}/{from_date}"
         try:
-            payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}", base_url=UPSTOX_V3_BASE_URL)
             payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}")
             out.extend(self._parse_candle_rows((payload.get("data") or {}).get("candles") or []))
         except Exception as exc:
@@ -2207,7 +2210,6 @@ class UpstoxAdapter:
         key, meta = self.resolve_instrument(instrument)
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date.isoformat()}/{from_date.isoformat()}"
-        payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}", base_url=UPSTOX_V3_BASE_URL)
         payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}")
         data = payload.get("data") or {}
         candles = data.get("candles") or []
@@ -8142,6 +8144,10 @@ def _merge_live_quote_into_candles(instrument: str, timeframe: str, candles: lis
 
 @app.get("/api/market/candles/{instrument}")
 async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=r"^(1m|2m|3m|4m|5m|10m|15m|30m|60m|120m|180m|240m|1D|1W|1M)$"), days: int = Query(7, ge=1, le=3650), user: dict[str, Any] | None = Depends(current_user)) -> dict[str, Any]:
+    ck = f"candles:{instrument}:{timeframe}:{days}"
+    cached = CACHE.get(ck)
+    if cached:
+        return JSONResponse(cached, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
     try:
         # One authoritative range-safe path for every chart request.
         key_for_session, meta_for_session = UPSTOX.resolve_instrument(instrument)
@@ -8156,7 +8162,9 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
         stale = bool(latest_date is not None and latest_date < expected) or (not candles)
         if not candles:
             candles = generate_fallback_replay_candles(instrument, timeframe, days)
-        return JSONResponse({"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": latest_date.isoformat() if latest_date else None, "latest_session_ist": expected.isoformat(), "stale": stale, "data_state": "LIVE" if live_quote and live_quote.get("ltp") is not None else "EOD"}, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
+        payload = {"instrument": instrument, "timeframe": timeframe, "candles": candles, "provider": "upstox", "timestamp": now_iso(), "live": bool(live_quote and live_quote.get("ltp") is not None), "live_quote": live_quote, "market_session": session, "latest_candle_ist": latest_date.isoformat() if latest_date else None, "latest_session_ist": expected.isoformat(), "stale": stale, "data_state": "LIVE" if live_quote and live_quote.get("ltp") is not None else "EOD"}
+        CACHE.set(ck, payload, 30.0)
+        return JSONResponse(payload, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0", "Pragma":"no-cache", "Expires":"0"})
     except ProviderRateLimited as exc:
         fallback = _LAST_GOOD_CANDLES.get(f"{instrument}:{timeframe}")
         if not fallback:
