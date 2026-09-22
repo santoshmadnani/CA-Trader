@@ -2502,7 +2502,7 @@ def session_time_remaining(segment: str = "NSE_EQ", at: datetime | None = None) 
             "session": "market"
         }
 
-def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_entry: float, underlying_spot: float, underlying_atr: float, lot_size: int, desired_profit: float | None = 500.0, bearable_loss: float | None = None, segment: str | None = None, days_high: float | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
+def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_entry: float, underlying_spot: float, underlying_atr: float, lot_size: int, desired_profit: float | None = 500.0, bearable_loss: float | None = None, segment: str | None = None, days_high: float | None = None, expiry_scalp: bool = False, timeframe: str = "5m") -> dict[str, Any]:
     seg = segment or get_symbol_segment(symbol)
     sess = session_time_remaining(seg)
     is_active = bool(sess.get("active"))
@@ -2517,52 +2517,51 @@ def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_e
     strike = float(opt_info.get("strike") or underlying_spot)
     greeks = bs_greeks(underlying_spot, strike, t_years=15.0 / 365.0, r=0.07, sigma=0.18, opt_type=opt_type)
 
-    next_sess = get_next_market_session(seg)
-    is_next_day = not is_active or rem_mins <= 15
-    # Strict 30-45 minute intraday momentum horizon for option buying
-    horizon = min(45, max(15, rem_mins - 5)) if (is_active and rem_mins > 15) else 45
-    # Realistic entry price: if price is consolidating or extended, recommend a limit entry
-    # slightly below CMP (0.8% to 1.5% pullback) that can be realistically filled within 5 minutes
-
-    # Entry price derivation
-    limit_entry = opt_entry
-    if opt_entry > 20.0:
-        pullback_pts = round(max(0.5, min(opt_entry * 0.012, underlying_atr * 0.04)), 2)
-        pullback_pts = round(max(0.5, min(opt_entry * 0.015, underlying_atr * 0.05)), 2)
-        limit_entry = round(max(0.05, opt_entry - pullback_pts), 2)
-    entry_to_use = limit_entry if limit_entry > 0 else opt_entry
-
-    # Strict max 30-minute intraday horizon for option buying (15-20m standard, 5-10m quick profit)
-    pts_for_dp = round(dp / lot_size, 2)
-    if pts_for_dp < entry_to_use * 0.07:
+    tf_str = str(timeframe or "5m").lower().strip()
+    if tf_str in ("1m", "2m"):
+        horizon = 3
+        duration_label = "1–3m Scalp"
+        tf_gain_mult = 0.05
+    elif tf_str in ("3m", "4m"):
+        horizon = 6
+        duration_label = "3–5m Quick Scalp"
+        tf_gain_mult = 0.07
+    elif tf_str == "5m":
         horizon = 10
-        duration_label = "5–10m Quick Scalp"
+        duration_label = "5–10m Momentum Scalp"
+        tf_gain_mult = 0.09
+    elif tf_str in ("10m", "15m"):
+        horizon = 20
+        duration_label = "15–20m Momentum"
+        tf_gain_mult = 0.13
+    elif tf_str in ("20m", "30m"):
+        horizon = 35
+        duration_label = "30m Swing"
+        tf_gain_mult = 0.18
+    elif tf_str in ("45m", "60m", "1h"):
+        horizon = 60
+        duration_label = "1h Intraday Trend"
+        tf_gain_mult = 0.22
+    else:
+        horizon = min(90, max(20, rem_mins - 5)) if (is_active and rem_mins > 15) else 90
+        duration_label = "Intraday Session"
+        tf_gain_mult = 0.25
+
     if expiry_scalp:
         horizon = 5
         duration_label = "1–5m Expiry Scalp"
-        n_candles = 1.0
-        expected_und_move = min(underlying_atr * 0.15, max(2.5, underlying_atr * 0.10))
-    else:
-        horizon = min(25, max(12, rem_mins - 5)) if (is_active and rem_mins > 15) else 20
-        duration_label = "15–20m Momentum"
-        pts_for_dp = round(dp / lot_size, 2)
-        if pts_for_dp < entry_to_use * 0.07:
-            horizon = 10
-            duration_label = "5–10m Quick Scalp"
-        else:
-            horizon = min(25, max(12, rem_mins - 5)) if (is_active and rem_mins > 15) else 20
-            duration_label = "15–20m Momentum"
-        n_candles = max(1.0, horizon / 5.0)
-        expected_und_move = min(underlying_atr * 0.25, (underlying_atr / 8.6) * math.sqrt(n_candles) * 1.10)
-        expected_und_move = max(4.0, expected_und_move)
+        tf_gain_mult = 0.055
+
+    # Derive realistic limit entry price with small pullback buffer
+    limit_entry = opt_entry
+    if opt_entry > 20.0:
+        pullback_pts = round(max(0.3, min(opt_entry * 0.012, underlying_atr * 0.03)), 2)
+        limit_entry = round(max(0.05, opt_entry - pullback_pts), 2)
+    entry_to_use = limit_entry if limit_entry > 0 else opt_entry
 
     n_candles = max(1.0, horizon / 5.0)
-    # Expected underlying move in 30-45m based on intraday ATR
-    expected_und_move = min(underlying_atr * 0.35, (underlying_atr / 8.6) * math.sqrt(n_candles) * 1.25)
-    expected_und_move = max(5.0, expected_und_move)
-    # Expected underlying move based on intraday ATR
-    expected_und_move = min(underlying_atr * 0.25, (underlying_atr / 8.6) * math.sqrt(n_candles) * 1.10)
-    expected_und_move = max(4.0, expected_und_move)
+    expected_und_move = min(underlying_atr * 0.28, (underlying_atr / 8.6) * math.sqrt(n_candles) * 1.10)
+    expected_und_move = max(3.5, expected_und_move)
 
     delta = abs(float(greeks.get("delta") or 0.5))
     gamma = float(greeks.get("gamma") or 0.001)
@@ -2572,67 +2571,20 @@ def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_e
     theta_loss = theta_min * horizon
     model_pts = max(0.5, delta_gain - theta_loss)
 
-    # Realistic entry price: if price is consolidating or extended, recommend a limit entry
-    # slightly below CMP (0.8% to 1.5% pullback) that can be realistically filled within 5 minutes
-    limit_entry = opt_entry
-    if opt_entry > 20.0:
-        pullback_pts = round(max(0.5, min(opt_entry * 0.015, underlying_atr * 0.05)), 2)
-        limit_entry = round(max(0.05, opt_entry - pullback_pts), 2)
-    
-    entry_to_use = limit_entry if limit_entry > 0 else opt_entry
-    if expiry_scalp:
-        # Tight 1-5m quick scalp bounds: 3.5% to 6.5% of entry premium
-        min_gain_pts = max(1.5, round(entry_to_use * 0.035, 2))
-        max_gain_pts = max(3.0, round(entry_to_use * 0.065, 2))
-        realistic_opt_pts = round(min(max_gain_pts, max(min_gain_pts, model_pts)), 2)
-        target = round(entry_to_use + realistic_opt_pts, 2)
-        sl_dist = round(max(1.5, realistic_opt_pts / 1.35), 2)
-    else:
-        # Standard 15-20m momentum bounds: 8% to 15% of entry premium
-        min_gain_pts = max(2.0, round(entry_to_use * 0.08, 2))
-        max_gain_pts = max(4.0, round(entry_to_use * 0.15, 2))
-        pts_for_dp = round(dp / lot_size, 2)
-        realistic_opt_pts = round(min(max_gain_pts, max(min_gain_pts, max(model_pts, min(pts_for_dp, max_gain_pts)))), 2)
-        target = round(entry_to_use + realistic_opt_pts, 2)
-        if days_high and float(days_high) > entry_to_use:
-            target = round(min(target, float(days_high) * 0.98), 2)
-            realistic_opt_pts = round(target - entry_to_use, 2)
-        sl_dist = round(max(2.0, realistic_opt_pts / 1.7), 2)
-        pct_sl_pts = round(entry_to_use * 0.08, 2)
-        sl_dist = min(realistic_opt_pts * 0.85, max(sl_dist, pct_sl_pts))
-        if bearable_loss and bearable_loss >= 1000 and lot_size > 0:
-            sl_dist = min(sl_dist, round(bearable_loss / lot_size, 2))
-
-    # Constrain realistic target to 10% - 22% of entry premium for option buyers
-    # (e.g. entry 155 -> target between 171 and 189, an expected gain of 16-34 pts, NOT 100+ pts)
-    min_gain_pts = max(2.0, round(entry_to_use * 0.10, 2))
-    max_gain_pts = max(5.0, round(entry_to_use * 0.22, 2))
-    pts_for_dp = round(dp / lot_size, 2)
-    # Constrain realistic target to 8% - 15% of entry premium for option buyers
-    # (e.g. entry 568 -> target between 613 and 653, an expected gain of 45-85 pts, NOT 200+ pts)
-    min_gain_pts = max(2.0, round(entry_to_use * 0.08, 2))
-    max_gain_pts = max(4.0, round(entry_to_use * 0.15, 2))
-    realistic_opt_pts = round(min(max_gain_pts, max(min_gain_pts, max(model_pts, min(pts_for_dp, max_gain_pts)))), 2)
+    min_gain_pts = max(1.5, round(entry_to_use * (tf_gain_mult * 0.65), 2))
+    max_gain_pts = max(3.0, round(entry_to_use * tf_gain_mult, 2))
+    realistic_opt_pts = round(min(max_gain_pts, max(min_gain_pts, model_pts)), 2)
 
     target = round(entry_to_use + realistic_opt_pts, 2)
-    # If option Day's High is known and entry is below Day's High, cap target at Day's High resistance
     if days_high and float(days_high) > entry_to_use:
-        target = round(min(target, float(days_high) * 0.98), 2) # cap just under Day's High resistance
+        target = round(min(target, float(days_high) * 0.98), 2)
         realistic_opt_pts = round(target - entry_to_use, 2)
 
-    # Stop Loss Sizing (Release 48 - Item 20)
-    # Give positions healthy breathing room (15% - 22% buffer) to avoid noise stop-outs
-    base_sl_pts = round(max(4.0, realistic_opt_pts / 1.6), 2)
-    # Allow at least 15% of premium
-    pct_sl_pts = round(entry_to_use * 0.18, 2)
-    sl_dist = max(base_sl_pts, pct_sl_pts)
-    # Stop Loss Sizing: 1:1.6 to 1:1.8 Risk:Reward ratio
-    sl_dist = round(max(2.0, realistic_opt_pts / 1.7), 2)
-    pct_sl_pts = round(entry_to_use * 0.08, 2) # 7-9% premium risk
+    # Stop Loss Sizing: 1:1.7 Risk:Reward ratio, non-tight floor
+    sl_dist = round(max(1.5, realistic_opt_pts / 1.7), 2)
+    pct_sl_pts = round(entry_to_use * 0.065, 2)
     sl_dist = min(realistic_opt_pts * 0.85, max(sl_dist, pct_sl_pts))
     if bearable_loss and bearable_loss >= 1000 and lot_size > 0:
-        # Respect user risk budget if realistic
-        sl_dist = max(sl_dist, round(bearable_loss / lot_size, 2))
         sl_dist = min(sl_dist, round(bearable_loss / lot_size, 2))
     sl = round(max(0.05, entry_to_use - sl_dist), 2)
 
@@ -2670,7 +2622,7 @@ def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_e
         "reason": f"Projected for {next_sess.get('target_session')} with 15-20m momentum breakout." if is_next_day else f"Realistic option target achievable in {duration_label} (max 30m horizon, R:R 1:{rr_ratio})."
     }
 
-def evaluate_achievable_equity_move(symbol: str, entry: float, atr: float, user_capital: float | None = None, desired_profit: float | None = 500.0, bearable_loss: float | None = None, side: str = "BUY", segment: str | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
+def evaluate_achievable_equity_move(symbol: str, entry: float, atr: float, user_capital: float | None = None, desired_profit: float | None = 500.0, bearable_loss: float | None = None, side: str = "BUY", segment: str | None = None, expiry_scalp: bool = False, timeframe: str = "5m") -> dict[str, Any]:
     seg = segment or get_symbol_segment(symbol)
     sess = session_time_remaining(seg)
     is_active = bool(sess.get("active"))
@@ -2679,19 +2631,13 @@ def evaluate_achievable_equity_move(symbol: str, entry: float, atr: float, user_
     entry = max(0.01, float(entry or 100.0))
     atr = max(0.5, float(atr or entry * 0.015))
 
-    next_sess = get_next_market_session(seg)
-    is_next_day = not is_active or rem_mins <= 15
-    horizon = 375 if is_next_day else min(max(15, rem_mins - 5), 180)
-
-    n_candles = max(1.0, horizon / 5.0)
-    calculated_pts = round(max(0.5, atr * math.sqrt(n_candles) * 1.15), 2)
     sym_u = str(symbol or "").upper()
     if "CRUDE" in sym_u:
         lot = 100
     elif "BANK" in sym_u:
-        lot = 15
+        lot = 30
     elif "NIFTY" in sym_u:
-        lot = 25
+        lot = 65
     else:
         lot = 1
     if "FUT" in sym_u or seg == "MCX":
@@ -2701,53 +2647,66 @@ def evaluate_achievable_equity_move(symbol: str, entry: float, atr: float, user_
     else:
         est_qty = 10
 
+    tf_str = str(timeframe or "5m").lower().strip()
+    if tf_str in ("1m", "2m"):
+        tf_factor = 0.50
+        max_pct = 0.0010
+        horizon = 3
+    elif tf_str in ("3m", "4m"):
+        tf_factor = 0.75
+        max_pct = 0.0015
+        horizon = 6
+    elif tf_str == "5m":
+        tf_factor = 1.00
+        max_pct = 0.0022  # ~50 pts max on 23400 Nifty
+        horizon = 10
+    elif tf_str in ("10m", "15m"):
+        tf_factor = 1.50
+        max_pct = 0.0040  # ~90 pts on Nifty
+        horizon = 20
+    elif tf_str in ("20m", "30m"):
+        tf_factor = 2.00
+        max_pct = 0.0065  # ~150 pts on Nifty
+        horizon = 35
+    elif tf_str in ("45m", "60m", "1h"):
+        tf_factor = 2.60
+        max_pct = 0.0090
+        horizon = 60
+    else:  # Daily / Swing
+        tf_factor = 3.80
+        max_pct = 0.0160
+        horizon = 375
+
     if expiry_scalp:
         horizon = 5
-        rem_pts = round(max(0.5, min(atr * 0.20, max(atr * 0.12, entry * 0.0008))), 2)
-        sl_dist = round(max(0.5, rem_pts * 1.35), 2)
-        target = round(entry + rem_pts, 2) if side == "BUY" else round(max(0.01, entry - rem_pts), 2)
-        sl = round(max(0.01, entry - sl_dist), 2) if side == "BUY" else round(entry + sl_dist, 2)
-        realistic_profit = round(rem_pts * est_qty, 2)
-        return {
-            "achievable": True,
-            "target": target,
-            "stop_loss": sl,
-            "target_move_pts": rem_pts,
-            "risk_amount": round(abs(entry - sl), 2),
-            "reward_amount": round(abs(target - entry), 2),
-            "risk_reward": round(rem_pts / max(0.01, abs(entry - sl)), 2),
-            "time_horizon": 5,
-            "realistic_profit": realistic_profit,
-            "reason": f"⚡ 1–5m Expiry Scalp target achievable within 5 minutes ({rem_pts:,.2f} pts)"
-        }
+        tf_factor = 0.70
+        max_pct = 0.0015
 
-    next_sess = get_next_market_session(seg)
-    is_next_day = not is_active or rem_mins <= 15
-    horizon = 375 if is_next_day else min(max(15, rem_mins - 5), 180)
+    # Target points based on timeframe ATR
+    raw_tf_pts = atr * tf_factor * 0.90
+    max_tf_pts = max(1.5, entry * max_pct)
+    min_tf_pts = max(0.5, entry * (max_pct * 0.35))
+    rem_pts = round(min(max_tf_pts, max(min_tf_pts, raw_tf_pts)), 2)
 
-    n_candles = max(1.0, horizon / 5.0)
-    calculated_pts = round(max(0.5, min(atr * 1.85, atr * math.sqrt(n_candles) * 0.35)), 2)
-
-    pts_for_dp = round(dp / est_qty, 2)
-    rem_pts = round(max(calculated_pts, pts_for_dp), 2)
-    realistic_profit = round(rem_pts * est_qty, 2)
+    # Risk budgeting: target-to-risk ratio ~ 1:1.75
+    sl_dist = round(max(0.5, rem_pts / 1.75), 2)
+    if bearable_loss and bearable_loss > 0 and est_qty > 0:
+        sl_dist = min(sl_dist, max(0.5, round(bearable_loss / est_qty, 2)))
 
     if side == "BUY":
         target = round(entry + rem_pts, 2)
-        sl_dist = round(rem_pts / 2.0, 2)
-        if bearable_loss and bearable_loss > 0:
-            sl_dist = min(sl_dist, max(0.5, bearable_loss / est_qty))
         sl = round(max(0.01, entry - sl_dist), 2)
     else:
         target = round(max(0.01, entry - rem_pts), 2)
-        sl_dist = round(rem_pts / 2.0, 2)
-        if bearable_loss and bearable_loss > 0:
-            sl_dist = min(sl_dist, max(0.5, bearable_loss / est_qty))
         sl = round(entry + sl_dist, 2)
 
     risk_amt = round(abs(entry - sl), 2)
     reward_amt = round(abs(target - entry), 2)
     rr_ratio = round(reward_amt / max(0.01, risk_amt), 2)
+    realistic_profit = round(reward_amt * est_qty, 2)
+
+    next_sess = get_next_market_session(seg)
+    is_next_day = not is_active or rem_mins <= 15
 
     return {
         "achievable": True,
@@ -2906,9 +2865,30 @@ def resolve_lot_size(sym: str, default: int = 1) -> int:
 
 def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: int | None = None) -> dict[str, Any] | None:
     """Find the optimal option contract for a futures symbol with STRICT directional consensus.
-    Priority 1: Live Option Chain Engine (calculating true ATM/near-OTM strike and live Upstox LTP).
-    Priority 2: User watchlist or database watchlist members (only if option chain is unavailable).
+    Priority 1: If future_sym is already an option contract, respect it directly.
+    Priority 2: Live Option Chain Engine (calculating true ATM/near-OTM strike and live Upstox LTP).
+    Priority 3: User watchlist or database watchlist members (only if option chain is unavailable).
     """
+    opt_already = parse_option_contract(future_sym)
+    if opt_already:
+        try:
+            q = UPSTOX.quote(future_sym)
+            live_ltp = float(q.get("ltp") or q.get("last_price") or 0.0)
+        except Exception:
+            live_ltp = 0.0
+        return {
+            "symbol": future_sym,
+            "display_name": future_sym,
+            "display": future_sym,
+            "instrument_key": future_sym,
+            "entry": round(float(live_ltp or 120.0), 2),
+            "strike": float(opt_already.get("strike") or 0.0),
+            "option_type": opt_already.get("option_type") or "CE",
+            "side": opt_already.get("option_type") or "CE",
+            "expiry": opt_already.get("expiry") or "",
+            "lot_size": resolve_lot_size(future_sym, 1)
+        }
+
     root = extract_root_symbol(future_sym).upper()
     is_bull = str(opt_bias).upper() in {"BUY", "LONG", "ACCUMULATE", "BULLISH"}
     bias_tag = "CE" if is_bull else "PE"
@@ -5042,8 +5022,111 @@ def reset_active_calibration(symbol: str) -> None:
         db_exec("UPDATE reco_calibration SET is_active=0 WHERE symbol=?", [root])
     _ACTIVE_CALIBRATION_CACHE.pop(root, None)
     CACHE.delete_pattern("overall:*")
-    CACHE.delete_pattern("overall-reco:*")
+def apply_backtest_blindspots(
+    symbol: str,
+    timeframe: str,
+    last_price: float,
+    vwap: float,
+    candles: list[dict[str, Any]],
+    atr: float,
+    side: str,
+    entry: float,
+    target: float,
+    stop_loss: float,
+    is_option: bool = False,
+    opt_delta: float = 0.50
+) -> dict[str, Any]:
+    """Applies the 6 Institutional Blindspots captured during 9:15 AM backtesting:
+    1. 9:15 Opening Volatility / Wick Filter: Adjusts entry so we don't buy the peak wick or short the low wick.
+    2. Gap Exhaustion vs Continuation Check: Detects opening gap >0.6% and opposite close, avoids trap.
+    3. VWAP Extension Barrier: If price > 1.2x ATR above VWAP, restricts BUY or shifts entry to pullback.
+    4. 15-Minute Opening Range (ORB) Barrier: Caps pre-9:30 targets within initial 15m range high/low.
+    5. Bid-Ask Spread & Liquidity Slippage: Buffers target and SL for spread friction.
+    6. IV Crush & Theta Contraction Dampener: Deducts morning volatility deflation from option targets.
+    """
+    applied = []
+    adj_entry = entry
+    adj_target = target
+    adj_sl = stop_loss
 
+    if not candles:
+        return {"entry": adj_entry, "target": adj_target, "stop_loss": adj_sl, "blindspots_applied": applied}
+
+    last_candle = candles[-1] if candles else {}
+    c_high = float(last_candle.get("high") or last_price)
+    c_low = float(last_candle.get("low") or last_price)
+    c_open = float(last_candle.get("open") or last_price)
+    c_close = float(last_candle.get("close") or last_price)
+    c_range = max(0.5, c_high - c_low)
+
+    # 1. Opening Volatility & Wick Buffer (9:15 - 9:20 AM IST)
+    if side == "BUY" and (c_high - last_price) < 0.15 * c_range:
+        pullback_buf = min(atr * 0.25, c_range * 0.30)
+        adj_entry = round(max(adj_sl + 1.0, adj_entry - pullback_buf), 2)
+        applied.append("Opening Wick Buffer: Pullback entry adjusted to avoid buying candle high wick")
+    elif side == "SELL" and (last_price - c_low) < 0.15 * c_range:
+        pullback_buf = min(atr * 0.25, c_range * 0.30)
+        adj_entry = round(adj_entry + pullback_buf, 2)
+        applied.append("Opening Wick Buffer: Pullback entry adjusted to avoid selling candle low wick")
+
+    # 2. Gap Exhaustion vs Continuation Check
+    if len(candles) >= 2:
+        prev_close = float(candles[-2].get("close") or last_price)
+        gap_pct = (c_open - prev_close) / max(1.0, prev_close)
+        if abs(gap_pct) > 0.006:
+            if gap_pct > 0 and c_close < c_open and side == "BUY":
+                adj_target = round(adj_entry + min(abs(adj_target - adj_entry), max(2.0, c_high - adj_entry)), 2)
+                applied.append("Gap Exhaustion Guard: Target capped at opening gap high due to bearish rejection wick")
+            elif gap_pct < 0 and c_close > c_open and side == "SELL":
+                adj_target = round(adj_entry - min(abs(adj_entry - adj_target), max(2.0, adj_entry - c_low)), 2)
+                applied.append("Gap Exhaustion Guard: Target capped at opening gap low due to bullish rejection wick")
+
+    # 3. VWAP Extension Barrier
+    if vwap and vwap > 0:
+        vwap_dist = last_price - vwap
+        if side == "BUY" and vwap_dist > 1.2 * atr:
+            adj_entry = round(max(vwap + 0.3 * atr, adj_entry - 0.35 * atr), 2)
+            applied.append("VWAP Extension Filter: Entry lowered toward VWAP equilibrium (preventing chased breakout)")
+        elif side == "SELL" and vwap_dist < -1.2 * atr:
+            adj_entry = round(min(vwap - 0.3 * atr, adj_entry + 0.35 * atr), 2)
+            applied.append("VWAP Extension Filter: Entry raised toward VWAP equilibrium (preventing chased breakdown)")
+
+    # 4. 15-Minute Opening Range (ORB) Barrier
+    orb_candles = candles[:3] if len(candles) >= 3 else candles
+    if orb_candles:
+        orb_high = max(float(c.get("high") or last_price) for c in orb_candles)
+        orb_low = min(float(c.get("low") or last_price) for c in orb_candles)
+        if orb_low < last_price < orb_high:
+            if side == "BUY" and adj_target > orb_high:
+                adj_target = round(min(adj_target, orb_high), 2)
+                applied.append("15m ORB Barrier: Target aligned with Opening Range High resistance until confirmed breakout")
+            elif side == "SELL" and adj_target < orb_low:
+                adj_target = round(max(adj_target, orb_low), 2)
+                applied.append("15m ORB Barrier: Target aligned with Opening Range Low support until confirmed breakdown")
+
+    # 5. Bid-Ask Spread & Liquidity Slippage
+    slippage = max(0.05, round(adj_entry * 0.0005, 2))
+    if is_option:
+        slippage = max(0.20, round(adj_entry * 0.008, 2))
+    if side == "BUY":
+        adj_target = round(max(adj_entry + 1.0, adj_target - slippage), 2)
+    else:
+        adj_target = round(max(0.05, adj_target + slippage), 2)
+    applied.append("Spread & Liquidity Buffer: Realized execution slippage factored into net target projection")
+
+    # 6. IV Crush & Premium Contraction Dampener
+    if is_option:
+        raw_gain = abs(adj_target - adj_entry)
+        iv_dampened_gain = max(1.5, raw_gain * 0.92)
+        adj_target = round(adj_entry + iv_dampened_gain, 2)
+        applied.append("IV Crush Dampener: Target adjusted for post-open implied volatility normalization")
+
+    return {
+        "entry": adj_entry,
+        "target": adj_target,
+        "stop_loss": adj_sl,
+        "blindspots_applied": applied
+    }
 
 
 def calculate_spec_levels(
@@ -5357,7 +5440,6 @@ def trade_levels(side: str, entry: float, atr_value: float | None, support: floa
                 target = max(target, float(support)) if desired_profit is None else min(target, float(entry - desired_profit))
     risk = abs(entry - sl)
     reward = abs(target - entry)
-    return {"entry": round(entry, 4), "stop_loss": round(sl, 4), "target": round(target, 4), "expected_risk": round(risk, 4), "expected_reward": round(reward, 4), "risk_reward": round(reward / risk, 3) if risk else None}
     return {"entry": round(entry, 4), "stop_loss": round(sl, 4), "target": round(target, 4), "expected_risk": round(risk, 4), "expected_reward": round(reward, 4), "risk_reward": round(reward / risk, 3) if risk else None, "is_expiry_scalp": expiry_scalp}
 
 
@@ -5478,15 +5560,29 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
     root = extract_root_symbol(symbol).upper()
     is_fut = is_future_symbol(symbol) or root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "NIFTY", "BANKNIFTY"}
     
-    # Always resolve optimal near-ATM option for commodities, indices, and futures
-    cand = resolve_option_for_future(symbol, opt_bias, user_id)
-    if not cand and user_id:
-        wl_options = user_watchlist_option_contracts(user_id, symbol, opt_bias)
-        if wl_options:
-            cand = wl_options[0]
+    if opt_info:
+        cand = {
+            "symbol": symbol,
+            "display_name": symbol,
+            "display": symbol,
+            "instrument_key": symbol,
+            "strike": opt_info["strike"],
+            "option_type": opt_info["option_type"],
+            "side": opt_info["option_type"],
+            "expiry": opt_info.get("expiry") or "",
+            "lot_size": resolve_lot_size(symbol, 1)
+        }
+        alt_cand = resolve_option_for_future(opt_info["underlying"], "SELL" if opt_info["option_type"] == "CE" else "BUY", user_id)
+    else:
+        # Always resolve optimal near-ATM option for commodities, indices, and futures
+        cand = resolve_option_for_future(symbol, opt_bias, user_id)
+        if not cand and user_id:
+            wl_options = user_watchlist_option_contracts(user_id, symbol, opt_bias)
+            if wl_options:
+                cand = wl_options[0]
 
-    opp_bias = "SELL" if opt_bias == "BUY" else "BUY"
-    alt_cand = resolve_option_for_future(symbol, opp_bias, user_id)
+        opp_bias = "SELL" if opt_bias == "BUY" else "BUY"
+        alt_cand = resolve_option_for_future(symbol, opp_bias, user_id)
 
     def _format_opt_candidate(c_node, c_bias, is_consensus=True):
         if not c_node:
@@ -5601,6 +5697,24 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         opt_entry_final = spec["entry"]
         opt_sl = spec["stop"]
         opt_target = spec["target"]
+
+        blind_spec = apply_backtest_blindspots(
+            symbol=c_sym,
+            timeframe=timeframe,
+            last_price=last_price,
+            vwap=float(ta.get("vwap") or last_price),
+            candles=candles,
+            atr=spot_atr_est,
+            side="BUY" if opt_type == "CE" else "SELL",
+            entry=opt_entry_final,
+            target=opt_target,
+            stop_loss=opt_sl,
+            is_option=True,
+            opt_delta=0.52
+        )
+        opt_entry_final = blind_spec["entry"]
+        opt_sl = blind_spec["stop_loss"]
+        opt_target = blind_spec["target"]
         return {
             "available": True,
             "instrument_kind": "OPTION",
@@ -5738,8 +5852,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         else:
             opt_tgt = round(max(0.05, opt_entry - profit_per_share), 2)
             opt_sl = round(opt_entry + profit_per_share / 2.2, 2)
-        opt_tgt = round(opt_entry + profit_per_share, 2)
-        opt_sl = round(max(0.05, opt_entry - profit_per_share / 2.2), 2)
         ach = evaluate_achievable_option_move(
             symbol=symbol,
             opt_info=opt_info,
@@ -5749,7 +5861,8 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             lot_size=lot,
             desired_profit=desired_profit,
             bearable_loss=bearable_loss,
-            expiry_scalp=expiry_scalp
+            expiry_scalp=expiry_scalp,
+            timeframe=timeframe
         )
         if not ach.get("achievable"):
             inst_obj = {"kind": "OPTION", "symbol": symbol, "display": symbol, "entry": opt_entry, "instrument_key": key, "lot_size": lot, "option_type": opt_type}
@@ -5776,34 +5889,7 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             }
             CACHE.set(cache_key, res_opt, 15)
             return res_opt
-        if not ach.get("achievable"):
-            inst_obj = {"kind": "OPTION", "symbol": symbol, "display": symbol, "entry": opt_entry, "instrument_key": key, "lot_size": lot, "option_type": opt_type}
-            res_opt = {
-                "qualifies": False,
-                "recommendation": "NO_TRADE",
-                "timeframe": timeframe,
-                "confidence": 0,
-                "entry": None,
-                "stop_loss": None,
-                "target": None,
-                "expected_risk": None,
-                "expected_reward": None,
-                "risk_reward": None,
-                "instrument": inst_obj,
-                "evidence": evidence,
-                "greeks": ach.get("greeks"),
-                "rationale": f"No Recommendation: {ach['reason']}",
-                "reason": ach["reason"],
-                "provider": "upstox+greeks_engine",
-                "timestamp": now_iso(),
-                **next_day_info
-            }
-            CACHE.set(cache_key, res_opt, 15)
-            return res_opt
 
-        risk_amt = round(abs(opt_entry - opt_sl), 2)
-        reward_amt = round(abs(opt_tgt - opt_entry), 2)
-        rr_ratio = round(reward_amt / max(0.01, risk_amt), 2)
         opt_perf = calculate_perfect_entry(
             side=opt_action,
             last_price=last_price,
@@ -5820,17 +5906,36 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         entry_to_use = opt_perf["entry"] if opt_perf.get("entry") else ach["entry"]
         opt_tgt = ach["target"]
         opt_sl = ach["stop_loss"]
-        risk_amt = ach["risk_amount"]
-        reward_amt = ach["reward_amount"]
-        rr_ratio = ach["risk_reward"]
+
+        # Apply 6 Institutional 9:15 Backtesting Blindspots
+        blind_opt_res = apply_backtest_blindspots(
+            symbol=symbol,
+            timeframe=timeframe,
+            last_price=last_price,
+            vwap=float(ta.get("vwap") or last_price),
+            candles=candles,
+            atr=atr,
+            side="BUY" if opt_type == "CE" else "SELL",
+            entry=entry_to_use,
+            target=opt_tgt,
+            stop_loss=opt_sl,
+            is_option=True,
+            opt_delta=abs(float(ach.get("greeks", {}).get("delta") or 0.5))
+        )
+        entry_to_use = blind_opt_res["entry"]
+        opt_tgt = blind_opt_res["target"]
+        opt_sl = blind_opt_res["stop_loss"]
+        risk_amt = round(abs(entry_to_use - opt_sl), 2)
+        reward_amt = round(abs(opt_tgt - entry_to_use), 2)
+        rr_ratio = round(reward_amt / max(0.01, risk_amt), 2)
         greeks = ach["greeks"]
 
         inst_obj = {
             "kind": "OPTION",
             "symbol": symbol,
             "display": symbol,
-            "entry": opt_entry,
             "entry": entry_to_use,
+            "cmp": opt_entry,
             "instrument_key": key,
             "lot_size": lot,
             "option_type": opt_type
@@ -6060,7 +6165,8 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             desired_profit=desired_profit,
             bearable_loss=bearable_loss,
             segment=seg,
-            expiry_scalp=expiry_scalp
+            expiry_scalp=expiry_scalp,
+            timeframe=timeframe
         )
         if not ach.get("achievable"):
             ach["achievable"] = True
@@ -6070,14 +6176,14 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             ach["reward_amount"] = round(abs(ach["target"] - entry), 2)
             ach["risk_reward"] = round(ach["reward_amount"] / max(0.01, ach["risk_amount"]), 2)
             ach["realistic_profit"] = round(ach["reward_amount"] * lot_size, 2)
-            ach["time_horizon"] = 375
+            ach["time_horizon"] = 5 if expiry_scalp else 30
             ach["target"] = tgt
             ach["stop_loss"] = sl
             ach["risk_amount"] = risk_amt
             ach["reward_amount"] = reward_amt
             ach["risk_reward"] = rr_ratio
             ach["realistic_profit"] = min_pnl
-            ach["time_horizon"] = 5 if expiry_scalp else 375
+            ach["time_horizon"] = 5 if expiry_scalp else 30
             ach["greeks"] = ach.get("greeks") or {"delta": 0.5, "gamma": 0.001, "theta": -8.0, "vega": 12.0, "iv": 22.0}
         if False and not ach["achievable"]:
             res_no_trade = {
@@ -6113,6 +6219,30 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         rr_ratio = ach["risk_reward"]
         min_pnl = ach["realistic_profit"]
         greeks = ach["greeks"]
+
+        # Apply 6 Institutional 9:15 Backtesting Blindspots
+        blind_opt_rec = apply_backtest_blindspots(
+            symbol=instrument.get("symbol") or symbol,
+            timeframe=timeframe,
+            last_price=last_price,
+            vwap=float(ta.get("vwap") or last_price),
+            candles=candles,
+            atr=atr,
+            side="BUY" if (instrument.get("option_type") or "CE") == "CE" else "SELL",
+            entry=entry,
+            target=tgt,
+            stop_loss=sl,
+            is_option=True,
+            opt_delta=abs(float(greeks.get("delta") or 0.50))
+        )
+        entry = blind_opt_rec["entry"]
+        tgt = blind_opt_rec["target"]
+        sl = blind_opt_rec["stop_loss"]
+        risk_amt = round(abs(entry - sl), 2)
+        reward_amt = round(abs(tgt - entry), 2)
+        rr_ratio = round(reward_amt / max(0.01, risk_amt), 2)
+        min_pnl = round(reward_amt * lot_size, 2)
+
         calc_details = {
             "entry_basis": f"Watchlist Option Setup: {instrument.get('display')} at Rs.{entry:.2f}" if instrument.get("from_watchlist") else f"Option Execution: {instrument.get('display')} at Rs.{entry:.2f}",
             "sl_basis": f"Risk-budgeted option SL Rs.{sl:.2f}" if bearable_loss else f"Greeks & risk boundary SL Rs.{sl:.2f}",
@@ -6128,10 +6258,8 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "news_sentiment": {"score": round(news_score, 2), "signal": stock_sig, "materiality": news.get("stock", {}).get("materiality", 0)}
         }
         if is_fut:
-            rationale_text = f"Connected via root initials '{root}' from {symbol}: {instrument.get('display') or instrument.get('symbol')} · Action: BUY · Entry ₹{entry:.2f}, Realistic Target ₹{tgt:.2f} (Est. +₹{min_pnl:,.0f}/lot, +{round((tgt-entry)/entry*100, 1)}%), SL ₹{sl:.2f} (R:R 1:{rr_ratio:.2f}). Greeks: Δ {abs(greeks['delta']):.2f}, Γ {greeks['gamma']:.4f}, Θ {greeks['theta']:.1f}/d · 30-45m Intraday Horizon."
             rationale_text = f"Connected via root initials '{root}' from {symbol}: {instrument.get('display') or instrument.get('symbol')} · Action: BUY · Entry ₹{entry:.2f}, Realistic Target ₹{tgt:.2f} (Est. +₹{min_pnl:,.0f}/lot, +{round((tgt-entry)/entry*100, 1)}%), SL ₹{sl:.2f} (R:R 1:{rr_ratio:.2f}). Greeks: Δ {abs(greeks['delta']):.2f}, Γ {greeks['gamma']:.4f}, Θ {greeks['theta']:.1f}/d · {'1–5m Quick Scalp' if expiry_scalp else '30-45m Intraday Horizon'}."
         else:
-            rationale_text = f"{'Next Market Day Setup (' + next_session_str + '): ' if not is_mkt_open else ''}Institutional Option Buying Setup: {instrument.get('display') or instrument.get('symbol')} · Action: BUY · Entry ₹{entry:.2f}, Realistic Target ₹{tgt:.2f} (Est. +₹{min_pnl:,.0f}/lot, +{round((tgt-entry)/entry*100, 1)}%), SL ₹{sl:.2f} (R:R 1:{rr_ratio:.2f}). Greeks: Δ {abs(greeks['delta']):.2f}, Γ {greeks['gamma']:.4f}, Θ {greeks['theta']:.1f}/d · 30-45m Intraday Horizon."
             rationale_text = f"{'Next Market Day Setup (' + next_session_str + '): ' if not is_mkt_open else ''}Institutional Option Buying Setup: {instrument.get('display') or instrument.get('symbol')} · Action: BUY · Entry ₹{entry:.2f}, Realistic Target ₹{tgt:.2f} (Est. +₹{min_pnl:,.0f}/lot, +{round((tgt-entry)/entry*100, 1)}%), SL ₹{sl:.2f} (R:R 1:{rr_ratio:.2f}). Greeks: Δ {abs(greeks['delta']):.2f}, Γ {greeks['gamma']:.4f}, Θ {greeks['theta']:.1f}/d · {'1–5m Quick Scalp' if expiry_scalp else '30-45m Intraday Horizon'}."
     else:
         if is_fut:
@@ -6202,7 +6330,8 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             bearable_loss=bearable_loss,
             side=side,
             segment=seg,
-            expiry_scalp=expiry_scalp
+            expiry_scalp=expiry_scalp,
+            timeframe=timeframe
         )
         if not ach_eq["achievable"]:
             res_eq_no_trade = {
@@ -6236,6 +6365,30 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         reward_amt = ach_eq["reward_amount"]
         rr_ratio = ach_eq["risk_reward"]
         min_pnl = ach_eq["realistic_profit"]
+
+        # Apply 6 Institutional 9:15 Backtesting Blindspots
+        blind_eq_rec = apply_backtest_blindspots(
+            symbol=symbol,
+            timeframe=timeframe,
+            last_price=last_price,
+            vwap=float(ta.get("vwap") or last_price),
+            candles=candles,
+            atr=atr,
+            side=side,
+            entry=entry,
+            target=tgt,
+            stop_loss=sl,
+            is_option=False,
+            opt_delta=1.0
+        )
+        entry = blind_eq_rec["entry"]
+        tgt = blind_eq_rec["target"]
+        sl = blind_eq_rec["stop_loss"]
+        risk_amt = round(abs(entry - sl), 2)
+        reward_amt = round(abs(tgt - entry), 2)
+        rr_ratio = round(reward_amt / max(0.01, risk_amt), 2)
+        min_pnl = round(reward_amt * est_qty, 2)
+
         calc_details = {
             "entry_basis": f"Institutional execution level at Rs.{entry:.2f}",
             "sl_basis": f"Risk-budgeted stop loss (ATR: {atr:.2f})" if bearable_loss else f"1:2.0 dynamic risk boundary",
@@ -8752,34 +8905,37 @@ async def analysis_overall(
 # ---------------------------------------------------------------------------
 
 def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> dict[str, Any]:
+    parsed = parse_option_contract(underlying)
+    if parsed:
+        underlying = parsed["underlying"]
     root = extract_root_symbol(underlying).upper()
     commodity_configs = {
-        "CRUDEOIL": {"spot": 6150.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": "17 SEP 2026"},
-        "CRUDEOIL": {"spot": 9650.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": "17 SEP 2026"},
+        "CRUDEOIL": {"spot": 6250.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": "17 SEP 2026"},
         "NATURALGAS": {"spot": 245.0, "step": 5.0, "lot": 1250, "iv": 48.0, "default_exp": "24 SEP 2026"},
         "GOLD": {"spot": 74500.0, "step": 200.0, "lot": 100, "iv": 14.0, "default_exp": "25 SEP 2026"},
         "SILVER": {"spot": 88200.0, "step": 500.0, "lot": 30, "iv": 22.0, "default_exp": "25 SEP 2026"},
         "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": "30 SEP 2026"},
         "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": "30 SEP 2026"},
-        "BANKNIFTY": {"spot": 56606.55, "step": 100.0, "lot": 15, "iv": 15.0, "default_exp": "24 SEP 2026"},
-        "BANKNIFTY": {"spot": 56606.55, "step": 100.0, "lot": 30, "iv": 15.0, "default_exp": "24 SEP 2026"},
-        "NIFTY": {"spot": 23398.10, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "24 SEP 2026"},
+        "BANKNIFTY": {"spot": 51250.0, "step": 100.0, "lot": 30, "iv": 15.0, "default_exp": "24 SEP 2026"},
+        "NIFTY": {"spot": 23400.0, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "24 SEP 2026"},
     }
     
     # Try fetching live quote for accurate spot
     spot = None
     try:
-        q = UPSTOX.quote(underlying)
-        if q and q.get("ltp"):
-            spot = float(q["ltp"])
-        elif root != underlying:
+        clean_und = underlying.strip().upper()
+        if not any(clean_und.endswith(x) for x in (" CE", " PE", "CE", "PE")):
+            q = UPSTOX.quote(underlying)
+            if q and q.get("ltp"):
+                spot = float(q["ltp"])
+        if spot is None or spot <= 0:
             q2 = UPSTOX.quote(root)
             if q2 and q2.get("ltp"):
                 spot = float(q2["ltp"])
     except Exception:
         pass
 
-    if spot is None:
+    if spot is None or (root in commodity_configs and spot < commodity_configs[root]["spot"] * 0.25):
         index_map = {
             "BANKNIFTY": "NSE_INDEX|Nifty Bank",
             "NIFTY": "NSE_INDEX|Nifty 50",
@@ -8801,7 +8957,8 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
     
     if root in commodity_configs:
         cfg = commodity_configs[root]
-        if spot is None or spot <= 0:
+        min_expected = cfg["spot"] * 0.30
+        if spot is None or spot < min_expected:
             spot = cfg["spot"]
         step = cfg["step"]
         lot = cfg["lot"]

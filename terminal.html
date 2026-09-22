@@ -670,11 +670,28 @@ button{font-family:inherit;cursor:pointer;}
 .btn.gold{background:var(--primary);color:#ffffff;border-color:var(--primary);}
 .btn.gold:hover{background:var(--primary-hover);border-color:var(--primary-hover);}
 .chip-filter{
-  font-size:10.5px;padding:2px 8px;border-radius:14px;border:1px solid var(--border);
-  color:var(--text-faint);display:inline-flex;align-items:center;justify-content:center;
-  line-height:1.2;min-height:22px;box-sizing:border-box;white-space:nowrap;
+  font-size:10.5px;padding:3px 10px;border-radius:14px;border:1px solid var(--border);
+  color:var(--text-dim);background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center;
+  line-height:1.2;min-height:22px;box-sizing:border-box;white-space:nowrap;cursor:pointer;
+  transition:all 0.15s ease;
 }
-.chip-filter.active{border-color:var(--primary);color:var(--primary);background:var(--primary-dim);font-weight:600;}
+.chip-filter:hover{
+  background:var(--surface-3);color:var(--text);border-color:#1890ff;
+}
+.chip-filter.active{
+  border-color:#1890ff !important;color:#ffffff !important;background:#1890ff !important;font-weight:700 !important;
+  box-shadow:0 1px 6px rgba(24,144,255,0.35);
+}
+#optionsExpiryPills .chip-filter{
+  background:var(--surface-2) !important;color:var(--text-dim) !important;border:1px solid var(--border) !important;
+}
+#optionsExpiryPills .chip-filter:hover{
+  background:var(--surface-3) !important;color:#ffffff !important;border-color:#1890ff !important;
+}
+#optionsExpiryPills .chip-filter.active{
+  background:#1890ff !important;color:#ffffff !important;border-color:#1890ff !important;font-weight:700 !important;
+  box-shadow:0 2px 8px rgba(24,144,255,0.45) !important;
+}
 .wl-at-checkbox{
   cursor:pointer;display:inline-flex;align-items:center;gap:4px;user-select:none;
   font-size:10.5px;font-weight:700;color:var(--primary);padding:2px 6px;
@@ -1726,6 +1743,8 @@ select, .select-box select, .tool-input select, #noteEditorFolder, #chartRecoOpt
   padding: 4px 8px !important;
 }
 
+/* Item 23: Chart Mobile Forced Landscape Transformation */
+.chart-shell.chart-forced-landscape {
 /* Chart Video Player-like Full Screen & Landscape Overlay */
 .chart-shell:fullscreen,
 .chart-shell:-webkit-full-screen,
@@ -1735,16 +1754,23 @@ select, .select-box select, .tool-input select, #noteEditorFolder, #chartRecoOpt
   inset: 0 !important;
   top: 0 !important;
   left: 0 !important;
+  width: 100vh !important;
+  height: 100vw !important;
+  transform: rotate(90deg) translateY(-100%) !important;
+  transform-origin: top left !important;
   width: 100vw !important;
   height: 100vh !important;
   z-index: 999999 !important;
   background: var(--bg) !important;
+  padding: 10px !important;
   padding: 6px !important;
   box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
   transform: none !important;
 }
+.chart-shell.chart-forced-landscape .chart-area-pro {
+  height: calc(100vw - 110px) !important;
 .chart-shell:fullscreen .chart-area-pro,
 .chart-shell:-webkit-full-screen .chart-area-pro,
 .chart-shell.chart-forced-landscape .chart-area-pro,
@@ -3035,35 +3061,25 @@ select#watchlistSelect, select.watchlist-select {
       <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="topSymbolSearch" autocomplete="off" placeholder="Search"></div>
       <div class="top-search-suggestions" id="topSearchSuggestions"></div>
     </div>
-    <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:4px 11px;height:30px;font-size:11.5px;cursor:pointer;border-radius:6px;" title="Chat with CA AI">
-      <span class="ai-btn-icon">✦</span> <span class="ai-btn-text">Ask CA AI</span>
-    <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:4px;font-weight:700;padding:3px 9px;height:26px;font-size:11px;cursor:pointer;border-radius:4px;" title="Chat with CA AI">
+    <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:3px 9px;height:26px;font-size:11px;cursor:pointer;border-radius:4px;" title="Chat with CA AI">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/></svg>
       <span class="ai-btn-text">Ask CA AI</span>
     </button>
-    
-    <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
-    <button class="btn small sell" id="panicKillSwitchBtn" title="🚨 EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;font-weight:700;margin-right:6px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;"><span class="panic-btn-icon">🚨</span> <span class="panic-btn-text">Panic Exit</span></button>
     <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
-    <button class="btn small sell" id="panicKillSwitchBtn" title="EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:2px 8px;height:26px;font-weight:700;margin-right:4px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;"><span class="panic-btn-text">Panic Exit</span></button>
+    <button class="btn small sell" id="panicKillSwitchBtn" title="EMERGENCY PANIC BUTTON: Square off ALL open positions & cancel all pending orders immediately" style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:2px 8px;height:26px;font-weight:700;margin-right:4px;background:rgba(239,68,68,0.2);color:var(--sell);border:1px solid var(--sell);cursor:pointer;border-radius:4px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span class="panic-btn-text">Panic Exit</span>
+    </button>
     <div class="top-icon-wrap"><button class="icon-btn" id="notificationBtn" title="Notifications"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="badge" id="notificationBadge">0</span></button><div class="notification-menu" id="notificationMenu">
         <div class="notification-tabs" id="notifTabs" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-soft);padding:4px 8px;">
           <div style="display:flex;gap:4px;">
-            <button class="notif-tab active" data-notif-filter="all">All</button>
-            <button class="notif-tab" data-notif-filter="news">News</button>
-            <button class="notif-tab" data-notif-filter="orders_reco">Orders &amp; Recos</button>
             <button type="button" class="notif-tab active" data-notif-filter="all" onclick="window.selectNotifFilter(this, 'all')">All</button>
             <button type="button" class="notif-tab" data-notif-filter="news" onclick="window.selectNotifFilter(this, 'news')">News</button>
             <button type="button" class="notif-tab" data-notif-filter="orders_reco" onclick="window.selectNotifFilter(this, 'orders_reco')">Orders &amp; Recos</button>
           </div>
           <div style="display:flex;align-items:center;gap:4px;">
-            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">✓ Read</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification retention and pruning settings">⚙</button>
-            <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active (Click to mute)" style="font-size:12px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;" onclick="window.toggleAudioAlerts(event)">🔊</button>
-            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:22px;" title="Mark all notifications as read">✓ Read</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙ Settings</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings">⚙</button>
-            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:20px;" title="Mark all notifications as read">Read</button>
-            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 5px;height:20px;" title="Notification settings">Settings</button>
+            <button type="button" class="btn ghost small" onclick="window.markAllNotifsRead()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Mark all notifications as read"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Read</button>
+            <button type="button" class="btn ghost small" onclick="window.openNotifSettingsModal()" style="font-size:10px;padding:2px 6px;height:22px;display:inline-flex;align-items:center;gap:3px;" title="Notification settings"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
             <button class="icon-btn" id="soundToggleBtn" title="Audio alerts active" style="font-size:12px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;" onclick="window.toggleAudioAlerts(event)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
             </button>
@@ -3100,16 +3116,17 @@ select#watchlistSelect, select.watchlist-select {
           <div class="user-menu-themes" id="userMenuThemes" style="display:none"></div>
         </div>
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);display:flex;flex-direction:column;gap:6px;">
-          <button class="btn small gold" id="turboLoadBtn" title="⚡ Turbo Refresh (Immediate instant live reload of all data feeds)" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;font-weight:600;">⚡ Turbo Refresh</button>
-          <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="✈️ Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="width:100%;justify-content:center;font-size:11px;padding:5px 9px;font-weight:600;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;">
-          <button class="btn small gold" id="turboLoadBtn" title="Turbo Refresh (Immediate instant live reload of all data feeds)" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;font-weight:600;">Turbo Refresh</button>
-          <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="width:100%;justify-content:center;font-size:11px;padding:5px 9px;font-weight:600;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+          <button class="btn small gold" id="turboLoadBtn" title="Turbo Refresh (Immediate instant live reload of all data feeds)" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;font-weight:600;display:inline-flex;align-items:center;gap:5px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Turbo Refresh</span>
+          </button>
+          <button class="btn small" id="telegramAlertsBtn" onclick="window.openTelegramModal()" title="Telegram Alert Bot (Mobile alerts for signals, SL &amp; news)" style="width:100%;justify-content:center;font-size:11px;padding:5px 9px;font-weight:600;background:rgba(0,136,204,0.18);color:#29b6f6;border:1px solid rgba(0,136,204,0.45);cursor:pointer;border-radius:4px;display:inline-flex;align-items:center;gap:5px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
             <span>Telegram Bot Alerts</span>
           </button>
-          <button type="button" class="btn ghost small" id="openClearCacheModalBtn" onclick="window.openClearCacheModal()" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;color:var(--text-muted);border:1px dashed var(--border);" title="Clear transient cached data">
-            🗑️ Clear Cache
-            Clear Cache
+          <button type="button" class="btn ghost small" id="openClearCacheModalBtn" onclick="window.openClearCacheModal()" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;color:var(--text-muted);border:1px dashed var(--border);display:inline-flex;align-items:center;gap:5px;" title="Clear transient cached data">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            <span>Clear Cache</span>
           </button>
         </div>
         <button class="btn ghost small" id="fitnessSwitchBtn" style="margin-top:7px;width:100%;justify-content:center;display:none;">Switch to Fitness Tracker</button>
@@ -3134,6 +3151,10 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
     Option Chain
   </div>
+    <div class="navtab" data-tab="notes" role="button" tabindex="0" onclick="showTab('notes')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Trader Notes
+  </div>
 
 
   <div class="navtab" data-tab="reco" role="button" tabindex="0" onclick="showTab('reco')">
@@ -3145,8 +3166,14 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
     News by CA AI
   </div>
-  <div class="navtab" data-tab="fundamentals" role="button" tabindex="0" onclick="showTab('fundamentals')">Fundamentals</div>
-  <div class="navtab" data-tab="movers" role="button" tabindex="0" onclick="showTab('movers')">Market Movers</div>
+  <div class="navtab" data-tab="fundamentals" role="button" tabindex="0" onclick="showTab('fundamentals')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+    Fundamentals
+  </div>
+  <div class="navtab" data-tab="movers" role="button" tabindex="0" onclick="showTab('movers')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    Market Movers
+  </div>
   <div class="navtab" data-tab="other-factors" role="button" tabindex="0" onclick="showTab('other-factors')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
     Other Factors
@@ -3159,7 +3186,10 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
     Funds
   </div>
-  <div class="navtab" data-tab="console" role="button" tabindex="0" onclick="showTab('console')">Server Console</div>
+  <div class="navtab" data-tab="console" role="button" tabindex="0" onclick="showTab('console')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    Server Console
+  </div>
   <div class="navtab" data-tab="reports" role="button" tabindex="0" onclick="showTab('reports')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     Reports &amp; P&amp;L
@@ -3225,14 +3255,12 @@ select#watchlistSelect, select.watchlist-select {
         <!-- Top Bar: Title & Multi-Timeframe Controls -->
         <div class="dash-reco-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:rgba(232,184,75,0.15);color:var(--gold);font-size:16px;font-weight:700;">✦</span>
-          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:rgba(24,144,255,0.15);color:#1890ff;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
+            </span>
             <div>
-              <b style="font-size:14.5px;color:var(--text);font-family:var(--font-display);">Algorithmic Dual-Engine · Multi-Timeframe Option Recommendations</b>
-              <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening across option chain. Best CE &amp; Best PE computed simultaneously.</div>
-              <b style="font-size:14.5px;color:var(--text);font-family:var(--font-display);">Recommendations</b>
-              <div style="font-size:11px;color:var(--text-dim);display:none;" id="dashRecoHeaderSub"></div>
-              <b style="font-size:13.5px;color:var(--text);font-family:var(--font-display);">Recommendations</b>
+              <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Dual-Engine Option Recommendations</b>
+              <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening across option chain · Best CE &amp; Best PE</div>
             </div>
           </div>
           <div class="dash-reco-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -4292,6 +4320,14 @@ select#watchlistSelect, select.watchlist-select {
           <div id="optionsExpiryPills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
+            <input type="checkbox" id="chkOptColOI" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
+            <span>OI &amp; Vol</span>
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
+            <input type="checkbox" id="chkOptColGreeks" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
+            <span>Greeks (Δ, Γ, Θ, IV)</span>
+          </label>
           <button type="button" class="btn ghost small" id="optionsRefreshBtn">↻ Refresh</button>
         </div>
       </div>
@@ -5270,6 +5306,24 @@ select#watchlistSelect, select.watchlist-select {
           </div>
         </div>
 
+        <!-- 11. Trader Notes -->
+        <div class="tut-node">
+          <div class="tut-header">
+            <div class="tut-header-left">
+              <span class="tut-icon-badge">11</span>
+              <span>11. Trader Notes, Categorized Folders &amp; Screen Space Maximizer</span>
+            </div>
+            <span class="tut-toggle-btn">[+]</span>
+          </div>
+          <div class="tut-body">
+            Your personal quantitative trade journal stored safely in local-first encrypted SQLite storage.
+            <ul class="tut-sublist">
+              <li><b>Folder Management:</b> Organize notes across custom folders (Breakouts, Earnings, Post-Trade Analysis, Risk Journal).</li>
+              <li><b>[◀ Collapse Folders] Button:</b> Click the toggle button in the notes toolbar to hide the folder list and expand the note writing editor to 100% full screen width.</li>
+              <li><b>Chart Attachments:</b> One-click screenshot capture saves live chart setups directly into your trade notes.</li>
+            </ul>
+          </div>
+        </div>
 
 
         <!-- 12. Fullscreen Landscape & Shortcuts -->
@@ -5492,43 +5546,39 @@ select#watchlistSelect, select.watchlist-select {
   <div class="tool-modal-card" style="max-width:680px;width:95%;">
     <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:rgba(232,184,75,0.18);color:var(--gold);font-weight:700;">✦</span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:rgba(24,144,255,0.18);color:#1890ff;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/></svg>
+        </span>
         <div>
-          <div class="card-title" style="font-size:14px;color:var(--text);">CA AI Companion</div>
+          <div class="card-title" style="font-size:13.5px;color:var(--text);font-weight:700;">CA AI Companion</div>
           <div style="font-size:10.5px;color:var(--text-dim);">Live quant intelligence, full app awareness &amp; multi-modal vision</div>
         </div>
-        <div class="card-title" style="font-size:13.5px;color:var(--text);font-weight:700;">CA AI Companion</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
-        <button type="button" class="btn ghost small" onclick="window.clearAiChatHistory()" title="Clear cached chat history" style="font-size:11px;padding:2px 7px;color:var(--text-dim);cursor:pointer;">🗑️ Clear</button>
-        <button type="button" class="btn ghost small" onclick="window.clearAiChatHistory()" title="Clear cached chat history" style="font-size:10.5px;padding:2px 7px;color:var(--text-dim);cursor:pointer;">Clear</button>
-        <button class="btn ghost small" id="caAiClose" onclick="closeModal('caAiModal')">✕</button>
+        <button type="button" class="btn ghost small" onclick="window.clearAiChatHistory()" title="Clear cached chat history" style="font-size:10.5px;padding:2px 7px;color:var(--text-dim);cursor:pointer;display:inline-flex;align-items:center;gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg> Clear</button>
+        <button class="btn ghost small" id="caAiClose" onclick="closeModal('caAiModal')" style="font-size:12px;padding:2px 6px;">✕</button>
       </div>
     </div>
     <div id="aiChatLog" class="ai-chat-log" style="height:320px;overflow-y:auto;"></div>
     
     <!-- File & Photo attachment preview bar -->
     <div id="caAiImagePreviewBar" style="display:none;padding:6px 8px;background:var(--surface-3);border:1px solid var(--border-soft);border-radius:6px;margin-top:6px;align-items:center;gap:8px;">
-      <div id="caAiPreviewIcon" style="font-size:18px;display:none;">📄</div>
-      <img id="caAiImageThumb" src="" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none;" alt="Upload preview">
-      <div id="caAiPreviewIcon" style="font-size:14px;display:none;">File</div>
+      <div id="caAiPreviewIcon" style="font-size:14px;display:none;">📄</div>
       <img id="caAiImageThumb" src="" style="width:32px;height:32px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none;" alt="Upload preview">
       <div style="flex:1;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="caAiImageFileName">Screenshot.png</div>
       <button type="button" onclick="window.clearAiAttachedImage()" style="background:transparent;border:none;color:var(--sell);font-weight:700;font-size:14px;cursor:pointer;">✕</button>
     </div>
 
-    <div class="ai-chat-row" style="display:flex;gap:7px;margin-top:8px;align-items:center;">
     <div class="ai-chat-row" style="display:flex;gap:6px;margin-top:8px;align-items:center;">
       <input type="file" id="caAiImageInput" accept="image/*,.pdf,.csv,.xlsx,.xls,.txt" style="display:none;" onchange="window.handleAiImageChosen(this)">
-      <button type="button" class="btn ghost small" onclick="document.getElementById('caAiImageInput').click()" title="Attach Photo / File (Image, PDF, CSV, Excel, TXT)" style="padding:0 10px;height:36px;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:3px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;">📎 📷</button>
-      <input id="aiChatInput" class="tool-input" placeholder="Ask CA AI about positions, funds, technicals, or upload chart/file..." style="flex:1;height:36px;">
-      <button class="btn gold" id="aiChatSend" style="height:36px;padding:0 14px;font-weight:700;">Send</button>
-      <button type="button" class="btn ghost small" onclick="document.getElementById('caAiImageInput').click()" title="Attach Photo / File" style="padding:0 7px;height:28px;display:inline-flex;align-items:center;justify-content:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;border-radius:4px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l7.88-7.88"/></svg>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <button type="button" class="btn ghost small" onclick="document.getElementById('caAiImageInput').click()" title="Attach Photo / File" style="padding:0 8px;height:30px;display:inline-flex;align-items:center;justify-content:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;border-radius:6px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l7.88-7.88"/></svg>
       </button>
-      <input id="aiChatInput" class="tool-input" placeholder="" style="flex:1;height:28px;font-size:12px;padding:0 8px;">
-      <button class="btn gold" id="aiChatSend" style="height:28px;padding:0 10px;font-size:11.5px;font-weight:700;">Send</button>
+      <input id="aiChatInput" class="tool-input" placeholder="Ask CA AI about positions, funds, technicals, or upload chart/file..." style="flex:1;height:30px;font-size:12px;padding:0 10px;border-radius:6px;">
+      <button class="btn gold" id="aiChatSend" style="height:30px;padding:0 12px;font-size:11.5px;font-weight:700;border-radius:6px;display:inline-flex;align-items:center;gap:4px;">
+        <span>Send</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
     </div>
   </div>
 </div>
