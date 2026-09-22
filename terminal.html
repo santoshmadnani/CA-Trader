@@ -6729,7 +6729,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   const state={candles:[],tf:'5m',history:30,visible:90,zoom:1,panX:0,panY:0,yScale:1,cross:null,drag:null,panArmed:false,yPanArmed:false,pendingDrawing:null,drawingStage:[],drawings:[],appliedIndicators:[],indicatorValues:{},currentKey:null,latestLive:null,fullscreen:false,interactionMode:'crosshair',hoverDrawing:null,dragDrawing:null};
   window.__CA_TRADER_STATE = state;
   const APP_CACHE = window.__CA_TRADER_CACHE = window.__CA_TRADER_CACHE || {quote:null,technical:null,mtf:null,newsStock:null,newsGlobal:null,fundamentals:null,options:null,movers:null};
-  let W=[],G=null,S='',F='all',market={nse:false,mcx:false};
   let W=[],G=null,S=window.CATraderSymbol||'NIFTY',F='all',market={nse:false,mcx:false};
   let autoEnabled=false, autoOptions=true, autoSymbols=[];
   const subscribedSymbols=new Set();
@@ -8417,8 +8416,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
             <div style="flex:1;">
               <div style="display:flex;align-items:center;gap:6px;">
                 <b>${esc(p.pattern)}</b>
-                <span class="tag ${p.
-... [truncated for diff preview]
                 <span class="tag ${p.signal==='BUY'?'buy':p.signal==='SELL'?'sell':'neutral'}" style="font-size:9.5px;padding:1px 6px;">${p.signal || 'PATTERN'}</span>
               </div>
               <div class="muted" style="font-size:10.5px;color:var(--gold);margin-top:2px;">⏱ ${formatPatternTimeRange(p)}</div>
