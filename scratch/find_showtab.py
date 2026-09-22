@@ -5,6 +5,7 @@ with open('terminal.html', 'r', encoding='utf-8', errors='ignore') as f:
     lines = f.readlines()
 from pathlib import Path
 import re
+with open('terminal.html', 'r', encoding='utf-8') as f:
     text = f.read()
 
 text = Path('terminal.html').read_text(encoding='utf-8')
@@ -23,3 +24,8 @@ for m in calls:
     p = m.start()
     snippet = text[max(0, p-60):min(len(text), p+80)].replace('\n', ' ')
     print(f"[{p}] {snippet}")
+idx = text.find('function showTab(')
+if idx == -1:
+    idx = text.find('showTab =')
+print('showTab context:')
+print(text[max(0, idx-50):min(len(text), idx+500)])

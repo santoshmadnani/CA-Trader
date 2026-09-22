@@ -4540,7 +4540,17 @@ def technical_analysis(candles: list[dict[str, Any]]) -> dict[str, Any]:
     # True Supertrend Calculation
     supertrend_val, supertrend_sig = calculate_supertrend(df, period=10, multiplier=3.0)
 
-    direction = "BUY" if (e20 and last > e20 and (m["histogram"] or 0) > 0) else "SELL" if (e20 and last < e20 and (m["histogram"] or 0) < 0) else "NO_TRADE"
+    hist = m.get("histogram")
+    if hist is not None and hist != 0:
+        direction = "BUY" if (e20 and last > e20 and hist > 0) else "SELL" if (e20 and last < e20 and hist < 0) else "NO_TRADE"
+    else:
+        # Fallback for early sessions (<35 candles) using Supertrend or VWAP momentum
+        if supertrend_sig == "BUY" or (last >= vwap and (r is None or r >= 45)):
+            direction = "BUY"
+        elif supertrend_sig == "SELL" or (last <= vwap and (r is None or r <= 55)):
+            direction = "SELL"
+        else:
+            direction = "NO_TRADE"
     sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else None
     wma20 = float((close.tail(20) * np.arange(1, min(20, len(close)) + 1)).sum() / np.arange(1, min(20, len(close)) + 1).sum()) if len(close) >= 20 else None
 
@@ -5627,7 +5637,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         news = recommendation_news_evidence(symbol)
     ta = technical_analysis(candles)
     if not ta.get("available"):
-        return fallback_recommendation_quick(symbol, user_id, desired_profit)
         return fallback_recommendation_quick(symbol, user_id, desired_profit, expiry_scalp=expiry_scalp)
     patterns = detect_candlestick_patterns(candles, timeframe)
     technical_side = ta.get("trend", "NO_TRADE")
@@ -5656,17 +5665,22 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         pattern_bias = -1
         pattern_trigger = bear_patterns[0].get("pattern") or "Bearish Breakdown"
 
-    # Multi-factor Institutional Alignment (replaces naive RSI inversion)
+    vwap_val = float(ta.get("vwap") or last_price)
+    st_sig = str(ta.get("supertrend_signal") or "").upper()
+    is_vwap_bull = (last_price >= vwap_val) and (st_sig == "BUY" or rsi_val >= 50 or pattern_bias > 0)
+    is_vwap_bear = (last_price <= vwap_val) and (st_sig == "SELL" or rsi_val <= 50 or pattern_bias < 0)
+
+    # Multi-factor Institutional Alignment
     if technical_side == "BUY":
-        if last_price < ema50 and rsi_val < 45 and pattern_bias <= 0:
+        if last_price < ema50 and rsi_val < 42 and pattern_bias <= 0 and not is_vwap_bull:
             technical_side = "NO_TRADE"
     elif technical_side == "SELL":
-        if last_price > ema50 and rsi_val > 55 and pattern_bias >= 0:
+        if last_price > ema50 and rsi_val > 58 and pattern_bias >= 0 and not is_vwap_bear:
             technical_side = "NO_TRADE"
     else:
-        if (last_price >= ema20 or pattern_bias > 0) and rsi_val >= 48 and news_score >= 0:
+        if (last_price >= ema20 or pattern_bias > 0 or is_vwap_bull) and rsi_val >= 46 and news_score >= 0:
             technical_side = "BUY"
-        elif (last_price <= ema20 or pattern_bias < 0) and rsi_val <= 52 and news_score <= 0:
+        elif (last_price <= ema20 or pattern_bias < 0 or is_vwap_bear) and rsi_val <= 54 and news_score <= 0:
             technical_side = "SELL"
 
     side = technical_side

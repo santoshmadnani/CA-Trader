@@ -151,3 +151,4 @@ This audit documents every single user prompt and requirement starting from the 
 | **BE-2** | 6 9:15 Blindspots | Retain institutional confirmation rules in `apply_backtest_blindspots` | `app.py` lines ~5160–5220 |
 | **BE-3** | Option Watchlist Fix | Correct option root/spot resolution in `resolve_option_for_future` | `app.py` lines ~9080–9150 |
 | **DEP-1**| Build & Deployment | Run syntax verification, package `46.zip`, SCP to EC2, run remote Docker deployment | `scratch/deploy_to_server.py` |
+
