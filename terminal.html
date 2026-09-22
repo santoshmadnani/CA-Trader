@@ -3074,18 +3074,46 @@ select#watchlistSelect, select.watchlist-select {
   .ai-btn-text, .panic-btn-text {
     display: none !important;
   }
+  .topbar button, .topbar .icon-btn, .topbar .user-chip {
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  .topbar button *, .topbar .icon-btn *, .topbar .user-chip * {
+    pointer-events: none !important;
+  }
   #caAiOpen {
-    padding: 2px 7px !important;
+    padding: 3px 8px !important;
     font-size: 13px !important;
-    height: 28px !important;
-    min-width: 30px !important;
+    height: 32px !important;
+    min-width: 34px !important;
+    cursor: pointer !important;
   }
   #panicKillSwitchBtn {
-    padding: 2px 7px !important;
+    padding: 3px 8px !important;
     font-size: 13px !important;
-    height: 28px !important;
-    min-width: 30px !important;
+    height: 32px !important;
+    min-width: 34px !important;
     margin-right: 0 !important;
+    cursor: pointer !important;
+  }
+  #notificationBtn {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    cursor: pointer !important;
+  }
+  #userChip {
+    min-width: 32px !important;
+    height: 32px !important;
+    cursor: pointer !important;
+  }
+  #mobileMenuBtn {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    cursor: pointer !important;
   }
 
   /* Timeframe bar containment & horizontal scroll on mobile */
@@ -3483,60 +3511,40 @@ select#watchlistSelect, select.watchlist-select {
         </div>
 
         <!-- 3 Recommendation Cards: Spot Benchmark | Best Call (CE) | Best Put (PE) -->
-        <div class="dash-reco-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px;margin-bottom:12px;">
         <div class="dash-reco-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;margin-bottom:12px;">
 
           <!-- CARD 1: UNDERLYING / SPOT BENCHMARK -->
-          <div class="card" id="dashCardSpot" style="padding:14px;background:var(--surface-2);border:1px solid var(--border-soft);border-top:3px solid var(--gold);border-radius:8px;position:relative;">
           <div class="card" id="dashCardSpot" style="padding:12px 14px;background:var(--surface-2);border:1px solid var(--border-soft);border-top:3px solid var(--gold);border-radius:8px;position:relative;min-width:0;box-sizing:border-box;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag gold" style="font-size:11px;font-weight:700;">INDEX / STOCK</span>
                 <span class="tag gold" style="font-size:10.5px;font-weight:700;">INDEX / STOCK</span>
                 <span class="tag neutral" id="undConsensusBadge" style="font-size:9.5px;font-weight:600;">Neutral Bias</span>
               </div>
               <div style="font-size:11px;color:var(--text-dim);" id="undTimeframeTag">TF: 15m</div>
             </div>
 
-            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
               <div>
-                <div style="font-weight:800;font-size:15px;color:var(--text);font-family:var(--font-mono);" id="undSymbol">NIFTY 50</div>
-                <div style="font-size:10.5px;color:var(--text-dim);" id="undSubTitle">Underlying Spot / Cash</div>
                 <div style="font-weight:800;font-size:14px;color:var(--text);font-family:var(--font-mono);" id="undSymbol">NIFTY 50</div>
                 <div style="font-size:10px;color:var(--text-dim);" id="undSubTitle">Underlying Spot / Cash</div>
               </div>
-              <div style="font-size:11.5px;color:var(--text-faint);"><span style="color:var(--text-dim);">CMP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="undCmp">₹--</b></div>
               <div style="font-size:11px;color:var(--text-faint);"><span style="color:var(--text-dim);">CMP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="undCmp">₹--</b></div>
             </div>
 
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
-            <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
-              <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'UND')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">ENTRY</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--buy);" id="undEntry">₹--</div>
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:4px;margin-bottom:8px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'UND')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">ENTRY</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--buy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undEntry">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('SL', 'UND')" title="Click to view mathematical calculation behind Stop Loss" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">STOP LOSS</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--sell);" id="undSl">₹--</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('SL', 'UND')" title="Click to view mathematical calculation behind Stop Loss" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">STOP LOSS</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--sell);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undSl">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('TARGET', 'UND')" title="Click to view mathematical calculation behind Target" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">TARGET</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);" id="undTarget">₹--</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('TARGET', 'UND')" title="Click to view mathematical calculation behind Target" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">TARGET</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undTarget">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'UND')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">R : R</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text);" id="undRr">1 : 2.0</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'UND')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">R : R</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRr">1 : 2.0</div>
@@ -3544,25 +3552,19 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRationaleShort">Formula-derived pullback entry aligned with ATR risk</span>
-              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
               <span class="muted" style="font-size:10px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRationaleShort">Formula-derived pullback entry aligned with ATR risk</span>
               <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:2px 8px;font-size:10.5px;height:24px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
             </div>
           </div>
 
           <!-- CARD 2: CALL OPTION (CE) - BUY ONLY -->
-          <div class="card" id="dashCardCe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;">
           <div class="card" id="dashCardCe" style="padding:12px 14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;min-width:0;box-sizing:border-box;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag buy" style="font-size:11px;font-weight:700;">Call (CE)</span>
                 <span class="tag buy" style="font-size:10.5px;font-weight:700;">Call (CE)</span>
                 <span class="tag neutral" id="ceConsensusBadge" style="font-size:9.5px;font-weight:600;">Bullish Flow</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
-                <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;user-select:none;">
-                  <span style="font-size:10px;color:var(--text-dim);">Auto Trade</span>
                 <label style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;cursor:pointer;user-select:none;">
                   <span style="font-size:9.5px;color:var(--text-dim);">Auto Trade</span>
                   <input type="checkbox" id="ceAutoTradeToggle" onchange="toggleSideAutoTrade('CE', this.checked)" style="accent-color:var(--buy);cursor:pointer;">
@@ -3574,45 +3576,28 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
-            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
               <div style="flex:1;min-width:0;margin-right:8px;">
-                <div style="font-weight:800;font-size:13.5px;color:var(--text);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceContractName">Loading CE Contract…</div>
-                <div style="font-size:10.5px;color:var(--gold);margin-top:2px;" id="ceExpiryDate">Exp: —</div>
                 <div style="font-weight:800;font-size:13px;color:var(--text);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceContractName">Loading CE Contract…</div>
                 <div style="font-size:10px;color:var(--gold);margin-top:2px;" id="ceExpiryDate">Exp: —</div>
               </div>
-              <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="ceCmp">₹--</b></div>
               <div style="font-size:11px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="ceCmp">₹--</b></div>
             </div>
 
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
-            <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
-              <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'CE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">ENTRY</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--buy);" id="ceEntry">₹--</div>
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:4px;margin-bottom:8px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'CE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">ENTRY</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--buy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceEntry">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('SL', 'CE')" title="Click to view mathematical calculation behind Stop Loss" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">STOP LOSS</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--sell);" id="ceSl">₹--</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('SL', 'CE')" title="Click to view mathematical calculation behind Stop Loss" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">STOP LOSS</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--sell);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceSl">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('TARGET', 'CE')" title="Click to view mathematical calculation behind Target" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">TARGET</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);" id="ceTarget">₹--</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('TARGET', 'CE')" title="Click to view mathematical calculation behind Target" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">TARGET</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceTarget">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'CE')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">R : R</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text);" id="ceRr">1 : 2.0</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'CE')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">R : R</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceRr">1 : 2.0</div>
@@ -3623,25 +3608,19 @@ select#watchlistSelect, select.watchlist-select {
             <div id="ceBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceRationaleShort">Pullback limit entry below CMP to prevent top buying</span>
-              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
               <span class="muted" style="font-size:10px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceRationaleShort">Pullback limit entry below CMP to prevent top buying</span>
               <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:2px 8px;font-size:10.5px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
             </div>
           </div>
 
           <!-- CARD 3: PUT OPTION (PE) - BUY ONLY -->
-          <div class="card" id="dashCardPe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-top:3px solid var(--sell);border-radius:8px;position:relative;">
           <div class="card" id="dashCardPe" style="padding:12px 14px;background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-top:3px solid var(--sell);border-radius:8px;position:relative;min-width:0;box-sizing:border-box;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag sell" style="font-size:11px;font-weight:700;">Put (PE)</span>
                 <span class="tag sell" style="font-size:10.5px;font-weight:700;">Put (PE)</span>
                 <span class="tag neutral" id="peConsensusBadge" style="font-size:9.5px;font-weight:600;">Bearish / Hedge</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
-                <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;user-select:none;">
-                  <span style="font-size:10px;color:var(--text-dim);">Auto Trade</span>
                 <label style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;cursor:pointer;user-select:none;">
                   <span style="font-size:9.5px;color:var(--text-dim);">Auto Trade</span>
                   <input type="checkbox" id="peAutoTradeToggle" onchange="toggleSideAutoTrade('PE', this.checked)" style="accent-color:var(--sell);cursor:pointer;">
@@ -3653,45 +3632,28 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
-            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
               <div style="flex:1;min-width:0;margin-right:8px;">
-                <div style="font-weight:800;font-size:13.5px;color:var(--text);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peContractName">Loading PE Contract…</div>
-                <div style="font-size:10.5px;color:var(--gold);margin-top:2px;" id="peExpiryDate">Exp: —</div>
                 <div style="font-weight:800;font-size:13px;color:var(--text);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peContractName">Loading PE Contract…</div>
                 <div style="font-size:10px;color:var(--gold);margin-top:2px;" id="peExpiryDate">Exp: —</div>
               </div>
-              <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="peCmp">₹--</b></div>
               <div style="font-size:11px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="peCmp">₹--</b></div>
             </div>
 
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
-            <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
-              <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'PE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">ENTRY</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--buy);" id="peEntry">₹--</div>
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:4px;margin-bottom:8px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'PE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">ENTRY</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--buy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peEntry">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('SL', 'PE')" title="Click to view mathematical calculation behind Stop Loss" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">STOP LOSS</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--sell);" id="peSl">₹--</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('SL', 'PE')" title="Click to view mathematical calculation behind Stop Loss" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">STOP LOSS</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--sell);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peSl">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('TARGET', 'PE')" title="Click to view mathematical calculation behind Target" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">TARGET</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);" id="peTarget">₹--</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('TARGET', 'PE')" title="Click to view mathematical calculation behind Target" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">TARGET</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peTarget">₹--</div>
               </div>
-              <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'PE')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
-                <div style="font-size:9px;color:var(--text-faint);font-weight:700;letter-spacing:0.5px;">R : R</div>
-                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text);" id="peRr">1 : 2.0</div>
               <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'PE')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">R : R</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peRr">1 : 2.0</div>
@@ -3702,8 +3664,6 @@ select#watchlistSelect, select.watchlist-select {
             <div id="peBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peRationaleShort">Pullback limit entry below CMP to protect capital</span>
-              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
               <span class="muted" style="font-size:10px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peRationaleShort">Pullback limit entry below CMP to protect capital</span>
               <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:2px 8px;font-size:10.5px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
             </div>
@@ -4190,7 +4150,6 @@ select#watchlistSelect, select.watchlist-select {
     </div>
 
     <!-- ============ BACKTESTING ENGINE & CANDLE REPLAY SIMULATOR ============ -->
-    <div class="panel" id="panel-backtesting" style="display:none;">
     <div class="panel" id="panel-backtesting">
 
       <!-- ============ QUICK BACKTEST RECOMMENDATION ENGINE & CALIBRATION TRACKER ============ -->
@@ -10802,6 +10761,11 @@ function applyDrawingPoint(x,y){
     window.__caLiveMacroFactors = null;
     window.__caFetchingMacro = false;
     // Reset dashboard UI elements for the new symbol
+    const cleanRoot = String(S).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
+    const undSymEl = document.getElementById('undSymbol');
+    if(undSymEl) undSymEl.textContent = cleanRoot;
+    const undSubEl = document.getElementById('undSubTitle');
+    if(undSubEl) undSubEl.textContent = `${cleanRoot} Spot / Cash`;
     ['dashSymbolLtp','dashSymbolChange','dashEntryPriceDisplay','dashSlPriceDisplay','dashTargetPriceDisplay',
      'chartRecoLotSize','chartRecoAction','chartRecoSymbol','chartRecoConfidence'].forEach(id => {
       const el = document.getElementById(id);
@@ -14776,7 +14740,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
 
   async function loadRecommendationHistory(){
     try{
-      const d=await api('/api/recommendations/history',{timeoutMs:3500});
+      const d=await api('/api/recommendations/history',{timeoutMs:12000});
       const st=d.stats||{};
       const pct=v=>v==null||!Number.isFinite(Number(v))?'—':`${fmt(v)}%`;
       if($('recoAutoWinRate'))$('recoAutoWinRate').textContent=pct(st.auto?((st.auto_wins||0)/st.auto*100):null);
@@ -22512,7 +22476,18 @@ window.renderDualRecoCards = function(data){
   if(document.getElementById('peRationaleShort')) document.getElementById('peRationaleShort').innerHTML = tfTipPe;
 };
 
+// Immediately populate CE/PE cards with fallback data so they never show "Loading CE Contract…" on page load.
+// The real recommendation API (12s timeout) will refresh these values once it resolves.
+(function initDualRecoCardsEarly(){
+  try {
+    if(typeof window.renderDualRecoCards === 'function'){
+      window.renderDualRecoCards(window.__caCurrentChartReco || {});
+    }
+  } catch(_) {}
+})();
+
 window.openOrderForUnderlying = function(){
+
   const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'NIFTY';
   const sig = document.getElementById('undSignalBadge')?.textContent || 'BUY';
   if(typeof window.openOrder === 'function'){

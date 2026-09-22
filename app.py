@@ -3104,7 +3104,6 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
 
     return None
 
-def fallback_recommendation_quick(instrument: str, user_id: int | None = None, desired_profit: float | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
 def fallback_recommendation_quick(instrument: str, user_id: int | None = None, desired_profit: float | None = None, expiry_scalp: bool = False, timeframe: str = "5m") -> dict[str, Any]:
     underlying_sym = instrument
     is_fut = is_future_symbol(instrument)
@@ -5775,8 +5774,15 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
                 d_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
                 thursday = d_ist + timedelta(days=((3 - d_ist.weekday() + 7) % 7 or 7))
                 expiry_val = thursday.strftime("%d %b %Y")
+                exp_weekday = 1 if root in ("NIFTY", "FINNIFTY") else 3
+                days_ahead = (exp_weekday - d_ist.weekday() + 7) % 7
+                if days_ahead == 0 and (d_ist.hour > 15 or (d_ist.hour == 15 and d_ist.minute >= 30)):
+                    days_ahead = 7
+                exp_dt = d_ist + timedelta(days=days_ahead)
+                expiry_val = exp_dt.strftime("%d %b %Y").upper()
             except Exception:
                 expiry_val = "Weekly Expiry"
+                expiry_val = "22 SEP 2026" if root in ("NIFTY", "FINNIFTY") else "24 SEP 2026"
         else:
             try:
                 if "-" in str(expiry_val):
@@ -9108,6 +9114,7 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": "30 SEP 2026"},
         "BANKNIFTY": {"spot": 51250.0, "step": 100.0, "lot": 30, "iv": 15.0, "default_exp": "24 SEP 2026"},
         "NIFTY": {"spot": 23400.0, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "24 SEP 2026"},
+        "NIFTY": {"spot": 23400.0, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "22 SEP 2026"},
     }
     
     # Try fetching live quote for accurate spot
@@ -9258,7 +9265,6 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
     cached = CACHE.get(key)
     if cached is not None:
         return cached
-
     is_mcx = root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "LEAD", "ALUMINIUM"}
     data = None
     if not is_mcx:
@@ -9273,8 +9279,6 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
         data = generate_option_chain_engine(underlying, expiry)
 
     # Real contract overlay for MCX commodities (CRUDEOIL, etc.)
-    if is_mcx and data and data.get("st
-... [truncated for diff preview]
     if is_mcx and data and data.get("strikes"):
         # Dynamic MCX instrument search without hardcoded expiry (Release 47 - Item 17)
         try:
@@ -9332,7 +9336,9 @@ async def option_expiries(underlying: str, user: dict[str, Any] = Depends(requir
 
     if not expiries:
         if is_mcx:
-            expiries = ["17 SEP 2026", "24 SEP 2026", "19 OCT 2026", "26 NOV 2026"]
+            expiries = ["17 SEP 2026", "19 OCT 2026", "17 NOV 2026", "18 DEC 2026"]
+        elif root in ("NIFTY", "FINNIFTY"):
+            expiries = ["22 SEP 2026", "29 SEP 2026", "06 OCT 2026", "13 OCT 2026", "29 OCT 2026"]
         else:
             expiries = ["24 SEP 2026", "01 OCT 2026", "08 OCT 2026", "29 OCT 2026", "26 NOV 2026"]
             
@@ -10059,6 +10065,11 @@ def _calc_reco_pnl(r: dict[str, Any], live_price: float | None = None) -> tuple[
 @app.get("/api/recommendations/history")
 async def recommendation_history(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     # Do not auto-scrap recommendations after 2 minutes; preserve audit trail
+    uid = user["id"] if isinstance(user, dict) and "id" in user else 1
+    cache_key = f"reco_history:{uid}"
+    cached = CACHE.get(cache_key)
+    if cached is not None:
+        return cached
     pass
     # 1. Fetch user's active watchlist symbols
     watch = user_watchlist_symbols(user["id"])
@@ -10144,7 +10155,7 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
     elif session_dt.weekday() == 6: session_dt -= timedelta(days=2)
     session_title = f"Recommendations of {session_dt.strftime('%A, %d %b %Y')}"
 
-    return {
+    result = {
         "items": filtered,
         "totals": totals,
         "stats": totals,
@@ -10152,6 +10163,8 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
         "title": session_title,
         "generated_at": now_iso()
     }
+    CACHE.set(cache_key, result, 30.0)  # Cache for 30s to avoid repeated 13s calls
+    return result
 
 
 # ===========================================================================
@@ -13033,7 +13046,46 @@ async def get_news_interests(user: dict[str, Any] = Depends(require_user)) -> di
     items=[str(x).upper().strip() for x in items if str(x).strip()]
     return {"items":list(dict.fromkeys(items))}
 
+
+@app.get("/api/news/stock/{symbol}")
+async def news_stock_alias(symbol: str, limit: int = 60, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Alias for /api/news/ca-ai-feed?symbol={symbol}&mode=stock — fixes frontend 404 errors."""
+    sym = (symbol or "NIFTY").upper().strip()
+    cache_key = f"ca_ai_feed:{sym}:stock"
+    cached = CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    uid = user["id"] if isinstance(user, dict) and "id" in user else 1
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(None, news_result, _target_news_query(sym), min(limit, 60), sym, uid)
+        out = {"events": result.get("events", [])[:limit], "symbol": sym, "mode": "stock", "timestamp": now_iso()}
+        CACHE.set(cache_key, out, 120.0)
+        return out
+    except Exception as exc:
+        log.warning("news_stock_alias failed for %s: %s", sym, exc)
+        return {"events": [], "symbol": sym, "mode": "stock", "timestamp": now_iso()}
+
+@app.get("/api/news/global")
+async def news_global_alias(limit: int = 60, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Alias for /api/news/ca-ai-feed?symbol=GLOBAL&mode=global — fixes frontend 404 errors."""
+    cache_key = "ca_ai_feed:GLOBAL:global"
+    cached = CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    uid = user["id"] if isinstance(user, dict) and "id" in user else 1
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(None, news_result, "crude oil OPEC inflation Fed RBI interest rates rupee dollar markets budget GDP", min(limit, 60), "GLOBAL", uid)
+        out = {"events": result.get("events", [])[:limit], "symbol": "GLOBAL", "mode": "global", "timestamp": now_iso()}
+        CACHE.set(cache_key, out, 180.0)
+        return out
+    except Exception as exc:
+        log.warning("news_global_alias failed: %s", exc)
+        return {"events": [], "symbol": "GLOBAL", "mode": "global", "timestamp": now_iso()}
+
 @app.put("/api/news/interests")
+
 async def save_news_interests(payload: dict[str,Any], user: dict[str,Any] = Depends(require_user)) -> dict[str,Any]:
     raw=payload.get("items") or []
     if not isinstance(raw,list): raise HTTPException(422,"items must be a list")
