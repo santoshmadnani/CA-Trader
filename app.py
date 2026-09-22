@@ -2502,7 +2502,6 @@ def session_time_remaining(segment: str = "NSE_EQ", at: datetime | None = None) 
             "session": "market"
         }
 
-def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_entry: float, underlying_spot: float, underlying_atr: float, lot_size: int, desired_profit: float | None = 500.0, bearable_loss: float | None = None, segment: str | None = None, days_high: float | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
 def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_entry: float, underlying_spot: float, underlying_atr: float, lot_size: int, desired_profit: float | None = 500.0, bearable_loss: float | None = None, segment: str | None = None, days_high: float | None = None, expiry_scalp: bool = False, timeframe: str = "5m") -> dict[str, Any]:
     seg = segment or get_symbol_segment(symbol)
     sess = session_time_remaining(seg)
@@ -2716,7 +2715,6 @@ def evaluate_achievable_option_move(symbol: str, opt_info: dict[str, Any], opt_e
         "reason": f"Projected for {next_sess.get('target_session')} with 15-20m momentum breakout." if is_next_day else f"Realistic option target achievable in {duration_label} (max 30m horizon, R:R 1:{rr_ratio})."
     }
 
-def evaluate_achievable_equity_move(symbol: str, entry: float, atr: float, user_capital: float | None = None, desired_profit: float | None = 500.0, bearable_loss: float | None = None, side: str = "BUY", segment: str | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
 def evaluate_achievable_equity_move(symbol: str, entry: float, atr: float, user_capital: float | None = None, desired_profit: float | None = 500.0, bearable_loss: float | None = None, side: str = "BUY", segment: str | None = None, expiry_scalp: bool = False, timeframe: str = "5m") -> dict[str, Any]:
     seg = segment or get_symbol_segment(symbol)
     sess = session_time_remaining(seg)
@@ -5728,8 +5726,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     opp_bias = "SELL" if opt_bias == "BUY" else "BUY"
     alt_cand = resolve_option_for_future(symbol, opp_bias, user_id)
-        opp_bias = "SELL" if opt_bias == "BUY" else "BUY"
-        alt_cand = resolve_option_for_future(symbol, opp_bias, user_id)
 
     def _format_opt_candidate(c_node, c_bias, is_consensus=True):
         if not c_node:
@@ -5999,8 +5995,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         else:
             opt_tgt = round(max(0.05, opt_entry - profit_per_share), 2)
             opt_sl = round(opt_entry + profit_per_share / 2.2, 2)
-        opt_tgt = round(opt_entry + profit_per_share, 2)
-        opt_sl = round(max(0.05, opt_entry - profit_per_share / 2.2), 2)
         ach = evaluate_achievable_option_move(
             symbol=symbol,
             opt_info=opt_info,
@@ -6010,7 +6004,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             lot_size=lot,
             desired_profit=desired_profit,
             bearable_loss=bearable_loss,
-            expiry_scalp=expiry_scalp
             expiry_scalp=expiry_scalp,
             timeframe=timeframe
         )
@@ -6346,27 +6339,17 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             desired_profit=desired_profit,
             bearable_loss=bearable_loss,
             segment=seg,
-            expiry_scalp=expiry_scalp
             expiry_scalp=expiry_scalp,
             timeframe=timeframe
         )
         if not ach.get("achievable"):
             ach["achievable"] = True
-            ach["target"] = round(entry + max(500.0 / lot_size, entry * 0.20), 2)
-            ach["stop_loss"] = round(max(0.05, entry - max(250.0 / lot_size, entry * 0.10)), 2)
-            ach["risk_amount"] = round(abs(entry - ach["stop_loss"]), 2)
-            ach["reward_amount"] = round(abs(ach["target"] - entry), 2)
-            ach["risk_reward"] = round(ach["reward_amount"] / max(0.01, ach["risk_amount"]), 2)
-            ach["realistic_profit"] = round(ach["reward_amount"] * lot_size, 2)
-            ach["time_horizon"] = 375
-            ach["time_horizon"] = 5 if expiry_scalp else 30
             ach["target"] = tgt
             ach["stop_loss"] = sl
             ach["risk_amount"] = risk_amt
             ach["reward_amount"] = reward_amt
             ach["risk_reward"] = rr_ratio
             ach["realistic_profit"] = min_pnl
-            ach["time_horizon"] = 5 if expiry_scalp else 375
             ach["time_horizon"] = 5 if expiry_scalp else 30
             ach["greeks"] = ach.get("greeks") or {"delta": 0.5, "gamma": 0.001, "theta": -8.0, "vega": 12.0, "iv": 22.0}
         if False and not ach["achievable"]:
@@ -6516,7 +6499,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             bearable_loss=bearable_loss,
             side=side,
             segment=seg,
-            expiry_scalp=expiry_scalp
             expiry_scalp=expiry_scalp,
             timeframe=timeframe
         )
@@ -9097,17 +9079,12 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         underlying = parsed["underlying"]
     root = extract_root_symbol(underlying).upper()
     commodity_configs = {
-        "CRUDEOIL": {"spot": 6150.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": "17 SEP 2026"},
-        "CRUDEOIL": {"spot": 9650.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": "17 SEP 2026"},
         "CRUDEOIL": {"spot": 6250.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": "17 SEP 2026"},
         "NATURALGAS": {"spot": 245.0, "step": 5.0, "lot": 1250, "iv": 48.0, "default_exp": "24 SEP 2026"},
         "GOLD": {"spot": 74500.0, "step": 200.0, "lot": 100, "iv": 14.0, "default_exp": "25 SEP 2026"},
         "SILVER": {"spot": 88200.0, "step": 500.0, "lot": 30, "iv": 22.0, "default_exp": "25 SEP 2026"},
         "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": "30 SEP 2026"},
         "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": "30 SEP 2026"},
-        "BANKNIFTY": {"spot": 56606.55, "step": 100.0, "lot": 15, "iv": 15.0, "default_exp": "24 SEP 2026"},
-        "BANKNIFTY": {"spot": 56606.55, "step": 100.0, "lot": 30, "iv": 15.0, "default_exp": "24 SEP 2026"},
-        "NIFTY": {"spot": 23398.10, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "24 SEP 2026"},
         "BANKNIFTY": {"spot": 51250.0, "step": 100.0, "lot": 30, "iv": 15.0, "default_exp": "24 SEP 2026"},
         "NIFTY": {"spot": 23400.0, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "24 SEP 2026"},
     }
@@ -9115,10 +9092,6 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
     # Try fetching live quote for accurate spot
     spot = None
     try:
-        q = UPSTOX.quote(underlying)
-        if q and q.get("ltp"):
-            spot = float(q["ltp"])
-        elif root != underlying:
         clean_und = underlying.strip().upper()
         if not any(clean_und.endswith(x) for x in (" CE", " PE", "CE", "PE")):
             q = UPSTOX.quote(underlying)
@@ -9131,7 +9104,6 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
     except Exception:
         pass
 
-    if spot is None:
     if spot is None or (root in commodity_configs and spot < commodity_configs[root]["spot"] * 0.25):
         index_map = {
             "BANKNIFTY": "NSE_INDEX|Nifty Bank",
@@ -9154,7 +9126,6 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
     
     if root in commodity_configs:
         cfg = commodity_configs[root]
-        if spot is None or spot <= 0:
         min_expected = cfg["spot"] * 0.30
         if spot is None or spot < min_expected:
             spot = cfg["spot"]
@@ -9261,8 +9232,6 @@ def generate_commodity_option_chain(underlying: str, expiry: str | None = None) 
 
 @app.get("/api/options/{underlying}")
 async def options_summary(underlying: str, expiry: str | None = None, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    root = extract_root_symbol(underly
-... [truncated for diff preview]
     root = extract_root_symbol(underlying).upper()
     key = f"option-chain:{root}:{expiry or 'nearest'}"
     cached = CACHE.get(key)

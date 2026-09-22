@@ -3151,6 +3151,9 @@ select#watchlistSelect, select.watchlist-select {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
             <span>Telegram Bot Alerts</span>
           </button>
+          <button type="button" class="btn ghost small" id="openClearCacheModalBtn" onclick="window.openClearCacheModal()" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;color:var(--text-muted);border:1px dashed var(--border);" title="Clear transient cached data">
+            🗑️ Clear Cache
+            Clear Cache
           <button type="button" class="btn ghost small" id="openClearCacheModalBtn" onclick="window.openClearCacheModal()" style="width:100%;justify-content:center;font-size:11px;padding:5px 8px;color:var(--text-muted);border:1px dashed var(--border);display:inline-flex;align-items:center;gap:5px;" title="Clear transient cached data">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
             <span>Clear Cache</span>
@@ -3178,6 +3181,11 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
     Option Chain
   </div>
+    <div class="navtab" data-tab="notes" role="button" tabindex="0" onclick="showTab('notes')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Trader Notes
+  </div>
+
 
   <div class="navtab" data-tab="reco" role="button" tabindex="0" onclick="showTab('reco')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
@@ -3188,6 +3196,8 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
     News by CA AI
   </div>
+  <div class="navtab" data-tab="fundamentals" role="button" tabindex="0" onclick="showTab('fundamentals')">Fundamentals</div>
+  <div class="navtab" data-tab="movers" role="button" tabindex="0" onclick="showTab('movers')">Market Movers</div>
   <div class="navtab" data-tab="fundamentals" role="button" tabindex="0" onclick="showTab('fundamentals')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
     Fundamentals
@@ -3208,6 +3218,7 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
     Funds
   </div>
+  <div class="navtab" data-tab="console" role="button" tabindex="0" onclick="showTab('console')">Server Console</div>
   <div class="navtab" data-tab="console" role="button" tabindex="0" onclick="showTab('console')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
     Server Console
@@ -4349,6 +4360,14 @@ select#watchlistSelect, select.watchlist-select {
           <div id="optionsExpiryPills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
+            <input type="checkbox" id="chkOptColOI" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
+            <span>OI &amp; Vol</span>
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;">
+            <input type="checkbox" id="chkOptColGreeks" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
+            <span>Greeks (Δ, Γ, Θ, IV)</span>
+          </label>
           <button type="button" class="btn ghost small" id="optionsRefreshBtn">↻ Refresh</button>
         </div>
       </div>
@@ -8109,9 +8128,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           candleRes = btFallback;
         }
       } catch(_){}
-    }
-    if(candleRes?.__error){const msg=String(candleRes.__error.message||'Market data unavailable');document.getElementById('signalUpdated').textContent=cached?.candles?.length?`Live refresh failed · showing cached data · ${msg}`:`Retrying candle data… ${msg}`;setTimeout(async()=>{if(seq!==chartRequestSeq||!S)return;try{const retry=await A(candleUrl,{timeoutMs:15000,cache:'no-store'});const rc=Array.isArray(retry?.candles)?retry.candles:[];if(rc.length){state.candles=rc.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Updated · ${retry.latest_candle_ist||formatTime(Date.now())} IST`;if(retry.live_quote?.ltp!=null){state.latestLive=Number(retry.live_quote.ltp);updateHeader(retry.live_quote);}}}catch(_){}},1200);}
-    else {const candles=Array.isArray(candleRes?.candles)?candleRes.candles:[];const stale=!!candleRes?.stale;const expected=candleRes?.latest_session_ist||'';if(candles.length){state.candles=candles.map(c=>({...c}));candleCache.set(key,{candles:state.candles.map(c=>({...c})),timestamp:candleRes.timestamp||new Date().toISOString(),fetchedAt:Date.now(),latestSession:candleRes.latest_candle_ist||expected});state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));state.panY=0;draw();document.getElementById('signalUpdated').textContent=stale?`EOD · ${candleRes.latest_candle_ist||expected} IST`:`Updated · ${candleRes.latest_candle_ist||expected} IST`;}else if(!state.candles.length){draw();document.getElementById('signalUpdated').textContent='Retrying latest candle data…';setTimeout(async()=>{if(seq!==chartRequestSeq||!S)return;try{const retry=await A('/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`,{timeoutMs:15000,cache:'no-store'});const rc=Array.isArray(retry?.candles)?retry.candles:[];if(rc.length){state.candles=rc.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Updated · ${retry.latest_candle_ist||formatTime(Date.now())} IST`;if(retry.live_quote?.ltp!=null){state.latestLive=Number(retry.live_quote.ltp);updateLiveCandle(Number(retry.live_quote.ltp),retry.live_quote.timestamp||Date.now())}}else document.getElementById('signalUpdated').textContent='No candle data returned by Upstox.'}catch(e){document.getElementById('signalUpdated').textContent='Market candle data unavailable.'}},700);}}
+    if(candleRes?.__error){const msg=String(candleRes.__error.message||'Market data unavailable');document.getElementById('signalUpdated').textContent=cached?.candles?.length?`Live refresh failed · showing cached data · ${msg}`:`Retrying candle data… ${msg}`;}
+    const candles=Array.isArray(candleRes?.candles)?candleRes.candles:[];const stale=!!candleRes?.stale;const expected=candleRes?.latest_session_ist||'';if(candles.length){state.candles=candles.map(c=>({...c}));candleCache.set(key,{candles:state.candles.map(c=>({...c})),timestamp:candleRes.timestamp||new Date().toISOString(),fetchedAt:Date.now(),latestSession:candleRes.latest_candle_ist||expected});state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));state.panY=0;draw();document.getElementById('signalUpdated').textContent=stale?`EOD · ${candleRes.latest_candle_ist||expected} IST`:`Updated · ${candleRes.latest_candle_ist||expected} IST`;}else if(!state.candles.length){draw();document.getElementById('signalUpdated').textContent='Retrying latest candle data…';setTimeout(async()=>{if(seq!==chartRequestSeq||!S)return;try{const retry=await A('/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`,{timeoutMs:15000,cache:'no-store'});const rc=Array.isArray(retry?.candles)?retry.candles:[];if(rc.length){state.candles=rc.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Updated · ${retry.latest_candle_ist||formatTime(Date.now())} IST`;if(retry.live_quote?.ltp!=null){state.latestLive=Number(retry.live_quote.ltp);updateLiveCandle(Number(retry.live_quote.ltp),retry.live_quote.timestamp||Date.now())}}else document.getElementById('signalUpdated').textContent='No candle data returned by Upstox.'}catch(e){document.getElementById('signalUpdated').textContent='Market candle data unavailable.'}},700);}
     if(candleRes?.live_quote?.ltp!=null){
       state.latestLive=Number(candleRes.live_quote.ltp); state.priceState=candleRes.live?'LIVE':'EOD'; updateHeader(candleRes.live_quote);
       if(candleRes.live) updateLiveCandle(Number(candleRes.live_quote.ltp),candleRes.live_quote.timestamp||Date.now()); else { const st=document.getElementById('signalUpdated'); if(st) st.textContent=`EOD · ${candleRes.latest_candle_ist||formatTime(candleRes.live_quote.timestamp||Date.now())} IST`; draw(); }
