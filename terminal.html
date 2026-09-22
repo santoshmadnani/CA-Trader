@@ -3219,7 +3219,7 @@ select#watchlistSelect, select.watchlist-select {
             <span class="chart-symbol-ltp" id="dashSymbolLtp">—</span>
             <span class="chart-symbol-change" id="dashSymbolChange">—</span>
           </div>
-          <div class="page-sub chart-company" id="dashCompany">Institutional Quantitative Dashboard · Live Intelligence</div>
+          <div class="page-sub chart-company" id="dashCompany" style="font-size:11px;color:var(--text-dim);margin-top:2px;">Live Market Intelligence</div>
         </div>
         <div class="head-actions">
           <button class="btn gold" id="dashBuyBtn" onclick="openOrder('BUY')">Buy</button>
@@ -3259,8 +3259,8 @@ select#watchlistSelect, select.watchlist-select {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
             </span>
             <div>
-              <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Dual-Engine Option Recommendations</b>
-              <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening across option chain · Best CE &amp; Best PE</div>
+              <b style="font-size:13.5px;color:var(--text);font-family:var(--font-display);">Dual-Engine Option Recommendations</b>
+              <div style="font-size:11px;color:var(--text-dim);" id="dashRecoHeaderSub">Autonomous mathematical screening · Best CE &amp; Best PE</div>
             </div>
           </div>
           <div class="dash-reco-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -3302,8 +3302,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardUnderlying" style="padding:14px;background:var(--surface-2);border:1px solid rgba(232,184,75,0.3);border-top:3px solid var(--gold);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag gold" style="font-size:11px;font-weight:700;" id="undDirectionTag">📊 INDEX / STOCK</span>
-                <span class="tag gold" style="font-size:11px;font-weight:700;" id="undDirectionTag">INDEX / STOCK</span>
+                <span class="tag gold" style="font-size:10.5px;font-weight:700;" id="undDirectionTag">INDEX / STOCK</span>
                 <span class="tag neutral" id="undConsensusBadge" style="font-size:9.5px;font-weight:600;">Algorithmic Bias</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
@@ -3340,9 +3339,8 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRationaleShort">Formula-derived pullback entry aligned with ATR risk</span>
-              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
-              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
+              <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRationaleShort">Pullback limit entry aligned with ATR risk</span>
+              <button type="button" class="btn gold small" id="undTradeBtn" onclick="window.openOrderForUnderlying()" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Trade Symbol</button>
             </div>
           </div>
 
@@ -3350,8 +3348,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardCe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag buy" style="font-size:11px;font-weight:700;">🟢 BUY CALL (CE)</span>
-                <span class="tag buy" style="font-size:11px;font-weight:700;">Call (CE)</span>
+                <span class="tag buy" style="font-size:10.5px;font-weight:700;" id="ceTagHeader">BUY CALL (CE)</span>
                 <span class="tag neutral" id="ceConsensusBadge" style="font-size:9.5px;font-weight:600;">Bullish Flow</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
@@ -3359,11 +3356,9 @@ select#watchlistSelect, select.watchlist-select {
                   <span style="font-size:10px;color:var(--text-dim);">Auto Trade</span>
                   <input type="checkbox" id="ceAutoTradeToggle" onchange="toggleSideAutoTrade('CE', this.checked)" style="accent-color:var(--buy);cursor:pointer;">
                 </label>
-                <div style="display:inline-flex;gap:2px;">
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">▲ ITM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">▼ OTM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">ITM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">OTM</button>
+                <div style="display:inline-flex;gap:3px;">
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','ITM')" style="padding:1px 6px;font-size:10px;height:22px;">▲ ITM</button>
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('CE','OTM')" style="padding:1px 6px;font-size:10px;height:22px;">▼ OTM</button>
                 </div>
               </div>
             </div>
@@ -3376,7 +3371,6 @@ select#watchlistSelect, select.watchlist-select {
               <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="ceCmp">₹--</b></div>
             </div>
 
-            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'CE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
@@ -3397,26 +3391,20 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
-            <!-- Capital Budget Alert Container (Item 2) -->
             <!-- Capital Budget Alert Container -->
             <div id="ceBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceRationaleShort">Pullback limit entry below CMP to prevent top buying</span>
-              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
-              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
+              <button type="button" class="btn buy small" onclick="placeSideQuickOrder('CE')" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order CE</button>
             </div>
           </div>
 
-          <!-- RIGHT CARD: PUT OPTION (PE) -->
           <!-- CARD 3: PUT OPTION (PE) - BUY ONLY -->
           <div class="card" id="dashCardPe" style="padding:14px;background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-top:3px solid var(--sell);border-radius:8px;position:relative;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
               <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BEST PUT (PE)</span>
-                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 BUY PUT (PE)</span>
-                <span class="tag sell" style="font-size:11px;font-weight:700;">🔴 Put (PE)</span>
-                <span class="tag sell" style="font-size:11px;font-weight:700;">Put (PE)</span>
+                <span class="tag sell" style="font-size:10.5px;font-weight:700;" id="peTagHeader">BUY PUT (PE)</span>
                 <span class="tag neutral" id="peConsensusBadge" style="font-size:9.5px;font-weight:600;">Bearish / Hedge</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
@@ -3424,11 +3412,9 @@ select#watchlistSelect, select.watchlist-select {
                   <span style="font-size:10px;color:var(--text-dim);">Auto Trade</span>
                   <input type="checkbox" id="peAutoTradeToggle" onchange="toggleSideAutoTrade('PE', this.checked)" style="accent-color:var(--sell);cursor:pointer;">
                 </label>
-                <div style="display:inline-flex;gap:2px;">
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">▲ ITM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">▼ OTM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','ITM')" style="padding:1px 5px;font-size:10px;height:20px;">ITM</button>
-                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','OTM')" style="padding:1px 5px;font-size:10px;height:20px;">OTM</button>
+                <div style="display:inline-flex;gap:3px;">
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','ITM')" style="padding:1px 6px;font-size:10px;height:22px;">▲ ITM</button>
+                  <button type="button" class="btn small ghost" onclick="shiftStrike('PE','OTM')" style="padding:1px 6px;font-size:10px;height:22px;">▼ OTM</button>
                 </div>
               </div>
             </div>
@@ -3441,7 +3427,6 @@ select#watchlistSelect, select.watchlist-select {
               <div style="font-size:11.5px;color:var(--text-faint);flex-shrink:0;"><span style="color:var(--text-dim);">LTP:</span> <b style="color:var(--text);font-family:var(--font-mono);" id="peCmp">₹--</b></div>
             </div>
 
-            <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R (1-line, no stray brackets) -->
             <!-- Price Metrics Grid: Pullback Entry, SL, Target, R:R -->
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:5px;margin-bottom:10px;text-align:center;">
               <div class="metric-clickable-box" onclick="openRecoMathModal('ENTRY', 'PE')" title="Click to view mathematical calculation behind Entry" style="background:var(--surface);padding:6px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;">
@@ -3462,105 +3447,72 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
-            <!-- Capital Budget Alert Container (Item 2) -->
             <!-- Capital Budget Alert Container -->
             <div id="peBudgetWarningBox" style="display:none;margin-bottom:8px;"></div>
 
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peRationaleShort">Pullback limit entry below CMP to protect capital</span>
-              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:4px 12px;font-size:11px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
-              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:2px 8px;font-size:10px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
+              <button type="button" class="btn sell small" onclick="placeSideQuickOrder('PE')" style="font-weight:700;padding:3px 10px;font-size:11px;height:24px;flex-shrink:0;white-space:nowrap;">Quick Order PE</button>
             </div>
           </div>
         </div>
 
-      <!-- ============ EXCEL WORKSHEET UI: LIVE INDICATORS & GREEKS MATRIX ============ -->
+      <!-- ============ QUANTITATIVE CONFLUENCE MATRIX ============ -->
       <div class="card" id="dashExcelWorksheetCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.18);width:100%;box-sizing:border-box;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(38,217,166,0.15);color:var(--buy);font-weight:700;font-size:14px;">▦</span>
-          <div style="display:flex;align-items:center;gap:8px;">
             <div>
-              <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Quantitative Confluence &amp; Valuation Matrix · Excel Worksheet UI</b>
-              <div style="font-size:11px;color:var(--text-dim);">Live streaming institutional factors. Click any Weightage % or Signal cell to calibrate algorithmic weighting.</div>
-              <b style="font-size:14px;color:var(--text);font-family:var(--font-display);">Recommendation Rationale</b>
+              <b style="font-size:13.5px;color:var(--text);font-family:var(--font-display);">Quantitative Confluence Matrix</b>
+              <div style="font-size:11px;color:var(--text-dim);">Multi-factor institutional quantitative valuation</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;flex-wrap:wrap;">
             <span class="tag gold" id="excelConsensusScoreBadge" style="font-family:var(--font-mono);font-weight:700;">Consensus: 86.4% Bullish</span>
             <span class="muted" id="excelLiveTimer">⏱ Live 1s / News 60s</span>
-            <button type="button" class="btn ghost small" onclick="resetExcelMatrixWeights()" style="font-size:11px;padding:3px 9px;">Reset Weights</button>
+            <button type="button" class="btn ghost small" onclick="resetExcelMatrixWeights()" style="font-size:10.5px;padding:2px 8px;height:22px;">Reset Weights</button>
           </div>
         </div>
 
-        <!-- Excel Table Container -->
-        
-        <!-- Excel Matrix Filter Bar (All 40 Factors) -->
-        <!-- Data Origin Legend & Source Transparency Banner -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;margin-bottom:10px;font-size:11px;flex-wrap:wrap;gap:8px;">
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;color:var(--buy);">
-              <span class="pulse-dot green"></span> ⚡ Live Real-Time Streamed in App (22 Factors)
-            </span>
-            <span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;color:#40a9ff;">
-              <span class="pulse-dot blue"></span> 🌐 Exchange &amp; Macro Official Feeds (18 Factors)
-            </span>
-        <!-- Excel Matrix Filter Bar with Dropdown Menu -->
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:11.5px;color:var(--text-dim);font-weight:600;">Category:</span>
-            <select id="excelMatrixCategorySelect" class="tool-input" onchange="filterExcelFactors(this.value)" style="height:26px;font-size:11.5px;padding:2px 8px;width:auto;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);cursor:pointer;">
-              <option value="all">All Factors (40)</option>
-              <option value="live_app">In-App Live Stream (22)</option>
-              <option value="macro_feed">Macro &amp; Exchange Verified (18)</option>
-              <option value="options">Options &amp; Greeks (10)</option>
-              <option value="flow">Order Flow &amp; Liquidity (7)</option>
-              <option value="tech">Technicals &amp; Levels (6)</option>
-              <option value="macro">Macro &amp; Global (7)</option>
-              <option value="fund">Fundamentals &amp; Events (10)</option>
-            </select>
-          </div>
-          <div style="color:var(--text-dim);font-size:10.5px;">
-            ✦ Click any <b style="color:var(--text);">Particulars Name</b> or <b style="color:var(--text);">Value</b> to jump directly to in-app feature or official external source.
-          </div>
-        </div>
+        <!-- Hidden select for backward compatibility with JS filters -->
+        <select id="excelMatrixCategorySelect" style="display:none;">
+          <option value="all">All Factors (40)</option>
+          <option value="live_app">In-App Live Stream (22)</option>
+          <option value="macro_feed">Macro &amp; Exchange Verified (18)</option>
+          <option value="options">Options &amp; Greeks (10)</option>
+          <option value="flow">Order Flow &amp; Liquidity (7)</option>
+          <option value="tech">Technicals &amp; Levels (6)</option>
+          <option value="macro">Macro &amp; Global (7)</option>
+          <option value="fund">Fundamentals &amp; Events (10)</option>
+        </select>
 
         <!-- Excel Matrix Filter Bar with Dedicated Live vs Macro Sections -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
           <div id="excelMatrixFilterTabs" class="dash-filter-button-group">
             <button type="button" class="chip-filter active" data-ef-cat="all" onclick="filterExcelFactors('all', this)">All (40)</button>
-            <button type="button" class="chip-filter" data-ef-cat="live_app" onclick="filterExcelFactors('live_app', this)">⚡ In-App Live Stream (22)</button>
-            <button type="button" class="chip-filter" data-ef-cat="macro_feed" onclick="filterExcelFactors('macro_feed', this)">🌐 Macro &amp; Exchange Verified (18)</button>
+            <button type="button" class="chip-filter" data-ef-cat="live_app" onclick="filterExcelFactors('live_app', this)">⚡ In-App Live (22)</button>
+            <button type="button" class="chip-filter" data-ef-cat="macro_feed" onclick="filterExcelFactors('macro_feed', this)">🌐 Macro Feeds (18)</button>
             <button type="button" class="chip-filter" data-ef-cat="options" onclick="filterExcelFactors('options', this)">Options &amp; Greeks (10)</button>
-            <button type="button" class="chip-filter" data-ef-cat="flow" onclick="filterExcelFactors('flow', this)">Order Flow &amp; Liquidity (7)</button>
-            <button type="button" class="chip-filter" data-ef-cat="tech" onclick="filterExcelFactors('tech', this)">Technicals &amp; Levels (6)</button>
+            <button type="button" class="chip-filter" data-ef-cat="flow" onclick="filterExcelFactors('flow', this)">Order Flow (7)</button>
+            <button type="button" class="chip-filter" data-ef-cat="tech" onclick="filterExcelFactors('tech', this)">Technicals (6)</button>
             <button type="button" class="chip-filter" data-ef-cat="macro" onclick="filterExcelFactors('macro', this)">Macro &amp; Global (7)</button>
-            <button type="button" class="chip-filter" data-ef-cat="fund" onclick="filterExcelFactors('fund', this)">Fundamentals &amp; Events (10)</button>
+            <button type="button" class="chip-filter" data-ef-cat="fund" onclick="filterExcelFactors('fund', this)">Fundamentals (10)</button>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:11px;padding:3px 10px;font-weight:700;">✦ Factors Math &amp; Formulas Suite</button>
-            <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:10px;padding:2px 8px;height:24px;font-weight:600;">Factors Math Suite</button>
+            <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:10.5px;padding:2px 9px;height:24px;font-weight:700;">✦ Factors Math Suite</button>
           </div>
         </div>
 
         <div style="overflow-x:auto;border:1px solid var(--border-soft);border-radius:6px;width:100%;">
-          <table class="table" id="dashExcelMatrixTable" style="width:100%;margin:0;font-size:11.5px;border-collapse:collapse;">
           <table class="table" id="dashExcelMatrixTable" style="width:100%;margin:0;font-size:11px;border-collapse:collapse;">
             <thead>
-              <tr style="background:var(--surface-2);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;">
-                <th style="padding:8px 12px;text-align:left;min-width:180px;">Name / Indicator</th>
-                <th style="padding:8px 12px;text-align:center;width:100px;">Time</th>
-                <th style="padding:8px 12px;text-align:right;min-width:100px;">Value</th>
-                <th style="padding:8px 12px;text-align:center;width:120px;">Weightage %</th>
-                <th style="padding:8px 12px;text-align:center;width:130px;">Signal</th>
-                <th style="padding:8px 12px;text-align:right;width:140px;">% Bull / Bear</th>
               <tr style="background:var(--surface-2);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;">
-                <th style="padding:4px 8px;text-align:left;min-width:160px;">Name / Indicator</th>
-                <th style="padding:4px 8px;text-align:center;width:90px;">Time</th>
-                <th style="padding:4px 8px;text-align:right;min-width:90px;">Value</th>
-                <th style="padding:4px 8px;text-align:center;width:105px;">Weightage %</th>
-                <th style="padding:4px 8px;text-align:center;width:115px;">Signal</th>
-                <th style="padding:4px 8px;text-align:right;width:120px;">% Bull / Bear</th>
+                <th style="padding:6px 10px;text-align:left;min-width:160px;">Name / Indicator</th>
+                <th style="padding:6px 10px;text-align:center;width:90px;">Time</th>
+                <th style="padding:6px 10px;text-align:right;min-width:90px;">Value</th>
+                <th style="padding:6px 10px;text-align:center;width:105px;">Weightage %</th>
+                <th style="padding:6px 10px;text-align:center;width:115px;">Signal</th>
+                <th style="padding:6px 10px;text-align:right;width:120px;">% Bull / Bear</th>
               </tr>
             </thead>
             <tbody id="dashExcelMatrixTbody">
@@ -3568,12 +3520,12 @@ select#watchlistSelect, select.watchlist-select {
             </tbody>
             <tfoot>
               <tr style="background:var(--surface-2);border-top:2px solid var(--border);font-weight:700;font-family:var(--font-mono);">
-                <td style="padding:9px 12px;">TOTAL CONFLUENCE</td>
-                <td style="padding:9px 12px;text-align:center;" id="excelFooterTime">Live</td>
-                <td style="padding:9px 12px;text-align:right;" id="excelFooterValue">—</td>
-                <td style="padding:9px 12px;text-align:center;" id="excelFooterWeight">100.0%</td>
-                <td style="padding:9px 12px;text-align:center;" id="excelFooterSignal"><span class="tag buy">BULLISH</span></td>
-                <td style="padding:9px 12px;text-align:right;color:var(--buy);" id="excelFooterPct">88.5% Bullish</td>
+                <td style="padding:8px 10px;">TOTAL CONFLUENCE</td>
+                <td style="padding:8px 10px;text-align:center;" id="excelFooterTime">Live</td>
+                <td style="padding:8px 10px;text-align:right;" id="excelFooterValue">—</td>
+                <td style="padding:8px 10px;text-align:center;" id="excelFooterWeight">100.0%</td>
+                <td style="padding:8px 10px;text-align:center;" id="excelFooterSignal"><span class="tag buy">BULLISH</span></td>
+                <td style="padding:8px 10px;text-align:right;color:var(--buy);" id="excelFooterPct">88.5% Bullish</td>
               </tr>
             </tfoot>
           </table>
@@ -19884,7 +19836,7 @@ setTimeout(() => {
       $('dashSymbolChange').textContent = `${chg >= 0 ? '+' : ''}${fmt(chg)} (${chgPct >= 0 ? '+' : ''}${fmt(chgPct)}%)`;
       $('dashSymbolChange').className = 'chart-symbol-change ' + (chg >= 0 ? 'up' : 'down');
     }
-    if ($('dashCompany')) $('dashCompany').textContent = `${baseSym} · Live Institutional Quantitative Analysis`;
+    if ($('dashCompany')) $('dashCompany').textContent = `${baseSym} · Live Benchmark`;
 
     // Fetch Recommendation for symbol
     const curRecoMatches = window.__caCurrentChartReco && (
@@ -21911,8 +21863,8 @@ window.renderDualRecoCards = function(data){
   if(document.getElementById('undRr')) document.getElementById('undRr').textContent = `1 : ${undRr.toFixed(2)}`;
   if(document.getElementById('undRationaleShort')){
     document.getElementById('undRationaleShort').innerHTML = isBacktest
-      ? `⏱️ <b>Backtest Replay (${btDateStr} ${btTimeStr}):</b> Unified formula pullback entry at ₹${_fmtNum(undEntry)}.`
-      : `Optimal ${isUndBuy ? 'pullback' : 'rally'} limit entry aligned with ATR geometry. R:R 1:${undRr.toFixed(2)}.`;
+      ? `⏱️ <b>Backtest Replay:</b> Entry at ₹${_fmtNum(undEntry)}`
+      : `Limit entry aligned with ATR risk · R:R 1:${undRr.toFixed(2)}`;
   }
 
   // Highlight Primary Card
@@ -22022,12 +21974,8 @@ window.renderDualRecoCards = function(data){
     document.getElementById('ceConsensusBadge').className = isCePrimary ? 'tag buy' : 'tag neutral';
   }
   const tfTipCe = isBacktest
-    ? `Backtest Replay (${btDateStr} ${btTimeStr}): Buy CE setup on ${strike} strike.`
-    : (activeTf === '5m'
-        ? `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 15m TF R:R (1:${ceSpec15m.actualRr.toFixed(2)} vs 1:${ceSpec.actualRr.toFixed(2)}).`
-        : (activeTf === '10m'
-            ? `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. Risk: ₹${ceSpec.risk.toFixed(1)}.`
-            : `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. Support: ₹${ceSpec.sl.toFixed(1)}.`));
+    ? `Backtest Replay: Buy CE setup on ${strike} strike`
+    : `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP · Risk: ₹${ceSpec.risk.toFixed(1)}`;
   if(document.getElementById('ceRationaleShort')) document.getElementById('ceRationaleShort').innerHTML = tfTipCe;
 
   // Render PUT (PE) Card - Only Buy Recommendations (Active when underlying signal is SELL)
@@ -22043,12 +21991,8 @@ window.renderDualRecoCards = function(data){
     document.getElementById('peConsensusBadge').className = !isCePrimary ? 'tag sell' : 'tag neutral';
   }
   const tfTipPe = isBacktest
-    ? `Backtest Replay (${btDateStr} ${btTimeStr}): Buy PE setup on ${strike} strike.`
-    : (activeTf === '5m'
-        ? `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 15m TF R:R (1:${peSpec15m.actualRr.toFixed(2)} vs 1:${peSpec.actualRr.toFixed(2)}).`
-        : (activeTf === '10m'
-            ? `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. Risk: ₹${peSpec.risk.toFixed(1)}.`
-            : `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. Support: ₹${peSpec.sl.toFixed(1)}.`));
+    ? `Backtest Replay: Buy PE setup on ${strike} strike`
+    : `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP · Risk: ₹${peSpec.risk.toFixed(1)}`;
   if(document.getElementById('peRationaleShort')) document.getElementById('peRationaleShort').innerHTML = tfTipPe;
 };
 
