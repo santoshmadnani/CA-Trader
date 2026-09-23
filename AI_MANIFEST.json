@@ -159,6 +159,23 @@
       "key_dom_ids": { "list": "dedicatedNotificationsList" },
       "api_routes": ["GET /api/notifications"]
     }
+  },
+  "database": {
+    "file": "ca_trader.sqlite3",
+    "engine": "sqlite3 (WAL mode, PRAGMA synchronous=FULL)",
+    "query_safety_rule": "CRITICAL FOR AI: Never execute 'SELECT * FROM recommendations' without column filtering or small LIMIT. The columns option_basis, news_basis, and technical_basis contain ~60KB of JSON per row (200MB total in DB). Querying them dumps tens of thousands of tokens into prompt context.",
+    "core_tables": {
+      "users": "User accounts, hashed passwords, auth status",
+      "settings": "Broker API keys, secret tokens, configuration flags",
+      "watchlist_groups": "Watchlist group definitions",
+      "watchlist_members": "User watchlist instruments (symbol, exchange, instrument_key)",
+      "orders": "Paper & live order book entries",
+      "positions": "Open and closed positions with live P&L tracking",
+      "funds": "User available margin, cash, collateral",
+      "recommendations": "Dual consensus (CE/PE) signal recommendations. Lightweight summary columns: id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, score, outcome, final_pnl, success, exit_reason, created_at, status",
+      "error_events": "Application error logs and exceptions"
+    }
   }
 }
+
 

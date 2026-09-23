@@ -1886,7 +1886,6 @@ class UpstoxAdapter:
             end=(now.date()-timedelta(days=1))
             start=end-timedelta(days=7)
             path=f"/historical-candle/{quote(key,safe='')}/day/{end.isoformat()}/{start.isoformat()}"
-            payload=self._get(path,{},ttl=300.0,cache_key=cache_key,base_url=UPSTOX_V3_BASE_URL)
             payload=self._get(path,{},ttl=1800.0,cache_key=cache_key)
             rows=(payload.get('data') or {}).get('candles') or []
             vals=[]
@@ -2160,7 +2159,6 @@ class UpstoxAdapter:
         # Single path segment interval: e.g. /historical-candle/intraday/{key}/1minute
         interval_str, _ = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/intraday/{quote(key, safe='')}/{interval_str}"
-        payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}", base_url=UPSTOX_V3_BASE_URL)
         payload = self._get(path, ttl=2.0, cache_key=f"intraday:{key}:{interval_str}")
         return self._parse_candle_rows((payload.get("data") or {}).get("candles") or [])
 
@@ -2182,7 +2180,6 @@ class UpstoxAdapter:
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
         hist_path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date}/{from_date}"
         try:
-            payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}", base_url=UPSTOX_V3_BASE_URL)
             payload = self._get(hist_path, ttl=10.0, cache_key=f"candles:{key}:{interval_str}:{from_date}:{to_date}:{'open' if active else 'closed'}")
             out.extend(self._parse_candle_rows((payload.get("data") or {}).get("candles") or []))
         except Exception as exc:
@@ -2213,7 +2210,6 @@ class UpstoxAdapter:
         key, meta = self.resolve_instrument(instrument)
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
         path = f"/historical-candle/{quote(key, safe='')}/{interval_str}/{to_date.isoformat()}/{from_date.isoformat()}"
-        payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}", base_url=UPSTOX_V3_BASE_URL)
         payload = self._get(path, ttl=60.0, cache_key=f"candles-between:{key}:{interval_str}:{from_date}:{to_date}")
         data = payload.get("data") or {}
         candles = data.get("candles") or []
@@ -10092,9 +10088,9 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
     if not allowed_symbols:
         allowed_symbols = {"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN", "TATAMOTORS", "NIFTY", "BANKNIFTY", "CRUDEOIL"}
 
-    # 2. Fetch raw rows - strictly actionable BUY/SELL recommendations with full rationale snapshots
+    # 2. Fetch raw rows - strictly actionable BUY/SELL recommendations without heavy basis blobs
     rows = db_exec(
-        "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, news_basis, option_basis, score, outcome, final_pnl, success, exit_reason, created_at, status FROM recommendations WHERE (user_id=? OR user_id IS NULL OR user_id=1) AND UPPER(recommendation) IN ('BUY', 'SELL') ORDER BY created_at DESC LIMIT 300",
+        "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, score, outcome, final_pnl, success, exit_reason, created_at, status FROM recommendations WHERE (user_id=? OR user_id IS NULL OR user_id=1) AND UPPER(recommendation) IN ('BUY', 'SELL') ORDER BY created_at DESC LIMIT 300",
         [user["id"]],
         "all"
     )
