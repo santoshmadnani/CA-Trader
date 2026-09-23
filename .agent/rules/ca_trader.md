@@ -3,6 +3,7 @@
 ## 0. Efficiency & Token Conservation (Manifest First)
 - **Always Read `app/AI_MANIFEST.json` First**: Never blindly read or grep 1.5MB `terminal.html` or 900KB `app.py`. The manifest indexes all 14 panels, DOM IDs, key JS functions, API endpoints, broker invariants, and SQLite tables in 2KB. Reading this first cuts AI token consumption by 80% and turnaround time to minutes.
 - **Surgical Line-Bounded Edits**: When modifying `terminal.html` or `app.py`, always use small, line-bounded `replace_file_content` blocks. Never attempt whole-file replacements.
+- **No Stdlib Name Collisions**: Never create scratch scripts in `app/` named after Python standard library modules (e.g., `inspect.py`, `types.py`, `token.py`, `ast.py`, `json.py`). These shadow stdlib modules and break Python compilation and test runners. Always store one-off scratch scripts in the designated brain scratch directory.
 
 ## 1. Database Query Safety
 - **Canonical Database**: `ca_trader.sqlite3` (SQLite3, WAL mode).
@@ -29,6 +30,8 @@
   3. Pull changes inside `/home/ubuntu/ca-trader-repo`.
   4. Package `/home/ubuntu/46.zip` on the server filesystem.
   5. Run `sudo /home/ubuntu/deploy.sh` and verify container hot-swap.
+- **Mandatory Live Verification Rule**:
+  Whenever code changes are made to `terminal.html` or `app.py`, NEVER declare the task complete based on local files alone. Always execute `python tools/deploy_via_git.py` and verify via headless Chrome / curl that the live production site (`https://catrader.site/terminal`) reflects the change with 0 unhandled console exceptions.
 
 ## 6. Post-Task Efficiency Audit & Self-Optimization Protocol
 Upon completing any user request or feature implementation:
