@@ -5416,6 +5416,13 @@ def calculate_spec_levels(
     actual_reward = round(target - entry, 2)
     actual_rr = round(actual_reward / max(0.01, actual_risk), 2)
 
+    target_1 = model_target if target_feasible else min_target
+    target_2 = round(entry + 3.5 * final_risk_budget, 2)
+    target_3 = round(entry + 5.5 * final_risk_budget, 2)
+    trailing_sl = f"Cost (₹{entry:.2f}) at T1; Lock T1 (₹{target_1:.2f}) at T2"
+    is_bull_run = bool(is_ce and (rsi >= 56.0 or adx >= 24.0 or score >= 0.35))
+    is_severe_fall = bool((not is_ce) and (rsi <= 44.0 or adx >= 24.0 or score <= -0.35))
+
     return {
         "side": "CE" if is_ce else "PE",
         "cmp": round(ltp_opt, 2),
@@ -5436,7 +5443,13 @@ def calculate_spec_levels(
         "d_option_target": round(d_option_target, 2),
         "model_target": model_target,
         "min_target": min_target,
-        "target": target,
+        "target": target_1,
+        "target_1": target_1,
+        "target_2": target_2,
+        "target_3": target_3,
+        "trailing_sl": trailing_sl,
+        "is_bull_run": is_bull_run,
+        "is_severe_fall": is_severe_fall,
         "target_feasible": target_feasible,
         "actual_risk": actual_risk,
         "actual_reward": actual_reward,
@@ -8482,6 +8495,7 @@ async def market_movers(category: str = "gainers", limit: int = Query(10, ge=5, 
         if not items:
             items = _full_market_mover_snapshot()
         if not items:
+            # Fallback based on premier Nifty 50 constituents so section is never blank
             # Premier Nifty constituents batch quote from live Upstox API
             top_constituents = [
                 ("RELIANCE", "NSE_EQ|INE002A01018"),

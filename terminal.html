@@ -1641,10 +1641,9 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85) !important;
 }
 
-/* Item 24: Mobile Responsive CE/PE Cards Stacking & Tables Scroll */
-@media (max-width: 768px) {
-/* Item 24: Responsive CE/PE Cards Stacking & Grid Dimensions */
-/* Item 24: Responsive 3-Card Stacking & Grid Dimensions (Underlying + Best CE + Best PE) */
+/* Recommendation Cards: Desktop 3-Card Grid Layout */
+.dash-reco-grid,
+#dashDualRecoContainer,
 #dashDualRecoContainer.dash-dual-reco-grid {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -1652,44 +1651,42 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   width: 100% !important;
   box-sizing: border-box !important;
 }
-@media (max-width: 992px) {
-  #dashDualRecoContainer.dash-dual-reco-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-#dashCardCe, #dashCardPe {
-#dashCardUnderlying, #dashCardCe, #dashCardPe {
-#dashCardSpot, #dashCardUnderlying, #dashCardCe, #dashCardPe {
+
+#dashCardSpot,
+#dashCardUnderlying,
+#dashCardCe,
+#dashCardPe {
   min-width: 0 !important;
   box-sizing: border-box !important;
-  padding: 16px 18px !important;
   padding: 14px 16px !important;
 }
-#dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
-#dashCardUnderlying .metric-clickable-box, #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
-  padding: 8px 4px !important;
-#dashCardSpot .metric-clickable-box, #dashCardUnderlying .metric-clickable-box, #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
+
+#dashCardSpot .metric-clickable-box,
+#dashCardUnderlying .metric-clickable-box,
+#dashCardCe .metric-clickable-box,
+#dashCardPe .metric-clickable-box {
   padding: 6px 3px !important;
   min-width: 0 !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
-#dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
-#dashCardUnderlying .metric-clickable-box div:first-child, #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
-  font-size: 9.5px !important;
-#dashCardSpot .metric-clickable-box div:first-child, #dashCardUnderlying .metric-clickable-box div:first-child, #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
+
+#dashCardSpot .metric-clickable-box div:first-child,
+#dashCardUnderlying .metric-clickable-box div:first-child,
+#dashCardCe .metric-clickable-box div:first-child,
+#dashCardPe .metric-clickable-box div:first-child {
   font-size: 8.5px !important;
   font-weight: 700 !important;
-  letter-spacing: 0.5px !important;
   letter-spacing: 0.3px !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
-#dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
-#dashCardUnderlying .metric-clickable-box div:last-child, #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
-  font-size: 13.5px !important;
-#dashCardSpot .metric-clickable-box div:last-child, #dashCardUnderlying .metric-clickable-box div:last-child, #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
+
+#dashCardSpot .metric-clickable-box div:last-child,
+#dashCardUnderlying .metric-clickable-box div:last-child,
+#dashCardCe .metric-clickable-box div:last-child,
+#dashCardPe .metric-clickable-box div:last-child {
   font-family: var(--font-mono) !important;
   font-size: 11px !important;
   font-weight: 700 !important;
@@ -1697,11 +1694,28 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
+
+/* Mobile & Tablet: Recommendation Cards Stack Vertically One Below Other */
 @media (max-width: 900px) {
+  .dash-reco-grid,
+  #dashDualRecoContainer,
   #dashDualRecoContainer.dash-dual-reco-grid {
+    display: flex !important;
+    flex-direction: column !important;
     grid-template-columns: 1fr !important;
-    gap: 10px !important;
-    gap: 12px !important;
+    gap: 14px !important;
+    width: 100% !important;
+  }
+  #dashCardSpot,
+  #dashCardUnderlying,
+  #dashCardCe,
+  #dashCardPe {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-bottom: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 }
 
@@ -3388,7 +3402,7 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
     Other Factors
   </div>
-  <div class="navtab" data-tab="backtesting" role="button" tabindex="0" onclick="showTab('backtesting')">
+  <div class="navtab" data-tab="backtesting" role="button" tabindex="0" onclick="showTab('backtesting')" style="display:none !important;" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><path d="M4 12a8 8 0 0 1 8-8"/></svg>
     Backtesting &amp; Calibration
   </div>
@@ -3481,8 +3495,18 @@ select#watchlistSelect, select.watchlist-select {
           </div>
         </div>
 
+        <!-- Bull Run / Severe Fall Sentinel Alert Banner -->
+        <div id="bullRunSentinelBanner" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:700;letter-spacing:0.3px;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(0,0,0,0.3);flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span id="bullRunIcon" style="font-size:16px;">🔥</span>
+            <span id="bullRunTitle" style="color:var(--text);font-weight:800;">STRONG BULL RUN EXPANSION SETUP DETECTED</span>
+            <span id="bullRunPointsBadge" class="tag gold" style="font-weight:800;font-size:10.5px;">+200PT TARGET ACTIVATED</span>
+          </div>
+          <div id="bullRunAdvice" style="font-size:11px;font-weight:600;color:var(--text-dim);font-family:var(--font-mono);">Trail SL Active: Breakeven at T1, Lock Profit at T2</div>
+        </div>
+
         <!-- 3 Recommendation Cards: Spot Benchmark | Best Call (CE) | Best Put (PE) -->
-        <div class="dash-reco-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch;width:100%;">
+        <div class="dash-reco-grid" id="dashDualRecoContainer" style="gap:12px;margin-bottom:12px;align-items:stretch;width:100%;">
 
           <!-- CARD 1: UNDERLYING / SPOT BENCHMARK -->
           <div class="card" id="dashCardSpot" style="padding:12px 14px;background:var(--surface-2);border:1px solid var(--border-soft);border-top:3px solid var(--gold);border-radius:8px;position:relative;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;height:100%;">
@@ -3519,6 +3543,18 @@ select#watchlistSelect, select.watchlist-select {
               <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'UND')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">R : R</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="undRr">1 : 2.0</div>
+              </div>
+            </div>
+
+            <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner (+200pt) & Trailing SL -->
+            <div style="background:rgba(232,184,75,0.06);border:1px dashed rgba(232,184,75,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;flex-wrap:wrap;gap:4px;">
+                <span><b>T1:</b> <span id="undTgt1" style="color:var(--text);font-weight:700;">₹--</span></span>
+                <span><b>T2:</b> <span id="undTgt2" style="color:var(--text);font-weight:700;">₹--</span></span>
+                <span><b style="color:var(--gold);">T3 (Runner +200pt):</b> <span id="undTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+              </div>
+              <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
+                <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="undTrailingSl">Cost at T1; Lock T1 at T2</span>
               </div>
             </div>
 
@@ -3592,6 +3628,18 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
+            <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
+            <div style="background:rgba(38,217,166,0.06);border:1px dashed rgba(38,217,166,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;flex-wrap:wrap;gap:4px;">
+                <span><b>T1:</b> <span id="ceTgt1" style="color:var(--buy);font-weight:700;">₹--</span></span>
+                <span><b>T2:</b> <span id="ceTgt2" style="color:var(--buy);font-weight:700;">₹--</span></span>
+                <span><b style="color:var(--gold);">T3 (Runner +200pt):</b> <span id="ceTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+              </div>
+              <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
+                <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="ceTrailingSl">Cost at T1; Lock T1 at T2</span>
+              </div>
+            </div>
+
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span class="muted" style="font-size:10px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="ceRationaleShort">Pullback limit entry below CMP to prevent top buying</span>
               <div style="display:inline-flex;gap:4px;flex-shrink:0;">
@@ -3659,6 +3707,18 @@ select#watchlistSelect, select.watchlist-select {
               <div class="metric-clickable-box" onclick="openRecoMathModal('RR', 'PE')" title="Click to view mathematical Risk:Reward derivation" style="background:var(--surface);padding:5px 2px;border-radius:6px;border:1px solid var(--border-soft);cursor:pointer;white-space:nowrap;overflow:hidden;min-width:0;">
                 <div style="font-size:8px;color:var(--text-faint);font-weight:700;letter-spacing:0.3px;margin-bottom:2px;">R : R</div>
                 <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="peRr">1 : 2.0</div>
+              </div>
+            </div>
+
+            <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
+            <div style="background:rgba(255,92,114,0.06);border:1px dashed rgba(255,92,114,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;flex-wrap:wrap;gap:4px;">
+                <span><b>T1:</b> <span id="peTgt1" style="color:var(--sell);font-weight:700;">₹--</span></span>
+                <span><b>T2:</b> <span id="peTgt2" style="color:var(--sell);font-weight:700;">₹--</span></span>
+                <span><b style="color:var(--gold);">T3 (Runner -200pt):</b> <span id="peTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+              </div>
+              <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
+                <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="peTrailingSl">Cost at T1; Lock T1 at T2</span>
               </div>
             </div>
 
@@ -4157,7 +4217,7 @@ select#watchlistSelect, select.watchlist-select {
     </div>
 
     <!-- ============ BACKTESTING ENGINE & CANDLE REPLAY SIMULATOR ============ -->
-    <div class="panel" id="panel-backtesting">
+    <div class="panel" id="panel-backtesting" style="display:none !important;" aria-hidden="true">
 
       <!-- ============ QUICK BACKTEST RECOMMENDATION ENGINE & CALIBRATION TRACKER ============ -->
       <div class="card" id="btQuickSection" style="margin-bottom:16px;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,0.22);">
@@ -11342,7 +11402,7 @@ window.handleNotificationClick = function(n){
       // Immediately sync Chart Tab Option Greeks card so it is never empty
       const gSide = atmRow?.call || {};
       const cgBadge = document.getElementById('chartGreeksContractBadge');
-      if(cgBadge) cgBadge.textContent = `Option: ${sym} ${atm} CE`;
+      if(cgBadge) cgBadge.textContent = `Option: ${underSym} ${atm} CE`;
       const cgIv = document.getElementById('chartGreeksIvBadge');
       if(cgIv) cgIv.textContent = `IV: ${gSide.iv ? (Number(gSide.iv) > 1 ? Number(gSide.iv).toFixed(1) : (Number(gSide.iv)*100).toFixed(1)) : (Number(atmIv)).toFixed(1)}%`;
       if(document.getElementById('cgDelta')) document.getElementById('cgDelta').textContent = Number(gSide.delta || 0.50).toFixed(3);
@@ -22505,12 +22565,16 @@ window.calculateSpecLevels = function(side, spot, vwap, ltpOpt, delta, gamma, th
   );
   const modelTarget = _roundV(entry + dOptionTarget);
   const minTarget = _roundV(entry + 2.0 * finalRiskBudget);
-  const targetFeasible = modelTarget >= minTarget;
-  const target = targetFeasible ? modelTarget : minTarget;
+  const target1 = targetFeasible ? modelTarget : minTarget;
+  const target2 = _roundV(entry + 3.5 * finalRiskBudget);
+  const target3 = _roundV(entry + 5.5 * finalRiskBudget);
+  const trailingSlDesc = `Cost (₹${entry}) at T1; Lock T1 (₹${target1}) at T2`;
+  const isBullRun = Boolean(isCe && (rsi >= 56 || adx >= 24 || score >= 0.35));
+  const isCrash = Boolean(!isCe && (rsi <= 44 || adx >= 24 || score <= -0.35));
 
   // 4. Actual Risk-Reward Ratio (Section 6 & 12)
   const actualRisk = _roundV(entry - stop);
-  const actualReward = _roundV(target - entry);
+  const actualReward = _roundV(target1 - entry);
   const actualRr = _roundV(actualReward / Math.max(0.01, actualRisk));
 
   return {
@@ -22535,8 +22599,17 @@ window.calculateSpecLevels = function(side, spot, vwap, ltpOpt, delta, gamma, th
     dOptionTarget: dOptionTarget,
     modelTarget: modelTarget,
     minTarget: minTarget,
-    tgt: target,
-    target: target,
+    tgt: target1,
+    target: target1,
+    target1: target1,
+    target2: target2,
+    target3: target3,
+    tgt1: target1,
+    tgt2: target2,
+    tgt3: target3,
+    trailingSl: trailingSlDesc,
+    isBullRun: isBullRun,
+    isCrash: isCrash,
     targetFeasible: targetFeasible,
     actualRisk: actualRisk,
     actualReward: actualReward,
@@ -22658,13 +22731,19 @@ window.renderDualRecoCards = function(data){
     ? undData.entry
     : _roundV(isUndBuy ? curLtp - undPullback : curLtp + undPullback));
   // Keep realistic targets strictly bound by timeframe
-  const undTgt = Number(undData.target && ((isUndBuy && Number(undData.target) > undEntry) || (!isUndBuy && Number(undData.target) < undEntry))
+  const undTgt1 = Number(undData.target && ((isUndBuy && Number(undData.target) > undEntry) || (!isUndBuy && Number(undData.target) < undEntry))
     ? undData.target
     : _roundV(isUndBuy ? undEntry + realisticTargetPts : undEntry - realisticTargetPts));
+  const undTgt2 = _roundV(isUndBuy ? undEntry + (realisticTargetPts * 1.8) : undEntry - (realisticTargetPts * 1.8));
+  // Bull run / crash runner target (+200pt for Bank Nifty / +120pt for Nifty / +2.5% for stocks)
+  const runnerPts = root.includes('BANK') ? Math.max(250, realisticTargetPts * 2.8) : (root.includes('CRUDE') ? Math.max(90, realisticTargetPts * 2.5) : Math.max(120, realisticTargetPts * 2.8));
+  const undTgt3 = _roundV(isUndBuy ? undEntry + runnerPts : undEntry - runnerPts);
+  const undTgt = undTgt1;
   const undSl = Number(undData.stop_loss && ((isUndBuy && Number(undData.stop_loss) < undEntry) || (!isUndBuy && Number(undData.stop_loss) > undEntry))
     ? undData.stop_loss
     : _roundV(isUndBuy ? undEntry - realisticRiskPts : undEntry + realisticRiskPts));
   const undRr = _roundV(Math.abs(undTgt - undEntry) / Math.max(0.01, Math.abs(undEntry - undSl)));
+  const undTrailingSl = `Cost (₹${_fmtNum(undEntry)}) at T1; Lock T1 (₹${_fmtNum(undTgt1)}) at T2`;
 
   const cardUnd = document.getElementById('dashCardSpot') || document.getElementById('dashCardUnderlying');
   if(cardUnd){
@@ -22687,6 +22766,10 @@ window.renderDualRecoCards = function(data){
   if(document.getElementById('undEntry')) document.getElementById('undEntry').textContent = `₹${_fmtNum(undEntry)}`;
   if(document.getElementById('undSl')) document.getElementById('undSl').textContent = `₹${_fmtNum(undSl)}`;
   if(document.getElementById('undTarget')) document.getElementById('undTarget').textContent = `₹${_fmtNum(undTgt)}`;
+  if(document.getElementById('undTgt1')) document.getElementById('undTgt1').textContent = `₹${_fmtNum(undTgt1)}`;
+  if(document.getElementById('undTgt2')) document.getElementById('undTgt2').textContent = `₹${_fmtNum(undTgt2)}`;
+  if(document.getElementById('undTgt3')) document.getElementById('undTgt3').textContent = `₹${_fmtNum(undTgt3)}`;
+  if(document.getElementById('undTrailingSl')) document.getElementById('undTrailingSl').textContent = undTrailingSl;
   if(document.getElementById('undRr')) document.getElementById('undRr').textContent = `1 : ${undRr}`;
   if(document.getElementById('undRationaleShort')){
     document.getElementById('undRationaleShort').textContent = isUndBuy
@@ -22810,6 +22893,10 @@ window.renderDualRecoCards = function(data){
   if(document.getElementById('ceEntry')) document.getElementById('ceEntry').textContent = `₹${_fmtNum(entryCe)}`;
   if(document.getElementById('ceSl')) document.getElementById('ceSl').textContent = `₹${_fmtNum(slCe)}`;
   if(document.getElementById('ceTarget')) document.getElementById('ceTarget').textContent = `₹${_fmtNum(tgtCe)}`;
+  if(document.getElementById('ceTgt1')) document.getElementById('ceTgt1').textContent = `₹${_fmtNum(ceSpec.target1 || tgtCe)}`;
+  if(document.getElementById('ceTgt2')) document.getElementById('ceTgt2').textContent = `₹${_fmtNum(ceSpec.target2 || _roundV(entryCe + 3.5 * ceSpec.risk))}`;
+  if(document.getElementById('ceTgt3')) document.getElementById('ceTgt3').textContent = `₹${_fmtNum(ceSpec.target3 || _roundV(entryCe + 5.5 * ceSpec.risk))}`;
+  if(document.getElementById('ceTrailingSl')) document.getElementById('ceTrailingSl').textContent = ceSpec.trailingSl || `Cost at T1; Lock T1 at T2`;
   if(document.getElementById('ceRr')) document.getElementById('ceRr').textContent = rrCe;
   if(document.getElementById('ceConsensusBadge')){
     document.getElementById('ceConsensusBadge').textContent = isCePrimary ? 'PRIMARY ALGO CONSENSUS' : 'Alternative / Counter-Trend';
@@ -22831,6 +22918,10 @@ window.renderDualRecoCards = function(data){
   if(document.getElementById('peEntry')) document.getElementById('peEntry').textContent = `₹${_fmtNum(entryPe)}`;
   if(document.getElementById('peSl')) document.getElementById('peSl').textContent = `₹${_fmtNum(slPe)}`;
   if(document.getElementById('peTarget')) document.getElementById('peTarget').textContent = `₹${_fmtNum(tgtPe)}`;
+  if(document.getElementById('peTgt1')) document.getElementById('peTgt1').textContent = `₹${_fmtNum(peSpec.target1 || tgtPe)}`;
+  if(document.getElementById('peTgt2')) document.getElementById('peTgt2').textContent = `₹${_fmtNum(peSpec.target2 || _roundV(entryPe + 3.5 * peSpec.risk))}`;
+  if(document.getElementById('peTgt3')) document.getElementById('peTgt3').textContent = `₹${_fmtNum(peSpec.target3 || _roundV(entryPe + 5.5 * peSpec.risk))}`;
+  if(document.getElementById('peTrailingSl')) document.getElementById('peTrailingSl').textContent = peSpec.trailingSl || `Cost at T1; Lock T1 at T2`;
   if(document.getElementById('peRr')) document.getElementById('peRr').textContent = rrPe;
   if(document.getElementById('peConsensusBadge')){
     document.getElementById('peConsensusBadge').textContent = !isCePrimary ? 'PRIMARY ALGO CONSENSUS' : 'Alternative / Counter-Trend';
@@ -22844,6 +22935,37 @@ window.renderDualRecoCards = function(data){
             ? `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. Risk: ₹${peSpec.risk.toFixed(1)}.`
             : `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. Support: ₹${peSpec.sl.toFixed(1)}.`));
   if(document.getElementById('peRationaleShort')) document.getElementById('peRationaleShort').innerHTML = tfTipPe;
+
+  // Bull Run / Severe Fall Sentinel Alert Banner
+  const brBanner = document.getElementById('bullRunSentinelBanner');
+  const brIcon = document.getElementById('bullRunIcon');
+  const brTitle = document.getElementById('bullRunTitle');
+  const brBadge = document.getElementById('bullRunPointsBadge');
+  const brAdvice = document.getElementById('bullRunAdvice');
+
+  const isStrongTrend = Boolean(isCePrimary ? (ceSpec.isBullRun || isCePrimary) : (peSpec.isCrash || !isCePrimary));
+  if(brBanner){
+    if(isStrongTrend){
+      brBanner.style.display = 'flex';
+      if(isCePrimary){
+        brBanner.style.background = 'linear-gradient(90deg, rgba(38,217,166,0.18) 0%, rgba(232,184,75,0.18) 100%)';
+        brBanner.style.border = '1px solid rgba(38,217,166,0.5)';
+        if(brIcon) brIcon.textContent = '🔥';
+        if(brTitle) brTitle.innerHTML = `<span style="color:var(--buy);">STRONG BULL RUN EXPANSION SETUP DETECTED:</span> ${root} primed for +200pt super-trend movement!`;
+        if(brBadge) { brBadge.className = 'tag buy'; brBadge.textContent = `+${Math.round(runnerPts)}PT RUNNER ACTIVE`; }
+        if(brAdvice) brAdvice.textContent = `Ride move with T3 Runner (₹${_fmtNum(ceSpec.target3)}). Lock Cost at T1, Lock Profit at T2.`;
+      } else {
+        brBanner.style.background = 'linear-gradient(90deg, rgba(255,92,114,0.18) 0%, rgba(232,184,75,0.18) 100%)';
+        brBanner.style.border = '1px solid rgba(255,92,114,0.5)';
+        if(brIcon) brIcon.textContent = '🚨';
+        if(brTitle) brTitle.innerHTML = `<span style="color:var(--sell);">SEVERE MARKET BREAKDOWN CASCADE DETECTED:</span> ${root} primed for -200pt downside collapse!`;
+        if(brBadge) { brBadge.className = 'tag sell'; brBadge.textContent = `-${Math.round(runnerPts)}PT RUNNER ACTIVE`; }
+        if(brAdvice) brAdvice.textContent = `Protect capital & ride Put options to T3 Runner (₹${_fmtNum(peSpec.target3)}). Strict trailing stop loss active.`;
+      }
+    } else {
+      brBanner.style.display = 'none';
+    }
+  }
 };
 
 // Immediately populate CE/PE cards with fallback data so they never show "Loading CE Contract…" on page load.
