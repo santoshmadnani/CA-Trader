@@ -25,6 +25,7 @@ def run_ssh(cmd, timeout=400):
         HOST,
         cmd
     ]
+    print(f"\n>> [SSH] {cmd}", flush=True)
     r = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
     enc = sys.stdout.encoding or 'utf-8'
     if r.stdout:

@@ -10,5 +10,8 @@ scratch/
 *.bak
 *.zip
 terminal_modular.html
+server_host/bin/
+server_host/logs/
+server_host/backups/
 
 

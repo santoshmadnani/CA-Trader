@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "comment": "CA Trader Laptop Server Configuration - Highly portable across Windows machines",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8000,
+    "log_level": "info",
+    "event_loop_policy": "WindowsSelectorEventLoopPolicy",
+    "reload": false
+  },
+  "database": {
+    "canonical_file": "ca_trader.sqlite3",
+    "backup_dir": "server_host/backups",
+    "auto_backup_on_start": true,
+    "max_backups_to_retain": 15
+  },
+  "tunnel": {
+    "enabled": true,
+    "provider": "cloudflare",
+    "mode": "quick",
+    "quick_tunnel_domain": "trycloudflare.com",
+    "named_tunnel": {
+      "tunnel_name": "ca-trader-laptop",
+      "custom_hostname": "catrader.site",
+      "credentials_file": "server_host/bin/tunnel_credentials.json"
+    },
+    "binary_path": "server_host/bin/cloudflared.exe"
+  },
+  "power_management": {
+    "prevent_system_sleep_while_running": true,
+    "recommended_windows_power_settings": {
+      "sleep_when_plugged_in": "Never",
+      "lid_close_action_when_plugged_in": "Do nothing"
+    }
+  }
+}
