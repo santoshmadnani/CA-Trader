@@ -8370,7 +8370,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     const cp=[];
     if(highs.length>=10 && lows.length>=10){
       const hh=Math.max(...highs),ll=Math.min(...lows),lastClose=Number(last?.close);
-      if(Number.isFinite(lastClose)&&lastClose>=hh*.995)cp.push({pattern:'Range Breakout (possible)',confidence:58,description:'Latest close is testing the recen
       if(Number.isFinite(lastClose)&&lastClose>=hh*.995)cp.push({pattern:'Range Breakout (possible)',confidence:58,description:'Latest close is testing the recent high.'});
       else if(Number.isFinite(lastClose)&&lastClose<=ll*1.005)cp.push({pattern:'Range Breakdown (possible)',confidence:58,description:'Latest close is testing the recent low.'});
       else cp.push({pattern:'Short-term Range Structure',confidence:50,description:'Recent loaded candles form a visible local range.'});
@@ -8385,7 +8384,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     window.__caChartPatterns = cp;
     $('chartPatternStatus').textContent=`${cp.length} chart pattern(s) detected`;
     $('chartPatternList').innerHTML=cp.length?cp.map((p,i)=>`
-      <div class="pattern-card" data-focus-chart-pattern="1" data-chart-pattern-index="${i}" style="cursor:pointer;" title
       <div class="pattern-card" data-focus-chart-pattern="1" data-chart-pattern-index="${i}" style="cursor:pointer;" title="Click to highlight ${esc(p.pattern)} on chart">
         <div style="flex:1;">
           <div style="display:flex;align-items:center;gap:6px;">
@@ -8437,8 +8435,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           </div>
           <div style="display:flex;align-items:center;gap:10px;text-align:left;">
             <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">MACD</span>
-            <span class="${macdVal >= 0 ? 'cell
-... [truncated for diff preview]
             <span class="${macdVal >= 0 ? 'cell-up' : 'cell-down'}" style="font-family:var(--font-mono);font-size:10.5px;font-weight:600;">${fmt(macdVal)}</span>
           </div>
           <div style="display:flex;align-items:center;gap:10px;text-align:left;">
