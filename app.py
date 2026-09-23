@@ -8482,7 +8482,57 @@ async def market_movers(category: str = "gainers", limit: int = Query(10, ge=5, 
         if not items:
             items = _full_market_mover_snapshot()
         if not items:
-            # Fallback based on premier Nifty 50 constituents so section is never blank
+            # Premier Nifty constituents batch quote from live Upstox API
+            top_constituents = [
+                ("RELIANCE", "NSE_EQ|INE002A01018"),
+                ("HDFCBANK", "NSE_EQ|INE040A01034"),
+                ("INFY", "NSE_EQ|INE009A01021"),
+                ("TCS", "NSE_EQ|INE467B01029"),
+                ("ICICIBANK", "NSE_EQ|INE090A01021"),
+                ("BHARTIARTL", "NSE_EQ|INE397D01024"),
+                ("SBIN", "NSE_EQ|INE062A01020"),
+                ("ITC", "NSE_EQ|INE154A01025"),
+                ("HINDUNILVR", "NSE_EQ|INE030A01027"),
+                ("LICI", "NSE_EQ|INE115A01026"),
+                ("LT", "NSE_EQ|INE018A01030"),
+                ("AXISBANK", "NSE_EQ|INE238A01034"),
+                ("KOTAKBANK", "NSE_EQ|INE237A01028"),
+                ("TATAMOTORS", "NSE_EQ|INE155A01022"),
+                ("M&M", "NSE_EQ|INE101A01026"),
+                ("SUNPHARMA", "NSE_EQ|INE044A01036"),
+                ("TITAN", "NSE_EQ|INE280A01028"),
+                ("BAJFINANCE", "NSE_EQ|INE296A01024"),
+                ("MARUTI", "NSE_EQ|INE585B01010"),
+                ("NTPC", "NSE_EQ|INE733E01010")
+            ]
+            try:
+                q_list = UPSTOX.quotes([k for _, k in top_constituents])
+                if q_list and isinstance(q_list, list):
+                    q_map = {q.get("instrument_key"): q for q in q_list if isinstance(q, dict)}
+                    for s, k in top_constituents:
+                        qd = q_map.get(k) or {}
+                        ltp = float(qd.get("ltp") or qd.get("last_price") or qd.get("cp") or 0.0)
+                        if ltp > 0:
+                            chg = float(qd.get("net_change") or qd.get("session_change") or 0.0)
+                            pct = float(qd.get("change_pct") or qd.get("session_change_pct") or 0.0)
+                            vol = float(qd.get("volume") or 0.0)
+                            items.append({
+                                "symbol": s,
+                                "instrument_key": k,
+                                "ltp": round(ltp, 2),
+                                "change": round(chg, 2),
+                                "change_pct": round(pct, 2),
+                                "volume": vol,
+                                "turnover": round(vol * ltp, 2),
+                                "circuit_limit": qd.get("upper_circuit")
+                            })
+                    if items:
+                        source = "upstox_live_nifty"
+            except Exception as e_live:
+                log.warning("Live market mover quote fallback failed: %s", safe_text(e_live))
+
+        if not items:
+            # Ultimate safety fallback if Upstox connectivity is completely severed
             sample_constituents = [
                 ("RELIANCE", 1307.20, -5.90, -0.45, 1250000),
                 ("HDFCBANK", 1650.40, 12.80, 0.78, 2300000),
@@ -9809,23 +9859,51 @@ async def news_ca_ai_feed(
 
         # Autonomous CA AI Sentiment & Price Impact Decision
         t_low = title.lower()
+
+        # Scope Calibration: Ensure US/Global Macro news is never misclassified as Stock/BankNifty specific
+        global_indicators = (
+            "u.s.", "us ", "wall street", "fed ", "federal reserve", "treasur", "bond yield",
+            "dollar", "euro", "biden", "trump", "putin", "xi jinping", "china", "ukraine",
+            "russia", "global", "un general assembly", "unga", "imf", "opec", "world order",
+            "oil price", "diesel", "crude"
+        )
+        is_truly_global = any(g in t_low for g in global_indicators)
+        sym_l = sym.lower()
+        is_truly_stock = (sym_l in t_low) or ("bank" in sym_l and any(b in t_low for b in ("bank", "rbi", "hdfc", "icici", "sbi", "pnb", "axis", "kotak", "npa", "lending", "credit")))
+        final_scope = "stock" if (is_truly_stock and not is_truly_global) else "global"
+
+        # Market directional phrases take priority over single conflicting words
+        market_down_phrases = (
+            "stocks fall", "stocks drop", "stocks slump", "stocks plunge", "market falls",
+            "markets fall", "shares fall", "wall street falls", "indices slide", "dow falls",
+            "nasdaq falls", "yields jump", "yields surge", "inflation jump", "crude spikes",
+            "fuel prices hit record", "record high diesel", "oil prices surge", "oil jump",
+            "rate hike", "fed fears", "crash", "bearish engulfing"
+        )
+        market_up_phrases = (
+            "stocks surge", "stocks rally", "stocks jump", "market rallies", "shares surge",
+            "wall street rallies", "rate cut", "inflation falls", "crude drops", "oil falls",
+            "profit surges", "record profit", "revenue beat", "earnings beat", "all-time high"
+        )
+
+        has_market_down = any(p in t_low for p in market_down_phrases)
+        has_market_up = any(p in t_low for p in market_up_phrases)
+
         bull_words = (
-            "surge", "jump", "rally", "profit", "gain", "rise", "soar", "record", "growth",
+            "surge", "rally", "profit", "gain", "rise", "soar", "growth",
             "expansion", "deal", "order", "contract", "acquisition", "merger", "approval",
-            "cut rate", "rate cut", "stimulus", "upgrade", "outperform", "dividend",
-            "buyback", "revenue beat", "earnings beat", "partnership", "all-time high",
+            "stimulus", "upgrade", "outperform", "dividend", "buyback", "partnership",
             "breakout", "bullish", "inflow", "accumulat"
         )
         bear_words = (
             "fall", "drop", "plunge", "loss", "decline", "slump", "war", "tariff",
-            "sanction", "hike", "rate hike", "inflation rise", "probe", "fine", "penalty",
-            "deficit", "downgrade", "crisis", "default", "bankruptcy", "fraud", "scam",
-            "recall", "selloff", "crash", "revenue miss", "earnings miss", "underperform",
+            "sanction", "probe", "fine", "penalty", "deficit", "downgrade", "crisis",
+            "default", "bankruptcy", "fraud", "scam", "recall", "selloff", "underperform",
             "bearish", "layoff", "debt", "outflow", "dump"
         )
 
-        is_bull = any(w in t_low for w in bull_words)
-        is_bear = any(w in t_low for w in bear_words)
+        is_bull = (has_market_up or any(w in t_low for w in bull_words)) and not has_market_down
+        is_bear = has_market_down or any(w in t_low for w in bear_words)
 
         # Discard mundane neutral filler lacking tangible price impact or financial metrics
         macro_material_words = (
@@ -9841,36 +9919,35 @@ async def news_ca_ai_feed(
             # Skip low-materiality neutral news completely
             continue
 
-        # Materiality & probability calibration per User Request 16
+        # Materiality & probability calibration
         high_severity_bear = ("huge loss", "loss surges", "loss jump", "fraud", "scam", "tariff", "unfavourable budget", "budget cut", "probe", "fine", "penalty", "default", "bankruptcy", "crash", "plunge", "ban", "war", "severe")
-        high_severity_bull = ("huge profit", "record profit", "profit jumps", "surge", "massive order", "mega deal", "rate cut", "budget relief", "all-time high", "approval", "acquisition", "record revenue")
+        high_severity_bull = ("huge profit", "record profit", "profit jumps", "massive order", "mega deal", "rate cut", "budget relief", "all-time high", "record revenue")
 
         is_high_bear = any(w in t_low for w in high_severity_bear)
         is_high_bull = any(w in t_low for w in high_severity_bull)
 
         h_val = abs(hash(title))
-        if (is_high_bear or is_bear) and not (is_bull and not is_high_bull):
+        if is_bear and not (is_bull and not is_high_bull and not has_market_down):
             sentiment = "BEARISH"
-            if is_high_bear:
-                prob = 100
-                impact_pct = "100% Sell Signal"
-                insight = "CA AI Decision: Severe downside catalyst (100% Sell Signal). Swift institutional selling expected. Accumulate put options or exit longs."
-            else:
-                prob = 75 + (h_val % 16)
+            if is_high_bear or has_market_down:
+                prob = 82 + (h_val % 13)
                 impact_pct = f"{prob}% Sell Signal"
-                insight = f"CA AI Decision: Bearish headwind ({prob}% Sell Signal). Downside pressure confirmed. Defensive trailing stops recommended."
-        elif is_bull or is_high_bull:
-            sentiment = "BULLISH"
-            if is_high_bull:
-                prob = 100
-                impact_pct = "100% Buy Signal"
-                insight = "CA AI Decision: Major growth catalyst (100% Buy Signal). High institutional buying conviction. Accumulate call options above support."
+                insight = f"Severe downside catalyst ({prob}% Sell Signal). Downside pressure confirmed. Accumulate put options or tighten long stops."
             else:
-                prob = 75 + (h_val % 16)
+                prob = 68 + (h_val % 15)
+                impact_pct = f"{prob}% Sell Signal"
+                insight = f"Bearish headwind ({prob}% Sell Signal). Downside resistance confirmed. Defensive trailing stops recommended."
+        elif is_bull:
+            sentiment = "BULLISH"
+            if is_high_bull or has_market_up:
+                prob = 82 + (h_val % 13)
                 impact_pct = f"{prob}% Buy Signal"
-                insight = f"CA AI Decision: Positive momentum catalyst ({prob}% Buy Signal). Favors long accumulation and call buying above pivot."
+                insight = f"Major growth catalyst ({prob}% Buy Signal). High institutional buying conviction. Accumulate call options above support."
+            else:
+                prob = 68 + (h_val % 15)
+                impact_pct = f"{prob}% Buy Signal"
+                insight = f"Positive momentum catalyst ({prob}% Buy Signal). Favors long accumulation and call buying above pivot."
         else:
-            # User Request 16: No need of neutral news
             continue
 
         curated.append({
@@ -9880,11 +9957,11 @@ async def news_ca_ai_feed(
             "time": rel_time,
             "time_ago": rel_time,
             "published_at": pub_raw or datetime.now(timezone.utc).isoformat(),
-            "scope": item.get("scope", "global"),
+            "scope": final_scope,
             "sentiment": sentiment,
             "impact_pct": impact_pct,
             "impact": impact_pct,
-            "relevance": "High" if (is_bull or is_bear or sym.lower() in t_low) else "Medium",
+            "relevance": "High" if (is_high_bear or is_high_bull or is_truly_stock) else "Medium",
             "ca_ai_insight": insight,
             "url": (item.get("url") if item.get("url") and item.get("url") != "#" and "catrader.site" not in item.get("url") else f"https://news.google.com/search?q={urllib.parse.quote_plus(title)}")
         })

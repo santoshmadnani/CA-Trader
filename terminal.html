@@ -8733,6 +8733,11 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       const us = macro.us_markets || {};
       const vix = macro.india_vix || {};
 
+      const drivers = macro.macro_drivers || [];
+      const gCrude = drivers.find(m => String(m.factor).includes('Crude')) || {};
+      const g10y = drivers.find(m => String(m.factor).includes('Yield')) || {};
+      const gDxy = drivers.find(m => String(m.factor).includes('Dollar')) || {};
+
       const factorList = [
         // Category 1: Global & Macro (6 factors, 28.0% weight)
         {
@@ -8763,43 +8768,43 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           desc: 'Global technology index barometer affecting Indian IT pack',
           time: 'Daily / Close',
           val: us.nasdaq?.level ? `${fmt(us.nasdaq.level)} (${(us.nasdaq.pct||0) >= 0 ? '+' : ''}${fmt(us.nasdaq.pct||0)}%)` : '18,340 (+0.65%)',
-          isUp: (us.nasdaq?.pct !== undefined ? Number(us.nasdaq.pct) >= 0 : true),
+          isUp: (us.nasdaq?.pct !== undefined ? Number(us.nasdaq.pct) >= 0 : false),
           weight: 4.5,
-          sig: 'BULLISH',
-          impact: 'Tech sector leadership aiding domestic IT export heavyweights (TCS, INFY, HCLTECH)'
+          sig: (us.nasdaq?.pct !== undefined ? (Number(us.nasdaq.pct) >= 0.15 ? 'BULLISH' : (Number(us.nasdaq.pct) <= -0.15 ? 'BEARISH' : 'NEUTRAL')) : 'NEUTRAL'),
+          impact: 'Tech sector leadership and sentiment impacting domestic IT export heavyweights'
         },
         {
           cat: 'macro', catName: 'GLOBAL & MACRO',
           name: 'US 10-Year Treasury Yield',
           desc: 'Global benchmark cost of capital; inverse correlation to emerging market equities',
           time: 'Live Macro',
-          val: '4.21% (-3 bps)',
-          isUp: false,
+          val: g10y.level ? `${g10y.level} (${g10y.change || '0 bps'})` : '4.21% (-3 bps)',
+          isUp: g10y.change ? parseFloat(String(g10y.change).replace(/[^0-9.-]/g,'')) > 0 : false,
           weight: 4.0,
-          sig: 'BULLISH',
-          impact: 'Softening sovereign yields ease foreign institutional selling pressure across Indian equities'
+          sig: g10y.change ? (parseFloat(String(g10y.change).replace(/[^0-9.-]/g,'')) <= 0 ? 'BULLISH' : 'BEARISH') : 'BULLISH',
+          impact: 'Yield curve trajectory affects foreign institutional risk appetite across emerging markets'
         },
         {
           cat: 'macro', catName: 'GLOBAL & MACRO',
           name: 'US Dollar Index (DXY)',
           desc: 'Strength of USD against major global currency basket',
           time: 'Live Macro',
-          val: '103.85 (-0.18%)',
-          isUp: false,
+          val: gDxy.level ? `${gDxy.level} (${gDxy.change || '0.00%'})` : '103.85 (-0.18%)',
+          isUp: gDxy.change ? parseFloat(String(gDxy.change).replace(/[^0-9.-]/g,'')) > 0 : false,
           weight: 4.0,
-          sig: 'BULLISH',
-          impact: 'Subdued dollar index provides headroom for INR stability and capital inflows'
+          sig: gDxy.change ? (parseFloat(String(gDxy.change).replace(/[^0-9.-]/g,'')) <= 0 ? 'BULLISH' : 'BEARISH') : 'BULLISH',
+          impact: 'Subdued dollar index provides headroom for INR stability and foreign portfolio inflows'
         },
         {
           cat: 'macro', catName: 'GLOBAL & MACRO',
           name: 'Brent Crude Oil Price',
           desc: 'Crucial commodity input cost; India imports over 85% of crude requirements',
           time: 'Live Commodity',
-          val: '$74.20 (-0.85%)',
-          isUp: false,
+          val: gCrude.level ? `${gCrude.level} (${gCrude.change || '0.00%'})` : '$74.20 (-0.85%)',
+          isUp: gCrude.change ? parseFloat(String(gCrude.change).replace(/[^0-9.-]/g,'')) > 0 : false,
           weight: 4.5,
-          sig: 'BULLISH',
-          impact: 'Sub-$75 Brent curbs imported inflation and supports current account balance'
+          sig: gCrude.change ? (parseFloat(String(gCrude.change).replace(/[^0-9.-]/g,'')) <= 0 ? 'BULLISH' : 'BEARISH') : 'BULLISH',
+          impact: 'Subdued crude prices curb imported inflation and support corporate operating margins'
         },
 
         // Category 2: Market Breadth (5 factors, 20.5% weight)
@@ -9001,22 +9006,52 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           name: 'Put-Call Ratio (OI & Volume PCR)',
           desc: 'Total outstanding puts divided by total calls across active expiries',
           time: 'Live 30s',
-          val: `OI ${oi.pcr_oi || 1.24} | Vol ${oi.pcr_volume || 1.18}`,
-          isUp: (Number(oi.pcr_oi || 1.24) >= 1.0),
+          val: (() => {
+            const liveP = window.__caLiveOptionPcr != null ? Number(window.__caLiveOptionPcr) : (parseFloat(document.getElementById('optSummaryPcr')?.textContent) || null);
+            const pVal = liveP != null ? liveP : Number(oi.pcr_oi || 1.14);
+            return `OI ${pVal.toFixed(2)} | Vol ${oi.pcr_volume || pVal.toFixed(2)}`;
+          })(),
+          isUp: (() => {
+            const liveP = window.__caLiveOptionPcr != null ? Number(window.__caLiveOptionPcr) : (parseFloat(document.getElementById('optSummaryPcr')?.textContent) || null);
+            return (liveP != null ? liveP : Number(oi.pcr_oi || 1.14)) >= 1.0;
+          })(),
           weight: 5.0,
-          sig: ((oi.pcr_oi || 1.24) >= 1.1 ? 'BULLISH' : ((oi.pcr_oi || 1.24) <= 0.8 ? 'BEARISH' : 'NEUTRAL')),
-          impact: 'Elevated PCR highlights strong institutional put underwriting support beneath spot'
+          sig: (() => {
+            const liveP = window.__caLiveOptionPcr != null ? Number(window.__caLiveOptionPcr) : (parseFloat(document.getElementById('optSummaryPcr')?.textContent) || null);
+            const pVal = liveP != null ? liveP : Number(oi.pcr_oi || 1.14);
+            return pVal >= 1.05 ? 'BULLISH' : (pVal <= 0.95 ? 'BEARISH' : 'NEUTRAL');
+          })(),
+          impact: 'Option chain Put-Call balance indicating institutional hedging vs underwriting bias'
         },
         {
           cat: 'oi', catName: 'ORDER FLOW & OI',
           name: 'Max Pain Strike & Dealer Gamma Flip',
           desc: 'Level where option writers incur minimal loss and dealer gamma neutralizes',
           time: 'Live Exp',
-          val: `Pain: ₹${fmt(oi.max_pain_strike || 23400)} | Flip: ₹${fmt(oi.dealer_gamma_flip || 23350)}`,
-          isUp: true,
+          val: (() => {
+            const curSpot = Number(_getLtp()) || 23400;
+            const step = curSpot > 30000 ? 100 : (curSpot > 10000 ? 50 : 10);
+            const liveMp = window.__caLiveMaxPain != null ? Number(window.__caLiveMaxPain) : (parseFloat(String(document.getElementById('optSummaryMaxPain')?.textContent||'').replace(/[^0-9.]/g,'')) || null);
+            const pain = liveMp || (Math.round(curSpot / step) * step);
+            const flip = pain - step;
+            return `Pain: ₹${fmt(pain)} | Flip: ₹${fmt(flip)}`;
+          })(),
+          isUp: (() => {
+            const curSpot = Number(_getLtp()) || 23400;
+            const step = curSpot > 30000 ? 100 : (curSpot > 10000 ? 50 : 10);
+            const liveMp = window.__caLiveMaxPain != null ? Number(window.__caLiveMaxPain) : (parseFloat(String(document.getElementById('optSummaryMaxPain')?.textContent||'').replace(/[^0-9.]/g,'')) || null);
+            const pain = liveMp || (Math.round(curSpot / step) * step);
+            return curSpot >= (pain - step);
+          })(),
           weight: 4.0,
-          sig: 'BULLISH',
-          impact: 'Spot operating comfortably above gamma flip line; dealers positioned long gamma to absorb dips'
+          sig: (() => {
+            const curSpot = Number(_getLtp()) || 23400;
+            const step = curSpot > 30000 ? 100 : (curSpot > 10000 ? 50 : 10);
+            const liveMp = window.__caLiveMaxPain != null ? Number(window.__caLiveMaxPain) : (parseFloat(String(document.getElementById('optSummaryMaxPain')?.textContent||'').replace(/[^0-9.]/g,'')) || null);
+            const pain = liveMp || (Math.round(curSpot / step) * step);
+            return curSpot >= pain ? 'BULLISH' : (curSpot <= (pain - step) ? 'BEARISH' : 'NEUTRAL');
+          })(),
+          impact: 'Spot operating relative to dealer gamma neutral threshold and max pain pinning'
         },
         {
           cat: 'oi', catName: 'ORDER FLOW & OI',
@@ -9798,6 +9833,14 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           <td class="muted" style="font-size:11px;">${r.criteria||''}</td>
         </tr>
       `).join('');
+
+      // Cross-Section Sync: Save live RSI and MACD to shared cache and calibrate 40 factors
+      const rsiRow = rows.find(r => r.name === 'RSI');
+      if(rsiRow && Number.isFinite(Number(rsiRow.value))) window.__caTechnicalRsi = Number(rsiRow.value);
+      const macdRow = rows.find(r => r.name === 'MACD');
+      if(macdRow && Number.isFinite(Number(macdRow.value))) window.__caTechnicalMacd = Number(macdRow.value);
+      if(typeof window.calibrateExcelFactors === 'function') window.calibrateExcelFactors();
+      if(typeof window.renderExcelMatrix === 'function') window.renderExcelMatrix();
     }
     const pane=document.getElementById('indicatorAppliedPane');
     if(pane){
@@ -11277,6 +11320,11 @@ window.handleNotificationClick = function(n){
       if(document.getElementById('optSummaryAtmIv')) document.getElementById('optSummaryAtmIv').textContent = `${Number(atmIv).toFixed(1)}%`;
       if(document.getElementById('optionsProviderStatus')) document.getElementById('optionsProviderStatus').textContent = 'Live (Upstox Feed)';
 
+      // Store live values in window shared cache
+      window.__caLiveOptionPcr = Number(pcr);
+      window.__caLiveMaxPain = Number(atm);
+      window.__caLiveAtmIv = Number(atmIv);
+
       const activeExpBtn = document.querySelector('#optionsExpiryPills .chip-filter.active');
       const expStr = activeExpBtn ? activeExpBtn.dataset.optExpiry : (optionState.expiry || '');
       if(expStr && document.getElementById('optSummaryDte')){
@@ -11284,10 +11332,27 @@ window.handleNotificationClick = function(n){
         if(!isNaN(targetDt.getTime())){
           const diffDays = Math.max(0.1, (targetDt.getTime() - Date.now()) / (1000 * 86400));
           document.getElementById('optSummaryDte').textContent = `${diffDays.toFixed(1)} Days`;
+          window.__caLiveDte = diffDays;
         } else {
           document.getElementById('optSummaryDte').textContent = '4.0 Days';
+          window.__caLiveDte = 4.0;
         }
       }
+
+      // Immediately sync Chart Tab Option Greeks card so it is never empty
+      const gSide = atmRow?.call || {};
+      const cgBadge = document.getElementById('chartGreeksContractBadge');
+      if(cgBadge) cgBadge.textContent = `Option: ${sym} ${atm} CE`;
+      const cgIv = document.getElementById('chartGreeksIvBadge');
+      if(cgIv) cgIv.textContent = `IV: ${gSide.iv ? (Number(gSide.iv) > 1 ? Number(gSide.iv).toFixed(1) : (Number(gSide.iv)*100).toFixed(1)) : (Number(atmIv)).toFixed(1)}%`;
+      if(document.getElementById('cgDelta')) document.getElementById('cgDelta').textContent = Number(gSide.delta || 0.50).toFixed(3);
+      if(document.getElementById('cgGamma')) document.getElementById('cgGamma').textContent = Number(gSide.gamma || 0.001).toFixed(4);
+      if(document.getElementById('cgTheta')) document.getElementById('cgTheta').textContent = Number(gSide.theta || -14.2).toFixed(2);
+      if(document.getElementById('cgVega')) document.getElementById('cgVega').textContent = Number(gSide.vega || 12.5).toFixed(2);
+
+      // Re-calibrate Dashboard 40 Factors matrix with real option chain data
+      if(typeof window.calibrateExcelFactors === 'function') window.calibrateExcelFactors(spot);
+      if(typeof window.renderExcelMatrix === 'function') window.renderExcelMatrix();
       setTimeout(() => {
         const rowsEl = host.querySelectorAll('.opt-chain-row');
         rowsEl.forEach(row => {
@@ -12257,10 +12322,11 @@ window.handleNotificationClick = function(n){
         const badgeClass = isBull ? 'buy' : isBear ? 'sell' : 'neutral';
         const borderLeftColor = isIrrelevant ? 'var(--border-soft)' : (isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--border-soft)');
         
-        // Probability out of 100% (Item 10)
+        // Dynamic probability calibration
         const rawImpact = parseFloat(String(it.impact_pct || '1.0').replace(/[^0-9.-]/g, '')) || 1.0;
-        const probVal = Math.min(98, Math.max(62, Math.round(68 + Math.abs(rawImpact) * 16)));
+        const probVal = (rawImpact >= 50 && rawImpact <= 100) ? Math.round(rawImpact) : Math.min(95, Math.max(62, Math.round(65 + Math.abs(rawImpact) * 20)));
         const probText = `${probVal}% ${isBull ? 'Bullish' : isBear ? 'Bearish' : 'Neutral'} Probability`;
+        const cleanInsight = String(it.ca_ai_insight || '').replace(/^CA AI Decision:\s*/i, '');
 
         return `
           <div class="news-card" data-news-item="${encodeURIComponent(JSON.stringify(it))}" style="cursor:pointer;background:var(--surface);border:1px solid var(--border-soft);border-left:4px solid ${borderLeftColor};border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:transform 0.15s ease,border-color 0.15s ease;opacity:${isIrrelevant ? '0.7' : '1'};">
@@ -12290,7 +12356,7 @@ window.handleNotificationClick = function(n){
             </div>
 
             <div style="background:var(--surface-2);border-radius:6px;padding:8px 12px;font-size:11.5px;line-height:1.45;color:var(--text-dim);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-              <div><b style="color:var(--gold);">CA AI Decision:</b> ${esc(it.ca_ai_insight)}</div>
+              <div><b style="color:var(--gold);">CA AI Decision:</b> ${esc(cleanInsight)}</div>
               <span class="tag neutral" style="font-size:10px;cursor:pointer;">Discuss / Counter-Question</span>
             </div>
           </div>
@@ -23405,22 +23471,39 @@ window.calibrateExcelFactors = function(curLtp, curQ){
   curQ = curQ || _getQuote() || {};
   const vwap = Number(curQ.vwap || (curLtp * 0.998)) || curLtp;
   const chg = Number(curQ.net_change != null ? curQ.net_change : (curLtp - vwap));
+  const chgPct = Number(curQ.change_pct != null ? curQ.change_pct : (chg / (curLtp || 1) * 100));
   const isUp = chg >= 0;
   const vwapGap = curLtp - vwap;
-  const rsi = Number(window.__caTechnicalRsi || 58.4);
-  const vix = Number(window.__caMacroVix || 13.8);
+  const sym = _getSym() || 'NIFTY';
+  const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
+  const step = root.includes('BANK') ? 100 : (root.includes('CRUDE') ? 50 : 50);
+  const atmStk = Math.round(curLtp / step) * step;
+
+  // Real Indicator Values
+  const rsi = (window.state?.indicatorValues?.RSI != null) ? Number(window.state.indicatorValues.RSI) : (window.__caTechnicalRsi != null ? Number(window.__caTechnicalRsi) : null);
+  const macd = (window.state?.indicatorValues?.MACD != null) ? Number(window.state.indicatorValues.MACD) : (window.__caTechnicalMacd != null ? Number(window.__caTechnicalMacd) : null);
+  const pcr = window.__caLiveOptionPcr != null ? Number(window.__caLiveOptionPcr) : (parseFloat(document.getElementById('optSummaryPcr')?.textContent) || null);
+  const atmIv = window.__caLiveAtmIv != null ? Number(window.__caLiveAtmIv) : (parseFloat(String(document.getElementById('optSummaryAtmIv')?.textContent||'').replace(/[^0-9.]/g,'')) || null);
+  const dte = window.__caLiveDte != null ? Number(window.__caLiveDte) : (parseFloat(document.getElementById('optSummaryDte')?.textContent) || null);
+  const macro = window.__caMacroFactors || {};
+  const us = macro.us_markets || {};
+  const gn = macro.gift_nifty || {};
+  const vix = Number(window.__caMacroVix || (macro.india_vix?.level) || 13.8);
 
   window.__caExcelFactors.forEach(f => {
     switch(f.id){
       case 'underlying_price':
-        f.sig = isUp ? 'Bullish' : 'Bearish';
-        f.pct = isUp ? '+82% Bullish' : '-78% Bearish';
+        f.val = `₹${_fmtNum(curLtp)} (${chg >= 0 ? '+' : ''}${chg.toFixed(2)})`;
+        f.sig = chg > 0 ? 'Bullish' : (chg < 0 ? 'Bearish' : 'Neutral');
+        f.pct = `${chg >= 0 ? '+' : '-'}${Math.min(95, Math.max(50, Math.round(50 + Math.abs(chgPct) * 15)))}% ${f.sig}`;
         break;
       case 'moneyness':
+        f.val = `${_fmtNum(atmStk)} ATM`;
         f.sig = isUp ? 'Bullish' : 'Neutral';
         f.pct = isUp ? '+74% Bullish' : '+50% Neutral';
         break;
       case 'time_to_expiry':
+        f.val = `${dte != null ? dte.toFixed(1) : '5.0'} Days`;
         f.sig = 'Neutral';
         f.pct = '+50% Neutral';
         break;
@@ -23437,16 +23520,17 @@ window.calibrateExcelFactors = function(curLtp, curQ){
         f.pct = '-65% Decay Drag';
         break;
       case 'vega':
-        f.sig = vix > 14.5 ? 'Bearish' : 'Bullish';
-        f.pct = vix > 14.5 ? '-55% High IV' : '+68% Low IV';
+        f.sig = vix > 16.0 ? 'Bearish' : 'Bullish';
+        f.pct = vix > 16.0 ? '-55% High IV' : '+68% Low IV';
         break;
       case 'iv':
-        f.sig = vix > 15.0 ? 'Bearish' : 'Bullish';
-        f.pct = vix > 15.0 ? '-60% Costly Prem' : '+64% Fair Pricing';
+        f.val = `${atmIv != null ? atmIv.toFixed(1) : (vix ? vix.toFixed(1) : '13.8')}% (ATM IV)`;
+        f.sig = atmIv != null ? (atmIv < 14 ? 'Bullish' : (atmIv > 18 ? 'Bearish' : 'Neutral')) : (vix > 16 ? 'Bearish' : 'Bullish');
+        f.pct = f.sig === 'Bullish' ? '+68% Low IV' : (f.sig === 'Bearish' ? '-60% Costly Prem' : '+50% Fair Pricing');
         break;
       case 'vol_surface':
-        f.sig = isUp ? 'Bullish' : 'Bearish';
-        f.pct = isUp ? '+68% Call Skew' : '-65% Put Skew';
+        f.sig = isUp ? 'Bullish' : 'Neutral';
+        f.pct = isUp ? '+68% Call Skew' : '+50% Balanced Skew';
         break;
       case 'gamma_exposure':
         f.sig = isUp ? 'Bullish' : 'Neutral';
@@ -23473,33 +23557,43 @@ window.calibrateExcelFactors = function(curLtp, curQ){
         f.pct = isUp ? '+85% Long Buildup' : '-82% Short Buildup';
         break;
       case 'put_call_skew':
-        f.sig = isUp ? 'Bullish' : 'Bearish';
-        f.pct = isUp ? '+82% PCR 1.18' : '-78% PCR 0.82';
+        f.val = `${pcr != null ? pcr.toFixed(2) : (isUp ? '1.14' : '0.88')} PCR`;
+        f.sig = pcr != null ? (pcr >= 1.05 ? 'Bullish' : (pcr <= 0.95 ? 'Bearish' : 'Neutral')) : (isUp ? 'Bullish' : 'Bearish');
+        f.pct = `${f.sig === 'Bullish' ? '+' : (f.sig === 'Bearish' ? '-' : '')}${pcr != null ? Math.min(90, Math.max(50, Math.round(pcr * 70))) : 75}% ${f.sig}`;
         break;
       case 'dealer_hedging':
         f.sig = isUp ? 'Bullish' : 'Bearish';
         f.pct = isUp ? '+74% Dip Support' : '-70% Overhead Hedge';
         break;
       case 'trend_momentum':
-        f.sig = isUp ? 'Bullish' : 'Bearish';
-        f.pct = isUp ? '+86% Bull Trend' : '-84% Bear Trend';
+        const macdBull = macd != null ? (macd >= 0) : isUp;
+        f.val = macd != null ? `MACD ${macd >= 0 ? '+' : ''}${macd.toFixed(2)}` : 'ADX 28.5 (Trend)';
+        f.sig = macdBull ? 'Bullish' : 'Bearish';
+        f.pct = macdBull ? '+86% Bull Momentum' : '-84% Bear Momentum';
         break;
       case 'vwap':
-        f.sig = vwapGap >= 0 ? 'Bullish' : 'Bearish';
-        f.pct = vwapGap >= 0 ? '+90% Above VWAP' : '-88% Below VWAP';
+        f.val = `${vwapGap >= 0 ? 'Above' : 'Below'} VWAP (${vwapGap >= 0 ? '+' : ''}${vwapGap.toFixed(1)} pts)`;
+        f.sig = vwapGap >= 4 ? 'Bullish' : (vwapGap <= -4 ? 'Bearish' : 'Neutral');
+        f.pct = f.sig === 'Bullish' ? '+88% Above VWAP' : (f.sig === 'Bearish' ? '-85% Below VWAP' : '50% Near VWAP');
         break;
       case 'relative_volume':
         f.sig = 'Bullish';
         f.pct = '+80% RVOL 1.45x';
         break;
       case 'support_resistance':
+        f.val = `S: ${_fmtNum(Math.round(curLtp * 0.99 / step) * step)} | R: ${_fmtNum(Math.round(curLtp * 1.01 / step) * step)}`;
         f.sig = vwapGap >= 0 ? 'Bullish' : 'Bearish';
         f.pct = vwapGap >= 0 ? '+78% Above Support' : '-75% Testing Support';
         break;
       case 'rsi_divergence':
-        if(rsi >= 58) { f.sig = 'Bullish'; f.pct = `+${Math.round(rsi)}% Strong Slope`; }
-        else if(rsi <= 42) { f.sig = 'Bearish'; f.pct = `-${Math.round(100-rsi)}% Weak Slope`; }
-        else { f.sig = 'Neutral'; f.pct = '50% Neutral Zone'; }
+        if(rsi != null) {
+          f.val = `${rsi.toFixed(1)} (${rsi >= 60 ? 'Positive Slope' : (rsi <= 40 ? 'Negative Slope' : 'Neutral')})`;
+          f.sig = rsi >= 55 ? 'Bullish' : (rsi <= 45 ? 'Bearish' : 'Neutral');
+          f.pct = f.sig === 'Bullish' ? `+${Math.round(rsi)}% Strong Slope` : (f.sig === 'Bearish' ? `-${Math.round(100 - rsi)}% Weak Slope` : '50% Neutral Zone');
+        } else {
+          f.sig = 'Neutral';
+          f.pct = '50% Neutral Zone';
+        }
         break;
       case 'atr_volatility':
         f.sig = 'Neutral';
@@ -23514,16 +23608,20 @@ window.calibrateExcelFactors = function(curLtp, curQ){
         f.pct = isUp ? '+78% Sector Rotation' : '-76% Sector Outflow';
         break;
       case 'global_markets':
-        f.sig = isUp ? 'Bullish' : 'Neutral';
-        f.pct = isUp ? '+75% Positive GIFT' : '+48% Flat Hand-off';
+        const usAvg = ((Number(us.sp500?.pct||0) + Number(us.nasdaq?.pct||0) + Number(us.dow?.pct||0)) / 3.0);
+        f.val = us.dow?.pct !== undefined ? `Dow ${Number(us.dow.pct)>=0?'+':''}${Number(us.dow.pct).toFixed(2)}% | S&P ${Number(us.sp500?.pct||0).toFixed(2)}%` : 'GIFT Nifty Cues';
+        f.sig = usAvg >= 0.15 ? 'Bullish' : (usAvg <= -0.15 ? 'Bearish' : 'Neutral');
+        f.pct = `${f.sig === 'Bullish' ? '+' : (f.sig === 'Bearish' ? '-' : '')}${Math.min(88, Math.max(50, Math.round(50 + Math.abs(usAvg)*18)))}% ${f.sig}`;
         break;
       case 'currency_flow':
         f.sig = 'Neutral';
         f.pct = '+50% Rangebound INR';
         break;
       case 'commodity_prices':
-        f.sig = isUp ? 'Neutral' : 'Bearish';
-        f.pct = isUp ? '+52% Stable Energy' : '-65% Crude Spike';
+        const brent = (macro.macro_drivers || []).find(m => String(m.factor).includes('Crude'));
+        const brentPct = brent ? parseFloat(String(brent.change).replace(/[^0-9.-]/g,'')) : 0;
+        f.sig = brentPct <= -0.5 ? 'Bullish' : (brentPct >= 0.5 ? 'Bearish' : 'Neutral');
+        f.pct = f.sig === 'Bullish' ? '+68% Easing Crude' : (f.sig === 'Bearish' ? '-65% Crude Spike' : '+52% Stable Energy');
         break;
       case 'economic_data':
         f.sig = 'Bullish';
@@ -23542,8 +23640,8 @@ window.calibrateExcelFactors = function(curLtp, curQ){
         f.pct = isUp ? '+76% Contango' : '+48% Narrow Basis';
         break;
       case 'short_interest':
-        f.sig = 'Bullish';
-        f.pct = '+74% Low Overhang';
+        f.sig = 'Neutral';
+        f.pct = '+50% Moderate Overhang';
         break;
       case 'earnings_exp':
         f.sig = 'Bullish';
@@ -23566,12 +23664,13 @@ window.calibrateExcelFactors = function(curLtp, curQ){
         f.pct = '+50% Ex-Date Calibrated';
         break;
       case 'corporate_actions':
-        f.sig = 'Bullish';
-        f.pct = '+75% Clean Balance Sheet';
+        f.sig = 'Neutral';
+        f.pct = '+50% Clean Balance Sheet';
         break;
       case 'news_intel':
-        f.sig = isUp ? 'Bullish' : 'Neutral';
-        f.pct = isUp ? '+88% Positive NLP' : '+48% Mixed Feed';
+        const newsSent = window.__caNewsSentimentScore || 0;
+        f.sig = newsSent >= 0.15 ? 'Bullish' : (newsSent <= -0.15 ? 'Bearish' : 'Neutral');
+        f.pct = `${f.sig === 'Bullish' ? '+' : (f.sig === 'Bearish' ? '-' : '')}${Math.round(50 + Math.abs(newsSent)*35)}% ${f.sig}`;
         break;
       case 'market_sentiment':
         f.sig = isUp ? 'Bullish' : 'Bearish';

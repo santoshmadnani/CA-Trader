@@ -22,3 +22,4 @@ print(json.dumps(out, indent=2))
 res = deploy_via_git.run_ssh(cmd)
 print("TEST RECO RESULT:")
 print(res.stdout)
+
