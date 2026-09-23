@@ -11260,25 +11260,25 @@ window.handleNotificationClick = function(n){
               <th colspan="9" style="text-align:center;color:var(--sell);font-weight:700;padding:6px;">PUTS (PE)</th>
             </tr>
             <tr style="background:var(--surface);border-bottom:2px solid var(--border);font-size:10px;text-transform:uppercase;color:var(--text-faint);text-align:center;">
-              <th style="padding:4px 6px;">OI</th>
-              <th style="padding:4px 6px;">Chg OI</th>
-              <th style="padding:4px 6px;">Vol</th>
-              <th style="padding:4px 6px;color:var(--gold);" title="Implied Volatility">IV</th>
-              <th style="padding:4px 6px;color:var(--buy);" title="Delta">Δ (Delta)</th>
-              <th style="padding:4px 6px;" title="Gamma">Γ (Gamma)</th>
-              <th style="padding:4px 6px;color:var(--sell);" title="Theta">Θ (Theta)</th>
-              <th style="padding:4px 6px;color:var(--primary);" title="Vega">ν (Vega)</th>
+              <th class="col-opt-oi" style="padding:4px 6px;">OI</th>
+              <th class="col-opt-oi" style="padding:4px 6px;">Chg OI</th>
+              <th class="col-opt-oi" style="padding:4px 6px;">Vol</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--gold);" title="Implied Volatility">IV</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--buy);" title="Delta">Δ (Delta)</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;" title="Gamma">Γ (Gamma)</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--sell);" title="Theta">Θ (Theta)</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--primary);" title="Vega">ν (Vega)</th>
               <th style="padding:4px 6px;text-align:right;color:var(--buy);border-right:1px solid var(--border);">LTP</th>
               <th style="text-align:center;padding:4px 8px;background:var(--surface-2);color:var(--gold);font-weight:800;border-right:1px solid var(--border);">STRIKE</th>
               <th style="padding:4px 6px;text-align:left;color:var(--sell);border-right:1px solid var(--border-soft);">LTP</th>
-              <th style="padding:4px 6px;color:var(--primary);" title="Vega">ν (Vega)</th>
-              <th style="padding:4px 6px;color:var(--sell);" title="Theta">Θ (Theta)</th>
-              <th style="padding:4px 6px;" title="Gamma">Γ (Gamma)</th>
-              <th style="padding:4px 6px;color:var(--sell);" title="Delta">Δ (Delta)</th>
-              <th style="padding:4px 6px;color:var(--gold);" title="Implied Volatility">IV</th>
-              <th style="padding:4px 6px;">Vol</th>
-              <th style="padding:4px 6px;">Chg OI</th>
-              <th style="padding:4px 6px;">OI</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--primary);" title="Vega">ν (Vega)</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--sell);" title="Theta">Θ (Theta)</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;" title="Gamma">Γ (Gamma)</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--sell);" title="Delta">Δ (Delta)</th>
+              <th class="col-opt-greeks" style="padding:4px 6px;color:var(--gold);" title="Implied Volatility">IV</th>
+              <th class="col-opt-oi" style="padding:4px 6px;">Vol</th>
+              <th class="col-opt-oi" style="padding:4px 6px;">Chg OI</th>
+              <th class="col-opt-oi" style="padding:4px 6px;">OI</th>
             </tr>
           </thead>
           <tbody>
@@ -11311,14 +11311,14 @@ window.handleNotificationClick = function(n){
 
               return `
                 <tr class="opt-chain-row ${isAtm ? 'atm-row strike-atm' : ''}" data-strike="${strike}" data-strike-json="${encodeURIComponent(JSON.stringify(r))}" style="cursor:pointer;border-bottom:1px solid var(--border-soft);text-align:center;${isAtm ? 'background:rgba(232,184,75,0.15);font-weight:700;' : ''}">
-                  <td style="padding:5px 6px;color:var(--text-faint);font-family:var(--font-mono);">${callOiL}L</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:${String(cChgOi).includes('+')?'var(--buy)':'var(--sell)'};">${cChgOi}</td>
-                  <td style="padding:5px 6px;color:var(--text-dim);font-family:var(--font-mono);">${cVol}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--gold);" onclick="openGreekModal('Call IV', ${cIv}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cIv}%</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--buy);font-weight:600;" onclick="openGreekModal('Call Delta', ${cDelta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">+${cDelta}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--text-faint);" onclick="openGreekModal('Call Gamma', ${cGamma}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cGamma}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--sell);" onclick="openGreekModal('Call Theta', ${cTheta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cTheta}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--primary);" onclick="openGreekModal('Call Vega', ${cVega}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cVega}</td>
+                  <td class="col-opt-oi" style="padding:5px 6px;color:var(--text-faint);font-family:var(--font-mono);">${callOiL}L</td>
+                  <td class="col-opt-oi" style="padding:5px 6px;font-family:var(--font-mono);color:${String(cChgOi).includes('+')?'var(--buy)':'var(--sell)'};">${cChgOi}</td>
+                  <td class="col-opt-oi" style="padding:5px 6px;color:var(--text-dim);font-family:var(--font-mono);">${cVol}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--gold);" onclick="openGreekModal('Call IV', ${cIv}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cIv}%</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--buy);font-weight:600;" onclick="openGreekModal('Call Delta', ${cDelta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">+${cDelta}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--text-faint);" onclick="openGreekModal('Call Gamma', ${cGamma}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cGamma}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--sell);" onclick="openGreekModal('Call Theta', ${cTheta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cTheta}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--primary);" onclick="openGreekModal('Call Vega', ${cVega}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${cVega}</td>
                   <td style="padding:5px 6px;text-align:right;border-right:1px solid var(--border);">
                     <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;">
                       <div class="opt-bs-group">
@@ -11346,14 +11346,14 @@ window.handleNotificationClick = function(n){
                       </div>
                     </div>
                   </td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--primary);" onclick="openGreekModal('Put Vega', ${pVega}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pVega}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--sell);" onclick="openGreekModal('Put Theta', ${pTheta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pTheta}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--text-faint);" onclick="openGreekModal('Put Gamma', ${pGamma}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pGamma}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--sell);font-weight:600;" onclick="openGreekModal('Put Delta', ${pDelta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pDelta}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:var(--gold);" onclick="openGreekModal('Put IV', ${pIv}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pIv}%</td>
-                  <td style="padding:5px 6px;color:var(--text-dim);font-family:var(--font-mono);">${pVol}</td>
-                  <td style="padding:5px 6px;font-family:var(--font-mono);color:${String(pChgOi).includes('+')?'var(--buy)':'var(--sell)'};">${pChgOi}</td>
-                  <td style="padding:5px 6px;color:var(--text-faint);font-family:var(--font-mono);">${putOiL}L</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--primary);" onclick="openGreekModal('Put Vega', ${pVega}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pVega}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--sell);" onclick="openGreekModal('Put Theta', ${pTheta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pTheta}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--text-faint);" onclick="openGreekModal('Put Gamma', ${pGamma}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pGamma}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--sell);font-weight:600;" onclick="openGreekModal('Put Delta', ${pDelta}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pDelta}</td>
+                  <td class="col-opt-greeks" style="padding:5px 6px;font-family:var(--font-mono);color:var(--gold);" onclick="openGreekModal('Put IV', ${pIv}, '${esc(S)}', ${strike}, ${cDelta}, ${pDelta})">${pIv}%</td>
+                  <td class="col-opt-oi" style="padding:5px 6px;color:var(--text-dim);font-family:var(--font-mono);">${pVol}</td>
+                  <td class="col-opt-oi" style="padding:5px 6px;font-family:var(--font-mono);color:${String(pChgOi).includes('+')?'var(--buy)':'var(--sell)'};">${pChgOi}</td>
+                  <td class="col-opt-oi" style="padding:5px 6px;color:var(--text-faint);font-family:var(--font-mono);">${putOiL}L</td>
                 </tr>
               `;
             }).join('')}
@@ -11446,6 +11446,10 @@ window.handleNotificationClick = function(n){
           applyOptionRecommendation(sym, ltp, S, lot);
         };
       });
+
+      if(typeof window.renderZerodhaOptionChainTable === 'function'){
+        window.renderZerodhaOptionChainTable();
+      }
 
     }catch(e){
       host.innerHTML = `<div class="options-empty">${e.message}</div>`;
@@ -26690,157 +26694,35 @@ window.renderDualRecoCards = function(data){
   }
 };
 
-// --- Item 10: Unified Multi-Column Option Chain Table (OI & Greeks) ---
+// --- Item 10: Unified Multi-Column Option Chain Table Column Visibility Controller ---
 window.renderZerodhaOptionChainTable = function(){
-  const d = window.__caCurrentOptionChain || window.APP_CACHE?.options || (typeof optionState !== 'undefined' ? optionState.chain : null);
   const host = document.getElementById('optionChainTable') || document.getElementById('zerodhaOptionChainContainer');
-  if(!host || !d) return;
-
-  // Clear stuck "Loading live option chain..." state (Item 9)
-  const statusEl = document.getElementById('optionsProviderStatus');
-  if(statusEl) statusEl.textContent = 'Live (Upstox Feed)';
-
-  const spot = Number(d.spot || (typeof _getLtp === 'function' ? _getLtp() : 23340));
-  const atm = Number(d.atm_strike || Math.round(spot / 50) * 50);
-  const rows = d.strikes || [];
+  if(!host) return;
 
   const showOI = document.getElementById('chkOptColOI')?.checked !== false;
   const showGreeks = document.getElementById('chkOptColGreeks')?.checked !== false;
 
-  // Populate Option Summary Bar (Items 8 & 13)
-  if(document.getElementById('optSummarySpot')) document.getElementById('optSummarySpot').textContent = `₹${fmt(spot)}`;
-  if(document.getElementById('optSummaryMaxPain')) document.getElementById('optSummaryMaxPain').textContent = fmt(atm);
+  host.querySelectorAll('.col-opt-oi').forEach(el => {
+    el.style.display = showOI ? '' : 'none';
+  });
+  host.querySelectorAll('.col-opt-greeks').forEach(el => {
+    el.style.display = showGreeks ? '' : 'none';
+  });
 
-  // Expiry & DTE
-  const activeExpBtn = document.querySelector('#optionsExpiryPills .chip-filter.active');
-  const expStr = activeExpBtn ? activeExpBtn.dataset.optExpiry : (d.expiry || '');
-  if(expStr && document.getElementById('optSummaryDte')){
-    const targetDt = new Date(expStr);
-    if(!isNaN(targetDt.getTime())){
-      const diffMs = targetDt.getTime() - Date.now();
-      const diffDays = Math.max(0.1, diffMs / (1000 * 60 * 60 * 24));
-      document.getElementById('optSummaryDte').textContent = `${diffDays.toFixed(1)} Days`;
-    } else {
-      document.getElementById('optSummaryDte').textContent = '4.0 Days';
-    }
+  // Dynamically update Calls/Puts header colspans based on active columns
+  let callColSpan = 1; // LTP
+  if(showOI) callColSpan += 3; // OI, Chg OI, Vol
+  if(showGreeks) callColSpan += 5; // IV, Delta, Gamma, Theta, Vega
+  const headers = host.querySelectorAll('thead tr:first-child th');
+  if(headers && headers.length >= 3){
+    headers[0].setAttribute('colspan', String(callColSpan));
+    headers[2].setAttribute('colspan', String(callColSpan));
   }
 
-  let totalCallOi = 0, totalPutOi = 0;
-  rows.forEach(r => {
-    totalCallOi += Number(r.call?.oi || 0);
-    totalPutOi += Number(r.put?.oi || 0);
-  });
-  const pcr = totalCallOi > 0 ? (totalPutOi / totalCallOi).toFixed(2) : '1.18';
-  if(document.getElementById('optSummaryPcr')) document.getElementById('optSummaryPcr').textContent = pcr;
-  const atmRow = rows.find(r => Number(r.strike) === atm) || rows[Math.floor(rows.length/2)];
-  const atmIv = atmRow?.call?.iv || atmRow?.put?.iv || 13.8;
-  if(document.getElementById('optSummaryAtmIv')) document.getElementById('optSummaryAtmIv').textContent = `${Number(atmIv).toFixed(1)}%`;
-
-  let html = `
-    <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:right;">
-      <thead>
-        <tr style="background:var(--surface-2);border-bottom:1px solid var(--border);">
-          <th colspan="9" style="text-align:center;color:var(--buy);font-weight:700;padding:6px;border-right:1px solid var(--border);">CALLS (CE)</th>
-          <th style="text-align:center;padding:6px;background:var(--surface-3);color:var(--gold);font-weight:700;">STRIKE</th>
-          <th colspan="9" style="text-align:center;color:var(--sell);font-weight:700;padding:6px;border-left:1px solid var(--border);">PUTS (PE)</th>
-        </tr>
-        <tr style="background:var(--surface);border-bottom:2px solid var(--border);font-size:9.5px;text-transform:uppercase;color:var(--text-faint);">
-          <th>OI</th><th>Chg OI</th><th>Vol</th>
-          <th class="col-greek-iv">IV</th><th class="col-greek-delta">Δ</th><th class="col-greek-gamma">Γ</th><th class="col-greek-theta">Θ</th><th class="col-greek-vega">ν (Vega)</th>
-          <th style="color:var(--buy);">LTP</th>
-          <th style="text-align:center;background:var(--surface-2);color:var(--gold);font-weight:800;border-left:1px solid var(--border);border-right:1px solid var(--border);">STRIKE</th>
-          <th style="color:var(--sell);text-align:left;">LTP</th>
-          <th class="col-greek-vega" style="text-align:left;">ν (Vega)</th><th class="col-greek-theta" style="text-align:left;">Θ</th><th class="col-greek-gamma" style="text-align:left;">Γ</th><th class="col-greek-delta" style="text-align:left;">Δ</th><th class="col-greek-iv" style="text-align:left;">IV</th>
-          <th style="text-align:left;">Vol</th><th style="text-align:left;">Chg OI</th><th style="text-align:left;">OI</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  rows.forEach(r => {
-    const stk = Number(r.strike);
-    const isAtm = stk === atm;
-    const c = r.call || {};
-    const p = r.put || {};
-
-    const cLtp = Number(c.ltp || c.close || 0);
-    const pLtp = Number(p.ltp || p.close || 0);
-    const cDelta = (c.delta != null ? Number(c.delta) : (stk <= spot ? 0.65 : 0.45)).toFixed(2);
-    const pDelta = (p.delta != null ? Number(p.delta) : (stk >= spot ? -0.65 : -0.45)).toFixed(2);
-    const cGamma = (c.gamma != null ? Number(c.gamma) : 0.0014).toFixed(4);
-    const pGamma = (p.gamma != null ? Number(p.gamma) : 0.0014).toFixed(4);
-    const cTheta = (c.theta != null ? Number(c.theta) : -12.4).toFixed(1);
-    const pTheta = (p.theta != null ? Number(p.theta) : -11.8).toFixed(1);
-    const cVega = (c.vega != null ? Number(c.vega) : 8.5).toFixed(1);
-    const pVega = (p.vega != null ? Number(p.vega) : 8.5).toFixed(1);
-    const cIv = (c.iv != null ? Number(c.iv) : 14.2).toFixed(1);
-    const pIv = (p.iv != null ? Number(p.iv) : 14.5).toFixed(1);
-
-    const cOi = fmt(c.oi || 0);
-    const pOi = fmt(p.oi || 0);
-    const cChgOi = (c.change_oi != null ? `${Number(c.change_oi)>=0?'+':''}${fmt(c.change_oi)}` : '—');
-    const pChgOi = (p.change_oi != null ? `${Number(p.change_oi)>=0?'+':''}${fmt(p.change_oi)}` : '—');
-    const cVol = fmt(c.volume || 0);
-    const pVol = fmt(p.volume || 0);
-
-    const rowBg = isAtm ? 'rgba(232,184,75,0.15)' : (stk < spot ? 'rgba(38,217,166,0.03)' : 'rgba(255,92,114,0.03)');
-    const atmBorder = isAtm ? 'border:2px solid var(--gold);font-weight:800;' : '';
-
-    html += `
-      <tr class="opt-chain-row ${isAtm ? 'atm-row strike-atm' : ''}" data-strike="${stk}" style="background:${rowBg};border-bottom:1px solid var(--border-soft);cursor:pointer;${atmBorder}">
-        <td style="color:var(--text-faint);">${cOi}</td>
-        <td style="color:${String(cChgOi).includes('+')?'var(--buy)':'var(--sell)'};">${cChgOi}</td>
-        <td class="col-vol" style="color:var(--text-dim);">${cVol}</td>
-        <td class="col-greek-iv" style="color:var(--gold);">${cIv}%</td>
-        <td class="col-greek-delta" style="color:var(--buy);font-weight:600;">+${cDelta}</td>
-        <td class="col-greek-gamma" style="color:var(--text-faint);">${cGamma}</td>
-        <td class="col-greek-theta" style="color:var(--sell);">${cTheta}</td>
-        <td class="col-greek-vega" style="color:var(--primary);">${cVega}</td>
-        <td style="font-weight:700;color:var(--buy);font-family:var(--font-mono);">₹${fmt(cLtp)}</td>
-        
-        <td style="text-align:center;font-weight:800;font-family:var(--font-mono);background:var(--surface-2);color:${isAtm?'var(--gold)':'var(--text)'};border-left:1px solid var(--border);border-right:1px solid var(--border);padding:6px 8px;">
-          ${fmt(stk)} ${isAtm ? '<span class="tag gold" style="font-size:8.5px;padding:0 3px;">ATM</span>' : ''}
-        </td>
-
-        <td style="font-weight:700;color:var(--sell);font-family:var(--font-mono);text-align:left;">₹${fmt(pLtp)}</td>
-        <td class="col-greek-vega" style="color:var(--primary);text-align:left;">${pVega}</td>
-        <td class="col-greek-theta" style="color:var(--sell);text-align:left;">${pTheta}</td>
-        <td class="col-greek-gamma" style="color:var(--text-faint);text-align:left;">${pGamma}</td>
-        <td class="col-greek-delta" style="color:var(--sell);font-weight:600;text-align:left;">${pDelta}</td>
-        <td class="col-greek-iv" style="color:var(--gold);text-align:left;">${pIv}%</td>
-        <td class="col-vol" style="color:var(--text-dim);text-align:left;">${pVol}</td>
-        <td style="color:${String(pChgOi).includes('+')?'var(--buy)':'var(--sell)'};text-align:left;">${pChgOi}</td>
-        <td style="color:var(--text-faint);text-align:left;">${pOi}</td>
-      </tr>
-    `;
-  });
-
-  html += '</tbody></table>';
-  host.innerHTML = html;
-
-  // Always ensure loading message is hidden/updated
+  // Ensure live status indicator
   const stEl = document.getElementById('optionsProviderStatus');
   if(stEl && (!stEl.textContent || stEl.textContent.includes('Loading'))){
     stEl.textContent = 'Live (Upstox Feed)';
-  }
-};
-
-// Hook renderZerodhaOptionChainTable into fetchOptionChain & renderOptionChain
-const origFetchOptionChain = window.fetchOptionChain;
-if(typeof origFetchOptionChain === 'function'){
-  window.fetchOptionChain = async function(){
-    await origFetchOptionChain();
-    if(typeof window.renderZerodhaOptionChainTable === 'function'){
-      window.renderZerodhaOptionChainTable();
-    }
-  };
-}
-
-const origRenderOptionChainGlobal = window.renderOptionChain;
-window.renderOptionChain = function(data){
-  if(typeof origRenderOptionChainGlobal === 'function') origRenderOptionChainGlobal(data);
-  if(typeof window.renderZerodhaOptionChainTable === 'function'){
-    window.renderZerodhaOptionChainTable();
   }
 };
 
