@@ -5642,14 +5642,45 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         except Exception:
             candles = []
         news = recommendation_news_evidence(symbol)
+
+    # Fetch live quote for symbol/underlying to guarantee fresh current session price & momentum
+    q_live = None
+    try:
+        q_live = UPSTOX.quote(symbol)
+    except Exception:
+        pass
+    live_ltp = float(q_live.get("ltp") or q_live.get("last_price") or 0.0) if q_live else 0.0
+    net_chg = float(q_live.get("net_change") or q_live.get("session_change") or 0.0) if q_live else 0.0
+    chg_pct = float(q_live.get("change_pct") or q_live.get("session_change_pct") or 0.0) if q_live else 0.0
+
+    if live_ltp > 0 and candles:
+        now_dt = datetime.now(timezone.utc)
+        open_p = float(q_live.get("open") or candles[-1].get("open") or live_ltp)
+        high_p = max(float(q_live.get("high") or live_ltp), live_ltp)
+        low_p = min(float(q_live.get("low") or live_ltp), live_ltp)
+        last_c_ts = str(candles[-1].get("timestamp") or "")
+        today_str = now_dt.strftime("%Y-%m-%d")
+        if today_str not in last_c_ts:
+            candles.append({
+                "timestamp": now_dt.isoformat(),
+                "open": open_p,
+                "high": high_p,
+                "low": low_p,
+                "close": live_ltp,
+                "volume": float(q_live.get("volume") or 0.0)
+            })
+        else:
+            candles[-1]["close"] = live_ltp
+            candles[-1]["high"] = max(candles[-1].get("high", live_ltp), live_ltp)
+            candles[-1]["low"] = min(candles[-1].get("low", live_ltp), live_ltp)
+
     ta = technical_analysis(candles)
     if not ta.get("available"):
-        return fallback_recommendation_quick(symbol, user_id, desired_profit, expiry_scalp=expiry_scalp)
         return fallback_recommendation_quick(symbol, user_id, desired_profit, expiry_scalp=expiry_scalp, timeframe=timeframe)
     patterns = detect_candlestick_patterns(candles, timeframe)
     technical_side = ta.get("trend", "NO_TRADE")
     rsi_val = float(ta.get("rsi") or 50.0)
-    last_price = float(ta.get("last") or 1.0)
+    last_price = live_ltp if live_ltp > 0 else float(ta.get("last") or 1.0)
     ema20 = float(ta.get("ema20") or last_price)
     ema50 = float(ta.get("ema50") or last_price * 0.99)
     support = float(ta.get("support") or last_price * 0.985)
@@ -5675,20 +5706,20 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     vwap_val = float(ta.get("vwap") or last_price)
     st_sig = str(ta.get("supertrend_signal") or "").upper()
-    is_vwap_bull = (last_price >= vwap_val) and (st_sig == "BUY" or rsi_val >= 50 or pattern_bias > 0)
-    is_vwap_bear = (last_price <= vwap_val) and (st_sig == "SELL" or rsi_val <= 50 or pattern_bias < 0)
+    is_vwap_bull = (last_price >= vwap_val) and (st_sig == "BUY" or rsi_val >= 50 or pattern_bias > 0 or net_chg > 0)
+    is_vwap_bear = (last_price <= vwap_val) and (st_sig == "SELL" or rsi_val <= 50 or pattern_bias < 0 or net_chg < 0)
 
     # Multi-factor Institutional Alignment
     if technical_side == "BUY":
         if last_price < ema50 and rsi_val < 42 and pattern_bias <= 0 and not is_vwap_bull:
             technical_side = "NO_TRADE"
     elif technical_side == "SELL":
-        if last_price > ema50 and rsi_val > 58 and pattern_bias >= 0 and not is_vwap_bear:
-            technical_side = "NO_TRADE"
+        if (last_price > ema50 or net_chg > 0) and rsi_val > 48 and not is_vwap_bear:
+            technical_side = "BUY" if net_chg > 0 else "NO_TRADE"
     else:
-        if (last_price >= ema20 or pattern_bias > 0 or is_vwap_bull) and rsi_val >= 46 and news_score >= 0:
+        if (last_price >= ema20 or pattern_bias > 0 or is_vwap_bull or net_chg > 0) and rsi_val >= 46 and news_score >= 0:
             technical_side = "BUY"
-        elif (last_price <= ema20 or pattern_bias < 0 or is_vwap_bear) and rsi_val <= 54 and news_score <= 0:
+        elif (last_price <= ema20 or pattern_bias < 0 or is_vwap_bear or net_chg < 0) and rsi_val <= 54 and news_score <= 0:
             technical_side = "SELL"
 
     side = technical_side
@@ -5709,13 +5740,13 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     # If side is NO_TRADE and not max_profit_mode, check for strong pattern or news catalyst
     if side == "NO_TRADE" and not max_profit_mode:
-        if (news_score >= 1.0 or pattern_bias > 0) and rsi_val >= 46:
+        if (news_score >= 1.0 or pattern_bias > 0 or net_chg > 0) and rsi_val >= 46:
             side = "BUY"; confidence = max(confidence, 65)
-        elif (news_score <= -1.0 or pattern_bias < 0) and rsi_val <= 54:
+        elif (news_score <= -1.0 or pattern_bias < 0 or net_chg < 0) and rsi_val <= 54:
             side = "SELL"; confidence = max(confidence, 65)
 
     evidence = {"technical": ta, "patterns": patterns, "news": news}
-    opt_bias = side if side in {"BUY", "SELL"} else ("BUY" if (rsi_val >= 50 or last_price >= ema20) else "SELL")
+    opt_bias = side if side in {"BUY", "SELL"} else ("BUY" if (net_chg > 0 or rsi_val >= 50 or last_price >= ema20) else "SELL")
     root = extract_root_symbol(symbol).upper()
     is_fut = is_future_symbol(symbol) or root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "NIFTY", "BANKNIFTY"}
     
