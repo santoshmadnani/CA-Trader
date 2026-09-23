@@ -29,3 +29,14 @@
   3. Pull changes inside `/home/ubuntu/ca-trader-repo`.
   4. Package `/home/ubuntu/46.zip` on the server filesystem.
   5. Run `sudo /home/ubuntu/deploy.sh` and verify container hot-swap.
+
+## 6. Post-Task Efficiency Audit & Self-Optimization Protocol
+Upon completing any user request or feature implementation:
+1. **Time & Latency Breakdown**: Provide a concise summary of the time elapsed and tools used across the key phases (e.g. Investigation, Code Modification, Local Validation, Git & Production Deployment).
+2. **Bottleneck Identification**: Identify if any sub-task consumed disproportionate time or tokens (e.g. repetitive greps, large payload fetches, unbuffered prints, slow SSH roundtrips, or polling).
+3. **Immediate Post-Task Hardening**:
+   - If a manual grep or discovery took multiple turns, update `app/AI_MANIFEST.json` with the exact function/endpoint mappings.
+   - If an endpoint or query was slow, optimize SQL projections or add indexing immediately.
+   - If a test or deployment script threw encoding or timeout warnings, fix the script on the spot.
+4. **Transparent Preventative Log**: State clearly what preventative fixes were applied so the next session executes even faster and with fewer tokens.
+

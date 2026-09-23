@@ -25,12 +25,14 @@ def run_ssh(cmd, timeout=400):
         HOST,
         cmd
     ]
-    print(f"\n>> [SSH] {cmd}", flush=True)
     r = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
+    enc = sys.stdout.encoding or 'utf-8'
     if r.stdout:
-        print(r.stdout.encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8').strip(), flush=True)
+        safe_out = r.stdout.encode(enc, errors='replace').decode(enc).strip()
+        print(safe_out, flush=True)
     if r.stderr:
-        print(f"[STDERR] {r.stderr.encode(sys.stderr.encoding or 'utf-8', errors='replace').decode(sys.stderr.encoding or 'utf-8').strip()}", flush=True)
+        safe_err = r.stderr.encode(enc, errors='replace').decode(enc).strip()
+        print(f"[STDERR] {safe_err}", flush=True)
     return r
 
 def main():
@@ -52,6 +54,23 @@ def main():
         print("[FAIL] Git sync failed on EC2.")
         return 1
 
+    # 2. Package 46.zip on EC2
+    print("\n[2/4] Packaging 46.zip directly on EC2...")
+    pack_cmd = """python3 -c "
+import zipfile, os, pathlib
+base = pathlib.Path('/home/ubuntu/ca-trader-repo')
+out = '/home/ubuntu/46.zip'
+if os.path.exists(out): os.remove(out)
+with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zf:
+    for root, dirs, files in os.walk(base):
+        if '.git' in root or '__pycache__' in root: continue
+        for f in files:
+            full = pathlib.Path(root) / f
+            rel = full.relative_to(base)
+            zf.write(full, str(rel))
+print('Pack complete: 46.zip is', os.path.getsize(out), 'bytes')
+" """
+    r2 = run_ssh(pack_cmd)
     # 2. Package clean 46.zip on EC2
     print("\n[2/4] Packaging clean 46.zip directly on EC2...")
     r2 = run_ssh("python3 /home/ubuntu/pack_clean.py")
