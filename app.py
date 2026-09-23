@@ -5443,6 +5443,7 @@ def calculate_spec_levels(
         "d_option_target": round(d_option_target, 2),
         "model_target": model_target,
         "min_target": min_target,
+        "target": target,
         "target": target_1,
         "target_1": target_1,
         "target_2": target_2,
@@ -9254,7 +9255,6 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": "30 SEP 2026"},
         "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": "30 SEP 2026"},
         "BANKNIFTY": {"spot": 51250.0, "step": 100.0, "lot": 30, "iv": 15.0, "default_exp": "24 SEP 2026"},
-        "NIFTY": {"spot": 23400.0, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "24 SEP 2026"},
         "NIFTY": {"spot": 23400.0, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "22 SEP 2026"},
     }
     

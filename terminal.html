@@ -1641,6 +1641,10 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85) !important;
 }
 
+/* Item 24: Mobile Responsive CE/PE Cards Stacking & Tables Scroll */
+@media (max-width: 768px) {
+/* Item 24: Responsive CE/PE Cards Stacking & Grid Dimensions */
+/* Item 24: Responsive 3-Card Stacking & Grid Dimensions (Underlying + Best CE + Best PE) */
 /* Recommendation Cards: Desktop 3-Card Grid Layout */
 .dash-reco-grid,
 #dashDualRecoContainer,
@@ -1651,6 +1655,14 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   width: 100% !important;
   box-sizing: border-box !important;
 }
+@media (max-width: 992px) {
+  #dashDualRecoContainer.dash-dual-reco-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+#dashCardCe, #dashCardPe {
+#dashCardUnderlying, #dashCardCe, #dashCardPe {
+#dashCardSpot, #dashCardUnderlying, #dashCardCe, #dashCardPe {
 
 #dashCardSpot,
 #dashCardUnderlying,
@@ -1658,8 +1670,13 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
 #dashCardPe {
   min-width: 0 !important;
   box-sizing: border-box !important;
+  padding: 16px 18px !important;
   padding: 14px 16px !important;
 }
+#dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
+#dashCardUnderlying .metric-clickable-box, #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
+  padding: 8px 4px !important;
+#dashCardSpot .metric-clickable-box, #dashCardUnderlying .metric-clickable-box, #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
 
 #dashCardSpot .metric-clickable-box,
 #dashCardUnderlying .metric-clickable-box,
@@ -1670,6 +1687,10 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
+#dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
+#dashCardUnderlying .metric-clickable-box div:first-child, #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
+  font-size: 9.5px !important;
+#dashCardSpot .metric-clickable-box div:first-child, #dashCardUnderlying .metric-clickable-box div:first-child, #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
 
 #dashCardSpot .metric-clickable-box div:first-child,
 #dashCardUnderlying .metric-clickable-box div:first-child,
@@ -1677,11 +1698,16 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
 #dashCardPe .metric-clickable-box div:first-child {
   font-size: 8.5px !important;
   font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
   letter-spacing: 0.3px !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
+#dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
+#dashCardUnderlying .metric-clickable-box div:last-child, #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
+  font-size: 13.5px !important;
+#dashCardSpot .metric-clickable-box div:last-child, #dashCardUnderlying .metric-clickable-box div:last-child, #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
 
 #dashCardSpot .metric-clickable-box div:last-child,
 #dashCardUnderlying .metric-clickable-box div:last-child,
@@ -1703,6 +1729,8 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
     display: flex !important;
     flex-direction: column !important;
     grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    gap: 12px !important;
     gap: 14px !important;
     width: 100% !important;
   }
@@ -2694,6 +2722,9 @@ body.light-theme .market-box *,
   .tool-modal{z-index: 4000 !important;}
   .tool-modal-card{width: calc(100vw - 16px) !important; max-height: 88dvh !important; z-index: 4001 !important;}
   .ca-ai-modal, .ca-ai-modal .tool-modal-card{z-index: 4500 !important;}
+  .tool-modal{z-index: 100001 !important;}
+  .tool-modal-card{width: calc(100vw - 16px) !important; max-height: 88dvh !important; z-index: 100002 !important;}
+  .ca-ai-modal, .ca-ai-modal .tool-modal-card{z-index: 100005 !important;}
   .table-wrap{overflow-x: auto !important; -webkit-overflow-scrolling: touch !important;}
   .table-wrap table{min-width: 700px !important;}
   .wl-item{min-height: 50px !important; padding: 8px 8px !important;}
@@ -2706,12 +2737,16 @@ body.light-theme .market-box *,
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
+    bottom: 52px !important;
     top: auto !important;
     max-height: 82vh !important;
+    max-height: 80vh !important;
     width: 100% !important;
     margin: 0 !important;
     border-radius: 18px 18px 0 0 !important;
     z-index: 3800 !important;
+    z-index: 100000 !important;
+    pointer-events: auto !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
     box-shadow: 0 -12px 48px rgba(0,0,0,0.85) !important;
@@ -3506,6 +3541,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
 
         <!-- 3 Recommendation Cards: Spot Benchmark | Best Call (CE) | Best Put (PE) -->
+        <div class="dash-reco-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch;width:100%;">
         <div class="dash-reco-grid" id="dashDualRecoContainer" style="gap:12px;margin-bottom:12px;align-items:stretch;width:100%;">
 
           <!-- CARD 1: UNDERLYING / SPOT BENCHMARK -->
@@ -3546,12 +3582,12 @@ select#watchlistSelect, select.watchlist-select {
               </div>
             </div>
 
-            <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner (+200pt) & Trailing SL -->
+            <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
             <div style="background:rgba(232,184,75,0.06);border:1px dashed rgba(232,184,75,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;flex-wrap:wrap;gap:4px;">
-                <span><b>T1:</b> <span id="undTgt1" style="color:var(--text);font-weight:700;">₹--</span></span>
-                <span><b>T2:</b> <span id="undTgt2" style="color:var(--text);font-weight:700;">₹--</span></span>
-                <span><b style="color:var(--gold);">T3 (Runner +200pt):</b> <span id="undTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="undTgt1" style="color:var(--text);font-weight:700;">₹--</span></span>
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="undTgt2" style="color:var(--text);font-weight:700;">₹--</span></span>
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b style="color:var(--gold);">T3 (Runner):</b> <span id="undTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
               </div>
               <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
                 <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="undTrailingSl">Cost at T1; Lock T1 at T2</span>
@@ -3634,6 +3670,10 @@ select#watchlistSelect, select.watchlist-select {
                 <span><b>T1:</b> <span id="ceTgt1" style="color:var(--buy);font-weight:700;">₹--</span></span>
                 <span><b>T2:</b> <span id="ceTgt2" style="color:var(--buy);font-weight:700;">₹--</span></span>
                 <span><b style="color:var(--gold);">T3 (Runner +200pt):</b> <span id="ceTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="ceTgt1" style="color:var(--buy);font-weight:700;">₹--</span></span>
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="ceTgt2" style="color:var(--buy);font-weight:700;">₹--</span></span>
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b style="color:var(--gold);">T3 (Runner):</b> <span id="ceTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
               </div>
               <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
                 <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="ceTrailingSl">Cost at T1; Lock T1 at T2</span>
@@ -3716,6 +3756,10 @@ select#watchlistSelect, select.watchlist-select {
                 <span><b>T1:</b> <span id="peTgt1" style="color:var(--sell);font-weight:700;">₹--</span></span>
                 <span><b>T2:</b> <span id="peTgt2" style="color:var(--sell);font-weight:700;">₹--</span></span>
                 <span><b style="color:var(--gold);">T3 (Runner -200pt):</b> <span id="peTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="peTgt1" style="color:var(--sell);font-weight:700;">₹--</span></span>
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="peTgt2" style="color:var(--sell);font-weight:700;">₹--</span></span>
+                <span style="overflow:hidden;text-overflow:ellipsis;"><b style="color:var(--gold);">T3 (Runner):</b> <span id="peTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
               </div>
               <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
                 <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="peTrailingSl">Cost at T1; Lock T1 at T2</span>
@@ -3823,6 +3867,9 @@ select#watchlistSelect, select.watchlist-select {
           <span id="chartSimSliderDisplay"></span><input id="chartSimSlider"><div id="chartSimDeltaImpact"></div><div id="chartSimGammaImpact"></div><div id="chartSimTotalImpact"></div><div id="chartSimLotPnl"></div><div id="chartSimLotNote"></div>
         </div>
       </div>
+    </div>
+    </div>
+    </div>
     </div> <!-- END panel-dashboard -->
 
   <div class="panel" id="panel-reco">
@@ -3939,6 +3986,7 @@ select#watchlistSelect, select.watchlist-select {
             <span>Pop-out</span>
           </button>
           <button class="btn gold" id="chartAiSuggestBtnMobile" style="display:none;font-weight:700;padding:4px 8px;font-size:11px;" title="CA AI Indicator & Trendline Suggestions"> CA AI Indicators</button>
+          <button class="btn gold" id="chartAiSuggestBtnMobile" style="display:none;font-weight:700;padding:4px 8px;font-size:11px;align-items:center;gap:4px;" title="CA AI Indicator & Trendline Suggestions" onclick="window.toggleChartAiPanel && window.toggleChartAiPanel(undefined, this)"> CA AI Suggestions <span class="badge" id="chartAiBadgeMobile" style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span></button>
           <button class="btn gold" id="chartBuyBtn">Buy</button>
           <button class="btn ghost" id="chartSellBtn">Sell</button>
         </div>
@@ -4047,6 +4095,7 @@ select#watchlistSelect, select.watchlist-select {
 
           <!-- CA AI Suggestions Pill -->
           <button class="btn gold small" id="chartAiSuggestBtn" title="CA AI Indicator &amp; Trendline Suggestions" style="font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:linear-gradient(135deg,rgba(239,251,245,0.12),rgba(38,217,166,0.18));border:1px solid var(--buy);color:var(--text);cursor:pointer;">
+          <button class="btn gold small" id="chartAiSuggestBtn" title="CA AI Indicator &amp; Trendline Suggestions" onclick="window.toggleChartAiPanel && window.toggleChartAiPanel(undefined, this)" style="font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:linear-gradient(135deg,rgba(239,251,245,0.12),rgba(38,217,166,0.18));border:1px solid var(--buy);color:var(--text);cursor:pointer;">
              CA AI Suggestions <span class="badge" id="chartAiBadge" style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span>
           </button>
         </div>
@@ -8333,6 +8382,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     const cp=[];
     if(highs.length>=10 && lows.length>=10){
       const hh=Math.max(...highs),ll=Math.min(...lows),lastClose=Number(last?.close);
+      if(Number.isFinite(lastClose)&&lastClose>=hh*.995)cp.push({pattern:'Range Breakout (possible)',confidence:58,description:'Latest close is testing the recen
       if(Number.isFinite(lastClose)&&lastClose>=hh*.995)cp.push({pattern:'Range Breakout (possible)',confidence:58,description:'Latest close is testing the recent high.'});
       else if(Number.isFinite(lastClose)&&lastClose<=ll*1.005)cp.push({pattern:'Range Breakdown (possible)',confidence:58,description:'Latest close is testing the recent low.'});
       else cp.push({pattern:'Short-term Range Structure',confidence:50,description:'Recent loaded candles form a visible local range.'});
@@ -8399,6 +8449,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           </div>
           <div style="display:flex;align-items:center;gap:10px;text-align:left;">
             <span style="width:72px;color:var(--text-faint);font-size:10px;font-weight:500;">MACD</span>
+            <span class="${macdVal >= 0 ? 'cell
+... [truncated for diff preview]
             <span class="${macdVal >= 0 ? 'cell-up' : 'cell-down'}" style="font-family:var(--font-mono);font-size:10.5px;font-weight:600;">${fmt(macdVal)}</span>
           </div>
           <div style="display:flex;align-items:center;gap:10px;text-align:left;">
@@ -9688,6 +9740,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     renderChartAiPanel(localData);
     const totalCount = localData.horizontal_levels.length + localData.indicators.length;
     if(badge) badge.textContent = String(totalCount);
+    const badgeMobile = document.getElementById('chartAiBadgeMobile');
+    if(badgeMobile) badgeMobile.textContent = String(totalCount);
 
     const activeSym = S || (typeof selectedSymbol === 'function' ? selectedSymbol() : null) || window.CATraderSymbol || 'NIFTY';
     if(activeSym){
@@ -9699,6 +9753,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           renderChartAiPanel(d);
           const serverCount = (d.horizontal_levels?.length || 0) + (d.indicators?.length || 0);
           if(badge) badge.textContent = String(serverCount);
+          if(badgeMobile) badgeMobile.textContent = String(serverCount);
         }
       } catch(err){
         console.debug('[CA AI chart suggestions]', err);
@@ -10784,41 +10839,60 @@ function applyDrawingPoint(x,y){
     const shouldOpen = forceState !== undefined ? forceState : isClosed;
     if(shouldOpen){
       panel.style.display = 'block';
-      panel.style.position = 'fixed';
-      panel.style.zIndex = '99999';
-      panel.style.width = '420px';
-      panel.style.maxWidth = '92vw';
-      panel.style.maxHeight = '520px';
+      panel.style.zIndex = '100000';
+      if(window.innerWidth <= 768){
+        panel.style.position = 'fixed';
+        panel.style.left = '0';
+        panel.style.right = '0';
+        panel.style.bottom = '52px';
+        panel.style.top = 'auto';
+        panel.style.width = '100%';
+        panel.style.maxWidth = '100vw';
+        panel.style.maxHeight = '80vh';
+        panel.style.borderRadius = '18px 18px 0 0';
+      } else {
+        panel.style.position = 'fixed';
+        panel.style.width = '420px';
+        panel.style.maxWidth = '92vw';
+        panel.style.maxHeight = '520px';
+        panel.style.bottom = 'auto';
+        panel.style.right = 'auto';
+        panel.style.borderRadius = '10px';
+        const btn = triggerBtn || document.getElementById('chartAiSuggestBtn') || document.getElementById('chartAiSuggestBtnMobile');
+        if(btn){
+          const rect = btn.getBoundingClientRect();
+          let top = rect.bottom + 6;
+          let left = rect.right - 420;
+          if(left < 10) left = 10;
+          if(top + 450 > window.innerHeight) top = Math.max(10, rect.top - 460);
+          panel.style.top = `${top}px`;
+          panel.style.left = `${left}px`;
+        }
+      }
       panel.style.overflowY = 'auto';
       panel.style.boxShadow = '0 16px 40px rgba(0,0,0,0.6)';
       panel.style.border = '1px solid var(--buy)';
-      panel.style.borderRadius = '10px';
       panel.style.background = 'var(--surface)';
 
-      const btn = triggerBtn || document.getElementById('chartAiSuggestBtn') || document.getElementById('chartAiSuggestBtnMobile');
-      if(btn){
-        const rect = btn.getBoundingClientRect();
-        let top = rect.bottom + 6;
-        let left = rect.right - 420;
-        if(left < 10) left = 10;
-        if(top + 450 > window.innerHeight) top = Math.max(10, rect.top - 460);
-        panel.style.top = `${top}px`;
-        panel.style.left = `${left}px`;
-      }
       loadChartAiSuggestions(true);
     } else {
       panel.style.display = 'none';
     }
   }
-  ['click'].forEach(ev => {
+  window.toggleChartAiPanel = toggleChartAiPanel;
+  window.openChartAiSuggestions = () => toggleChartAiPanel(true);
+
+  ['click', 'touchend'].forEach(ev => {
     document.getElementById('chartAiSuggestBtn')?.addEventListener(ev, (e) => {
+      e.preventDefault();
       e.stopPropagation();
       toggleChartAiPanel(undefined, e.currentTarget);
-    });
+    }, { passive: false });
     document.getElementById('chartAiSuggestBtnMobile')?.addEventListener(ev, (e) => {
+      e.preventDefault();
       e.stopPropagation();
       toggleChartAiPanel(undefined, e.currentTarget);
-    });
+    }, { passive: false });
   });
   // Dismiss chart AI suggestions when clicking outside
   document.addEventListener('click', (e) => {
@@ -22565,6 +22639,7 @@ window.calculateSpecLevels = function(side, spot, vwap, ltpOpt, delta, gamma, th
   );
   const modelTarget = _roundV(entry + dOptionTarget);
   const minTarget = _roundV(entry + 2.0 * finalRiskBudget);
+  const targetFeasible = Boolean(modelTarget >= minTarget && modelTarget > entry);
   const target1 = targetFeasible ? modelTarget : minTarget;
   const target2 = _roundV(entry + 3.5 * finalRiskBudget);
   const target3 = _roundV(entry + 5.5 * finalRiskBudget);
@@ -22650,7 +22725,9 @@ window.renderDualRecoCards = function(data){
   const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'NIFTY';
   const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
   
-  const curLtp = Number(data.cmp || _getLtp());
+  const curLtpRaw = Number(data.cmp || (typeof _getLtp === 'function' ? _getLtp() : 0));
+  const fallbackLtp = root.includes('BANK') ? 54000 : (root.includes('CRUDE') ? 6200 : 25200);
+  const curLtp = curLtpRaw > 10 ? curLtpRaw : fallbackLtp;
   const step = root.includes('BANK') ? 100 : (root.includes('CRUDE') ? 50 : 50);
   const strike = Math.round(curLtp / step) * step;
 
@@ -22847,8 +22924,10 @@ window.renderDualRecoCards = function(data){
   if(!cleanCeSym.toUpperCase().startsWith(root)){
     cleanCeSym = `${root} ${cleanExpCe} ${strike} CE`;
   }
+  const defaultCeLtp = root.includes('BANK') ? 420.0 : (root.includes('CRUDE') ? 85.0 : 185.0);
+  const defaultPeLtp = root.includes('BANK') ? 380.0 : (root.includes('CRUDE') ? 78.0 : 165.0);
   const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, root) : null;
-  const ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || 219.46);
+  const ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || defaultCeLtp);
   const activeTf = window.__caRecoTimeframe || '5m';
   const ceSpec = window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, activeTf);
   // Compare with 15m alternative for timeframe commentary
@@ -22861,7 +22940,7 @@ window.renderDualRecoCards = function(data){
     cleanPeSym = `${root} ${cleanExpPe} ${strike} PE`;
   }
   const liveQPe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanPeSym, root) : null;
-  const ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || 172.71);
+  const ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || defaultPeLtp);
   const peSpec = window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, activeTf);
   const peSpec15m = window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, '15m');
   peSpec.symbol = cleanPeSym;
