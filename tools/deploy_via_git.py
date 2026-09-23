@@ -28,9 +28,9 @@ def run_ssh(cmd, timeout=400):
     print(f"\n>> [SSH] {cmd}", flush=True)
     r = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
     if r.stdout:
-        print(r.stdout.strip(), flush=True)
+        print(r.stdout.encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8').strip(), flush=True)
     if r.stderr:
-        print(f"[STDERR] {r.stderr.strip()}", flush=True)
+        print(f"[STDERR] {r.stderr.encode(sys.stderr.encoding or 'utf-8', errors='replace').decode(sys.stderr.encoding or 'utf-8').strip()}", flush=True)
     return r
 
 def main():
