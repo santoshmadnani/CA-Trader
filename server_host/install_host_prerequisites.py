@@ -85,3 +85,4 @@ if __name__ == "__main__":
     install_dependencies()
     download_cloudflared()
     verify_setup()
+

@@ -6,3 +6,4 @@ echo    STARTING CA TRADER LAPTOP SERVER
 echo ==========================================================
 python server_host\start_laptop_server.py
 pause
+

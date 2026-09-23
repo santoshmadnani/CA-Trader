@@ -173,6 +173,7 @@
       "positions": "Open and closed positions with live P&L tracking",
       "funds": "User available margin, cash, collateral",
       "recommendations": "Dual consensus (CE/PE) signal recommendations. Lightweight summary columns: id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, score, outcome, final_pnl, success, exit_reason, created_at, status",
+      "error_events": "Application error logs and exceptions"
     }
   },
   "laptop_server_hosting": {

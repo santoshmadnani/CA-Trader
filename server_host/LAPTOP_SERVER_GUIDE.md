@@ -113,3 +113,4 @@ The entire hosting environment is self-contained. To switch to a new laptop at a
 | `database.max_backups_to_retain` | `15` | Automatically purges older backup snapshots |
 | `tunnel.mode` | `"quick"` | `"quick"` gives instant URL; change to `"named"` for custom domain `catrader.site` |
 | `power_management.prevent_system_sleep`| `true` | Prevents Windows sleep while the server process is alive |
+
