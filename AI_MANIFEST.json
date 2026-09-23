@@ -173,8 +173,20 @@
       "positions": "Open and closed positions with live P&L tracking",
       "funds": "User available margin, cash, collateral",
       "recommendations": "Dual consensus (CE/PE) signal recommendations. Lightweight summary columns: id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, score, outcome, final_pnl, success, exit_reason, created_at, status",
-      "error_events": "Application error logs and exceptions"
     }
+  },
+  "laptop_server_hosting": {
+    "guide_file": "LAPTOP_SERVER_GUIDE.md",
+    "host_config": "server_host/host_config.json",
+    "launcher": "server_host/start_laptop_server.bat",
+    "installer": "server_host/install_host_prerequisites.bat",
+    "db_sync_tool": "tools/sync_db_from_aws.py",
+    "10_day_cutover_procedure": [
+      "1. Run 'python tools/sync_db_from_aws.py' to pull latest database snapshot from AWS EC2.",
+      "2. In Cloudflare Dashboard (or Namecheap DNS), point catrader.site CNAME/Tunnel to the laptop.",
+      "3. In server_host/host_config.json, set mode to 'named' (or run cloudflared tunnel run).",
+      "4. Double-click server_host/start_laptop_server.bat."
+    ]
   }
 }
 
