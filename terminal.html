@@ -3391,7 +3391,6 @@ select#watchlistSelect, select.watchlist-select {
   <div class="navtab" data-tab="backtesting" role="button" tabindex="0" onclick="showTab('backtesting')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><path d="M4 12a8 8 0 0 1 8-8"/></svg>
     Backtesting &amp; Calibration
-    Auto Analyze Day Recommendations
   </div>
   <div class="navtab" data-tab="orders" role="button" tabindex="0" onclick="showTab('orders')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6l1 4H8z"/><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M9 12h6M9 16h6"/></svg>
@@ -3472,13 +3471,13 @@ select#watchlistSelect, select.watchlist-select {
               <button type="button" class="btn small ghost reco-tf-btn" data-tf="1h" onclick="setRecoTimeframe('1h', this)" style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1h</button>
               <button type="button" class="btn small ghost reco-tf-btn" data-tf="1D" onclick="setRecoTimeframe('1D', this)" style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1D</button>
             </div>
-            <button type="button" class="btn ghost small" onclick="loadDashboard(true); toast('Scanning all option chains for new setups...');" style="padding:3px 8px;font-size:11px;">Refresh recommendations</button>
-            <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);padding:2px 6px;border-radius:6px;border:1px solid var(--border-soft);">
+                        <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);padding:2px 6px;border-radius:6px;border:1px solid var(--border-soft);">
               <span style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:700;">Expiry:</span>
               <select id="recoOptionExpirySelect" onchange="window.onRecoExpiryChanged(this.value)" style="background:var(--surface);color:var(--text);border:1px solid var(--border-soft);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer;outline:none;">
                 <option value="">Current Expiry</option>
               </select>
             </div>
+            <button type="button" class="btn ghost small" onclick="loadDashboard(true); toast('Scanning all option chains for new setups...');" style="padding:3px 8px;font-size:11px;">Refresh recommendations</button>
           </div>
         </div>
 
@@ -3536,9 +3535,9 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardCe" style="padding:12px 14px;background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-top:3px solid var(--buy);border-radius:8px;position:relative;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;height:100%;">
             <!-- Top Right Caution Badge for Budget Overrun (Item 2) -->
             <div id="ceCautionBadge" style="display:none;position:absolute;top:9px;right:9px;cursor:pointer;z-index:20;" onclick="window.toggleBudgetPopover('CE', event)" onmouseenter="window.showBudgetPopover('CE')" onmouseleave="window.hideBudgetPopover('CE')" title="Click or hover: Capital per trade not enough">
-              <span style="display:inline-flex;align-items:center;justify-content:center;background:rgba(239,68,68,0.18);color:#ef4444;border:1px solid rgba(239,68,68,0.6);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;">!</span>
+              <span style="display:inline-flex;align-items:center;justify-content:center;background:rgba(239,68,68,0.18);color:#ef4444;border:1px solid rgba(239,68,68,0.6);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;"></span>
               <div id="ceCautionPopover" style="display:none;position:absolute;right:0;top:calc(100% + 5px);width:260px;background:var(--surface);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.7);color:var(--text);font-size:11px;line-height:1.45;z-index:99999;text-align:left;white-space:normal;">
-                <div style="font-weight:700;color:var(--sell);margin-bottom:4px;">Capital per trade not enough</div>
+                <div style="font-weight:700;color:var(--sell);margin-bottom:4px;"> Capital per trade not enough</div>
                 <div id="ceCautionPopoverText" style="color:var(--text-dim);font-size:10.5px;"></div>
               </div>
             </div>
@@ -3559,7 +3558,7 @@ select#watchlistSelect, select.watchlist-select {
                 </div>
                 <!-- Search Box beside ITM & OTM buttons (Item 5) -->
                 <div class="top-search" style="position:relative;display:inline-block;">
-                  <input type="text" id="ceOptionSearchInput" placeholder="CE strike…" autocomplete="off" style="width:84px;height:20px;padding:1px 6px;font-size:10px;border-radius:4px;background:var(--surface);color:var(--text);border:1px solid var(--border-soft);">
+                  <input type="text" id="ceOptionSearchInput" placeholder=" CE strike…" autocomplete="off" style="width:84px;height:20px;padding:1px 6px;font-size:10px;border-radius:4px;background:var(--surface);color:var(--text);border:1px solid var(--border-soft);">
                   <div class="top-search-suggestions" id="ceOptionSearchSuggestions" style="position:absolute;right:0;top:calc(100% + 4px);min-width:210px;max-height:220px;overflow-y:auto;z-index:99999;"></div>
                 </div>
               </div>
@@ -3606,9 +3605,9 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card" id="dashCardPe" style="padding:12px 14px;background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-top:3px solid var(--sell);border-radius:8px;position:relative;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;height:100%;">
             <!-- Top Right Caution Badge for Budget Overrun (Item 2) -->
             <div id="peCautionBadge" style="display:none;position:absolute;top:9px;right:9px;cursor:pointer;z-index:20;" onclick="window.toggleBudgetPopover('PE', event)" onmouseenter="window.showBudgetPopover('PE')" onmouseleave="window.hideBudgetPopover('PE')" title="Click or hover: Capital per trade not enough">
-              <span style="display:inline-flex;align-items:center;justify-content:center;background:rgba(239,68,68,0.18);color:#ef4444;border:1px solid rgba(239,68,68,0.6);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;">!</span>
+              <span style="display:inline-flex;align-items:center;justify-content:center;background:rgba(239,68,68,0.18);color:#ef4444;border:1px solid rgba(239,68,68,0.6);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;"></span>
               <div id="peCautionPopover" style="display:none;position:absolute;right:0;top:calc(100% + 5px);width:260px;background:var(--surface);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.7);color:var(--text);font-size:11px;line-height:1.45;z-index:99999;text-align:left;white-space:normal;">
-                <div style="font-weight:700;color:var(--sell);margin-bottom:4px;">Capital per trade not enough</div>
+                <div style="font-weight:700;color:var(--sell);margin-bottom:4px;"> Capital per trade not enough</div>
                 <div id="peCautionPopoverText" style="color:var(--text-dim);font-size:10.5px;"></div>
               </div>
             </div>
@@ -3629,7 +3628,7 @@ select#watchlistSelect, select.watchlist-select {
                 </div>
                 <!-- Search Box beside ITM & OTM buttons (Item 5) -->
                 <div class="top-search" style="position:relative;display:inline-block;">
-                  <input type="text" id="peOptionSearchInput" placeholder="PE strike…" autocomplete="off" style="width:84px;height:20px;padding:1px 6px;font-size:10px;border-radius:4px;background:var(--surface);color:var(--text);border:1px solid var(--border-soft);">
+                  <input type="text" id="peOptionSearchInput" placeholder=" PE strike…" autocomplete="off" style="width:84px;height:20px;padding:1px 6px;font-size:10px;border-radius:4px;background:var(--surface);color:var(--text);border:1px solid var(--border-soft);">
                   <div class="top-search-suggestions" id="peOptionSearchSuggestions" style="position:absolute;right:0;top:calc(100% + 4px);min-width:210px;max-height:220px;overflow-y:auto;z-index:99999;"></div>
                 </div>
               </div>
@@ -3686,7 +3685,6 @@ select#watchlistSelect, select.watchlist-select {
           <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;flex-wrap:wrap;">
             <span class="tag gold" id="excelConsensusScoreBadge" style="font-family:var(--font-mono);font-weight:700;">Consensus: 86.4% Bullish</span>
             <span class="muted" id="excelLiveTimer">⏱ Live 1s / News 60s</span>
-            <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:11px;padding:3px 10px;font-weight:700;">✦ Factors Math &amp; Formulas Suite</button>
             <button type="button" class="btn gold small" onclick="window.openFactorsSuiteModal()" style="font-size:11px;padding:3px 10px;font-weight:700;"> Factors Math &amp; Formulas Suite</button>
           </div>
         </div>
@@ -3758,7 +3756,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
         <div id="dashRationaleCard"><span id="dashRationaleSignalTag"></span><span id="dashRationaleScoreBadge"></span><div id="dashConfluenceTableBody"></div></div>
         <div id="dashAutoRecoStrip"><span id="autoRecoTimerBadge"></span><span id="dashAutoRecoStatusText"></span><div id="dashAutoRecoSymbolsList"></div></div>
-        <div id="dashGreeksCard"><span id="dashGreeksTitle"></span><span id="dashGreeksSubtitle"></span><span id="chartGreeksContractBadge"></span><span id="chartGreeksIvBadge"></span>
+        <div id="dashGreeksCard"><span id="dashGreeksTitle"></span><span id="dashGreeksSubtitle"></span><span id="dashGreeksContractBadge"></span><span id="dashGreeksIvBadge"></span>
           <div id="chartGreeksGrid"><span id="cgDelta"></span><span id="cgGamma"></span><span id="cgTheta"></span><span id="cgVega"></span></div>
         </div>
         <div id="chartPriceSensitivityCard"><span id="priceSensitivityTitle"></span><span id="chartSimPointsBadge"></span><span id="chartSimNetGainBadge"></span>
@@ -3819,8 +3817,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="page-sub">Independent audited trade signals, execution outcomes (Target Hit, SL Hit, Active Trail) and realized P&amp;L</div>
         </div>
         <div class="head-actions">
-          <button class="btn ghost small" id="recoHistoryRefreshBtn" onclick="loadRecommendationHistory()">↻ Refresh History</button>
-          <button class="btn ghost small" id="recoHistoryRefreshBtn" onclick="loadRecommendationHistory()">Refresh Refresh History</button>
+          <button class="btn ghost small" id="recoHistoryRefreshBtn" onclick="loadRecommendationHistory()">Refresh History</button>
         </div>
       </div>
 
@@ -3852,8 +3849,6 @@ select#watchlistSelect, select.watchlist-select {
       <div class="card" style="margin-bottom:14px;padding:14px 16px;">
         <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <b style="font-size:13px;color:var(--text);">Audited Recommendations Log</b>
-            <b style="font-size:13px;color:var(--text);">Recommendation History</b>
             <b style="font-size:13px;color:var(--text);">Recommendation History Log</b>
             <span class="tag neutral" id="recoHistoryCountBadge" style="font-size:10px;">0 records</span>
           </div>
@@ -3883,7 +3878,6 @@ select#watchlistSelect, select.watchlist-select {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             <span>Pop-out</span>
           </button>
-          <button class="btn gold" id="chartAiSuggestBtnMobile" style="display:none;font-weight:700;padding:4px 8px;font-size:11px;" title="CA AI Indicator & Trendline Suggestions">✦ CA AI Indicators</button>
           <button class="btn gold" id="chartAiSuggestBtnMobile" style="display:none;font-weight:700;padding:4px 8px;font-size:11px;" title="CA AI Indicator & Trendline Suggestions"> CA AI Indicators</button>
           <button class="btn gold" id="chartBuyBtn">Buy</button>
           <button class="btn ghost" id="chartSellBtn">Sell</button>
@@ -3956,7 +3950,6 @@ select#watchlistSelect, select.watchlist-select {
 
           <!-- Lock Drawings Button (Release 48 - Item 22) -->
           <button type="button" class="tf-btn" id="btnLockDrawings" title="Lock Drawings (Pan & Crosshair only)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;font-size:11.5px;font-weight:600;">
-            <span id="lockDrawingsIcon">🔓</span>
             <span id="lockDrawingsIcon"></span>
             <span>Lock</span>
           </button>
@@ -3994,7 +3987,6 @@ select#watchlistSelect, select.watchlist-select {
 
           <!-- CA AI Suggestions Pill -->
           <button class="btn gold small" id="chartAiSuggestBtn" title="CA AI Indicator &amp; Trendline Suggestions" style="font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:linear-gradient(135deg,rgba(239,251,245,0.12),rgba(38,217,166,0.18));border:1px solid var(--buy);color:var(--text);cursor:pointer;">
-            ✦ CA AI Suggestions <span class="badge" id="chartAiBadge" style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span>
              CA AI Suggestions <span class="badge" id="chartAiBadge" style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span>
           </button>
         </div>
@@ -4013,8 +4005,7 @@ select#watchlistSelect, select.watchlist-select {
           </label>
           <button type="button" class="btn small ghost" id="btnChartReplayGo" onclick="loadChartReplaySession()" style="padding:1px 7px;font-size:10.5px;height:22px;font-family:inherit;font-weight:700;">Go</button>
           <div style="height:12px;width:1px;background:var(--border-soft);margin:0 2px;"></div>
-          <button type="button" class="btn small gold" id="btnChartReplayPlayPause" onclick="toggleChartReplayPlay()" style="padding:1px 8px;font-size:10.5px;height:22px;font-family:inherit;font-weight:700;">▶ Play</button>
-          <button type="button" class="btn small gold" id="btnChartReplayPlayPause" onclick="toggleChartReplayPlay()" style="padding:1px 8px;font-size:10.5px;height:22px;font-family:inherit;font-weight:700;">Play Play</button>
+          <button type="button" class="btn small gold" id="btnChartReplayPlayPause" onclick="toggleChartReplayPlay()" style="padding:1px 8px;font-size:10.5px;height:22px;font-family:inherit;font-weight:700;">Play</button>
           <select id="chartReplaySpeedSelect" onchange="setChartReplaySpeed(this.value)" style="height:22px;padding:0 4px;font-size:10.5px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;font-family:inherit;cursor:pointer;">
             <option value="1">1x Speed</option>
             <option value="2" selected>2x Speed</option>
@@ -4035,7 +4026,6 @@ select#watchlistSelect, select.watchlist-select {
             <span id="btActivePosSide" class="tag buy" style="font-size:9.5px;padding:1px 4px;">BUY</span>
             <span id="btActivePosEntry">₹--</span>
             <span id="btActivePosPnl" style="font-weight:700;">+₹0.00</span>
-            <button type="button" class="btn ghost small" onclick="window.squareOffReplayPosition()" style="padding:0 4px;font-size:9.5px;height:18px;line-height:1;color:var(--sell);" title="Exit simulation position">✕ Exit</button>
             <button type="button" class="btn ghost small" onclick="window.squareOffReplayPosition()" style="padding:0 4px;font-size:9.5px;height:18px;line-height:1;color:var(--sell);" title="Exit simulation position">Close Exit</button>
           </div>
 
@@ -4044,12 +4034,9 @@ select#watchlistSelect, select.watchlist-select {
 
           <!-- Backtest Settings Popover -->
           <div style="position:relative;display:inline-block;">
-            <button type="button" class="btn ghost small" id="btReplaySettingsBtn" onclick="window.toggleReplayOrderSettings(event)" style="padding:1px 7px;font-size:10.5px;height:22px;font-family:inherit;" title="Configure Backtesting SL, Target &amp; Max Loss">⚙ Settings</button>
             <button type="button" class="btn ghost small" id="btReplaySettingsBtn" onclick="window.toggleReplayOrderSettings(event)" style="padding:1px 7px;font-size:10.5px;height:22px;font-family:inherit;" title="Configure Backtesting SL, Target &amp; Max Loss"> Settings</button>
             <div id="btReplaySettingsPopover" style="display:none;position:absolute;right:0;top:calc(100% + 4px);width:250px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.6);font-size:11px;">
               <div style="font-weight:700;color:var(--text);margin-bottom:8px;border-bottom:1px solid var(--border-soft);padding-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
-                <span>⚙ Backtest Order &amp; Risk</span>
-                <span style="cursor:pointer;font-size:12px;color:var(--text-dim);" onclick="window.toggleReplayOrderSettings(event)">✕</span>
                 <span> Backtest Order &amp; Risk</span>
                 <span style="cursor:pointer;font-size:12px;color:var(--text-dim);" onclick="window.toggleReplayOrderSettings(event)">Close</span>
               </div>
@@ -4085,19 +4072,15 @@ select#watchlistSelect, select.watchlist-select {
       <div class="ca-chart-ai-panel card" id="chartAiPanel" style="display:none;margin:8px 0 12px;padding:12px 14px;border-radius:10px;background:var(--surface);border:1px solid rgba(38,217,166,0.3);box-shadow:0 8px 24px rgba(0,0,0,0.25);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-soft);flex-wrap:wrap;gap:8px;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:var(--buy-bg);color:var(--buy);font-size:13px;font-weight:700;">✦</span>
             <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:var(--buy-bg);color:var(--buy);font-size:13px;font-weight:700;"></span>
             <div>
               <div style="font-weight:700;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;">CA AI Chart Assistant <span class="tag buy" id="chartAiStatusTag" style="font-size:9.5px;padding:1px 6px;">Live Suggestions</span></div>
-              <div class="muted" id="chartAiSub" style="font-size:10.5px;margin-top:2px;">Algorithmic Top-to-Top & Bottom-to-Bottom Trendlines, Key S/R & Indicators</div>
-              <div class="muted" id="chartAiSub" style="font-size:10.5px;margin-top:2px;">Structural Support &amp; Resistance &amp; Context-Aware Technical Indicators</div>
+            <div class="muted" id="chartAiSub" style="font-size:10.5px;margin-top:2px;">Algorithmic Top Setups, Structural Support/Resistance &amp; Confluence Signals</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <button class="btn buy small" id="chartAiApplyAllBtn" style="padding:4px 10px;font-size:11px;font-weight:700;">✦ Apply All to Chart</button>
             <button class="btn buy small" id="chartAiApplyAllBtn" style="padding:4px 10px;font-size:11px;font-weight:700;"> Apply All to Chart</button>
             <button class="btn ghost small" id="chartAiMaximizeBtn" onclick="toggleChartAiMaximize()" style="padding:3px 8px;font-size:12px;line-height:1;" title="Toggle Fullscreen">⛶</button>
-            <button class="btn ghost small" id="chartAiCloseBtn" style="padding:3px 8px;font-size:12px;line-height:1;" title="Close CA AI panel">✕</button>
             <button class="btn ghost small" id="chartAiCloseBtn" style="padding:3px 8px;font-size:12px;line-height:1;" title="Close CA AI panel">Close</button>
           </div>
         </div>
@@ -4180,7 +4163,7 @@ select#watchlistSelect, select.watchlist-select {
       <div class="card" id="btQuickSection" style="margin-bottom:16px;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,0.22);">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:36px;height:36px;border-radius:8px;background:rgba(232,184,75,0.15);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:18px;font-weight:bold;">🎯</div>
+            <div style="width:36px;height:36px;border-radius:8px;background:rgba(232,184,75,0.15);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:18px;font-weight:bold;"></div>
             <div>
               <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
                 <span>Quick Backtest Recommendation Engine</span>
@@ -4190,7 +4173,7 @@ select#watchlistSelect, select.watchlist-select {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <button type="button" class="btn ghost small" onclick="loadQuickBacktestHistory()">Refresh History (<span id="btQuickHistoryCount">0</span>)</button>
+            <button type="button" class="btn ghost small" onclick="loadQuickBacktestHistory()"> Refresh History (<span id="btQuickHistoryCount">0</span>)</button>
           </div>
         </div>
 
@@ -4236,7 +4219,7 @@ select#watchlistSelect, select.watchlist-select {
           <!-- Run Button -->
           <div>
             <button type="button" class="btn gold" id="btnRunQuickBacktest" onclick="runQuickBacktest()" style="width:100%;font-weight:700;padding:7px 12px;display:flex;align-items:center;justify-content:center;gap:6px;">
-              <span>⚡ Backtest Recommendation</span>
+              <span> Backtest Recommendation</span>
             </button>
           </div>
         </div>
@@ -4251,7 +4234,6 @@ select#watchlistSelect, select.watchlist-select {
             </div>
             <div style="display:flex;align-items:center;gap:12px;">
               <span>Baseline: <b id="btResBeforeOutcomePill" style="color:var(--sell);">FAILED (-₹3,800)</b></span>
-              <span>➜</span>
               <span>-></span>
               <span>Calibrated: <b id="btResAfterOutcomePill" style="color:var(--buy);">SUCCESS (+₹2,990)</b></span>
             </div>
@@ -4263,7 +4245,7 @@ select#watchlistSelect, select.watchlist-select {
             <div style="background:var(--surface-2);border:1px solid rgba(255,92,114,0.3);border-radius:8px;padding:14px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid var(--border-soft);padding-bottom:8px;">
                 <b style="color:var(--sell);font-size:13px;display:flex;align-items:center;gap:6px;">
-                  <span>❌ Baseline Recommendation (Before Calibration)</span>
+                  <span>Baseline Recommendation (Before Calibration)</span>
                 </b>
                 <span id="btBeforeStatusTag" class="tag sell" style="font-size:10px;">FAILED</span>
               </div>
@@ -4288,7 +4270,6 @@ select#watchlistSelect, select.watchlist-select {
 
               <!-- RATIONALE: WHAT WAS NOT CONSIDERED -->
               <div style="background:rgba(255,92,114,0.06);border:1px solid rgba(255,92,114,0.2);border-radius:6px;padding:10px;">
-                <b style="display:block;color:var(--sell);font-size:11.5px;margin-bottom:6px;">⚠️ Rationale: What was NOT considered in failed trade:</b>
                 <b style="display:block;color:var(--sell);font-size:11.5px;margin-bottom:6px;"> Rationale: What was NOT considered in failed trade:</b>
                 <ul id="btUnconsideredList" style="padding-left:16px;font-size:11px;color:var(--text-dim);line-height:1.55;display:grid;gap:4px;">
                 </ul>
@@ -4299,7 +4280,7 @@ select#watchlistSelect, select.watchlist-select {
             <div style="background:var(--surface-2);border:1px solid rgba(38,217,166,0.3);border-radius:8px;padding:14px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid var(--border-soft);padding-bottom:8px;">
                 <b style="color:var(--buy);font-size:13px;display:flex;align-items:center;gap:6px;">
-                  <span>✅ Calibrated Recommendation (After Calibration)</span>
+                  <span>Calibrated Recommendation (After Calibration)</span>
                 </b>
                 <span id="btAfterStatusTag" class="tag buy" style="font-size:10px;">SUCCESS (Target Hit)</span>
               </div>
@@ -4324,7 +4305,6 @@ select#watchlistSelect, select.watchlist-select {
 
               <!-- CALIBRATION FIXES APPLIED -->
               <div style="background:rgba(38,217,166,0.06);border:1px solid rgba(38,217,166,0.2);border-radius:6px;padding:10px;">
-                <b style="display:block;color:var(--buy);font-size:11.5px;margin-bottom:6px;">🎯 Calibrated Geometry Applied:</b>
                 <b style="display:block;color:var(--buy);font-size:11.5px;margin-bottom:6px;"> Calibrated Geometry Applied:</b>
                 <div style="font-size:11px;color:var(--text-dim);line-height:1.55;display:grid;gap:4px;">
                   <div>• <b>Timeframe-Scaled Target:</b> Realistic 0.0020× entry bounds (achieved in 10 minutes, avoiding theta decay).</div>
@@ -4340,7 +4320,6 @@ select#watchlistSelect, select.watchlist-select {
           <div style="background:rgba(232,184,75,0.06);border:1px solid rgba(232,184,75,0.3);border-radius:8px;padding:14px;margin-bottom:14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
               <b style="font-size:13px;color:var(--gold);display:flex;align-items:center;gap:6px;">
-                <span>🤖 CA AI Institutional Analysis on Failed vs Calibrated Recommendation</span>
                 <span> CA AI Institutional Analysis on Failed vs Calibrated Recommendation</span>
               </b>
               <button type="button" class="btn ghost small" onclick="askCaAiDetailedReview()" style="font-size:11px;padding:2px 8px;border-color:rgba(232,184,75,0.4);color:var(--gold);">Ask CA AI Follow-Up</button>
@@ -4399,7 +4378,7 @@ select#watchlistSelect, select.watchlist-select {
           </select>
           <button class="btn gold" id="btLoadSessionBtn" style="font-weight:700;">Load Session</button>
           <button class="btn primary" id="btTestRecalibrateBtn" style="background:linear-gradient(135deg,#00b074,#008a5b);border:none;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,176,116,0.35);" title="Test 5m trades across 6 hours and auto-recalibrate recommendation model for 90% accuracy">
-            <span>⚡ Test &amp; Recalibrate Model (90% Target)</span>
+            <span> Test &amp; Recalibrate Model (90% Target)</span>
           </button>
         </div>
       </div>
@@ -4408,7 +4387,7 @@ select#watchlistSelect, select.watchlist-select {
       <div id="recoCalibrationSection" class="card" style="margin-bottom:14px;padding:18px;background:var(--surface);border:1px solid rgba(0,176,116,0.3);border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,0.25);display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:36px;height:36px;border-radius:8px;background:rgba(0,176,116,0.15);display:flex;align-items:center;justify-content:center;color:#00b074;font-size:18px;font-weight:bold;">⚡</div>
+            <div style="width:36px;height:36px;border-radius:8px;background:rgba(0,176,116,0.15);display:flex;align-items:center;justify-content:center;color:#00b074;font-size:18px;font-weight:bold;"></div>
             <div>
               <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
                 <span>5-Minute Recommendation Model Calibration</span>
@@ -4419,7 +4398,7 @@ select#watchlistSelect, select.watchlist-select {
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             <button class="btn ghost small" id="btResetCalibBtn" style="color:#ff5c72;border-color:rgba(255,92,114,0.3);" title="Revert to system default model">Reset Calibration</button>
-            <button class="btn ghost small" id="btCloseCalibBtn">✕ Close</button>
+            <button class="btn ghost small" id="btCloseCalibBtn">Close</button>
           </div>
         </div>
 
@@ -4430,11 +4409,9 @@ select#watchlistSelect, select.watchlist-select {
             <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:600;margin-bottom:4px;">Accuracy (Win Rate)</div>
             <div style="display:flex;align-items:baseline;gap:8px;">
               <span id="recoCalibBeforeRate" style="font-size:16px;color:var(--text-dim);text-decoration:line-through;">22.9%</span>
-              <span style="font-size:14px;color:var(--text-faint);">➜</span>
               <span style="font-size:14px;color:var(--text-faint);">-></span>
               <span id="recoCalibAfterRate" style="font-size:22px;font-weight:800;color:#00b074;">100.0%</span>
             </div>
-            <div style="font-size:11px;color:#00b074;margin-top:2px;font-weight:600;" id="recoCalibRateNote">🎯 Target Achieved (&gt;= 90%)</div>
             <div style="font-size:11px;color:#00b074;margin-top:2px;font-weight:600;" id="recoCalibRateNote"> Target Achieved (&gt;= 90%)</div>
           </div>
 
@@ -4443,7 +4420,6 @@ select#watchlistSelect, select.watchlist-select {
             <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:600;margin-bottom:4px;">5m Trades Tested</div>
             <div style="display:flex;align-items:baseline;gap:8px;">
               <span id="recoCalibBeforeTrades" style="font-size:16px;color:var(--text-dim);">70 Trades</span>
-              <span style="font-size:14px;color:var(--text-faint);">➜</span>
               <span style="font-size:14px;color:var(--text-faint);">-></span>
               <span id="recoCalibAfterTrades" style="font-size:22px;font-weight:800;color:var(--text);">8 Trades</span>
             </div>
@@ -4455,7 +4431,6 @@ select#watchlistSelect, select.watchlist-select {
             <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:600;margin-bottom:4px;">Net P&amp;L (Points)</div>
             <div style="display:flex;align-items:baseline;gap:8px;">
               <span id="recoCalibBeforePnl" style="font-size:16px;color:#ff5c72;">-7.67</span>
-              <span style="font-size:14px;color:var(--text-faint);">➜</span>
               <span style="font-size:14px;color:var(--text-faint);">-></span>
               <span id="recoCalibAfterPnl" style="font-size:22px;font-weight:800;color:#00b074;">+29.15</span>
             </div>
@@ -4467,22 +4442,16 @@ select#watchlistSelect, select.watchlist-select {
             <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:600;margin-bottom:4px;">Realized 5m P&amp;L (₹)</div>
             <div style="display:flex;align-items:baseline;gap:8px;">
               <span id="recoCalibBeforeInr" style="font-size:16px;color:#ff5c72;">-₹767</span>
-              <span style="font-size:14px;color:var(--text-faint);">➜</span>
               <span style="font-size:14px;color:var(--text-faint);">-></span>
               <span id="recoCalibAfterInr" style="font-size:22px;font-weight:800;color:#00b074;">+₹2,915</span>
             </div>
             <div style="font-size:11px;color:var(--text-dim);margin-top:2px;" id="recoCalibInrNote">Based on 1 standard lot</div>
           </div>
-        <div class="card" style="padding:12px 14px;background:var(--surface);">
-          <div class="muted" style="font-size:10.5px;text-transform:uppercase;">Calibrated Day P&amp;L</div>
-          <div id="dayAnalysisNetPnl" style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:var(--buy);margin-top:4px;">—</div>
-          <div class="muted" style="font-size:10px;margin-top:2px;">Audited on standard lot</div>
         </div>
 
         <!-- Parameter Changes Diff Accordion/Box -->
         <div style="background:rgba(0,176,116,0.06);border:1px solid rgba(0,176,116,0.2);border-radius:8px;padding:12px;margin-bottom:16px;">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-            <span>⚙️ Calibration Adjustments Made for 90% Target Accuracy:</span>
             <span> Calibration Adjustments Made for 90% Target Accuracy:</span>
           </div>
           <div id="recoCalibDiffList" style="display:flex;flex-wrap:wrap;gap:8px;">
@@ -4528,20 +4497,19 @@ select#watchlistSelect, select.watchlist-select {
         </div>
 
         <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text-faint);">
-          <div>Live Engine Synced: Model active in SQLite table <code style="color:var(--gold);">reco_calibration</code>. Live Dashboard and Terminal will use this calibrated model without code edits.</div>
+          <div> Live Engine Synced: Model active in SQLite table <code style="color:var(--gold);">reco_calibration</code>. Live Dashboard and Terminal will use this calibrated model without code edits.</div>
           <div id="recoCalibTimestamp">Calibrated at: —</div>
         </div>
-      </div>
       </div>
 
       <!-- Playback Control Center Card -->
       <div class="card" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <button class="btn primary" id="btPlayPauseBtn" style="min-width:90px;font-weight:700;">▶ Play</button>
-            <button class="btn ghost" id="btStepBackBtn" title="Previous Bar">⏮ Back</button>
-            <button class="btn ghost" id="btStepFwdBtn" title="Next Bar">⏭ Next</button>
-            <button class="btn ghost" id="btResetBtn" title="Reset Session">↺ Reset</button>
+            <button class="btn primary" id="btPlayPauseBtn" style="min-width:90px;font-weight:700;">Play</button>
+            <button class="btn ghost" id="btStepBackBtn" title="Previous Bar">Back Back</button>
+            <button class="btn ghost" id="btStepFwdBtn" title="Next Bar">Next Next</button>
+            <button class="btn ghost" id="btResetBtn" title="Reset Session">Reset Reset</button>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:240px;max-width:550px;">
@@ -4650,7 +4618,6 @@ select#watchlistSelect, select.watchlist-select {
             <button class="btn buy" id="btBuyCeBtn" style="font-weight:700;padding:6px 16px;">Buy CE</button>
             <button class="btn sell" id="btBuyPeBtn" style="font-weight:700;padding:6px 16px;">Buy PE</button>
             <button class="btn ghost" id="btSquareOffBtn" style="font-weight:700;padding:6px 14px;">Square Off</button>
-            <button class="btn ghost" id="btSquareOffBtn" style="font-weight:700;padding:6px 14px;">Exit</button>
             <button class="btn ghost small" id="btClearTradesBtn" title="Clear backtest paper trade history" style="color:var(--sell);">Clear Trades</button>
           </div>
         </div>
@@ -4678,8 +4645,6 @@ select#watchlistSelect, select.watchlist-select {
         <!-- Backtesting Positions & Trade History Table -->
         <div style="overflow-x:auto;">
           <table class="data-table" style="width:100%;font-size:12px;">
-        <div style="overflow-x:auto;border:1px solid var(--border-soft);border-radius:6px;">
-          <table class="table" id="dayAnalysisTable" style="width:100%;margin:0;font-size:11.5px;border-collapse:collapse;">
             <thead>
               <tr>
                 <th>Symbol / Contract</th>
@@ -4690,59 +4655,15 @@ select#watchlistSelect, select.watchlist-select {
                 <th>P&amp;L</th>
                 <th>Status</th>
                 <th>Action</th>
-              <tr style="background:var(--surface-2);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;">
-                <th style="padding:8px 10px;text-align:center;width:34px;">#</th>
-                <th style="padding:8px 10px;text-align:left;">Time (IST)</th>
-                <th style="padding:8px 10px;text-align:left;min-width:160px;">Instrument &amp; Strike</th>
-                <th style="padding:8px 10px;text-align:center;width:60px;">Signal</th>
-                <th style="padding:8px 10px;text-align:right;">Entry Price</th>
-                <th style="padding:8px 10px;text-align:right;">Stop Loss</th>
-                <th style="padding:8px 10px;text-align:right;">Target</th>
-                <th style="padding:8px 10px;text-align:center;min-width:140px;">Baseline Outcome</th>
-                <th style="padding:8px 10px;text-align:center;min-width:150px;">Calibrated Outcome</th>
-                <th style="padding:8px 10px;text-align:left;min-width:240px;">Confluence &amp; Calibration Rationale</th>
-                <th style="padding:8px 10px;text-align:center;width:110px;">Action</th>
               </tr>
             </thead>
             <tbody id="btTradesTableBody">
               <tr><td colspan="8" class="text-center muted" style="padding:14px;">No backtesting trades placed yet in this session.</td></tr>
-            <tbody id="dayAnalysisTbody">
-              <tr><td colspan="11" class="data-empty" style="text-align:center;padding:24px;">Pick a trading day above and click "Auto Analyze Recommendations for Day" to scan all possible good trades (max 10).</td></tr>
             </tbody>
           </table>
         </div>
       </div>
-
-      <!-- Hidden backward-compatibility anchors for legacy backtesting simulator JS -->
-      <div style="display:none !important;" aria-hidden="true">
-        <select id="btSymbolSelect"><option value="NIFTY">NIFTY</option></select>
-        <input id="btDatePicker"><select id="btTimeframeSelect"><option value="5m">5m</option></select>
-        <button id="btLoadSessionBtn"></button><button id="btTestRecalibrateBtn"></button>
-        <div id="recoCalibrationSection"></div>
-        <span id="recoCalibBeforeRate"></span><span id="recoCalibAfterRate"></span><span id="recoCalibBeforeTrades"></span><span id="recoCalibAfterTrades"></span>
-        <span id="recoCalibBeforePnl"></span><span id="recoCalibAfterPnl"></span><span id="recoCalibBeforeInr"></span><span id="recoCalibAfterInr"></span>
-        <div id="recoCalibDiffList"></div><tbody id="recoCalibTradesTbody"></tbody><button id="btResetCalibBtn"></button><button id="btCloseCalibBtn"></button>
-        <input type="text" id="btQuickSymbolSearch" value="NIFTY"><div id="btQuickSymbolSuggestions"></div>
-        <input type="date" id="btQuickDate"><input type="time" id="btQuickTime"><select id="btQuickTimeframe"><option value="5m">5m</option></select>
-        <button id="btnRunQuickBacktest"></button><div id="btQuickResultsContainer"></div>
-        <span id="btQuickHistoryCount"></span><tbody id="btQuickHistoryTbody"></tbody>
-      </div>
-
-      <!-- Hidden backward-compatibility anchors for replay simulator elements -->
-      <div style="display:none !important;" aria-hidden="true">
-        <button id="btPlayPauseBtn"></button><button id="btStepBackBtn"></button><button id="btStepFwdBtn"></button><button id="btResetBtn"></button>
-        <input id="btScrubber"><span id="btScrubberText"></span><select id="btSpeedSelect"><option value="500">2x</option></select>
-        <span id="btCandleClock"></span><span id="btStatusBadge"></span>
-        <span id="btChartTitle"></span><span id="btBarOhlc"></span><canvas id="btCanvas"></canvas><div id="btEmptyChartNotice"></div>
-        <div id="btRecoCard"></div><span id="btVerdictBadge"></span><span id="btConvictionBadge"></span><div id="btOptionName"></div>
-        <div id="btOptEntry"></div><div id="btOptSl"></div><div id="btOptTarget"></div><div id="btRationaleText"></div>
-        <div id="btEma20"></div><div id="btEma50"></div><div id="btRsi"></div><div id="btSupertrend"></div>
-        <button id="btBuyCeBtn"></button><button id="btBuyPeBtn"></button><button id="btSquareOffBtn"></button><button id="btClearTradesBtn"></button>
-        <div id="btTotalPnl"></div><div id="btWinLossRatio"></div><div id="btWinRate"></div><div id="btTotalTrades"></div>
-        <tbody id="btTradesTableBody"></tbody>
-      </div>
     </div>
-  </div>
 
     <div class="panel" id="panel-console">
       <div class="page-head"><div><div class="eyebrow">SERVER DIAGNOSTICS</div><h1>Server Console</h1><p class="page-subtitle">Live backend + API activity. This mirrors the application log, including API path, status and response time.</p></div><div class="head-actions"><button class="btn ghost small" id="consoleRefresh">Refresh</button><button class="btn ghost small" id="consoleClear">Clear view</button></div></div>
@@ -4792,8 +4713,7 @@ select#watchlistSelect, select.watchlist-select {
             <input type="checkbox" id="chkOptColGreeks" checked onchange="window.renderZerodhaOptionChainTable()" style="accent-color:var(--gold);cursor:pointer;">
             <span>Greeks (Δ, Γ, Θ, IV)</span>
           </label>
-          <button type="button" class="btn ghost small" id="optionsRefreshBtn">↻ Refresh</button>
-          <button type="button" class="btn ghost small" id="optionsRefreshBtn">Refresh Refresh</button>
+          <button type="button" class="btn ghost small" id="optionsRefreshBtn">Refresh</button>
         </div>
       </div>
       <div id="mcxOptSelector" style="display:none;margin-bottom:10px;padding:10px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;position:relative;">
@@ -4803,7 +4723,6 @@ select#watchlistSelect, select.watchlist-select {
             <label>Commodity</label>
             <input id="mcxOptSymbol" class="tool-input" style="width:150px;" placeholder="Search MCX commodity…" value="CRUDEOIL" autocomplete="off">
             <div id="mcxSymbolSuggestions" class="auto-suggestions-menu" style="display:none;position:absolute;top:calc(100% + 2px);left:0;width:200px;z-index:1500;background:var(--surface);border:1px solid var(--border);border-radius:7px;box-shadow:0 12px 30px rgba(0,0,0,.4);max-height:200px;overflow-y:auto;"></div>
-      <!-- Options Strike Price List Matrix (Item 15) -->
           </div>
           <div class="finder-field"><label>Expiry Month</label><select id="mcxOptExpiry" class="tool-input" style="width:130px;"><option value="">Select expiry…</option></select></div>
           <div class="finder-field"><label>Year</label><select id="mcxOptYear" class="tool-input" style="width:90px;"></select></div>
@@ -4817,27 +4736,20 @@ select#watchlistSelect, select.watchlist-select {
       <div id="optionsStrikeMatrixSection" class="card" style="margin-bottom:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(232,184,75,0.15);color:var(--gold);font-weight:700;font-size:13px;">⚡</span>
             <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(232,184,75,0.15);color:var(--gold);font-weight:700;font-size:12px;">R</span>
             <div>
               <b style="font-size:13.5px;color:var(--text);font-family:var(--font-display);">Options Strike Prices &amp; Confluence Rationale Matrix</b>
               <div style="font-size:11px;color:var(--text-dim);">Live streaming options contracts across strikes with full name, live LTP, Greeks (Delta, Theta, Vega, Gamma), IV, Volume, and Algorithmic Rationale.</div>
             </div>
           </div>
-          <div class="finder-field"><label>Expiry Month</label><select id="mcxOptExpiry" class="tool-input" style="width:130px;"><option value="">Select expiry…</option></select></div>
-          <div class="finder-field"><label>Year</label><select id="mcxOptYear" class="tool-input" style="width:90px;"></select></div>
-          <button class="btn gold small" id="mcxOptLoadBtn" style="margin-top:18px;">Load Chain</button>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <div class="top-search" style="position:relative;display:inline-block;">
-              <input type="text" id="optMatrixSearchInput" placeholder="🔍 Filter strike/contract…" autocomplete="off" oninput="window.filterOptionStrikeMatrix(this.value)" style="width:140px;height:24px;padding:2px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);">
               <input type="text" id="optMatrixSearchInput" placeholder="Filter strike/contract..." autocomplete="off" oninput="window.filterOptionStrikeMatrix(this.value)" style="width:140px;height:24px;padding:2px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);">
             </div>
-            <button type="button" class="btn ghost small" onclick="window.refreshOptionStrikeMatrix()" style="padding:3px 8px;font-size:11px;">↻ Refresh Matrix</button>
             <button type="button" class="btn ghost small" onclick="window.clearOptionStrikeConfluence()" style="padding:3px 8px;font-size:11px;color:var(--sell);border-color:rgba(255,92,114,0.3);">Clear List</button>
             <button type="button" class="btn ghost small" onclick="window.refreshOptionStrikeMatrix()" style="padding:3px 8px;font-size:11px;">Refresh</button>
           </div>
         </div>
-        <div class="muted" style="font-size:10px;margin-top:5px;">Search MCX commodities (e.g. CRUDEOIL, NATURALGAS, GOLD, SILVER) to load option chain.</div>
 
         <div style="overflow-x:auto;border:1px solid var(--border-soft);border-radius:6px;">
           <table class="table" id="optionStrikeMatrixTable" style="width:100%;margin:0;font-size:11.5px;border-collapse:collapse;">
@@ -4847,8 +4759,6 @@ select#watchlistSelect, select.watchlist-select {
                 <th style="padding:8px 10px;text-align:center;width:60px;">Type</th>
                 <th style="padding:8px 10px;text-align:left;min-width:180px;">Full Contract Name</th>
                 <th style="padding:8px 10px;text-align:right;">Live LTP</th>
-                <th style="padding:8px 10px;text-align:center;">Delta (Δ)</th>
-                <th style="padding:8px 10px;text-align:center;">Theta (Θ)</th>
                 <th style="padding:8px 10px;text-align:center;">Delta (Delta)</th>
                 <th style="padding:8px 10px;text-align:center;">Theta (Theta)</th>
                 <th style="padding:8px 10px;text-align:center;">IV %</th>
@@ -4858,22 +4768,12 @@ select#watchlistSelect, select.watchlist-select {
               </tr>
             </thead>
             <tbody id="optionStrikeMatrixTbody">
-              <!-- Dynamically populated rows -->
               <tr><td colspan="10" class="data-empty" style="text-align:center;padding:24px;color:var(--text-dim);">No options selected. Click [R] on any contract in the Option Chain or Watchlist to view algorithmic confluence rationale.</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Hidden anchor elements for legacy MCX selector backward-compatibility -->
-      <div style="display:none !important;" id="mcxOptSelector">
-        <input id="mcxOptSymbol" value="CRUDEOIL">
-        <div id="mcxSymbolSuggestions"></div>
-        <select id="mcxOptExpiry"></select>
-        <select id="mcxOptYear"></select>
-        <button id="mcxOptLoadBtn"></button>
-      </div>
-      <div class="card" style="margin-bottom:14px;"><div class="card-head"><div class="card-title">Option Chain</div><div class="muted" id="optionsProviderStatus">Waiting for selected instrument</div></div><div class="table-wrap options-dynamic" id="optionChainTable" style="width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;"><div class="options-empty">Select an instrument to load the live option chain.</div></div></div>
 <!-- Redundant bottom Greeks box removed per Item 10, integrated into Option Chain table -->
     </div>
 
@@ -4896,8 +4796,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="chip-filter active" data-ca-news-mode="all">All Impact News</div>
           <div class="chip-filter" data-ca-news-mode="stock" id="newsStockTab">Stock Impact</div>
           <div class="chip-filter" data-ca-news-mode="global">Global Macro</div>
-          <button class="btn ghost small" id="newsRefreshNowBtn" title="Fetch latest CA AI newsfeed">↻ Refresh</button>
-          <button class="btn ghost small" id="newsRefreshNowBtn" title="Fetch latest CA AI newsfeed">Refresh Refresh</button>
+          <button class="btn ghost small" id="newsRefreshNowBtn" title="Fetch latest CA AI newsfeed">Refresh</button>
         </div>
       </div>
 
@@ -4928,13 +4827,12 @@ select#watchlistSelect, select.watchlist-select {
               <input type="checkbox" id="newsSelectAllCheckbox" onchange="window.toggleAllNewsSelection(this.checked)" style="cursor:pointer;accent-color:var(--gold);"> Select All
             </label>
             <button type="button" class="btn small ghost" onclick="window.deleteSelectedNews()" style="color:var(--sell);font-size:11px;padding:3px 10px;" title="Dismiss selected news stories">
-              🗑️ Delete Selected
+             ️ Delete Selected
             </button>
             <button type="button" class="btn small ghost" onclick="window.markSelectedNewsIrrelevant()" style="color:var(--gold);font-size:11px;padding:3px 10px;" title="Exclude selected from sentiment score">
-              🚫 Mark Not Relevant for Overall Score
+              Mark Not Relevant for Overall Score
             </button>
             <button type="button" class="btn small ghost" onclick="window.deleteAllNews()" style="color:var(--sell);font-size:11px;padding:3px 10px;margin-left:auto;" title="Clear all currently displayed news stories">
-              ✕ Delete All
               Close Delete All
             </button>
           </div>
@@ -5000,7 +4898,7 @@ select#watchlistSelect, select.watchlist-select {
         <div class="head-actions" style="display:flex;align-items:center;gap:10px;">
           <span class="tag gold" id="otherFactorsConsensusBadge" style="font-family:var(--font-mono);font-weight:700;">Consensus: 78.5% Bullish</span>
           <span class="muted" id="ofCountdownBadge" style="font-size:11px;font-family:var(--font-mono);display:inline-flex;align-items:center;gap:4px;">⏱ Auto-updating in <b id="ofNextRefreshSecs" style="color:var(--buy);">30s</b></span>
-          <button class="btn gold small" id="refreshOtherFactorsBtn" onclick="loadOtherFactorsSuite(true)" style="font-size:11px;padding:3px 10px;font-weight:700;cursor:pointer;">🔄 Refresh (30s)</button>
+          <button class="btn gold small" id="refreshOtherFactorsBtn" onclick="loadOtherFactorsSuite(true)" style="font-size:11px;padding:3px 10px;font-weight:700;cursor:pointer;">Refresh (30s)</button>
         </div>
       </div>
 
@@ -5096,7 +4994,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
         <div class="head-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <button class="btn ghost small" id="ordersPopoutBtn" title="Pop out into a movable floating window to keep watching the chart">⧉ Pop-out Window</button>
-          <button class="btn ghost small" onclick="window.openImportTradebookModal()" style="color:var(--gold);border:1px solid var(--gold);font-weight:700;">📥 Import Tradebook CSV/Excel</button>
+          <button class="btn ghost small" onclick="window.openImportTradebookModal()" style="color:var(--gold);border:1px solid var(--gold);font-weight:700;">Import Tradebook CSV/Excel</button>
           <button class="btn gold small" onclick="window.openAddRealTradeModal()" style="font-weight:700;">＋ Track Real Trade</button>
           <button class="btn gold" id="ordersNewBtn">＋ New Order</button>
         </div>
@@ -5108,13 +5006,11 @@ select#watchlistSelect, select.watchlist-select {
         <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>
-            <b style="font-size:13px;color:var(--text);">🛡️ Real Broker Positions &amp; Capital Guardian (CA AI Advice)</b>
             <b style="font-size:13px;color:var(--text);"> Real Broker Positions &amp; Capital Guardian (CA AI Advice)</b>
             <span id="realTradesCountBadge" class="tag buy" style="font-size:10px;">0 Active</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            <button type="button" class="btn ghost small" onclick="window.loadExternalPositions()">↻ Refresh Real Trades</button>
-            <button type="button" class="btn ghost small" onclick="window.loadExternalPositions()">Refresh Refresh Real Trades</button>
+            <button type="button" class="btn ghost small" onclick="window.loadExternalPositions()">Refresh Real Trades</button>
             <button type="button" class="btn gold small" onclick="window.openAddRealTradeModal()">＋ Add Trade</button>
           </div>
         </div>
@@ -5137,7 +5033,7 @@ select#watchlistSelect, select.watchlist-select {
             <tbody id="realTradesTableBody">
               <tr>
                 <td colspan="9" style="text-align:center;padding:16px;color:var(--text-faint);">
-                  No external broker trades tracked yet. Click <b>"＋ Add Trade"</b> or <b>"📥 Import Tradebook CSV/Excel"</b> to monitor live risk.
+                  No external broker trades tracked yet. Click <b>"＋ Add Trade"</b> or <b>"Import Tradebook CSV/Excel"</b> to monitor live risk.
                 </td>
               </tr>
             </tbody>
@@ -5158,7 +5054,6 @@ select#watchlistSelect, select.watchlist-select {
         <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--buy);box-shadow:0 0 8px var(--buy);" id="ordersAdvisorPulse"></span>
-            <b style="font-size:13px;color:var(--text);letter-spacing:0.3px;">✦ CA AI During &amp; Post-Trade Advisor</b>
             <b style="font-size:13px;color:var(--text);letter-spacing:0.3px;"> CA AI During &amp; Post-Trade Advisor</b>
             <span id="ordersAdvisorActiveSymbol" class="tag neutral" style="font-size:10px;font-weight:700;">No Open Position Selected</span>
           </div>
@@ -5166,7 +5061,6 @@ select#watchlistSelect, select.watchlist-select {
             <span id="ordersAdvisorSyncStatus" style="font-size:10.5px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
               <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--buy);" id="ordersAdvisorSyncDot"></span> <span id="ordersAdvisorSyncText">Real-time Sync Active (2s)</span>
             </span>
-            <button type="button" class="btn ghost small" style="padding:2px 8px;height:24px;font-size:11px;" onclick="refreshPositionAdvisor()">↻ Sync</button>
             <button type="button" class="btn ghost small" style="padding:2px 8px;height:24px;font-size:11px;" onclick="refreshPositionAdvisor()">Refresh Sync</button>
           </div>
         </div>
@@ -5174,7 +5068,6 @@ select#watchlistSelect, select.watchlist-select {
         <!-- Verdict Banner -->
         <div id="ordersAdvisorBanner" style="padding:10px 14px;border-radius:8px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-            <b id="ordersAdvisorVerdict" style="font-size:13px;color:var(--gold);">⚡ ANALYZING TRADE HEALTH…</b>
             <b id="ordersAdvisorVerdict" style="font-size:13px;color:var(--gold);"> ANALYZING TRADE HEALTH…</b>
             <span id="ordersAdvisorUrgency" class="tag gold" style="font-size:10px;">MONITORING</span>
           </div>
@@ -5228,19 +5121,15 @@ select#watchlistSelect, select.watchlist-select {
 
         <!-- Action Buttons -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-          <button type="button" class="btn sell" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executePositionSquareOff()">⚡ Square Off Position at Market</button>
-          <button type="button" class="btn sell" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executePositionSquareOff()">⚡ Exit Position at Market</button>
-          <button type="button" class="btn gold" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executeTrailSlBreakeven()">🔒 Trail Stop-Loss to Breakeven</button>
           <button type="button" class="btn sell" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executePositionSquareOff()"> Square Off Position at Market</button>
           <button type="button" class="btn sell" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executePositionSquareOff()"> Exit Position at Market</button>
           <button type="button" class="btn gold" style="flex:1;min-width:180px;font-size:12px;padding:7px 12px;" onclick="executeTrailSlBreakeven()"> Trail Stop-Loss to Breakeven</button>
-          <button type="button" class="btn ghost" style="padding:7px 14px;font-size:12px;" onclick="toggleOrdersAdvisorChat()" title="Expand CA AI Trade Chat">💬 Ask CA AI Advisor</button>
+          <button type="button" class="btn ghost" style="padding:7px 14px;font-size:12px;" onclick="toggleOrdersAdvisorChat()" title="Expand CA AI Trade Chat">Ask CA AI Advisor</button>
         </div>
 
         <!-- Expandable Two-Way Chat Box in Orders Panel -->
         <div id="ordersAdvisorChatBox" style="background:var(--surface-2);border-radius:8px;padding:12px;border:1px solid var(--border-soft);">
           <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-            <span>✦ Interactive Position Strategy Advisor</span>
             <span> Interactive Position Strategy Advisor</span>
             <span class="muted" style="font-size:10px;">Greeks &amp; Real-time Sentinel Chat</span>
           </div>
@@ -5278,7 +5167,7 @@ select#watchlistSelect, select.watchlist-select {
           <div style="display:flex;gap:6px;align-items:center;">
             <button class="tab-sub-btn active" id="subTabOpenPositions">Open Positions</button>
             <button class="tab-sub-btn" id="subTabClosedPositions">Closed / Past Positions</button>
-            <button type="button" class="btn ghost small" id="clearAllClosedPositionsBtn" onclick="window.clearAllClosedPositions()" style="font-size:10.5px;color:var(--sell);padding:2px 7px;display:none;" title="Delete all closed trade records">🗑 Clear All Closed</button>
+            <button type="button" class="btn ghost small" id="clearAllClosedPositionsBtn" onclick="window.clearAllClosedPositions()" style="font-size:10.5px;color:var(--sell);padding:2px 7px;display:none;" title="Delete all closed trade records">Clear All Closed</button>
           </div>
         </div>
         <div id="positionsTable" class="table-wrap"><div class="data-empty">Loading positions…</div></div>
@@ -5316,9 +5205,7 @@ select#watchlistSelect, select.watchlist-select {
           <button class="btn ghost small" id="fundsPopoutBtn" title="Pop out into a movable floating window">⧉ Pop-out Window</button>
         </div>
         <div class="head-actions" style="display:flex;gap:8px;align-items:center;">
-          <button class="btn ghost small" id="fundsRefreshBtn" title="Refresh Wallet Balances">↻ Refresh</button>
-          <button class="btn ghost small" id="fundsResetAllBtn" style="color:var(--sell);display:none;" title="Reset all 3 wallets to fresh ₹1,00,000">↺ Reset Wallets (₹1L Each)</button>
-          <button class="btn ghost small" id="fundsRefreshBtn" title="Refresh Wallet Balances">Refresh Refresh</button>
+          <button class="btn ghost small" id="fundsRefreshBtn" title="Refresh Wallet Balances">Refresh</button>
           <button class="btn ghost small" id="fundsResetAllBtn" style="color:var(--sell);display:none;" title="Reset all 3 wallets to fresh ₹1,00,000">Reset Reset Wallets (₹1L Each)</button>
         </div>
       </div>
@@ -5395,11 +5282,10 @@ select#watchlistSelect, select.watchlist-select {
       <div class="card" id="passbookAnalyticsCard" style="margin-bottom:16px;padding:14px 16px;border:1px solid var(--border);border-left:4px solid var(--gold);background:var(--surface);">
         <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
           <div>
-            <div style="font-size:13px;font-weight:700;color:var(--gold);">📊 Real Broker Tradebook &amp; Funds Passbook Analysis</div>
             <div style="font-size:13px;font-weight:700;color:var(--gold);"> Real Broker Tradebook &amp; Funds Passbook Analysis</div>
             <div class="muted" style="font-size:11px;">Upload Zerodha, Upstox, Angel or Groww tradebook/passbook (CSV/Excel) for deep quantitative audits</div>
           </div>
-          <button type="button" class="btn gold small" onclick="window.openImportTradebookModal()" style="font-weight:700;">📥 Upload Broker Passbook / Tradebook</button>
+          <button type="button" class="btn gold small" onclick="window.openImportTradebookModal()" style="font-weight:700;">Upload Broker Passbook / Tradebook</button>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;margin-bottom:14px;">
@@ -5518,7 +5404,7 @@ select#watchlistSelect, select.watchlist-select {
             </select>
             <button class="btn gold small" id="reportExportCsvBtn" style="padding:2px 8px;height:26px;font-size:11px;">⬇ Export CSV</button>
             <button class="btn ghost small" id="reportRefreshBtn" style="padding:2px 8px;height:26px;font-size:11px;">Refresh</button>
-            <button class="btn ghost small" onclick="clearAllTradeHistory()" style="color:var(--sell);font-size:11px;padding:2px 8px;height:26px;" title="Clear Trade History">🗑️ Clear All</button>
+            <button class="btn ghost small" onclick="clearAllTradeHistory()" style="color:var(--sell);font-size:11px;padding:2px 8px;height:26px;" title="Clear Trade History">️ Clear All</button>
           </div>
         </div>
 
@@ -5614,7 +5500,7 @@ select#watchlistSelect, select.watchlist-select {
           <div class="page-sub">Expand any module `[+]` / `[-]` to explore operational workflows, formulas, hotkeys, and algorithmic mechanics.</div>
         </div>
         <div class="head-actions">
-          <a href="/guide" target="_blank" class="btn primary small" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">🌳 Master Guide &amp; Branch Diagram ↗</a>
+          <a href="/guide" target="_blank" class="btn primary small" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">Master Guide &amp; Branch Diagram ↗</a>
           <button class="btn ghost small" id="tutExpandAllBtn">Expand All [+]</button>
           <button class="btn ghost small" id="tutCollapseAllBtn">Collapse All [-]</button>
         </div>
@@ -5636,7 +5522,6 @@ select#watchlistSelect, select.watchlist-select {
               <li><b>Precision Crosshair:</b> Engaging touch or hovering on PC instantly generates high-contrast dotted crosshair lines across the full canvas, anchoring live price tags on the Y-axis and exact bar timestamps (IST) on the X-axis.</li>
               <li><b>Zoom &amp; Pinch Controls:</b> Tapping the <b>[+]</b> button or pinching two fingers apart zooms IN into the candles; tapping the <b>[−]</b> button or pinching fingers inward zooms OUT for broad macro view.</li>
               <li><b>Freeform Pan Drag:</b> Click or touch anywhere to slide the viewport horizontally across trading days and vertically across price ranges.</li>
-              <li><b>Drawing Tools &amp; Accidental Drag Lock:</b> Select trendlines, rays, horizontal levels, channels, or Fibonacci retracements from the floating toolbar. Click <b>[🔒 Lock]</b> in the top toolbar to freeze all drawings in place, preventing accidental repositioning while panning.</li>
               <li><b>Drawing Tools &amp; Accidental Drag Lock:</b> Select trendlines, rays, horizontal levels, channels, or Fibonacci retracements from the floating toolbar. Click <b>[ Lock]</b> in the top toolbar to freeze all drawings in place, preventing accidental repositioning while panning.</li>
             </ul>
           </div>
@@ -5888,7 +5773,6 @@ select#watchlistSelect, select.watchlist-select {
                 <br>• <b>Space / Arrow Keys:</b> Pan across historical candles
                 <br>• <b>Del / Backspace:</b> Remove selected drawing or indicator
                 <br>• <b>Esc:</b> Exit fullscreen or cancel pending drawing</li>
-              <li><b>Saved Recommendation History:</b> Click <b>💾 Save to History</b> on any active setup to permanently log it for performance tracking and post-trade review.</li>
               <li><b>Saved Recommendation History:</b> Click <b> Save to History</b> on any active setup to permanently log it for performance tracking and post-trade review.</li>
             </ul>
           </div>
@@ -5907,7 +5791,6 @@ select#watchlistSelect, select.watchlist-select {
             Step through historical price action bar-by-bar with zero look-ahead bias to test strategies and evaluate signals under real market conditions.
             <ul class="tut-sublist">
               <li><b>Historical Calendar &amp; Session Picker:</b> Select any past trading date and timeframe (1m, 5m, 15m) for NIFTY, BANKNIFTY, CRUDEOIL, or individual equities.</li>
-              <li><b>Replay Controller:</b> Play (▶), Pause (⏸), Step Next Bar (⏭), Reset (⏮), and variable playback speed (1x to 10x). Drag the candle scrubber to jump to any point in the trading session.</li>
               <li><b>Replay Controller:</b> Play (Play), Pause (⏸), Step Next Bar (Next), Reset (Back), and variable playback speed (1x to 10x). Drag the candle scrubber to jump to any point in the trading session.</li>
               <li><b>Synchronized Point-in-Time Intelligence:</b> As the replay advances bar-by-bar, all technical indicators, candlestick patterns, and historical news catalysts re-evaluate strictly up to the current candle with zero future leakage.</li>
               <li><b>Expired Option Recommendations:</b> Real-time option recommendations calculate expired ATM Call and Put strikes based on historical underlying levels.</li>
@@ -5929,25 +5812,20 @@ select#watchlistSelect, select.watchlist-select {
           <div class="page-sub">Institutional alerts, Golden Trade triggers, Sentinel risk advisories, and breaking news</div>
         </div>
         <div class="head-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn ghost small" onclick="loadDedicatedNotifications(true)">↻ Refresh</button>
-          <button class="btn ghost small" onclick="markSelectedNotificationsRead()">✓ Mark Selected Read</button>
-          <button class="btn small" onclick="markAllNotificationsRead()">✓ Mark All Read</button>
-          <button class="btn ghost small" onclick="loadDedicatedNotifications(true)">Refresh Refresh</button>
+          <button class="btn ghost small" onclick="loadDedicatedNotifications(true)">Refresh</button>
           <button class="btn ghost small" onclick="markSelectedNotificationsRead()"> Mark Selected Read</button>
           <button class="btn small" onclick="markAllNotificationsRead()"> Mark All Read</button>
-          <button class="btn ghost small" onclick="deleteSelectedNotifications()" style="color:var(--sell);">🗑️ Delete Selected</button>
-          <button class="btn ghost small" onclick="deleteAllNotifications()" style="color:var(--sell);">🗑️ Delete All</button>
+          <button class="btn ghost small" onclick="deleteSelectedNotifications()" style="color:var(--sell);">️ Delete Selected</button>
+          <button class="btn ghost small" onclick="deleteAllNotifications()" style="color:var(--sell);">️ Delete All</button>
         </div>
       </div>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;border-bottom:1px solid var(--border-soft);margin-bottom:12px;">
           <button class="tab-sub-btn active" id="notifSubTabAll" onclick="filterDedicatedNotifications('all', this)">All Notifications</button>
-          <button class="tab-sub-btn" id="notifSubTabGolden" onclick="filterDedicatedNotifications('golden', this)">🌟 Golden Trades</button>
-          <button class="tab-sub-btn" id="notifSubTabRisk" onclick="filterDedicatedNotifications('risk', this)">🛡️ Risk Advisories</button>
           <button class="tab-sub-btn" id="notifSubTabGolden" onclick="filterDedicatedNotifications('golden', this)"> Golden Trades</button>
           <button class="tab-sub-btn" id="notifSubTabRisk" onclick="filterDedicatedNotifications('risk', this)"> Risk Advisories</button>
-          <button class="tab-sub-btn" id="notifSubTabNews" onclick="filterDedicatedNotifications('news', this)">📰 High-Impact News</button>
+          <button class="tab-sub-btn" id="notifSubTabNews" onclick="filterDedicatedNotifications('news', this)">High-Impact News</button>
         </div>
 
         <div id="dedicatedNotifList" style="display:flex;flex-direction:column;gap:8px;min-height:200px;">
@@ -5965,8 +5843,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
         <div class="head-actions" style="display:flex;gap:8px;">
           <span id="passbookAutoSyncBadge" class="tag buy" style="font-size:10px;">● Live 3s Meter</span>
-          <button class="btn ghost small" onclick="loadAdminApiPassbook()">↻ Refresh Statement</button>
-          <button class="btn ghost small" onclick="loadAdminApiPassbook()">Refresh Refresh Statement</button>
+          <button class="btn ghost small" onclick="loadAdminApiPassbook()">Refresh Statement</button>
         </div>
       </div>
 
@@ -6060,7 +5937,6 @@ select#watchlistSelect, select.watchlist-select {
         <span style="font-weight:700;font-size:16px;color:var(--text);"><b style="color:var(--gold);font-style:italic;">fx</b> Studies &amp; Indicators</span>
         <span class="tag neutral" id="indicatorCountBadge" style="font-size:10px;">114 Studies</span>
       </div>
-      <button class="btn ghost small" id="indicatorSearchModalClose">✕</button>
       <button class="btn ghost small" id="indicatorSearchModalClose">Close</button>
     </div>
     <div style="padding:10px 0 6px;">
@@ -6086,7 +5962,6 @@ select#watchlistSelect, select.watchlist-select {
           <div class="card-sub" style="font-size:10.5px;color:var(--text-faint);" id="recoCalcModalSubtitle">Mathematical formulas and multi-factor evidence</div>
         </div>
       </div>
-      <button class="icon-btn" id="recoCalcModalClose" style="cursor:pointer;" onclick="const m=document.getElementById('recoCalculationModal');if(m){m.style.display='none';m.classList.remove('open');}">✕</button>
       <button class="icon-btn" id="recoCalcModalClose" style="cursor:pointer;" onclick="const m=document.getElementById('recoCalculationModal');if(m){m.style.display='none';m.classList.remove('open');}">Close</button>
     </div>
     <div id="recoCalcModalBody" style="display:grid;gap:12px;max-height:75vh;overflow-y:auto;padding-right:4px;">
@@ -6099,7 +5974,6 @@ select#watchlistSelect, select.watchlist-select {
   <div class="tool-modal-card" style="width:min(640px,calc(100vw - 28px));max-width:640px;">
     <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(24,144,255,0.15);color:#1890ff;font-size:14px;">✦</span>
         <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(24,144,255,0.15);color:#1890ff;font-size:14px;"></span>
         <div>
           <div class="card-title" style="font-size:14px;color:var(--text);font-weight:700;">CA AI Companion</div>
@@ -6111,7 +5985,6 @@ select#watchlistSelect, select.watchlist-select {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
           <span>Clear</span>
         </button>
-        <button class="btn ghost small" id="caAiClose" onclick="closeModal('caAiModal')" style="font-size:12px;padding:2px 6px;">✕</button>
         <button class="btn ghost small" id="caAiClose" onclick="closeModal('caAiModal')" style="font-size:12px;padding:2px 6px;">Close</button>
       </div>
     </div>
@@ -6119,10 +5992,9 @@ select#watchlistSelect, select.watchlist-select {
     
     <!-- File & Photo attachment preview bar -->
     <div id="caAiImagePreviewBar" style="display:none;padding:6px 8px;background:var(--surface-3);border:1px solid var(--border-soft);border-radius:6px;margin-top:6px;align-items:center;gap:8px;">
-      <div id="caAiPreviewIcon" style="font-size:14px;display:none;">📄</div>
+      <div id="caAiPreviewIcon" style="font-size:14px;display:none;"></div>
       <img id="caAiImageThumb" src="" style="width:32px;height:32px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none;" alt="Upload preview">
       <div style="flex:1;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="caAiImageFileName">Screenshot.png</div>
-      <button type="button" onclick="window.clearAiAttachedImage()" style="background:transparent;border:none;color:var(--sell);font-weight:700;font-size:14px;cursor:pointer;">✕</button>
       <button type="button" onclick="window.clearAiAttachedImage()" style="background:transparent;border:none;color:var(--sell);font-weight:700;font-size:14px;cursor:pointer;">Close</button>
     </div>
 
@@ -6145,7 +6017,6 @@ select#watchlistSelect, select.watchlist-select {
   <div class="modal-card" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:95%;max-width:560px;max-height:90vh;overflow-y:auto;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(232,184,75,0.18);color:var(--gold);font-weight:700;">🛡️</span>
         <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(232,184,75,0.18);color:var(--gold);font-weight:700;"></span>
         <div>
           <b style="font-size:14px;color:var(--text);" id="advisoryBackupModalTitle">CA AI Hold / Sell Mathematical Backup</b>
@@ -6175,7 +6046,6 @@ select#watchlistSelect, select.watchlist-select {
         <span class="tag buy" id="quickOrderSideBadge" style="font-weight:700;font-size:11px;">BUY</span>
         <div class="card-title" id="quickOrderModalTitle" style="font-size:15px;">Quick 1-Click Order</div>
       </div>
-      <button class="btn ghost small" id="quickOrderModalClose">✕</button>
       <button class="btn ghost small" id="quickOrderModalClose">Close</button>
     </div>
     <div id="quickOrderSummaryBanner" style="margin-top:10px;padding:9px 12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border-soft);display:flex;justify-content:space-between;align-items:center;">
@@ -6242,17 +6112,14 @@ select#watchlistSelect, select.watchlist-select {
     <div id="quickOrderFactorsBox" style="margin-top:10px;padding:9px 12px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border-soft);">
       <div style="font-size:10px;font-weight:700;color:var(--text-faint);text-transform:uppercase;margin-bottom:6px;">Multi-Factor Institutional Confirmation</div>
       <div id="quickOrderFactorsList" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10.5px;">
-        <div style="display:flex;align-items:center;gap:5px;"><span>📈</span> <span>Technicals: <b id="qoFactorTech" style="color:var(--buy);">Confirmed</b></span></div>
         <div style="display:flex;align-items:center;gap:5px;"><span></span> <span>Technicals: <b id="qoFactorTech" style="color:var(--buy);">Confirmed</b></span></div>
-        <div style="display:flex;align-items:center;gap:5px;"><span>🕯️</span> <span>Pattern: <b id="qoFactorPattern" style="color:var(--buy);">Double Top / Hammer</b></span></div>
-        <div style="display:flex;align-items:center;gap:5px;"><span>⚡</span> <span>Greeks / Delta: <b id="qoFactorGreeks" style="color:var(--gold);">Δ 0.52 · Θ -12</b></span></div>
+        <div style="display:flex;align-items:center;gap:5px;"><span>️</span> <span>Pattern: <b id="qoFactorPattern" style="color:var(--buy);">Double Top / Hammer</b></span></div>
         <div style="display:flex;align-items:center;gap:5px;"><span></span> <span>Greeks / Delta: <b id="qoFactorGreeks" style="color:var(--gold);">Δ 0.52 · Θ -12</b></span></div>
-        <div style="display:flex;align-items:center;gap:5px;"><span>🌐</span> <span>Global Macro / VIX: <b id="qoFactorMacro" style="color:var(--buy);">Bullish (13.25)</b></span></div>
+        <div style="display:flex;align-items:center;gap:5px;"><span></span> <span>Global Macro / VIX: <b id="qoFactorMacro" style="color:var(--buy);">Bullish (13.25)</b></span></div>
       </div>
     </div>
     <div class="tool-modal-actions" style="margin-top:12px;border-top:1px solid var(--border-soft);padding-top:10px;">
       <button class="btn ghost" id="quickOrderCancel">Cancel</button>
-      <button class="btn gold" id="quickOrderSubmit" style="font-weight:700;padding:0 18px;">⚡ Place Quick Order</button>
       <button class="btn gold" id="quickOrderSubmit" style="font-weight:700;padding:0 18px;"> Place Quick Order</button>
     </div>
   </div>
@@ -6265,11 +6132,9 @@ select#watchlistSelect, select.watchlist-select {
   <div class="tool-modal-card" style="max-width:540px;border-radius:14px;border:1.5px solid #FF5C72;box-shadow:0 25px 60px rgba(0,0,0,0.65);background:var(--surface);">
     <div class="card-head" style="border-bottom:1px solid var(--border-soft);padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="tag sell" style="font-weight:800;font-size:11px;letter-spacing:0.5px;padding:3px 8px;">⚠️ MATERIAL REGIME SHIFT</span>
         <span class="tag sell" style="font-weight:800;font-size:11px;letter-spacing:0.5px;padding:3px 8px;"> MATERIAL REGIME SHIFT</span>
         <div class="card-title" id="sentinelModalTitle" style="font-size:15px;font-weight:700;">Adverse Trade Factors Detected</div>
       </div>
-      <button class="btn ghost small" onclick="closeModal('tradeSentinelModal')">✕</button>
       <button class="btn ghost small" onclick="closeModal('tradeSentinelModal')">Close</button>
     </div>
     <div id="sentinelModalBody" style="margin-top:14px;">
@@ -6285,7 +6150,6 @@ select#watchlistSelect, select.watchlist-select {
         <span class="tag gold" style="font-weight:700;font-size:11px;">CA AI DIAGNOSTIC</span>
         <div class="card-title" id="posAnalysisModalTitle">Trade Diagnostic &amp; Entry Thesis</div>
       </div>
-      <button class="btn ghost small" id="posAnalysisModalClose">✕</button>
       <button class="btn ghost small" id="posAnalysisModalClose">Close</button>
     </div>
     <div id="posAnalysisModalBody" style="margin-top:12px;">
@@ -6303,7 +6167,6 @@ select#watchlistSelect, select.watchlist-select {
     </div>
     <div class="floating-workspace-controls">
       <button class="btn ghost small" id="floatingWorkspaceDock" title="Dock back into normal panel view" style="padding:2px 8px;font-size:11px;height:24px;">⧉ Dock</button>
-      <button class="btn ghost small" id="floatingWorkspaceClose" title="Close and dock back" style="padding:2px 8px;font-size:11px;height:24px;">✕</button>
       <button class="btn ghost small" id="floatingWorkspaceClose" title="Close and dock back" style="padding:2px 8px;font-size:11px;height:24px;">Close</button>
     </div>
   </div>
@@ -6342,7 +6205,6 @@ select#watchlistSelect, select.watchlist-select {
     <div class="field" style="margin-top:10px;"><label>Terminal Layout Mode</label>
       <select id="layoutModeSelect" class="tool-input">
         <option value="classic">Classic Web View (Scrolling)</option>
-        <option value="app-shell">⚡ Zerodha Kite App Shell (Fixed Viewport)</option>
         <option value="app-shell"> Zerodha Kite App Shell (Fixed Viewport)</option>
       </select>
     </div>
@@ -6644,14 +6506,11 @@ const caEditBar = document.createElement('div');
 caEditBar.className = 'ca-edit-bar';
 caEditBar.innerHTML = `
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span style="font-weight:700;color:var(--gold);">✦ Edit UI Mode</span>
     <span style="font-weight:700;color:var(--gold);"> Edit UI Mode</span>
     <span class="muted" style="font-size:11px;">Drag cards (⠿) to reposition stacked layout</span>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <button id="caResetLayout" class="btn ghost small" style="font-size:11px;">↺ Reset Layout</button>
-    <button id="caEditDone" style="background:var(--primary);color:#ffffff;border:none;padding:4px 12px;border-radius:5px;font-weight:700;cursor:pointer;font-size:11.5px;">✓ Done</button>
-    <button id="caResetLayout" class="btn ghost small" style="font-size:11px;">Reset Reset Layout</button>
+    <button id="caResetLayout" class="btn ghost small" style="font-size:11px;">Reset Layout</button>
     <button id="caEditDone" style="background:var(--primary);color:#ffffff;border:none;padding:4px 12px;border-radius:5px;font-weight:700;cursor:pointer;font-size:11.5px;"> Done</button>
   </div>
 `;
@@ -6851,7 +6710,6 @@ if(mcxOptExpiry && mcxOptYear){
     const comm = (document.getElementById('mcxOptSymbol')?.value || S || 'CRUDEOIL').trim().toUpperCase();
     const exp = document.getElementById('mcxOptExpiry')?.value || '';
     if(!comm){ alert('Enter an MCX commodity symbol'); return; }
-    mcxOptLoadBtn.textContent = '⏳ Loading…';
     mcxOptLoadBtn.textContent = ' Loading…';
     mcxOptLoadBtn.disabled = true;
     try{
@@ -6879,7 +6737,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   const sym = window.__CA_CURRENT_SYMBOL || '';
   if(!sym){alert('Select an instrument first');return;}
   const btn = document.getElementById('maxProfitRecommendationBtn');
-  btn.textContent = '⏳ Analyzing…';
   btn.textContent = ' Analyzing…';
   btn.disabled = true;
   try{
@@ -6910,7 +6767,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   }catch(err){
     alert('Max Profit analysis failed: '+err.message);
   }finally{
-    btn.textContent = '⚡ Max Profit';
     btn.textContent = ' Max Profit';
     btn.disabled = false;
   }
@@ -7022,10 +6878,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({article: selectedExternalArticle, target, is_global: isGlobal})
         });
-        if(extStatus) extStatus.textContent = '✓ News article added successfully!';
         if(extStatus) extStatus.textContent = ' News article added successfully!';
         closeModal('externalNewsModal');
-        if(typeof toast === 'function') toast('✓ External news article ingested into CA Trader');
         if(typeof toast === 'function') toast(' External news article ingested into CA Trader');
         if(typeof loadNews === 'function') loadNews();
       } catch(err){
@@ -7383,7 +7237,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
             x.fillStyle = '#ef4444';
             x.font = 'bold 15px sans-serif';
             x.textAlign = 'center';
-            x.fillText('▼', px, py);
             x.fillText('-', px, py);
             // Draw small mountain peak dot
             x.beginPath();
@@ -7454,7 +7307,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
             x.fillStyle = '#10b981';
             x.font = 'bold 15px sans-serif';
             x.textAlign = 'center';
-            x.fillText('▲', px, py);
             x.fillText('+', px, py);
             x.beginPath();
             x.arc(px, y(Number(vl.low)), 3.5, 0, Math.PI * 2);
@@ -7523,7 +7375,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       }
 
       // Clean top pattern tag badge
-      const labelText = `✦ ${hp.name || 'Pattern'} (${hp.confidence || 75}%)`;
       const labelText = ` ${hp.name || 'Pattern'} (${hp.confidence || 75}%)`;
       x.font = 'bold 9.5px IBM Plex Mono, monospace';
       x.textAlign = 'left';
@@ -8418,8 +8269,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       </div>
     `;
 
-    const highs=a.slice(-30).map(x=>Number(x.high)).
-... [truncated for diff preview]
     const highs=a.slice(-30).map(x=>Number(x.high)).filter(Number.isFinite), lows=a.slice(-30).map(x=>Number(x.low)).filter(Number.isFinite);
     const cp=[];
     if(highs.length>=10 && lows.length>=10){
@@ -9383,7 +9232,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       if(__caReplayTimer){
         clearInterval(__caReplayTimer);
         __caReplayTimer = null;
-        if(pBtn) pBtn.textContent = 'Play Play';
+        if(pBtn) pBtn.textContent = 'Play';
       } else {
         if(pBtn) pBtn.textContent = '⏸ Pause';
         __caReplayTimer = setInterval(() => {
@@ -9399,7 +9248,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           } else {
             clearInterval(__caReplayTimer);
             __caReplayTimer = null;
-            if(pBtn) pBtn.textContent = 'Play Play';
+            if(pBtn) pBtn.textContent = 'Play';
           }
         }, 800);
       }
@@ -12051,7 +11900,7 @@ window.handleNotificationClick = function(n){
         caAiAttachedFile = { type: 'doc', data: e.target.result, name: file.name, mime: file.type || 'text/plain' };
         if(bar) bar.style.display = 'flex';
         if(thumb) thumb.style.display = 'none';
-        if(icon) { icon.style.display = 'inline-block'; icon.textContent = file.name.endsWith('.csv') ? '' : '📄'; }
+        if(icon) { icon.style.display = 'inline-block'; icon.textContent = file.name.endsWith('.csv') ? '' : ''; }
         if(name) name.textContent = `${file.name} (${Math.round(file.size/1024)} KB)`;
       };
       reader.readAsText(file);
@@ -12065,7 +11914,7 @@ window.handleNotificationClick = function(n){
           if(icon) icon.style.display = 'none';
         } else {
           if(thumb) thumb.style.display = 'none';
-          if(icon) { icon.style.display = 'inline-block'; icon.textContent = '📑'; }
+          if(icon) { icon.style.display = 'inline-block'; icon.textContent = ''; }
         }
         if(name) name.textContent = `${file.name} (${Math.round(file.size/1024)} KB)`;
       };
@@ -12195,7 +12044,7 @@ window.handleNotificationClick = function(n){
   const caNewsAiByKey=window.__caNewsAiByKey=window.__caNewsAiByKey||new Map();
   const newsArticleKey=a=>String(a?.url||a?.headline||a?.title||'');
   const newsAiBadge=a=>{const x=caNewsAiByKey.get(newsArticleKey(a));if(!x)return '';const sent=x.sentiment||'Neutral';const mat=Number(x.materiality||0);const rec=(x.recommend_delete||x.recommendDelete||x.delete_recommended)?'Remove':'Keep';return `<div class="news-ai-badge"><b>Analyzed with CA AI</b> · ${esc(sent)} · Materiality ${fmt(mat)} · <span class="tag ${rec==='Keep'?'buy':'sell'}">${rec}</span></div>`};
-  const renderNewsCard=(e,i)=>`<div class="card news-card" data-news-index="${i}"><div class="obs-top"><span class="news-select-wrap"><input type="checkbox" class="news-select" data-news-select="${i}"><span class="obs-sym news-headline" style="font-size:13px">${esc(e.headline||e.event||'Untitled')}</span></span><span class="obs-time">${esc(formatTime(e.published_at))}</span></div><div class="news-summary" style="font-size:11.5px;color:var(--text-dim);margin:8px 0 6px">${esc(newsText(e.summary||''))}</div>${(e.full_summary && e.full_summary.length > (e.summary||'').length) ? `<div class="news-expanded-summary" style="margin:8px 0;padding:8px 10px;background:var(--surface-2);border-radius:6px;border-left:3px solid var(--gold);font-size:11px;color:var(--text);line-height:1.45;">${esc(e.full_summary)}</div>` : ''}<div class="obs-meta" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:8px;"><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;"><span class="meta-chip">${esc(e.source||e.provider||'')}</span><span class="meta-chip">${esc(e.reason||'Stock/global match')}</span>${e.url?`<a class="news-source-link" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--gold);font-size:10.5px;margin-left:4px;">Open source ↗</a>`:''}</div><div style="display:flex;gap:6px;align-items:center;"><button type="button" class="btn small ghost delete-news-btn" data-delete-news="${i}" style="font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;color:var(--sell);border:1px solid rgba(255,92,114,0.3);" title="Delete / Dismiss News Story">🗑 Delete</button><button type="button" class="btn gold small analyze-news-ai-btn" data-analyze-ai="${i}" style="font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;"> Analyze with CA AI</button></div></div>${newsAiBadge(e)}</div>`;
+  const renderNewsCard=(e,i)=>`<div class="card news-card" data-news-index="${i}"><div class="obs-top"><span class="news-select-wrap"><input type="checkbox" class="news-select" data-news-select="${i}"><span class="obs-sym news-headline" style="font-size:13px">${esc(e.headline||e.event||'Untitled')}</span></span><span class="obs-time">${esc(formatTime(e.published_at))}</span></div><div class="news-summary" style="font-size:11.5px;color:var(--text-dim);margin:8px 0 6px">${esc(newsText(e.summary||''))}</div>${(e.full_summary && e.full_summary.length > (e.summary||'').length) ? `<div class="news-expanded-summary" style="margin:8px 0;padding:8px 10px;background:var(--surface-2);border-radius:6px;border-left:3px solid var(--gold);font-size:11px;color:var(--text);line-height:1.45;">${esc(e.full_summary)}</div>` : ''}<div class="obs-meta" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:8px;"><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;"><span class="meta-chip">${esc(e.source||e.provider||'')}</span><span class="meta-chip">${esc(e.reason||'Stock/global match')}</span>${e.url?`<a class="news-source-link" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--gold);font-size:10.5px;margin-left:4px;">Open source ↗</a>`:''}</div><div style="display:flex;gap:6px;align-items:center;"><button type="button" class="btn small ghost delete-news-btn" data-delete-news="${i}" style="font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;color:var(--sell);border:1px solid rgba(255,92,114,0.3);" title="Delete / Dismiss News Story">Delete</button><button type="button" class="btn gold small analyze-news-ai-btn" data-analyze-ai="${i}" style="font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;"> Analyze with CA AI</button></div></div>${newsAiBadge(e)}</div>`;
 
   function bindNewsListEvents(){
     const host=$('newsList');
@@ -12219,7 +12068,7 @@ window.handleNotificationClick = function(n){
           card.style.opacity = '0';
           card.style.transform = 'translateX(20px)';
           setTimeout(() => card.remove(), 300);
-          if(typeof toast === 'function') toast('🗑 News article dismissed');
+          if(typeof toast === 'function') toast('News article dismissed');
         }
         return;
       }
@@ -12298,7 +12147,7 @@ window.handleNotificationClick = function(n){
       localStorage.setItem('ca_dismissed_news', JSON.stringify(dismissed.slice(-500)));
     } catch(_) {}
 
-    toast(`🗑 Deleted ${keys.length} news item(s)`);
+    toast(`Deleted ${keys.length} news item(s)`);
     if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
   };
 
@@ -12309,7 +12158,7 @@ window.handleNotificationClick = function(n){
       if(!dismissed.includes(key)) dismissed.push(key);
       localStorage.setItem('ca_dismissed_news', JSON.stringify(dismissed.slice(-500)));
     } catch(_) {}
-    toast('🗑 News story dismissed');
+    toast('News story dismissed');
     if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
   };
 
@@ -12345,7 +12194,7 @@ window.handleNotificationClick = function(n){
         toast(' Re-included in sentiment score');
       } else {
         irrelevant.push(key);
-        toast('🚫 Marked not relevant for overall score');
+        toast('Marked not relevant for overall score');
       }
       localStorage.setItem('ca_irrelevant_news', JSON.stringify(irrelevant.slice(-500)));
     } catch(_) {}
@@ -12421,14 +12270,14 @@ window.handleNotificationClick = function(n){
                 <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);background:var(--surface-2);padding:2px 8px;border-radius:4px;border:1px solid var(--border-soft);">${esc(it.source)}</span>
                 <span style="font-size:11px;color:var(--text-faint);">Time: ${esc(it.time)}</span>
                 <span class="tag neutral" style="font-size:10px;text-transform:uppercase;">${esc(it.scope === 'stock' ? (sym + ' Specific') : 'Global Macro')}</span>
-                ${isIrrelevant ? '<span class="tag sell" style="font-size:9.5px;padding:1px 5px;background:rgba(239,68,68,0.15);color:var(--sell);border:1px solid var(--sell);">🚫 Not in Score</span>' : ''}
+                ${isIrrelevant ? '<span class="tag sell" style="font-size:9.5px;padding:1px 5px;background:rgba(239,68,68,0.15);color:var(--sell);border:1px solid var(--sell);">Not in Score</span>' : ''}
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <span class="tag ${badgeClass}" style="font-weight:700;font-size:11px;padding:3px 9px;border-radius:5px;">
                   ${esc(probText)}
                 </span>
                 <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.toggleSingleNewsRelevance('${esc(k)}')" style="font-size:10px;padding:2px 7px;" title="Toggle whether this story counts toward overall sentiment score">
-                  ${isIrrelevant ? ' Include' : '🚫 Exclude'}
+                  ${isIrrelevant ? ' Include' : 'Exclude'}
                 </button>
                 <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.deleteSingleNews('${esc(k)}')" style="color:var(--sell);font-size:10px;padding:2px 6px;" title="Dismiss Story">Close</button>
               </div>
@@ -12442,7 +12291,7 @@ window.handleNotificationClick = function(n){
 
             <div style="background:var(--surface-2);border-radius:6px;padding:8px 12px;font-size:11.5px;line-height:1.45;color:var(--text-dim);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
               <div><b style="color:var(--gold);">CA AI Decision:</b> ${esc(it.ca_ai_insight)}</div>
-              <span class="tag neutral" style="font-size:10px;cursor:pointer;">💬 Discuss / Counter-Question</span>
+              <span class="tag neutral" style="font-size:10px;cursor:pointer;">Discuss / Counter-Question</span>
             </div>
           </div>
         `;
@@ -12484,7 +12333,7 @@ window.handleNotificationClick = function(n){
     $('newsRefreshNowBtn')?.addEventListener('click', () => {
       caAiNewsCountdown = 60;
       loadNewsByCaAi();
-      toast('Refresh Refreshing CA AI news intelligence…');
+      toast('Refreshing CA AI news intelligence…');
     });
 
     document.querySelectorAll('[data-ca-news-mode]').forEach(b => {
@@ -13554,7 +13403,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       // Aligned Call in Bullish Market
       recoAction = 'BUY';
       qualifies = true;
-      advisoryIcon = isExpiryScalp ? '' : (isOtm ? '' : '✅');
+      advisoryIcon = isExpiryScalp ? '' : (isOtm ? '' : '');
       if(isExpiryScalp){
         advisoryComment = ` High-Volatility Expiry Scalp Active: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Quick directional scalp targeting +₹${estProfit}/lot (+${Math.round((reward/entry)*100)}%). Expected completion in 1–5 minutes. Exit promptly on target hit or trail SL tightly.`;
         rationale = `Expiry Scalp Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot, +${Math.round((reward/entry)*100)}%), SL ₹${fmt(sl)} (R:R 1:${rr}). High-volatility scalp achievable within 1–5m.`;
@@ -13562,17 +13411,17 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         advisoryComment = ` Budget-Friendly OTM Call Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Trade is aligned with ${baseSym} Bullish market structure.  Advisory: Out-of-the-Money options have lower Delta (~0.25-0.35) and faster Theta decay closer to expiry. Scalp with 15–20m target window and trail SL once in profit.`;
         rationale = `OTM Call Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot, +${Math.round((reward/entry)*100)}%), SL ₹${fmt(sl)} (R:R 1:${rr}). Achievable in 15–20m momentum horizon.`;
       } else if(isItm){
-        advisoryComment = `✅ High-Delta ITM Call Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). High Delta (~0.65) captures direct underlying trend momentum with lower Theta erosion. Fully aligned with ${baseSym} Bullish trend.`;
+        advisoryComment = `High-Delta ITM Call Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). High Delta (~0.65) captures direct underlying trend momentum with lower Theta erosion. Fully aligned with ${baseSym} Bullish trend.`;
         rationale = `ITM Call Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (+${Math.round((reward/entry)*100)}%), SL ₹${fmt(sl)} (R:R 1:${rr}). Deep intrinsic protection in 15–20m window.`;
       } else {
-        advisoryComment = `✅ Optimal ATM Call Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Balanced Greeks (Delta ~0.50) with maximum liquidity. High conviction institutional trend following on ${baseSym}.`;
+        advisoryComment = `Optimal ATM Call Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Balanced Greeks (Delta ~0.50) with maximum liquidity. High conviction institutional trend following on ${baseSym}.`;
         rationale = `ATM Call Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot, +${Math.round((reward/entry)*100)}%), SL ₹${fmt(sl)} (R:R 1:${rr}). Target achievable in 15–20m.`;
       }
     } else if(isUnderlyingBear && isPut){
       // Aligned Put in Bearish Market
       recoAction = 'BUY';
       qualifies = true;
-      advisoryIcon = isExpiryScalp ? '' : (isOtm ? '' : '✅');
+      advisoryIcon = isExpiryScalp ? '' : (isOtm ? '' : '');
       if(isExpiryScalp){
         advisoryComment = ` High-Volatility Expiry Scalp Active: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Quick directional scalp targeting +₹${estProfit}/lot (+${Math.round((reward/entry)*100)}%). Expected completion in 1–5 minutes. Exit promptly on target hit or trail SL tightly.`;
         rationale = `Expiry Scalp Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot, +${Math.round((reward/entry)*100)}%), SL ₹${fmt(sl)} (R:R 1:${rr}). High-volatility scalp achievable within 1–5m.`;
@@ -13580,10 +13429,10 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         advisoryComment = ` Budget-Friendly OTM Put Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Trade is aligned with ${baseSym} Bearish market structure.  Advisory: Out-of-the-Money options have lower Delta (~0.25-0.35) and faster Theta decay. Scalp with tight trailing SL aligned with downward trend.`;
         rationale = `OTM Put Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)}. Target achievable in 15–20m.`;
       } else if(isItm){
-        advisoryComment = `✅ High-Delta ITM Put Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). High Delta protection capturing downward institutional breakdown with lower time decay sensitivity.`;
+        advisoryComment = `High-Delta ITM Put Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). High Delta protection capturing downward institutional breakdown with lower time decay sensitivity.`;
         rationale = `ITM Put Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)}, SL ₹${fmt(sl)}. Strong downward tracking in 15–20m window.`;
       } else {
-        advisoryComment = `✅ Optimal ATM Put Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Balanced Greeks (Delta -0.50) and high liquidity. Aligned with downward institutional breakdown on ${baseSym}.`;
+        advisoryComment = `Optimal ATM Put Selected: ${optSym} (Capital: ~${fmtMoney(capitalReq)}/lot). Balanced Greeks (Delta -0.50) and high liquidity. Aligned with downward institutional breakdown on ${baseSym}.`;
         rationale = `ATM Put Setup: ${optSym} · Action: BUY · Entry ₹${fmt(entry)}, Target ₹${fmt(tgt)} (Est. +₹${estProfit}/lot), SL ₹${fmt(sl)} (R:R 1:${rr}). High conviction trade.`;
       }
     } else if(isUnderlyingBull && isPut){
@@ -13601,8 +13450,8 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         entry = null;
         tgt = null;
         sl = null;
-        advisoryIcon = '🚫';
-        advisoryComment = `🚫 No Active Recommendation: Market structure for ${baseSym} is Bullish (Call is recommended). Buying Put options (PE) against prevailing upward momentum carries extreme risk of capital loss. Switch to recommended Call (${suggestedContract}) or enable  Expiry Scalp (1–5m) for short-term scalp levels.`;
+        advisoryIcon = '';
+        advisoryComment = `No Active Recommendation: Market structure for ${baseSym} is Bullish (Call is recommended). Buying Put options (PE) against prevailing upward momentum carries extreme risk of capital loss. Switch to recommended Call (${suggestedContract}) or enable  Expiry Scalp (1–5m) for short-term scalp levels.`;
         rationale = `No Active Recommendation: ${baseSym} technical structure is Bullish. Recommended: ${suggestedContract}. You selected Put (${optSym}). Counter-trend recommendations blocked to protect capital.`;
       }
     } else if(isUnderlyingBear && isCall){
@@ -13620,8 +13469,8 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
         entry = null;
         tgt = null;
         sl = null;
-        advisoryIcon = '🚫';
-        advisoryComment = `🚫 No Active Recommendation: Market structure for ${baseSym} is Bearish (Put is recommended). Buying Call options (CE) against downward momentum carries extreme risk of capital loss. Switch to recommended Put (${suggestedContract}) or enable  Expiry Scalp (1–5m) for short-term bounce levels.`;
+        advisoryIcon = '';
+        advisoryComment = `No Active Recommendation: Market structure for ${baseSym} is Bearish (Put is recommended). Buying Call options (CE) against downward momentum carries extreme risk of capital loss. Switch to recommended Put (${suggestedContract}) or enable  Expiry Scalp (1–5m) for short-term bounce levels.`;
         rationale = `No Active Recommendation: ${baseSym} technical structure is Bearish. Recommended: ${suggestedContract}. You selected Call (${optSym}). Counter-trend recommendations blocked to protect capital.`;
       }
     } else if(isChop){
@@ -14519,7 +14368,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     if(advBox && advText){
       const advisory = rec?.advisory || {};
       const msg = advisory.comment || rec?.rationale || 'Consensus levels synchronized.';
-      const icon = advisory.icon || (qualifies ? (rec?.moneyness === 'OTM' ? '' : '✅') : '🚫');
+      const icon = advisory.icon || (qualifies ? (rec?.moneyness === 'OTM' ? '' : '') : '');
       if(advIcon) advIcon.textContent = icon;
       let html = esc(msg);
       if(advisory.suggested_switch && advisory.suggested_sym){
@@ -14871,7 +14720,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border-soft);padding-top:10px;align-items:center;">
-            <span class="muted" style="font-size:11px;">⛔ Execution Disabled (Counter-trend)</span>
+            <span class="muted" style="font-size:11px;">Execution Disabled (Counter-trend)</span>
           </div>
         </div>
         ` : ''}
@@ -15831,7 +15680,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                         <button type="button" class="btn ghost small pos-analysis-btn" onclick="event.stopPropagation(); openPosAnalysisModal('${esc(x.id)}')" style="padding:2px 6px;color:var(--gold);display:inline-flex;align-items:center;justify-content:center;" title="Gemini AI Analysis">
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"/></svg>
                         </button>
-                        <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.deletePositionRecord('${esc(x.id)}', ${isOpen ? 'true' : 'false'})" style="padding:2px 6px;color:var(--text-faint);font-size:11px;" onmouseover="this.style.color='var(--sell)'" onmouseout="this.style.color='var(--text-faint)'" title="Delete position record">🗑</button>
+                        <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.deletePositionRecord('${esc(x.id)}', ${isOpen ? 'true' : 'false'})" style="padding:2px 6px;color:var(--text-faint);font-size:11px;" onmouseover="this.style.color='var(--sell)'" onmouseout="this.style.color='var(--text-faint)'" title="Delete position record"></button>
                       </div>
                     </td>
                   </tr>
@@ -15927,7 +15776,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
                   <td>
                     <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;">
                       ${isPending ? `<button type="button" class="btn ghost small" onclick="cancelPendingOrder('${esc(x.id)}')" style="color:var(--sell);padding:2px 8px;font-size:10.5px;">Cancel</button>` : ''}
-                      <button type="button" class="btn ghost small" onclick="deleteOrderRecord('${esc(x.id)}')" style="padding:2px 6px;color:var(--text-faint);font-size:11px;" onmouseover="this.style.color='var(--sell)'" onmouseout="this.style.color='var(--text-faint)'" title="Delete order record">🗑</button>
+                      <button type="button" class="btn ghost small" onclick="deleteOrderRecord('${esc(x.id)}')" style="padding:2px 6px;color:var(--text-faint);font-size:11px;" onmouseover="this.style.color='var(--sell)'" onmouseout="this.style.color='var(--text-faint)'" title="Delete order record"></button>
                     </div>
                   </td>
                 </tr>
@@ -17396,7 +17245,7 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
     btState.timer = null;
     const btn = $('btPlayPauseBtn');
     if(btn){
-      btn.textContent = 'Play Play';
+      btn.textContent = 'Play';
       btn.style.background = 'var(--buy)';
       btn.style.color = '#0B2A1E';
     }
@@ -21031,7 +20880,7 @@ setTimeout(() => {
       <!-- Block 4: News Catalysts with Materiality & Live Proofs -->
       <div class="card" style="padding:14px;background:var(--surface);border:1px solid var(--border-soft);border-radius:10px;width:100%;box-sizing:border-box;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <b style="font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;">📰 Ingested Institutional News</b>
+          <b style="font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;">Ingested Institutional News</b>
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="tag buy" style="font-weight:700;font-size:10px;">94% MATERIALITY</span>
             <button type="button" class="btn ghost small" style="padding:2px 7px;font-size:10.5px;height:24px;cursor:pointer;" onclick="toggleCardDetail('detailNewsList', this)">[+] Details</button>
@@ -21069,7 +20918,7 @@ setTimeout(() => {
       <!-- Block 5: Global & Domestic Macro Drivers -->
       <div class="card" style="padding:14px;background:var(--surface);border:1px solid var(--border-soft);border-radius:10px;width:100%;box-sizing:border-box;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <b style="font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;">🌐 Macro Confluence Drivers</b>
+          <b style="font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;">Macro Confluence Drivers</b>
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="tag gold" style="font-weight:700;font-size:10px;">GLOBAL CONFLUENCE</span>
             <button type="button" class="btn ghost small" style="padding:2px 7px;font-size:10.5px;height:24px;cursor:pointer;" onclick="toggleCardDetail('detailMacroDrivers', this)">[+] Details</button>
@@ -21641,7 +21490,7 @@ setTimeout(() => {
                   <b style="color:var(--warn);">Materiality: 70%</b>
                 </div>
                 <div style="display:flex;justify-content:space-between;background:var(--surface-2);padding:8px 10px;border-radius:6px;font-size:12px;">
-                  <span>🌐 <b>Macro Pressure:</b> GIFT Nifty divergence</span>
+                  <span><b>Macro Pressure:</b> GIFT Nifty divergence</span>
                   <b style="color:var(--neutral);">Materiality: 60%</b>
                 </div>
               </div>
@@ -21649,7 +21498,7 @@ setTimeout(() => {
               <div style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;margin-bottom:8px;">Suggested Actions</div>
               <div style="display:flex;flex-direction:column;gap:8px;">
                 <button class="btn gold" style="width:100%;justify-content:center;font-weight:700;padding:10px;" onclick="closeModal('tradeSentinelModal');if(typeof closePosition==='function')closePosition('${esc(pos.id)}');toast('Position closed. Evaluating ${esc(oppContract)}');">
-                  🔄 Square Off &amp; Pivot to ${optType === 'CE' ? 'PE (Put)' : 'CE (Call)'}
+                  Square Off &amp; Pivot to ${optType === 'CE' ? 'PE (Put)' : 'CE (Call)'}
                 </button>
                 <div style="display:flex;gap:8px;">
                   <button class="btn ghost small" style="flex:1;justify-content:center;" onclick="closeModal('tradeSentinelModal');toast('Stop loss tightened to protect capital');">
@@ -21790,7 +21639,7 @@ setTimeout(() => {
           <div class="muted" style="font-size:11.5px;margin-top:5px;line-height:1.45;color:var(--text-dim);">${esc(snippet)}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:10px;color:var(--text-faint);">
             <span>${n.updated_at ? new Date(n.updated_at).toLocaleDateString() : 'Today'}</span>
-            ${hasImg ? '<span style="color:var(--gold);">📷 Image attached</span>' : ''}
+            ${hasImg ? '<span style="color:var(--gold);">Image attached</span>' : ''}
           </div>
         </div>
       `;
@@ -21928,7 +21777,7 @@ setTimeout(() => {
         note.images.push(b64);
         renderNoteImagesGallery(note.images);
         saveActiveNote();
-        toast('📷 Photo attached to note');
+        toast('Photo attached to note');
       }
     };
     reader.readAsDataURL(file);
@@ -21952,7 +21801,7 @@ setTimeout(() => {
               note.images.push(b64);
               renderNoteImagesGallery(note.images);
               saveActiveNote();
-              toast('📋 Screenshot pasted directly into note!');
+              toast('Screenshot pasted directly into note!');
             }
           };
           reader.readAsDataURL(file);
@@ -22046,7 +21895,7 @@ setTimeout(() => {
            Trail SL to Entry
         </button>
         <button type="button" class="btn ghost small" style="padding:0 8px;height:26px;font-size:10.5px;" onclick="toggleAdvisorChat()" title="Chat with CA AI about this position">
-          💬 Chat
+          Chat
         </button>
       </div>
 
@@ -22172,7 +22021,7 @@ setTimeout(() => {
         if(screen.orientation && typeof screen.orientation.lock === 'function'){
           screen.orientation.lock('landscape').catch(() => {});
         }
-        toast('📺 Fullscreen Landscape Activated');
+        toast('Fullscreen Landscape Activated');
       } else {
         if(document.fullscreenElement || document.webkitFullscreenElement){
           if(document.exitFullscreen) await document.exitFullscreen();
@@ -22190,7 +22039,7 @@ setTimeout(() => {
       if(isFull && screen.orientation && typeof screen.orientation.lock === 'function'){
         screen.orientation.lock('landscape').catch(() => {});
       }
-      toast(isFull ? '📺 Fullscreen Viewport Mode' : 'Normal View');
+      toast(isFull ? 'Fullscreen Viewport Mode' : 'Normal View');
     }
     setTimeout(()=>{ if(typeof draw === 'function') draw(); }, 100);
   }
@@ -24532,7 +24381,7 @@ window.toggleChartReplayPlay = function(forceRestart){
   if(window.__caReplayState.playing && !forceRestart){
     window.__caReplayState.playing = false;
     clearInterval(window.__caReplayState.timer);
-    if(btn) btn.textContent = 'Play Play';
+    if(btn) btn.textContent = 'Play';
     _toastMsg('Replay paused');
     return;
   }
@@ -24609,7 +24458,7 @@ window.resetLiveChartMode = function(){
   window.__caReplayState.active = false;
   clearInterval(window.__caReplayState.timer);
   const btn = document.getElementById('btnChartReplayPlayPause');
-  if(btn) btn.textContent = 'Play Play';
+  if(btn) btn.textContent = 'Play';
   _toastMsg('Exited Backtest Replay. Reconnected to live market stream.');
 
   try {
@@ -25765,7 +25614,7 @@ function pauseBacktest(){
   btSession.isPlaying = false;
   if(btSession.timer) clearInterval(btSession.timer);
   const btn = document.getElementById('btPlayPauseBtn');
-  if(btn) { btn.textContent = 'Play Play'; btn.className = 'btn primary'; }
+  if(btn) { btn.textContent = 'Play'; btn.className = 'btn primary'; }
   const statusEl = document.getElementById('btStatusBadge');
   if(statusEl) { statusEl.textContent = 'Paused'; statusEl.className = 'tag neutral'; }
 }
@@ -26154,7 +26003,7 @@ setTimeout(() => {
     }
     const toggleBtn = document.getElementById('layoutModeToggleBtn');
     if (toggleBtn) {
-      toggleBtn.innerHTML = isApp ? '📄 Classic View' : ' App View';
+      toggleBtn.innerHTML = isApp ? 'Classic View' : ' App View';
       toggleBtn.title = isApp ? 'Switch back to Classic Scrolling Web View' : 'Switch to Zerodha Kite App Shell View (Fixed Viewport)';
     }
     const selectEl = document.getElementById('layoutModeSelect');
@@ -26166,7 +26015,7 @@ setTimeout(() => {
     const current = localStorage.getItem('ca_layout_mode') === 'app-shell' ? 'app-shell' : 'classic';
     const next = current === 'app-shell' ? 'classic' : 'app-shell';
     applyLayoutMode(next);
-    if(typeof toast === 'function') toast(next === 'app-shell' ? ' Switched to Kite App Shell' : '📄 Switched to Classic Web View');
+    if(typeof toast === 'function') toast(next === 'app-shell' ? ' Switched to Kite App Shell' : 'Switched to Classic Web View');
   };
 
   function applyMobileDock(enabled) {
@@ -26213,7 +26062,7 @@ setTimeout(() => {
   });
   document.getElementById('layoutModeSelect')?.addEventListener('change', e => {
     applyLayoutMode(e.target.value);
-    if(typeof toast === 'function') toast(e.target.value === 'app-shell' ? ' Switched to Kite App Shell' : '📄 Switched to Classic Web View');
+    if(typeof toast === 'function') toast(e.target.value === 'app-shell' ? ' Switched to Kite App Shell' : 'Switched to Classic Web View');
   });
   document.getElementById('mobileDockToggleCheckbox')?.addEventListener('change', e => {
     applyMobileDock(e.target.checked);
@@ -26355,7 +26204,7 @@ setTimeout(() => {
 
       if(Array.isArray(data.history)) renderQuickHistoryRows(data.history);
 
-      if(typeof toast === 'function') toast(`✅ Backtest completed for ${sym}: Baseline Failed -> Calibrated Success`);
+      if(typeof toast === 'function') toast(`Backtest completed for ${sym}: Baseline Failed -> Calibrated Success`);
     } catch(err) {
       if(typeof toast === 'function') toast('Backtest Error: ' + err.message);
       else alert('Backtest Error: ' + err.message);
@@ -26883,7 +26732,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="modal-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:92%;max-width:480px;padding:20px;box-shadow:0 16px 40px rgba(0,0,0,0.6);display:flex;flex-direction:column;gap:12px;">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft);padding-bottom:10px;">
       <b style="font-size:15px;color:var(--gold);display:flex;align-items:center;gap:6px;">
-        🗑️ Clear Categorized Cache
+       ️ Clear Categorized Cache
       </b>
       <button type="button" onclick="document.getElementById('clearCacheModal').style.display='none'" style="background:transparent;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;line-height:1;">×</button>
     </div>
@@ -26938,7 +26787,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="modal" id="importTradebookModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;">
   <div class="modal-card" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:90%;max-width:480px;padding:20px;box-shadow:0 12px 36px rgba(0,0,0,0.5);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <b style="font-size:14px;color:var(--gold);">📥 Upload Broker Tradebook / Passbook</b>
+      <b style="font-size:14px;color:var(--gold);">Upload Broker Tradebook / Passbook</b>
       <button type="button" onclick="document.getElementById('importTradebookModal').style.display='none'" style="background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;">×</button>
     </div>
     <p style="font-size:11.5px;color:var(--text-dim);line-height:1.4;margin-bottom:12px;">
@@ -27408,7 +27257,7 @@ window.loadExternalPositions = async function(){
           <td style="padding:6px 10px;text-align:center;white-space:nowrap;">
             <div style="display:inline-flex;align-items:center;gap:4px;">
               <button type="button" class="btn ghost small" onclick="window.exitRealTrade('${esc(p.id)}')" style="padding:2px 7px;font-size:10px;color:var(--sell);border:1px solid rgba(239,68,68,0.3);" title="Exit real trade">Exit</button>
-              <button type="button" class="btn ghost small" onclick="window.deleteRealTrade('${esc(p.id)}')" style="padding:2px 6px;font-size:10.5px;color:var(--text-dim);" title="Delete real trade record">🗑</button>
+              <button type="button" class="btn ghost small" onclick="window.deleteRealTrade('${esc(p.id)}')" style="padding:2px 6px;font-size:10.5px;color:var(--text-dim);" title="Delete real trade record"></button>
             </div>
           </td>
         </tr>
@@ -27469,7 +27318,7 @@ window.toggleChartAiMaximize = function(){
   if(!p) return;
   const isMax = p.classList.toggle('maximized');
   const btn = document.getElementById('chartAiMaximizeBtn');
-  if(btn) btn.textContent = isMax ? '🗗' : '⛶';
+  if(btn) btn.textContent = isMax ? '' : '⛶';
   if(btn) btn.title = isMax ? 'Restore size' : 'Toggle Fullscreen';
 };
 

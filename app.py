@@ -4323,14 +4323,56 @@ def recommendation_news_evidence(symbol: str) -> dict[str, Any]:
         }
         CACHE.set(key, result, 120)
         return result
-    if "BANK" in sym_u:
+    if "BANK" in sym_u or "NIFTY" in sym_u or "RELIANCE" in sym_u:
+        # Use live global market data to derive signal dynamically
+        try:
+            g_quotes = fetch_global_market_quotes()
+        except Exception:
+            g_quotes = {}
+        g_sp = g_quotes.get("^GSPC") or {}
+        g_dow = g_quotes.get("^DJI") or {}
+        g_nas = g_quotes.get("^IXIC") or {}
+        sp_pct = float(g_sp.get("pct") or 0.0)
+        dow_pct = float(g_dow.get("pct") or 0.0)
+        nas_pct = float(g_nas.get("pct") or 0.0)
+        us_avg = (sp_pct + dow_pct + nas_pct) / 3.0
+        if us_avg >= 0.15:
+            global_sig_val = "BUY"
+            global_mat = 88
+            global_sent = "US_MARKETS_POSITIVE"
+        elif us_avg <= -0.15:
+            global_sig_val = "SELL"
+            global_mat = 88
+            global_sent = "US_MARKETS_NEGATIVE"
+        else:
+            global_sig_val = "NEUTRAL"
+            global_mat = 70
+            global_sent = "US_MARKETS_MIXED"
+        # Stock signal from NIFTY candles (use UPSTOX quote momentum as proxy)
+        try:
+            nq = UPSTOX.quote("NIFTY" if "NIFTY" in sym_u else sym_u)
+            n_chg_pct = float(nq.get("change_pct") or nq.get("session_change_pct") or 0.0)
+        except Exception:
+            n_chg_pct = 0.0
+        if "BANK" in sym_u:
+            try:
+                bq = UPSTOX.quote("BANKNIFTY")
+                n_chg_pct = float(bq.get("change_pct") or bq.get("session_change_pct") or n_chg_pct)
+            except Exception:
+                pass
+        if n_chg_pct >= 0.2:
+            stock_sig_val = "BUY"; stock_mat = 92; stock_sent = "INTRADAY_MOMENTUM_UP"
+        elif n_chg_pct <= -0.2:
+            stock_sig_val = "SELL"; stock_mat = 92; stock_sent = "INTRADAY_MOMENTUM_DOWN"
+        else:
+            stock_sig_val = "NEUTRAL"; stock_mat = 75; stock_sent = "CONSOLIDATION"
         result = {
-            "stock": {"signal": "BUY", "materiality": 93, "sentiment_score": 0.6, "sentiment": "CREDIT_EXPANSION"},
-            "global": {"signal": "BUY", "materiality": 89, "sentiment_score": 0.5, "sentiment": "LIQUIDITY_SURPLUS"},
-            "stock_events": BANKNIFTY_REAL_NEWS_2026,
-            "global_events": NIFTY_REAL_NEWS_2026
+            "stock": {"signal": stock_sig_val, "materiality": stock_mat, "sentiment_score": round(n_chg_pct / 100.0, 3), "sentiment": stock_sent},
+            "global": {"signal": global_sig_val, "materiality": global_mat, "sentiment_score": round(us_avg / 100.0, 3), "sentiment": global_sent},
+            "stock_events": NIFTY_REAL_NEWS_2026 if "NIFTY" in sym_u else BANKNIFTY_REAL_NEWS_2026,
+            "global_events": BANKNIFTY_REAL_NEWS_2026 if "BANK" in sym_u else NIFTY_REAL_NEWS_2026
         }
-        CACHE.set(key, result, 120)
+        CACHE.set(key, result, 60)  # 60s cache — live data
         return result
     if "GOLD" in sym_u or "SILVER" in sym_u:
         result = {
@@ -4338,15 +4380,6 @@ def recommendation_news_evidence(symbol: str) -> dict[str, Any]:
             "global": {"signal": "BUY", "materiality": 87, "sentiment_score": 0.4, "sentiment": "CENTRAL_BANK_BUYING"},
             "stock_events": GOLD_REAL_NEWS_2026,
             "global_events": CRUDE_REAL_NEWS_2026[:2]
-        }
-        CACHE.set(key, result, 120)
-        return result
-    if "NIFTY" in sym_u or "RELIANCE" in sym_u:
-        result = {
-            "stock": {"signal": "BUY", "materiality": 94, "sentiment_score": 0.65, "sentiment": "FII_INFLOWS"},
-            "global": {"signal": "BUY", "materiality": 91, "sentiment_score": 0.5, "sentiment": "MACRO_RESILIENCE"},
-            "stock_events": NIFTY_REAL_NEWS_2026,
-            "global_events": BANKNIFTY_REAL_NEWS_2026
         }
         CACHE.set(key, result, 120)
         return result
@@ -5706,16 +5739,21 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     vwap_val = float(ta.get("vwap") or last_price)
     st_sig = str(ta.get("supertrend_signal") or "").upper()
-    is_vwap_bull = (last_price >= vwap_val) and (st_sig == "BUY" or rsi_val >= 50 or pattern_bias > 0 or net_chg > 0)
-    is_vwap_bear = (last_price <= vwap_val) and (st_sig == "SELL" or rsi_val <= 50 or pattern_bias < 0 or net_chg < 0)
+    is_vwap_bull = (last_price >= vwap_val) and (st_sig == "BUY" or rsi_val >= 52 or pattern_bias > 0 or net_chg > 0)
+    is_vwap_bear = (last_price <= vwap_val) and (st_sig == "SELL" or rsi_val <= 48 or pattern_bias < 0 or net_chg < 0)
 
     # Multi-factor Institutional Alignment
     if technical_side == "BUY":
         if last_price < ema50 and rsi_val < 42 and pattern_bias <= 0 and not is_vwap_bull:
             technical_side = "NO_TRADE"
     elif technical_side == "SELL":
-        if (last_price > ema50 or net_chg > 0) and rsi_val > 48 and not is_vwap_bear:
-            technical_side = "BUY" if net_chg > 0 else "NO_TRADE"
+        if last_price > ema50 and rsi_val > 58 and pattern_bias >= 0 and not is_vwap_bear:
+            technical_side = "NO_TRADE"
+        # Only flip SELL→BUY if price is clearly above ema50 AND positive net change AND RSI confirms bullish
+        if last_price > ema50 and net_chg > 0 and rsi_val > 52 and not is_vwap_bear:
+            technical_side = "BUY"
+        elif last_price > ema50 and rsi_val > 55 and not is_vwap_bear:
+            technical_side = "NO_TRADE"
     else:
         if (last_price >= ema20 or pattern_bias > 0 or is_vwap_bull or net_chg > 0) and rsi_val >= 46 and news_score >= 0:
             technical_side = "BUY"
@@ -5740,9 +5778,9 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     # If side is NO_TRADE and not max_profit_mode, check for strong pattern or news catalyst
     if side == "NO_TRADE" and not max_profit_mode:
-        if (news_score >= 1.0 or pattern_bias > 0 or net_chg > 0) and rsi_val >= 46:
+        if (news_score >= 1.0 or pattern_bias > 0 or chg_pct >= 0.3) and rsi_val >= 48:
             side = "BUY"; confidence = max(confidence, 65)
-        elif (news_score <= -1.0 or pattern_bias < 0 or net_chg < 0) and rsi_val <= 54:
+        elif (news_score <= -1.0 or pattern_bias < 0 or chg_pct <= -0.3) and rsi_val <= 52:
             side = "SELL"; confidence = max(confidence, 65)
 
     evidence = {"technical": ta, "patterns": patterns, "news": news}
