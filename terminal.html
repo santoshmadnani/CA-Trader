@@ -3541,8 +3541,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
 
         <!-- 3 Recommendation Cards: Spot Benchmark | Best Call (CE) | Best Put (PE) -->
-        <div class="dash-reco-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch;width:100%;">
-        <div class="dash-reco-grid" id="dashDualRecoContainer" style="gap:12px;margin-bottom:12px;align-items:stretch;width:100%;">
+        <div class="dash-reco-grid" id="dashDualRecoContainer" style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:12px;margin-bottom:12px;align-items:stretch;width:100%;">
 
           <!-- CARD 1: UNDERLYING / SPOT BENCHMARK -->
           <div class="card" id="dashCardSpot" style="padding:12px 14px;background:var(--surface-2);border:1px solid var(--border-soft);border-top:3px solid var(--gold);border-radius:8px;position:relative;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;height:100%;">
@@ -3666,10 +3665,6 @@ select#watchlistSelect, select.watchlist-select {
 
             <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
             <div style="background:rgba(38,217,166,0.06);border:1px dashed rgba(38,217,166,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;flex-wrap:wrap;gap:4px;">
-                <span><b>T1:</b> <span id="ceTgt1" style="color:var(--buy);font-weight:700;">₹--</span></span>
-                <span><b>T2:</b> <span id="ceTgt2" style="color:var(--buy);font-weight:700;">₹--</span></span>
-                <span><b style="color:var(--gold);">T3 (Runner +200pt):</b> <span id="ceTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
               <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
                 <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="ceTgt1" style="color:var(--buy);font-weight:700;">₹--</span></span>
                 <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="ceTgt2" style="color:var(--buy);font-weight:700;">₹--</span></span>
@@ -3752,10 +3747,6 @@ select#watchlistSelect, select.watchlist-select {
 
             <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
             <div style="background:rgba(255,92,114,0.06);border:1px dashed rgba(255,92,114,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;flex-wrap:wrap;gap:4px;">
-                <span><b>T1:</b> <span id="peTgt1" style="color:var(--sell);font-weight:700;">₹--</span></span>
-                <span><b>T2:</b> <span id="peTgt2" style="color:var(--sell);font-weight:700;">₹--</span></span>
-                <span><b style="color:var(--gold);">T3 (Runner -200pt):</b> <span id="peTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
               <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
                 <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="peTgt1" style="color:var(--sell);font-weight:700;">₹--</span></span>
                 <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="peTgt2" style="color:var(--sell);font-weight:700;">₹--</span></span>
@@ -3867,9 +3858,6 @@ select#watchlistSelect, select.watchlist-select {
           <span id="chartSimSliderDisplay"></span><input id="chartSimSlider"><div id="chartSimDeltaImpact"></div><div id="chartSimGammaImpact"></div><div id="chartSimTotalImpact"></div><div id="chartSimLotPnl"></div><div id="chartSimLotNote"></div>
         </div>
       </div>
-    </div>
-    </div>
-    </div>
     </div> <!-- END panel-dashboard -->
 
   <div class="panel" id="panel-reco">
@@ -4266,7 +4254,7 @@ select#watchlistSelect, select.watchlist-select {
     </div>
 
     <!-- ============ BACKTESTING ENGINE & CANDLE REPLAY SIMULATOR ============ -->
-    <div class="panel" id="panel-backtesting" style="display:none !important;" aria-hidden="true">
+    <div class="panel" id="panel-backtesting">
 
       <!-- ============ QUICK BACKTEST RECOMMENDATION ENGINE & CALIBRATION TRACKER ============ -->
       <div class="card" id="btQuickSection" style="margin-bottom:16px;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,0.22);">
