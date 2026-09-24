@@ -9175,12 +9175,15 @@ async def analysis_fundamental(instrument: str, user: dict[str, Any] = Depends(r
 @app.get("/api/recommendations/{instrument}")
 async def analysis_overall(
     instrument: str,
+    request: Request,
     timeframe: str = "5m",
     desired_profit: float | None = None,
     bearable_loss: float | None = None,
     expiry_scalp: str | int | bool | None = None,
     user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
+    if instrument.lower() == "history":
+        return await recommendation_history(request, user)
     uid = user.get("id") if isinstance(user, dict) else (getattr(user, "id", None) or 1)
     is_scalp = bool(expiry_scalp and str(expiry_scalp).lower() in ("1", "true", "yes", "on"))
     try:
@@ -9426,6 +9429,7 @@ def generate_commodity_option_chain(underlying: str, expiry: str | None = None) 
 
 
 @app.get("/api/options/{underlying}")
+@app.get("/api/options/{underlying}/chain")
 async def options_summary(underlying: str, expiry: str | None = None, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     root = extract_root_symbol(underlying).upper()
     key = f"option-chain:{root}:{expiry or 'nearest'}"

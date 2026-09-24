@@ -85,10 +85,22 @@ async def get_mcp_openapi():
                     "responses": {"200": {"description": "Complete option chain table"}}
                 }
             },
+            "/api/recommendations/{instrument}": {
+                "get": {
+                    "summary": "Get AI Trade Recommendation for Symbol",
+                    "description": "Returns live algorithmic trade setup, entry, target, stop loss, and confidence for a specific stock or index (e.g. NIFTY, BANKNIFTY, RELIANCE).",
+                    "operationId": "getRecommendationForSymbol",
+                    "parameters": [
+                        {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. NIFTY, BANKNIFTY, RELIANCE)"},
+                        {"name": "timeframe", "in": "query", "required": False, "schema": {"type": "string", "default": "5m"}, "description": "Analysis timeframe (e.g. 1m, 5m, 15m, 1h)"}
+                    ],
+                    "responses": {"200": {"description": "Algorithmic trade setup details"}}
+                }
+            },
             "/api/recommendations/history": {
                 "get": {
-                    "summary": "Get AI Trade Recommendations",
-                    "description": "Returns recent AI trade setups with entry, target, stop-loss, and rationale.",
+                    "summary": "Get AI Trade Recommendations History",
+                    "description": "Returns recent AI trade setups audit history with entry, target, stop-loss, and rationale.",
                     "operationId": "getRecommendationsHistory",
                     "responses": {"200": {"description": "Recent recommendations history"}}
                 }
