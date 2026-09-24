@@ -1,7 +1,11 @@
 import os, glob, subprocess, json, urllib.request, time, sys
+import re
+import sys
 
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 PORT = 9260
+with open(r'c:\Users\SantoshMadnani\OneDrive - BDO INDIA SERVICES PRIVATE LIMITED\Personal files\CA_Trader\app\terminal.html', 'r', encoding='utf-8') as f:
+    text = f.read()
 
 proc = subprocess.Popen([
     CHROME,
@@ -12,6 +16,14 @@ proc = subprocess.Popen([
     "--no-default-browser-check",
     "about:blank"
 ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# Find script blocks
+pattern = re.compile(r'<script\b[^>]*>(.*?)</script>', re.DOTALL)
+for match_num, m in enumerate(pattern.finditer(text), 1):
+    script_content = m.group(1)
+    start_pos = m.start(1)
+    # calculate line number of start_pos
+    start_line = text[:start_pos].count('\n') + 1
+    print(f"Script #{match_num} starts at line {start_line}, length {len(script_content)} chars")
 
 time.sleep(2)
 
@@ -68,3 +80,16 @@ try:
 finally:
     proc.kill()
 
+    # Check each line of script
+    lines = script_content.split('\n')
+    for line_idx, l in enumerate(lines, start_line):
+        stripped = l.strip()
+        # check for unfinished tokens
+        if stripped in ["$('structureStat", "$('structureStat'", "$('structureStatus').textContent='Local"]:
+            print(f"  [X] BROKEN LINE {line_idx}: {stripped}")
+        if stripped.endswith("recen") or stripped.endswith("title"):
+            print(f"  [X] TRUNCATED LINE {line_idx}: {stripped}")
+        # check for illegal single-quote lines (not template literals ` and not double quotes)
+        # in JS, single-line strings enclosed in ' cannot span multiple lines unless escaped with \
+        # if a line contains an odd number of unescaped ', and does not end with \, it's a syntax error
+        # BUT ignore lines inside template literals or comments!
