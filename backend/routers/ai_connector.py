@@ -41,7 +41,7 @@ class SqlQueryIn(BaseModel):
 async def get_mcp_openapi():
     """Returns a focused OpenAPI 3.0 specification tailored for ChatGPT Actions and Gemini Function Calling."""
     return {
-        "openapi": "3.0.0",
+        "openapi": "3.1.0",
         "info": {
             "title": "CA Trader AI Assistant & MCP API",
             "description": "Secure API connector for ChatGPT, Gemini, and MCP agents to inspect stock quotes, option chains, portfolios, and trigger cloud deployments.",
