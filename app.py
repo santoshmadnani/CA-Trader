@@ -7029,6 +7029,16 @@ except Exception as _st_err:
 
 @app.middleware("http")
 async def request_middleware(request: Request, call_next):
+    # Canonical redirect: www.catrader.site -> catrader.site to prevent cookie domain mismatch on mobile
+    host = request.headers.get("host", "").split(":")[0].lower()
+    if host.startswith("www."):
+        non_www = host[4:]
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme or "https")
+        url_path = request.url.path
+        if request.url.query:
+            url_path += f"?{request.url.query}"
+        return RedirectResponse(f"{proto}://{non_www}{url_path}", status_code=301)
+
     started = time.monotonic()
     forwarded = request.headers.get("x-forwarded-for")
     client = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
