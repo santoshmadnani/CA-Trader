@@ -1,0 +1,34 @@
+name: Auto-Deploy to Oracle Cloud
+
+on:
+  push:
+    branches:
+      - CA-Trader-Bifurcated
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Oracle Cloud VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/CA-Trader
+            git fetch origin CA-Trader-Bifurcated
+            git reset --hard origin/CA-Trader-Bifurcated
+            /home/ubuntu/venv/bin/pip install -r requirements.txt --quiet
+            sudo systemctl restart catrader
+            sleep 3
+            sudo systemctl is-active catrader
+
+      - name: Verify Live Site Health
+        run: |
+          sleep 5
+          curl -f https://catrader.site/health || exit 1
+

@@ -90,11 +90,16 @@ def run_tunnel_thread(cfg, port):
         return None
 
     mode = cfg.get("tunnel", {}).get("mode", "quick")
-    if mode == "quick":
+    named = cfg.get("tunnel", {}).get("named_tunnel", {})
+    token = named.get("tunnel_token")
+    custom_host = named.get("custom_hostname", "catrader.site")
+
+    if mode == "named" and token:
+        cmd = [str(CLOUDFLARED_EXE), "tunnel", "run", "--token", token]
+    elif mode == "quick":
         cmd = [str(CLOUDFLARED_EXE), "tunnel", "--url", f"http://127.0.0.1:{port}", "--no-autoupdate"]
     else:
-        named = cfg.get("tunnel", {}).get("named_tunnel", {})
-        tname = named.get("tunnel_name", "ca-trader-laptop")
+        tname = named.get("tunnel_name", "catrader-laptop")
         cmd = [str(CLOUDFLARED_EXE), "tunnel", "run", tname]
 
     print(f"\n[TUNNEL] Launching Cloudflare Tunnel ({mode} mode)...", flush=True)
@@ -121,6 +126,17 @@ def run_tunnel_thread(cfg, port):
                 print(f"  Terminal: {pub_url}/terminal", flush=True)
                 print("  Access this URL from your phone, tablet, or external browser!", flush=True)
                 print("=" * 65 + "\n", flush=True)
+
+            if "Registered tunnel connection" in line or ("Connection" in line and "registered" in line.lower()):
+                if not url_found:
+                    url_found = True
+                    print("\n" + "=" * 65, flush=True)
+                    print("  PERMANENT CLOUDFLARE TUNNEL ACTIVE FOR YOUR LAPTOP!", flush=True)
+                    print(f"  Domain:   https://{custom_host}", flush=True)
+                    print(f"  Terminal: https://{custom_host}/terminal", flush=True)
+                    print(f"  Alt:      https://www.{custom_host}/terminal", flush=True)
+                    print("  Your custom domain routes directly to your laptop with zero hosting fees!", flush=True)
+                    print("=" * 65 + "\n", flush=True)
 
     t = threading.Thread(target=monitor_tunnel, daemon=True)
     t.start()

@@ -17,12 +17,12 @@
   "tunnel": {
     "enabled": true,
     "provider": "cloudflare",
-    "mode": "quick",
-    "quick_tunnel_domain": "trycloudflare.com",
+    "mode": "named",
     "named_tunnel": {
-      "tunnel_name": "ca-trader-laptop",
-      "custom_hostname": "catrader.site",
-      "credentials_file": "server_host/bin/tunnel_credentials.json"
+      "tunnel_name": "catrader-laptop",
+      "tunnel_id": "5176ca7a-88f2-46f7-a644-147f47708213",
+      "tunnel_token": "eyJhIjoiYTUzY2U1Yjg0MDZhNmQwMzA3ZTcyZWVmNWYzNDdmNDEiLCJ0IjoiNTE3NmNhN2EtODhmMi00NmY3LWE2NDQtMTQ3ZjQ3NzA4MjEzIiwicyI6IlpPbzRZZEo2WTZ3WWVvQ29uYU80L3NNZjZRM05NNElqTUdRY2ZWcE1uRzg9In0=",
+      "custom_hostname": "catrader.site"
     },
     "binary_path": "server_host/bin/cloudflared.exe"
   },
@@ -34,4 +34,3 @@
     }
   }
 }
-

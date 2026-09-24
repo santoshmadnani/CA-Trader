@@ -22,16 +22,14 @@
 - Maintain the dark mode palette (`#1890ff`, `#0b0e14`, `#151b26`).
 - Preserve the flex layout hierarchy (`.layout > .sidebar + .main`). Never displace panels outside `.main`.
 
-## 5. Zero-Laptop-Transfer Deployment Protocol
+## 5. Automated Production Deployment Protocol (Oracle Cloud 24/7)
 - **Strict Prohibition**: Never transfer files directly from the Windows laptop via SCP, SFTP, or rsync to avoid corporate Sophos security popups.
-- **Deployment Flow**:
+- **Automated Deployment Flow**:
   1. Commit and push to Git: `git push origin CA-Trader-Bifurcated`.
-  2. SSH to EC2 (`ubuntu@15.252.81.122`) using `ca-trader-key.pem`.
-  3. Pull changes inside `/home/ubuntu/ca-trader-repo`.
-  4. Package `/home/ubuntu/46.zip` on the server filesystem.
-  5. Run `sudo /home/ubuntu/deploy.sh` and verify container hot-swap.
+  2. Immediately execute: `python tools/deploy_to_oracle.py` (which connects to Oracle Cloud VM `80.225.236.5`, pulls the latest commit, and reloads `catrader.service` in ~5 seconds).
+  3. Verify `https://catrader.site/health` returns 200 OK with browser User-Agent.
 - **Mandatory Live Verification Rule**:
-  Whenever code changes are made to `terminal.html` or `app.py`, NEVER declare the task complete based on local files alone. Always execute `python tools/deploy_via_git.py` and verify via headless Chrome / curl that the live production site (`https://catrader.site/terminal`) reflects the change with 0 unhandled console exceptions.
+  Whenever code changes are made to `terminal.html` or `app.py`, NEVER declare the task complete based on local files alone. Always execute the automated deployment and verify that the live production site (`https://catrader.site/terminal`) reflects the change with 0 unhandled console exceptions.
 
 ## 6. Post-Task Efficiency Audit & Self-Optimization Protocol
 Upon completing any user request or feature implementation:
