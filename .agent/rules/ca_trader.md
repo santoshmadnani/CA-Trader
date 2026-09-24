@@ -5,6 +5,14 @@
 - **Surgical Line-Bounded Edits**: When modifying `terminal.html` or `app.py`, always use small, line-bounded `replace_file_content` blocks. Never attempt whole-file replacements.
 - **No Stdlib Name Collisions**: Never create scratch scripts in `app/` named after Python standard library modules (e.g., `inspect.py`, `types.py`, `token.py`, `ast.py`, `json.py`). These shadow stdlib modules and break Python compilation and test runners. Always store one-off scratch scripts in the designated brain scratch directory.
 
+## 0.1 Multi-Device Sync Protocol (Phone / External Edits)
+- **Mandatory Pre-Task Remote Check**: At the beginning of ANY modification task, Antigravity MUST run `git fetch origin CA-Trader-Bifurcated`.
+- **Auto-Detect & Auto-Backup**: If remote commits are detected (e.g. user pushed code from phone, ChatGPT, Gemini, or GitHub Web):
+  1. Automatically take a backup of current local work.
+  2. Run `git pull origin CA-Trader-Bifurcated` so the laptop folder is instantly updated with the latest changes from GitHub.
+  3. Inform the user that remote updates from phone/external devices were synced.
+- **Unified Pipeline**: Any subsequent edits are made on top of this latest code and pushed back to GitHub, keeping phone, laptop, and GitHub in perfect sync.
+
 ## 1. Database Query Safety
 - **Canonical Database**: `ca_trader.sqlite3` (SQLite3, WAL mode).
 - **Never Query Basis Blobs**: When querying the `recommendations` table, never execute `SELECT *`. The columns `option_basis`, `news_basis`, and `technical_basis` contain ~60KB of JSON per row (200MB+ in total). Always project explicit lightweight columns (`id`, `symbol`, `recommendation`, `entry`, `target`, `stop_loss`, `final_pnl`, `rationale`, `created_at`, `status`).
