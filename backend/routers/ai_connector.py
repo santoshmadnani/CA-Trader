@@ -44,7 +44,7 @@ async def get_mcp_openapi():
         "openapi": "3.1.0",
         "info": {
             "title": "CA Trader AI Assistant & MCP API",
-            "description": "Secure API connector for ChatGPT, Gemini, and MCP agents to inspect stock quotes, option chains, portfolios, and trigger cloud deployments.",
+            "description": "Secure READ-ONLY API connector for ChatGPT, Gemini, and AI assistants to inspect live market quotes, option chains, portfolios, and algorithmic trade setups.",
             "version": "1.0.0"
         },
         "servers": [
@@ -87,8 +87,8 @@ async def get_mcp_openapi():
             },
             "/api/recommendations/{instrument}": {
                 "get": {
-                    "summary": "Get AI Trade Recommendation for Symbol",
-                    "description": "Returns live algorithmic trade setup, entry, target, stop loss, and confidence for a specific stock or index (e.g. NIFTY, BANKNIFTY, RELIANCE).",
+                    "summary": "Get Live AI Trade Recommendation for Symbol",
+                    "description": "Returns current live algorithmic trade setup with calculated Entry, Target, Stop Loss, Greeks, and confidence for any stock or index (e.g. NIFTY, BANKNIFTY, RELIANCE, CRUDEOIL). Always use this when the user asks for current or latest trade setups for a specific symbol.",
                     "operationId": "getRecommendationForSymbol",
                     "parameters": [
                         {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. NIFTY, BANKNIFTY, RELIANCE)"},
@@ -128,38 +128,9 @@ async def get_mcp_openapi():
                     "operationId": "getHealth",
                     "responses": {"200": {"description": "System health status"}}
                 }
-            },
-            "/api/mcp/deploy": {
-                "post": {
-                    "summary": "Trigger Cloud Git Auto-Deploy",
-                    "description": "Instructs the 24/7 Oracle Cloud server to pull latest changes from GitHub and reload in 5 seconds.",
-                    "operationId": "triggerCloudDeploy",
-                    "responses": {"200": {"description": "Deployment status result"}}
-                }
-            },
-            "/api/mcp/sql": {
-                "post": {
-                    "summary": "Query SQLite Database",
-                    "description": "Safely executes a read-only SELECT query on the production SQLite database.",
-                    "operationId": "queryDatabase",
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SqlQueryIn"}}}
-                    },
-                    "responses": {"200": {"description": "Query results"}}
-                }
             }
         },
         "components": {
-            "schemas": {
-                "SqlQueryIn": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "SELECT query to execute"}
-                    },
-                    "required": ["query"]
-                }
-            },
             "securitySchemes": {
                 "ApiKeyAuth": {
                     "type": "apiKey",

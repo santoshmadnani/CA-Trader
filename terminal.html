@@ -3522,7 +3522,7 @@ select#watchlistSelect, select.watchlist-select {
             </div>
                         <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);padding:2px 6px;border-radius:6px;border:1px solid var(--border-soft);">
               <span style="font-size:11px;color:var(--text-faint);text-transform:uppercase;font-weight:700;">Expiry:</span>
-              <select id="recoOptionExpirySelect" onchange="window.onRecoExpiryChanged(this.value)" style="background:var(--surface);color:var(--text);border:1px solid var(--border-soft);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer;outline:none;">
+              <select id="recoOptionExpirySelect" onfocus="window.populateRecoExpirySelect()" onmousedown="window.populateRecoExpirySelect()" onchange="window.onRecoExpiryChanged(this.value)" style="background:var(--surface);color:var(--text);border:1px solid var(--border-soft);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;cursor:pointer;outline:none;">
                 <option value="">Current Expiry</option>
               </select>
             </div>
@@ -3582,13 +3582,22 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
-            <div style="background:rgba(232,184,75,0.06);border:1px dashed rgba(232,184,75,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
-              <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="undTgt1" style="color:var(--text);font-weight:700;">₹--</span></span>
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="undTgt2" style="color:var(--text);font-weight:700;">₹--</span></span>
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b style="color:var(--gold);">T3 (Runner):</b> <span id="undTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+            <div style="background:rgba(232,184,75,0.06);border:1px dashed rgba(232,184,75,0.25);border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:10.5px;font-family:var(--font-mono);">
+              <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:5px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--text-dim);font-weight:600;">Target 1 (Safe Exit):</span>
+                  <span id="undTgt1" style="color:var(--text);font-weight:700;">₹--</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--text-dim);font-weight:600;">Target 2 (Main Target):</span>
+                  <span id="undTgt2" style="color:var(--text);font-weight:700;">₹--</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--gold);font-weight:700;">Target 3 (Runner):</span>
+                  <span id="undTgt3" style="color:var(--gold);font-weight:800;">₹--</span>
+                </div>
               </div>
-              <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
+              <div style="font-size:9.5px;color:var(--text-dim);display:flex;align-items:center;gap:4px;border-top:1px dashed rgba(255,255,255,0.07);padding-top:4px;">
                 <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="undTrailingSl">Cost at T1; Lock T1 at T2</span>
               </div>
             </div>
@@ -3664,13 +3673,22 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
-            <div style="background:rgba(38,217,166,0.06);border:1px dashed rgba(38,217,166,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
-              <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="ceTgt1" style="color:var(--buy);font-weight:700;">₹--</span></span>
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="ceTgt2" style="color:var(--buy);font-weight:700;">₹--</span></span>
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b style="color:var(--gold);">T3 (Runner):</b> <span id="ceTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+            <div style="background:rgba(38,217,166,0.06);border:1px dashed rgba(38,217,166,0.25);border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:10.5px;font-family:var(--font-mono);">
+              <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:5px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--text-dim);font-weight:600;">Target 1 (Safe Exit):</span>
+                  <span id="ceTgt1" style="color:var(--buy);font-weight:700;">₹--</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--text-dim);font-weight:600;">Target 2 (Main Target):</span>
+                  <span id="ceTgt2" style="color:var(--buy);font-weight:700;">₹--</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--gold);font-weight:700;">Target 3 (Runner):</span>
+                  <span id="ceTgt3" style="color:var(--gold);font-weight:800;">₹--</span>
+                </div>
               </div>
-              <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
+              <div style="font-size:9.5px;color:var(--text-dim);display:flex;align-items:center;gap:4px;border-top:1px dashed rgba(255,255,255,0.07);padding-top:4px;">
                 <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="ceTrailingSl">Cost at T1; Lock T1 at T2</span>
               </div>
             </div>
@@ -3746,13 +3764,22 @@ select#watchlistSelect, select.watchlist-select {
             </div>
 
             <!-- Multi-Tier Targets Strip: T1, T2, T3 Runner & Trailing SL -->
-            <div style="background:rgba(255,92,114,0.06);border:1px dashed rgba(255,92,114,0.25);border-radius:6px;padding:5px 8px;margin-bottom:8px;font-size:10px;font-family:var(--font-mono);">
-              <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:center;margin-bottom:3px;gap:4px;white-space:nowrap;">
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T1:</b> <span id="peTgt1" style="color:var(--sell);font-weight:700;">₹--</span></span>
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b>T2:</b> <span id="peTgt2" style="color:var(--sell);font-weight:700;">₹--</span></span>
-                <span style="overflow:hidden;text-overflow:ellipsis;"><b style="color:var(--gold);">T3 (Runner):</b> <span id="peTgt3" style="color:var(--gold);font-weight:800;">₹--</span></span>
+            <div style="background:rgba(255,92,114,0.06);border:1px dashed rgba(255,92,114,0.25);border-radius:6px;padding:7px 10px;margin-bottom:10px;font-size:10.5px;font-family:var(--font-mono);">
+              <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:5px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--text-dim);font-weight:600;">Target 1 (Safe Exit):</span>
+                  <span id="peTgt1" style="color:var(--sell);font-weight:700;">₹--</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--text-dim);font-weight:600;">Target 2 (Main Target):</span>
+                  <span id="peTgt2" style="color:var(--sell);font-weight:700;">₹--</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="color:var(--gold);font-weight:700;">Target 3 (Runner):</span>
+                  <span id="peTgt3" style="color:var(--gold);font-weight:800;">₹--</span>
+                </div>
               </div>
-              <div style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;">
+              <div style="font-size:9.5px;color:var(--text-dim);display:flex;align-items:center;gap:4px;border-top:1px dashed rgba(255,255,255,0.07);padding-top:4px;">
                 <span style="color:var(--gold);font-weight:700;">🛡️ Trailing SL:</span> <span id="peTrailingSl">Cost at T1; Lock T1 at T2</span>
               </div>
             </div>
@@ -6354,6 +6381,47 @@ window.$ = window.$ || (id => document.getElementById(id));
 window.esc = window.esc || (v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 window.fmtMoney = window.fmtMoney || (v => '₹' + Number(v||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}));
 window.formatTime = window.formatTime || (v => { try { const d = new Date(v); return isNaN(d) ? String(v||'') : d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch(_) { return String(v||''); } });
+window.__caSelectedRecoExpiry = '';
+window.populateRecoExpirySelect = async function(symbol){
+  try {
+    const sel = document.getElementById('recoOptionExpirySelect');
+    if(!sel) return;
+    const sym = symbol || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+    const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
+    const res = await fetch('/api/options/' + encodeURIComponent(root) + '/expiries', {credentials: 'include'});
+    if(!res.ok) return;
+    const data = await res.json();
+    const expiries = (data && data.expiries) || [];
+    if(expiries.length > 0){
+      const curr = window.__caSelectedRecoExpiry || sel.value || '';
+      let opts = '<option value="">Current Expiry (' + expiries[0] + ')</option>';
+      expiries.forEach((e, idx) => {
+        const isSel = (curr === e) ? 'selected' : '';
+        opts += `<option value="${e}" ${isSel}>${e}${idx === 0 ? ' (Near)' : ''}</option>`;
+      });
+      sel.innerHTML = opts;
+    }
+  } catch(e) {
+    console.warn('Could not populate reco expiry dropdown:', e);
+  }
+};
+window.onRecoExpiryChanged = async function(val){
+  window.__caSelectedRecoExpiry = val || '';
+  if(typeof toast === 'function') toast('Recommendations expiry set to: ' + (val || 'Current Expiry'));
+  const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+  try {
+    const res = await fetch('/api/recommendations/' + encodeURIComponent(sym) + (val ? '?expiry=' + encodeURIComponent(val) : ''), {credentials: 'include'});
+    if(res.ok){
+      const data = await res.json();
+      window.__caCurrentChartReco = data;
+      if(typeof window.renderDualRecoCards === 'function') window.renderDualRecoCards(data);
+    }
+  } catch(_) {
+    if(typeof window.renderDualRecoCards === 'function'){
+      window.renderDualRecoCards(window.__caCurrentChartReco || {});
+    }
+  }
+};
 window.toast = window.toast || ((m) => {
   try {
     const el = document.getElementById('toast') || (() => {
@@ -8342,6 +8410,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       ? 'Buyers maintaining control above 20-EMA; continuation towards upper resistance targets favored while higher lows hold.'
       : 'Sellers defending lower highs below 50-EMA; breakdown re-testing of swing support levels favored until moving averages reverse.';
 
+    $('structureStatus').textContent=`${Math.min(a.length, 3
+... [truncated for diff preview]
     $('structureStatus').textContent=`${Math.min(a.length, 30)} candles analyzed`;
     $('structureBox').innerHTML=`
       <div class="pattern-card">
@@ -23007,29 +23077,37 @@ window.renderDualRecoCards = function(data){
   const brBadge = document.getElementById('bullRunPointsBadge');
   const brAdvice = document.getElementById('bullRunAdvice');
 
-  const isStrongTrend = Boolean(isCePrimary ? (ceSpec.isBullRun || isCePrimary) : (peSpec.isCrash || !isCePrimary));
+  // Only trigger Sentinel banner on genuine high-conviction momentum breakouts / breakdowns (Confidence >= 85%)
+  const recoConf = Number(data.confidence || 0);
+  const minRunnerThreshold = root.includes('BANK') ? 250 : (root.includes('NIFTY') ? 100 : (root.includes('CRUDE') ? 80 : curLtp * 0.025));
+  const isStrongTrend = Boolean(
+    (isCePrimary && (ceSpec.isBullRun || (recoConf >= 85 && runnerPts >= minRunnerThreshold))) ||
+    (!isCePrimary && (peSpec.isCrash || (recoConf >= 85 && runnerPts >= minRunnerThreshold)))
+  );
   if(brBanner){
     if(isStrongTrend){
       brBanner.style.display = 'flex';
+      const actualPts = Math.max(1, Math.round(runnerPts || (curLtp * 0.015)));
       if(isCePrimary){
         brBanner.style.background = 'linear-gradient(90deg, rgba(38,217,166,0.18) 0%, rgba(232,184,75,0.18) 100%)';
         brBanner.style.border = '1px solid rgba(38,217,166,0.5)';
         if(brIcon) brIcon.textContent = '🔥';
-        if(brTitle) brTitle.innerHTML = `<span style="color:var(--buy);">STRONG BULL RUN EXPANSION SETUP DETECTED:</span> ${root} primed for +200pt super-trend movement!`;
-        if(brBadge) { brBadge.className = 'tag buy'; brBadge.textContent = `+${Math.round(runnerPts)}PT RUNNER ACTIVE`; }
+        if(brTitle) brTitle.innerHTML = `<span style="color:var(--buy);">BULL RUN EXPANSION SETUP:</span> ${root} primed for +${actualPts}pt trend runner!`;
+        if(brBadge) { brBadge.className = 'tag buy'; brBadge.textContent = `+${actualPts}PT RUNNER`; }
         if(brAdvice) brAdvice.textContent = `Ride move with T3 Runner (₹${_fmtNum(ceSpec.target3)}). Lock Cost at T1, Lock Profit at T2.`;
       } else {
         brBanner.style.background = 'linear-gradient(90deg, rgba(255,92,114,0.18) 0%, rgba(232,184,75,0.18) 100%)';
         brBanner.style.border = '1px solid rgba(255,92,114,0.5)';
         if(brIcon) brIcon.textContent = '🚨';
-        if(brTitle) brTitle.innerHTML = `<span style="color:var(--sell);">SEVERE MARKET BREAKDOWN CASCADE DETECTED:</span> ${root} primed for -200pt downside collapse!`;
-        if(brBadge) { brBadge.className = 'tag sell'; brBadge.textContent = `-${Math.round(runnerPts)}PT RUNNER ACTIVE`; }
+        if(brTitle) brTitle.innerHTML = `<span style="color:var(--sell);">BEARISH BREAKDOWN CASCADE:</span> ${root} primed for -${actualPts}pt downside runner!`;
+        if(brBadge) { brBadge.className = 'tag sell'; brBadge.textContent = `-${actualPts}PT RUNNER`; }
         if(brAdvice) brAdvice.textContent = `Protect capital & ride Put options to T3 Runner (₹${_fmtNum(peSpec.target3)}). Strict trailing stop loss active.`;
       }
     } else {
       brBanner.style.display = 'none';
     }
   }
+  if(typeof window.populateRecoExpirySelect === 'function') window.populateRecoExpirySelect(root);
 };
 
 // Immediately populate CE/PE cards with fallback data so they never show "Loading CE Contract…" on page load.
@@ -28754,48 +28832,8 @@ window.openDayAnalysisCalibrationModal = function(tradeId){
 // ============================================================================
 // SELECTABLE EXPIRY & INTEGRATED DAY RECOMMENDATIONS ANALYZER
 // ============================================================================
-window.__caSelectedRecoExpiry = '';
-window.populateRecoExpirySelect = async function(symbol){
-  try {
-    const sel = document.getElementById('recoOptionExpirySelect');
-    if(!sel) return;
-    const sym = symbol || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
-    const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
-    const fetchFn = window.A || window.api || (async (u) => { const r = await fetch(u); return r.json(); });
-    const data = await fetchFn('/api/options/' + encodeURIComponent(root) + '/expiries');
-    const expiries = (data && data.expiries) || [];
-    if(expiries.length > 0){
-      const curr = window.__caSelectedRecoExpiry || sel.value || '';
-      let opts = '<option value="">Current Expiry (' + expiries[0] + ')</option>';
-      expiries.forEach((e, idx) => {
-        const isSel = (curr === e) ? 'selected' : '';
-        opts += `<option value="${e}" ${isSel}>${e}${idx === 0 ? ' (Near)' : ''}</option>`;
-      });
-      sel.innerHTML = opts;
-    }
-  } catch(e) {
-    console.warn('Could not populate reco expiry dropdown:', e);
-  }
-};
-
-window.onRecoExpiryChanged = async function(val){
-  window.__caSelectedRecoExpiry = val || '';
-  if(typeof toast === 'function') toast('Recommendations expiry set to: ' + (val || 'Current Expiry'));
-  const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
-  try {
-    const fetchFn = window.A || window.api || (async (u) => { const r = await fetch(u); return r.json(); });
-    const url = '/api/recommendations/' + encodeURIComponent(sym) + (val ? '?expiry=' + encodeURIComponent(val) : '');
-    const data = await fetchFn(url);
-    if(data){
-      window.__caCurrentChartReco = data;
-      if(typeof window.renderDualRecoCards === 'function') window.renderDualRecoCards(data);
-    }
-  } catch(_) {
-    if(typeof window.renderDualRecoCards === 'function'){
-      window.renderDualRecoCards(window.__caCurrentChartReco || {});
-    }
-  }
-};
+// Initial trigger for Expiry Dropdown
+setTimeout(() => { if(typeof window.populateRecoExpirySelect === 'function') window.populateRecoExpirySelect(); }, 500);
 // Populate on load
 setTimeout(() => { if(typeof window.populateRecoExpirySelect === 'function') window.populateRecoExpirySelect(); }, 800);
 

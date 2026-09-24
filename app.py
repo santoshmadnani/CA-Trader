@@ -10329,7 +10329,8 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
                 " CE" in clean_sym or " PE" in clean_sym or clean_sym.endswith("CE") or clean_sym.endswith("PE") or
                 "OPTION" in clean_sym or "CALL" in clean_sym or "PUT" in clean_sym
             )
-            if is_opt or is_on_demand:
+            has_entry = r.get("entry") is not None and float(r.get("entry") or 0) > 0
+            if (is_opt or is_on_demand) and has_entry:
                 filtered.append(r)
 
     # 4. Aggregates
