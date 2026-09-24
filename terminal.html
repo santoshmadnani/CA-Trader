@@ -10969,6 +10969,7 @@ function applyDrawingPoint(x,y){
       const optSearch = document.getElementById('chartRecoOptionSearchInput') || document.getElementById('chartRecoOptionSearch');
       if(optSearch) optSearch.value = '';
     }
+    if(typeof window.populateRecoExpirySelect === 'function') window.populateRecoExpirySelect(currUnder || S);
     // Fix 10: Clear all section caches on symbol switch so nothing carries over
     if(typeof tabLoadedAt!=='undefined' && tabLoadedAt.clear) tabLoadedAt.clear();
     // Clear recommendation and chart analysis caches for previous symbol
@@ -28754,13 +28755,50 @@ window.openDayAnalysisCalibrationModal = function(tradeId){
 // SELECTABLE EXPIRY & INTEGRATED DAY RECOMMENDATIONS ANALYZER
 // ============================================================================
 window.__caSelectedRecoExpiry = '';
-window.onRecoExpiryChanged = function(val){
-  window.__caSelectedRecoExpiry = val || '';
-  if(typeof window.renderDualRecoCards === 'function'){
-    window.renderDualRecoCards(window.__caCurrentChartReco || {});
+window.populateRecoExpirySelect = async function(symbol){
+  try {
+    const sel = document.getElementById('recoOptionExpirySelect');
+    if(!sel) return;
+    const sym = symbol || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+    const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
+    const fetchFn = window.A || window.api || (async (u) => { const r = await fetch(u); return r.json(); });
+    const data = await fetchFn('/api/options/' + encodeURIComponent(root) + '/expiries');
+    const expiries = (data && data.expiries) || [];
+    if(expiries.length > 0){
+      const curr = window.__caSelectedRecoExpiry || sel.value || '';
+      let opts = '<option value="">Current Expiry (' + expiries[0] + ')</option>';
+      expiries.forEach((e, idx) => {
+        const isSel = (curr === e) ? 'selected' : '';
+        opts += `<option value="${e}" ${isSel}>${e}${idx === 0 ? ' (Near)' : ''}</option>`;
+      });
+      sel.innerHTML = opts;
+    }
+  } catch(e) {
+    console.warn('Could not populate reco expiry dropdown:', e);
   }
-  if(typeof toast === 'function') toast('Recommendations expiry set to: ' + (val || 'Current Expiry'));
 };
+
+window.onRecoExpiryChanged = async function(val){
+  window.__caSelectedRecoExpiry = val || '';
+  if(typeof toast === 'function') toast('Recommendations expiry set to: ' + (val || 'Current Expiry'));
+  const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+  try {
+    const fetchFn = window.A || window.api || (async (u) => { const r = await fetch(u); return r.json(); });
+    const url = '/api/recommendations/' + encodeURIComponent(sym) + (val ? '?expiry=' + encodeURIComponent(val) : '');
+    const data = await fetchFn(url);
+    if(data){
+      window.__caCurrentChartReco = data;
+      if(typeof window.renderDualRecoCards === 'function') window.renderDualRecoCards(data);
+    }
+  } catch(_) {
+    if(typeof window.renderDualRecoCards === 'function'){
+      window.renderDualRecoCards(window.__caCurrentChartReco || {});
+    }
+  }
+};
+// Populate on load
+setTimeout(() => { if(typeof window.populateRecoExpirySelect === 'function') window.populateRecoExpirySelect(); }, 800);
+
 
 window.runAutoAnalyzeDayTrades = async function(){
   const dateInput = document.getElementById('autoAnalyzeDayPicker');
