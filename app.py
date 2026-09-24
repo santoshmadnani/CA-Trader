@@ -7026,6 +7026,12 @@ try:
 except Exception as _st_err:
     log.warning("Could not mount /static: %s", _st_err)
 
+try:
+    from backend.routers.ai_connector import router as ai_connector_router
+    app.include_router(ai_connector_router)
+except Exception as _ai_err:
+    log.warning("Could not mount AI/MCP connector router: %s", _ai_err)
+
 
 @app.middleware("http")
 async def request_middleware(request: Request, call_next):
@@ -7070,6 +7076,17 @@ async def request_middleware(request: Request, call_next):
 
 
 def current_user(request: Request) -> dict[str, Any] | None:
+    # Support AI / MCP / ChatGPT / Gemini API Key and Bearer token authentication
+    auth_header = request.headers.get("authorization") or ""
+    api_key_header = request.headers.get("x-api-key") or ""
+    bearer_token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
+    token_candidate = api_key_header or bearer_token
+    mcp_secret = os.getenv("CA_MCP_TOKEN") or AUTH_SECRET
+    if token_candidate and mcp_secret and hmac.compare_digest(token_candidate, mcp_secret):
+        admin = db_exec("SELECT * FROM users WHERE role='admin' ORDER BY id LIMIT 1", fetch="one")
+        if admin:
+            return admin
+
     if not AUTH_ENABLED:
         row = db_exec("SELECT * FROM users ORDER BY id LIMIT 1", fetch="one")
         if row:
