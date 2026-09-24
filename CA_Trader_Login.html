@@ -601,12 +601,15 @@ document.querySelectorAll('.tab').forEach(t=>{
 });
 
 /* ---------- Sign In handler ---------- */
+window.__CA_LOGIN_INITIALIZED__ = true;
 async function doSignIn(){
   const emailInput = document.getElementById('signinEmail');
   const passInput = document.getElementById('signinPass');
+  const remInput = document.getElementById('rememberMe');
   const btn = document.getElementById('signinButton');
   const email = (emailInput?.value || '').trim();
   const password = passInput?.value || '';
+  const remember_me = remInput ? remInput.checked : true;
   if(!email || !password){
     alert('Please enter your email and password');
     return;
@@ -620,11 +623,11 @@ async function doSignIn(){
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       credentials: 'include',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, remember_me })
     });
     const data = await res.json().catch(()=>({}));
     if(res.ok && data.authenticated){
-      window.location.href = data.redirect || window.__CA_POST_LOGIN__ || '/terminal';
+      window.location.replace(data.redirect || window.__CA_POST_LOGIN__ || '/terminal');
     } else {
       alert(data.detail?.message || data.detail || 'Invalid email or password');
       if(btn){
@@ -798,6 +801,10 @@ const chartRightEl = document.getElementById('chartRight');
 const market = createMarket(100 + Math.random()*20);
 
 function loop(ts){
+  if(window.innerWidth <= 768){
+    // Skip heavy continuous canvas rendering on mobile devices to prevent iOS WebKit GPU crash
+    return;
+  }
   const totalWidth = window.innerWidth;
   market.update(ts, totalWidth);
 

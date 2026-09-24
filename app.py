@@ -7015,7 +7015,7 @@ async def lifespan(app: FastAPI):
 from starlette.middleware.gzip import GZipMiddleware
 app = FastAPI(title="CA Trader Headless Backend", version="1.0.0", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(SessionMiddleware, secret_key=AUTH_SECRET, max_age=int(AUTH_IDLE_HOURS * 3600), same_site="lax", https_only=False)
+app.add_middleware(SessionMiddleware, secret_key=AUTH_SECRET, max_age=int(AUTH_IDLE_HOURS * 3600), same_site="lax", https_only=bool(AUTH_ENABLED))
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 try:
@@ -7132,22 +7132,21 @@ LOGIN_BRIDGE = r"""
   const signinPane = document.getElementById('pane-signin');
   const signupPane = document.getElementById('pane-signup');
 
-  // Do not bounce an authenticated user through the login screen.
-  api('/api/auth/me').then(r => { if(r?.authenticated) window.location.replace('/'); }).catch(() => {});
-
   const signinButton = signinPane?.querySelector('.btn-primary');
-  signinButton?.addEventListener('click', async () => {
-    const inputs = signinPane.querySelectorAll('input');
-    const email = (inputs[0]?.value || '').trim().toLowerCase();
-    const password = inputs[1]?.value || '';
-    const remember = !!inputs[2]?.checked;
-    if(!email || !password){ notify('Email address and password are required.'); return; }
-    busy(signinButton, true);
-    try {
-      await api('/api/auth/login', {method:'POST', body:JSON.stringify({email,password,remember_me:remember})});
-      window.location.replace(window.__CA_POST_LOGIN__ || '/post-login');
-    } catch(e) { notify(e.message); busy(signinButton, false); }
-  });
+  if (signinButton && !window.__CA_LOGIN_INITIALIZED__) {
+    signinButton.addEventListener('click', async () => {
+      const inputs = signinPane.querySelectorAll('input');
+      const email = (inputs[0]?.value || '').trim().toLowerCase();
+      const password = inputs[1]?.value || '';
+      const remember = !!inputs[2]?.checked;
+      if(!email || !password){ notify('Email address and password are required.'); return; }
+      busy(signinButton, true);
+      try {
+        await api('/api/auth/login', {method:'POST', body:JSON.stringify({email,password,remember_me:remember})});
+        window.location.replace(window.__CA_POST_LOGIN__ || '/post-login');
+      } catch(e) { notify(e.message); busy(signinButton, false); }
+    });
+  }
 
   const signupButton = signupPane?.querySelector('.btn-primary');
   signupButton?.addEventListener('click', async () => {
@@ -7196,7 +7195,7 @@ async def index(request: Request) -> Response:
     if AUTH_ENABLED and not user:
         return await login_page(request)
     if (fitness_allowlisted(user) or is_admin(user)) and not selected_terminal(request):
-        return RedirectResponse("/post-login")
+        return RedirectResponse("/post-login", status_code=302)
     if selected_terminal(request) == "video" and is_admin(user):
         return await video_terminal_page(request)
     if selected_terminal(request) == "fitness":
@@ -7220,22 +7219,22 @@ async def login_page(request: Request) -> Response:
 @app.get("/logout", response_class=HTMLResponse)
 async def browser_logout(request: Request) -> Response:
     request.session.clear()
-    return RedirectResponse("/", headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
+    return RedirectResponse("/", status_code=302, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
 
 @app.get("/force-login", response_class=HTMLResponse)
 async def force_login(request: Request) -> Response:
     request.session.clear()
-    return RedirectResponse("/", headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
+    return RedirectResponse("/", status_code=302, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
 
 @app.get("/post-login", response_class=HTMLResponse)
 async def post_login_page(request: Request) -> Response:
     user=current_user(request)
-    if AUTH_ENABLED and not user: return RedirectResponse("/login")
-    if not (fitness_allowlisted(user) or is_admin(user)): return RedirectResponse("/terminal")
-    if selected_terminal(request)=="video" and is_admin(user): return RedirectResponse("/video")
-    if selected_terminal(request)=="fitness": return RedirectResponse("/fitness")
-    if selected_terminal(request)=="trading": return RedirectResponse("/terminal")
-    if not TERMINAL_SELECTOR_HTML_PATH.exists(): return RedirectResponse("/terminal")
+    if AUTH_ENABLED and not user: return RedirectResponse("/login", status_code=302)
+    if not (fitness_allowlisted(user) or is_admin(user)): return RedirectResponse("/terminal", status_code=302)
+    if selected_terminal(request)=="video" and is_admin(user): return RedirectResponse("/video", status_code=302)
+    if selected_terminal(request)=="fitness": return RedirectResponse("/fitness", status_code=302)
+    if selected_terminal(request)=="trading": return RedirectResponse("/terminal", status_code=302)
+    if not TERMINAL_SELECTOR_HTML_PATH.exists(): return RedirectResponse("/terminal", status_code=302)
     return HTMLResponse(TERMINAL_SELECTOR_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
 
 @app.post("/api/auth/select-terminal")
@@ -7250,8 +7249,8 @@ async def auth_select_terminal(request: Request, user: dict[str, Any] = Depends(
 @app.get("/fitness", response_class=HTMLResponse)
 async def fitness_page(request: Request) -> Response:
     user=current_user(request)
-    if AUTH_ENABLED and not user: return RedirectResponse("/login")
-    if not fitness_allowlisted(user): return RedirectResponse("/terminal")
+    if AUTH_ENABLED and not user: return RedirectResponse("/login", status_code=302)
+    if not fitness_allowlisted(user): return RedirectResponse("/terminal", status_code=302)
     if not FITNESS_HTML_PATH.exists(): return error_json("FITNESS_UI_NOT_FOUND", "fitness.html is missing", 500)
     request.session["selected_terminal"]="fitness"
     return HTMLResponse(FITNESS_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
@@ -7259,8 +7258,8 @@ async def fitness_page(request: Request) -> Response:
 @app.get("/video", response_class=HTMLResponse)
 async def video_terminal_page(request: Request) -> Response:
     user=current_user(request)
-    if AUTH_ENABLED and not user: return RedirectResponse("/login")
-    if not is_admin(user): return RedirectResponse("/terminal")
+    if AUTH_ENABLED and not user: return RedirectResponse("/login", status_code=302)
+    if not is_admin(user): return RedirectResponse("/terminal", status_code=302)
     if not VIDEO_TERMINAL_HTML_PATH.exists(): return error_json("VIDEO_UI_NOT_FOUND", "video_terminal.html is missing", 500)
     request.session["selected_terminal"]="video"
     return HTMLResponse(VIDEO_TERMINAL_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
@@ -7276,11 +7275,11 @@ async def guide_page(request: Request) -> Response:
 async def terminal_page(request: Request) -> Response:
     user=current_user(request)
     if AUTH_ENABLED and not user:
-        return RedirectResponse("/login")
+        return RedirectResponse("/login", status_code=302)
     if is_admin(user) and selected_terminal(request)=="video":
-        return RedirectResponse("/video")
+        return RedirectResponse("/video", status_code=302)
     if fitness_allowlisted(user) and selected_terminal(request)=="fitness":
-        return RedirectResponse("/fitness")
+        return RedirectResponse("/fitness", status_code=302)
     if not HTML_PATH.exists():
         return error_json("UI_NOT_FOUND", f"HTML file not found: {HTML_PATH}", 500)
     html = HTML_PATH.read_text(encoding="utf-8")
