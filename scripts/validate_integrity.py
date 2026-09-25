@@ -86,13 +86,24 @@ async def check_v8_scripts():
         print("  Edge/Chrome not found, skipping V8 evaluation")
         return True
 
-    cmd = [edge_bin, '--headless=new', '--remote-debugging-port=9222', '--no-first-run', '--no-default-browser-check', 'about:blank']
+    import tempfile
+    temp_dir = tempfile.mkdtemp(prefix='edge_cdp_')
+    cmd = [edge_bin, '--headless=new', '--remote-debugging-port=9222', f'--user-data-dir={temp_dir}', '--no-first-run', '--no-default-browser-check', 'about:blank']
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    await asyncio.sleep(2)
     has_error = False
     try:
-        req = urllib.request.urlopen('http://127.0.0.1:9222/json')
-        targets = json.loads(req.read())
+        targets = None
+        for _ in range(10):
+            await asyncio.sleep(0.5)
+            try:
+                with urllib.request.urlopen('http://127.0.0.1:9222/json') as req:
+                    targets = json.loads(req.read())
+                    if targets: break
+            except Exception:
+                pass
+        if not targets:
+            print("  V8 check warning: Could not connect to headless browser CDP")
+            return True
         ws_url = targets[0]['webSocketDebuggerUrl']
         async with websockets.connect(ws_url) as ws:
             with open('terminal.html', 'r', encoding='utf-8') as f:

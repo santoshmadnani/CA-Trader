@@ -9088,12 +9088,12 @@ async def analysis_chart_mtf(instrument: str, timeframe: str = "5m", user: dict[
     if cached is not None: return cached
     try:
         d=30 if timeframe in {"1m","3m","5m","15m"} else 90 if timeframe in {"30m","60m"} else 365
-        candles=analysis_candles_robust(instrument,timeframe,d)
+        candles=await asyncio.to_thread(analysis_candles_robust, instrument, timeframe, d)
         if not candles:
             raise ProviderUnavailable("No historical candles returned for selected timeframe")
         items=await _analysis_mtf_items(instrument,timeframe,candles)
         out={"instrument":instrument,"timeframe":timeframe,"items":items,"provider":"upstox","timestamp":now_iso()}
-        CACHE.set(cache_key,out,20.0)
+        CACHE.set(cache_key,out,120.0)
         return out
     except Exception as exc:
         return error_json("CHART_MTF_UNAVAILABLE",safe_text(exc),503)
@@ -9114,7 +9114,7 @@ async def analysis_chart_bundle(instrument: str, timeframe: str = "5m", include_
         unit="days" if timeframe=="1D" else "hours" if timeframe=="60m" else "minutes"
         interval="1" if timeframe in {"1D","60m"} else timeframe[:-1]
         days=30 if timeframe in {"1m","3m","5m","15m"} else 90 if timeframe in {"30m","60m"} else 365
-        candles=analysis_candles_robust(instrument,timeframe,days)
+        candles=await asyncio.to_thread(analysis_candles_robust, instrument, timeframe, days)
         if not candles:
             raise ProviderUnavailable("No historical candles returned for this timeframe")
         tech=technical_analysis(candles)
@@ -9144,7 +9144,6 @@ async def analysis_chart_bundle(instrument: str, timeframe: str = "5m", include_
                 "structure":{"instrument":instrument,"timeframe":timeframe,"candles_used":len(window),"trend":wta.get("trend"),"trend_strength":wta.get("trend_strength"),"structure":structure,"pattern_signals":detect_candlestick_patterns(window,timeframe)[-5:],"last_candle_change_pct":round(move,3),"expected_outcome":outcome,"technical":wta},
                 "chart_patterns":{"instrument":instrument,"timeframe":timeframe,"patterns":cpats,"provider":"upstox"},
                 "timestamp":now_iso()}
-        CACHE.set(cache_key,result,20.0)
         CACHE.set(cache_key,result,60.0)
         return result
     except Exception as exc:
@@ -9156,7 +9155,7 @@ async def analysis_chart_patterns(instrument: str, timeframe: str = "5m", user: 
         unit="days" if timeframe=="1D" else "hours" if timeframe=="60m" else "minutes"
         interval="1" if timeframe in {"1D","60m"} else timeframe[:-1]
         days=60 if timeframe in {"1D","60m"} else 20
-        candles=analysis_candles_robust(instrument,timeframe,days)
+        candles=await asyncio.to_thread(analysis_candles_robust, instrument, timeframe, days)
         return {"instrument":instrument,"timeframe":timeframe,"patterns":detect_chart_patterns(candles),"definitions":{
             "Double Top":"Two similar highs; bearish confirmation on neckline break.",
             "Double Bottom":"Two similar lows; bullish confirmation on neckline break.",
@@ -9300,7 +9299,7 @@ async def analysis_overall(
             log.warning("Failed to auto-save recommendation: %s", exc)
 
     result = {"instrument": instrument, "timeframe": timeframe, **rec, "ai": {"available": False, "requested": False, "decision": "NOT REQUESTED", "reason": "CA AI opinion is manual. Click Ask CA AI to request it."}, "timestamp": now_iso()}
-    CACHE.set(cache_key, result, 15.0)
+    CACHE.set(cache_key, result, 60.0)
     return result
 
 # ---------------------------------------------------------------------------
@@ -10323,6 +10322,7 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
 
     # 3. Filter strictly to user's watchlist symbols, BUT always include on-demand recommendations!
     filtered = []
+    pending_db_updates = []
     for r in rows:
         sym = str(r.get("symbol") or "").upper().strip()
         underlying = str(r.get("underlying") or "").upper().strip()
@@ -10330,19 +10330,12 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
         is_on_demand = str(r.get("source") or "") == "on-demand"
         is_in_watchlist = bool(sym in allowed_symbols or base_sym in allowed_symbols or underlying in allowed_symbols or any(w in sym for w in allowed_symbols))
         if (is_on_demand or is_in_watchlist) and str(r.get("recommendation") or "").upper() in {"BUY", "SELL"}:
-            # Check and compute P&L if null or 0
-            if r.get("final_pnl") is None or float(r.get("final_pnl") or 0) == 0.0:
-                pnl_val, outcome_val, success_val = _calc_reco_pnl(r)
-            # Evaluate outcome and P&L accurately
             pnl_val, outcome_val, success_val = _calc_reco_pnl(r)
             if r.get("outcome") is None or r.get("outcome") in ("SCRAPPED", "PENDING"):
                 r["final_pnl"] = pnl_val
                 r["outcome"] = outcome_val
                 r["success"] = success_val
-                try:
-                    db_exec("UPDATE recommendations SET final_pnl=?, outcome=?, success=? WHERE id=? AND user_id=?", [pnl_val, outcome_val, success_val, r["id"], user["id"]])
-                except Exception:
-                    pass
+                pending_db_updates.append((pnl_val, outcome_val, success_val, r["id"], user["id"]))
             else:
                 r["final_pnl"] = r.get("final_pnl") if r.get("final_pnl") is not None else pnl_val
                 r["outcome"] = r.get("outcome") or outcome_val
@@ -10368,6 +10361,18 @@ async def recommendation_history(request: Request, user: dict[str, Any] = Depend
             has_entry = r.get("entry") is not None and float(r.get("entry") or 0) > 0
             if (is_opt or is_on_demand) and has_entry:
                 filtered.append(r)
+
+    if pending_db_updates:
+        def _flush_reco_updates(updates):
+            try:
+                for up in updates:
+                    db_exec("UPDATE recommendations SET final_pnl=?, outcome=?, success=? WHERE id=? AND user_id=?", list(up))
+            except Exception:
+                pass
+        try:
+            asyncio.create_task(asyncio.to_thread(_flush_reco_updates, pending_db_updates))
+        except Exception:
+            pass
 
     # 4. Aggregates
     totals = {"auto": 0, "on-demand": 0, "combined": 0, "auto_wins": 0, "on_demand_wins": 0, "wins": 0, "pnl": 0.0}

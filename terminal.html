@@ -172,7 +172,9 @@
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <style>
 :root{
   --primary:#1890ff;
@@ -8572,8 +8574,14 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   async function loadChartBundle(force=false){
     if(!S)return null;
     const key=`bundle:${S}|${state.tf}`;
-    const cached=analysisCache.get(key), now=Date.now();
-    if(!force&&cached&&now-cached.ts<20000)return cached.data;
+    let cached=analysisCache.get(key), now=Date.now();
+    if(!cached){
+      try {
+        const stored=sessionStorage.getItem('ca_bundle_'+key);
+        if(stored){ cached=JSON.parse(stored); analysisCache.set(key, cached); }
+      } catch(_){}
+    }
+    if(!force&&cached&&(now-cached.ts<45000))return cached.data;
     if(analysisInflight.has(key))return analysisInflight.get(key);
     const status=$('signalUpdated');
     if(status)status.textContent='Loading technical & pattern analysis…';
@@ -8589,8 +8597,9 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
 
     const promise=(async()=>{
       try{
-        const d=await A('/api/analysis/chart-bundle/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&include_mtf=false`,{timeoutMs:15000});
+        const d=await A('/api/analysis/chart-bundle/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&include_mtf=false`,{timeoutMs:12000});
         analysisCache.set(key,{ts:Date.now(),data:d}); window.__CA_CHART_BUNDLE={key:S+'|'+state.tf,ts:Date.now(),data:d};
+        try{sessionStorage.setItem('ca_bundle_'+key,JSON.stringify({ts:Date.now(),data:d}));}catch(_){}
         APP_CACHE.technical=d.technical||null;APP_CACHE.mtf=d.mtf||null;
         const rows=d.technical?.technical?.indicators||[];renderIndicators(rows);
         const items=d.mtf?.items||[];
@@ -8687,25 +8696,38 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   }
 
   async function loadChart(){if(!S) S = window.CATraderSymbol || 'NIFTY';const seq=++chartRequestSeq;const key=`${S}|${state.tf}|${state.history}`;let q=null;
-    const cached=candleCache.get(key);
+    let cached=candleCache.get(key);
+    if(!cached){
+      try {
+        const stored=sessionStorage.getItem('ca_candles_'+key);
+        if(stored){ cached=JSON.parse(stored); candleCache.set(key, cached); }
+      } catch(_){}
+    }
     const cacheAge = cached?.fetchedAt ? Date.now()-cached.fetchedAt : Infinity;
-    if(cached?.candles?.length && cacheAge < 15000){state.candles=cached.candles.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Refreshing · ${formatTime(cached.timestamp)}`;}
-    else {draw();document.getElementById('signalUpdated').textContent='Loading latest candles…';}
+    if(cached?.candles?.length){
+      state.candles=cached.candles.map(c=>({...c}));
+      state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));
+      draw();
+      document.getElementById('signalUpdated').textContent=cacheAge<15000?`Live · ${formatTime(cached.timestamp)}`:`Cached · ${formatTime(cached.timestamp)} · Updating…`;
+    } else {
+      draw();
+      document.getElementById('signalUpdated').textContent='Loading latest candles…';
+    }
     const quotePromise=loadHeaderQuote().catch(()=>null);
-    const candleUrl='/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`;
-    const candlePromise=A(candleUrl,{timeoutMs:15000,cache:'no-store'}).catch(e=>({__error:e}));
+    const candleUrl='/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}`;
+    const candlePromise=A(candleUrl,{timeoutMs:10000}).catch(e=>({__error:e}));
     const subPromise=(window.__CA_MARKET_STREAM_ENABLED!==false?subscribeInstrument(S):Promise.resolve(null)).catch(()=>null);
     let [quoteRes,candleRes]=await Promise.all([quotePromise,candlePromise]);
     if(candleRes?.__error || !Array.isArray(candleRes?.candles) || !candleRes.candles.length){
       try {
-        const btFallback = await A('/api/backtest/candles/' + encodeURIComponent(S) + `?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`, {timeoutMs:8000, cache:'no-store'});
+        const btFallback = await A('/api/backtest/candles/' + encodeURIComponent(S) + `?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}`, {timeoutMs:6000});
         if(btFallback && Array.isArray(btFallback.candles) && btFallback.candles.length){
           candleRes = btFallback;
         }
       } catch(_){}
     }
     if(candleRes?.__error){const msg=String(candleRes.__error.message||'Market data unavailable');document.getElementById('signalUpdated').textContent=cached?.candles?.length?`Live refresh failed · showing cached data · ${msg}`:`Retrying candle data… ${msg}`;}
-    const candles=Array.isArray(candleRes?.candles)?candleRes.candles:[];const stale=!!candleRes?.stale;const expected=candleRes?.latest_session_ist||'';if(candles.length){state.candles=candles.map(c=>({...c}));candleCache.set(key,{candles:state.candles.map(c=>({...c})),timestamp:candleRes.timestamp||new Date().toISOString(),fetchedAt:Date.now(),latestSession:candleRes.latest_candle_ist||expected});state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));state.panY=0;draw();document.getElementById('signalUpdated').textContent=stale?`EOD · ${candleRes.latest_candle_ist||expected} IST`:`Updated · ${candleRes.latest_candle_ist||expected} IST`;}else if(!state.candles.length){draw();document.getElementById('signalUpdated').textContent='Retrying latest candle data…';setTimeout(async()=>{if(seq!==chartRequestSeq||!S)return;try{const retry=await A('/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}&_=${Date.now()}`,{timeoutMs:15000,cache:'no-store'});const rc=Array.isArray(retry?.candles)?retry.candles:[];if(rc.length){state.candles=rc.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Updated · ${retry.latest_candle_ist||formatTime(Date.now())} IST`;if(retry.live_quote?.ltp!=null){state.latestLive=Number(retry.live_quote.ltp);updateLiveCandle(Number(retry.live_quote.ltp),retry.live_quote.timestamp||Date.now())}}else document.getElementById('signalUpdated').textContent='No candle data returned by Upstox.'}catch(e){document.getElementById('signalUpdated').textContent='Market candle data unavailable.'}},700);}
+    const candles=Array.isArray(candleRes?.candles)?candleRes.candles:[];const stale=!!candleRes?.stale;const expected=candleRes?.latest_session_ist||'';if(candles.length){state.candles=candles.map(c=>({...c}));const toCache={candles:state.candles.map(c=>({...c})),timestamp:candleRes.timestamp||new Date().toISOString(),fetchedAt:Date.now(),latestSession:candleRes.latest_candle_ist||expected};candleCache.set(key,toCache);try{sessionStorage.setItem('ca_candles_'+key,JSON.stringify(toCache));}catch(_){}state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));state.panY=0;draw();document.getElementById('signalUpdated').textContent=stale?`EOD · ${candleRes.latest_candle_ist||expected} IST`:`Updated · ${candleRes.latest_candle_ist||expected} IST`;}else if(!state.candles.length){draw();document.getElementById('signalUpdated').textContent='Retrying latest candle data…';setTimeout(async()=>{if(seq!==chartRequestSeq||!S)return;try{const retry=await A('/api/market/candles/'+encodeURIComponent(S)+`?timeframe=${encodeURIComponent(state.tf)}&days=${state.history}`,{timeoutMs:10000});const rc=Array.isArray(retry?.candles)?retry.candles:[];if(rc.length){state.candles=rc.map(c=>({...c}));state.panX=Math.max(0,state.candles.length-Math.floor(state.visible/state.zoom));draw();document.getElementById('signalUpdated').textContent=`Updated · ${retry.latest_candle_ist||formatTime(Date.now())} IST`;if(retry.live_quote?.ltp!=null){state.latestLive=Number(retry.live_quote.ltp);updateLiveCandle(Number(retry.live_quote.ltp),retry.live_quote.timestamp||Date.now())}}else document.getElementById('signalUpdated').textContent='No candle data returned by Upstox.'}catch(e){document.getElementById('signalUpdated').textContent='Market candle data unavailable.'}},700);}
     if(candleRes?.live_quote?.ltp!=null){
       state.latestLive=Number(candleRes.live_quote.ltp); state.priceState=candleRes.live?'LIVE':'EOD'; updateHeader(candleRes.live_quote);
       if(candleRes.live) updateLiveCandle(Number(candleRes.live_quote.ltp),candleRes.live_quote.timestamp||Date.now()); else { const st=document.getElementById('signalUpdated'); if(st) st.textContent=`EOD · ${candleRes.latest_candle_ist||formatTime(candleRes.live_quote.timestamp||Date.now())} IST`; draw(); }
@@ -11186,7 +11208,6 @@ function applyDrawingPoint(x,y){
     // C9/C10 Release 37: Update card instrument labels and master summary bar when symbol changes
     if(typeof window.__caUpdateChartInstrumentLabels === 'function') window.__caUpdateChartInstrumentLabels(sym);
     if(typeof window.updateMasterSummary === 'function') window.updateMasterSummary(window.__caCurrentChartReco || window.__caRecommendation, sym);
-    if(typeof window.prefetchAllSections === 'function') void window.prefetchAllSections(true);
   }
   async function prefetchSelectedData(){
     const tab=document.querySelector('.navtab.active')?.dataset.tab;
@@ -19008,39 +19029,18 @@ document.querySelectorAll('.navtab').forEach(t=>t.addEventListener('click',(e)=>
   async function prefetchAllSections(force=false){
     try {
       const sym = typeof selectedSymbol === 'function' ? selectedSymbol() : (window.selectedSymbol ? window.selectedSymbol() : 'NIFTY');
-      await Promise.allSettled([
-        (window.loadOtherFactorsSuite || (typeof loadOtherFactorsSuite === 'function' ? loadOtherFactorsSuite : null))?.(force),
-        (window.loadNewsByCaAi || window.loadNews || (typeof loadNews === 'function' ? loadNews : null))?.('all'),
-        (window.loadOptions || (typeof loadOptions === 'function' ? loadOptions : null))?.(),
-        (window.loadRecommendations || (typeof loadRecommendations === 'function' ? loadRecommendations : null))?.(force),
-        (window.loadRecommendationHistory || (typeof loadRecommendationHistory === 'function' ? loadRecommendationHistory : null))?.(),
-        (window.loadFundamentals || (typeof loadFundamentals === 'function' ? loadFundamentals : null))?.(),
-        (window.loadMovers || (typeof loadMovers === 'function' ? loadMovers : null))?.('gainers'),
-        (window.CATraderAnalysis?.loadChartBundle || (typeof loadChartBundle === 'function' ? loadChartBundle : null))?.(force)
-      ]);
       const rec = window.__caCurrentChartReco || window.__caRecommendation;
       if(typeof updateMasterSummary === 'function') updateMasterSummary(rec, sym);
       if(typeof updateChartInstrumentLabels === 'function') updateChartInstrumentLabels(sym);
-    } catch(e) { console.debug('[CA prefetchAllSections error]', e); }
+    } catch(e) {}
   }
   window.prefetchAllSections = prefetchAllSections;
 
   setTimeout(()=>{
     try { if(typeof ensureChartLayout === 'function') ensureChartLayout(); else (window.CATraderAnalysis?.ensureChartLayout || window.ensureChartLayout)?.(); } catch(_){}
-    const tab=document.querySelector('.navtab.active')?.dataset.tab;
+    const tab=document.querySelector('.navtab.active')?.dataset.tab || 'dashboard';
     if(tab) loadTabData(tab);
-    const sym = typeof selectedSymbol === 'function' ? selectedSymbol() : (window.selectedSymbol ? window.selectedSymbol() : window.state?.symbol);
-    if(sym){ (window.CATraderAnalysis?.loadChart || window.loadChart || (typeof loadChart === 'function' ? loadChart : null))?.()?.catch?.(()=>{}); }
-    void prefetchAllSections(false);
-  }, 300);
-  setTimeout(()=>{
-    const sym = typeof selectedSymbol === 'function' ? selectedSymbol() : (window.selectedSymbol ? window.selectedSymbol() : window.state?.symbol);
-    if(sym){
-      try { if(typeof ensureChartLayout === 'function') ensureChartLayout(); else (window.CATraderAnalysis?.ensureChartLayout || window.ensureChartLayout)?.(); } catch(_){}
-      (window.CATraderAnalysis?.loadChart || window.loadChart || (typeof loadChart === 'function' ? loadChart : null))?.()?.catch?.(()=>{});
-    }
-    void prefetchAllSections(true);
-  }, 1800);
+  }, 200);
 })();
 </script>
 
@@ -20865,62 +20865,55 @@ setTimeout(() => {
     }
     if ($('dashCompany')) $('dashCompany').textContent = `${baseSym} · Live Institutional Quantitative Analysis`;
 
-    // Fetch Recommendation for symbol
+    // Fetch Recommendation for symbol (Instant cache first, background refresh)
     const curRecoMatches = window.__caCurrentChartReco && (
       String(window.__caCurrentChartReco.symbol || '').toUpperCase().includes(baseSym.toUpperCase()) ||
       String(window.__caCurrentChartReco.underlying || '').toUpperCase().includes(baseSym.toUpperCase()) ||
       baseSym.toUpperCase().includes(String(window.__caCurrentChartReco.symbol || '').toUpperCase())
     );
     let rec = curRecoMatches ? window.__caCurrentChartReco : {};
-    if (typeof window.renderDualRecoCards === 'function') {
-      try { window.renderDualRecoCards(rec); } catch(_) {}
+    if (!rec || !rec.recommendation) {
+      try {
+        const storedRec = sessionStorage.getItem('ca_reco_' + baseSym);
+        if (storedRec) rec = JSON.parse(storedRec);
+      } catch(_) {}
     }
-    try {
-      const rd = await fetchApi(`/api/recommendations/${encodeURIComponent(sym)}`, { timeoutMs: 12000 });
-      if (rd && (rd.recommendation || rd.action)) {
-        rec = rd;
-        window.__caCurrentChartReco = rd;
+
+    // Render immediately with cached/local calculation
+    const renderRecoViews = (r) => {
+      if (!r) return;
+      const b = String(r.recommendation || r.action || 'BUY').toUpperCase().includes('BUY');
+      if (typeof window.renderDualRecoCards === 'function') {
+        try { window.renderDualRecoCards(r); } catch(_) {}
       }
-    } catch(_) {}
+      if (typeof window.renderExcelMatrix === 'function') {
+        try { window.renderExcelMatrix(); } catch(_) {}
+      }
+      const ePrice = Number(r.entry || ltp);
+      const sPrice = Number(r.stop_loss || (b ? ePrice * 0.985 : ePrice * 1.015));
+      const tPrice = Number(r.target || 0);
+      if ($('dashEntryPriceDisplay')) $('dashEntryPriceDisplay').textContent = `₹${fmt(ePrice)}`;
+      if ($('dashEntryTriggerTag')) $('dashEntryTriggerTag').textContent = b ? 'BREAKOUT CONFIRMED' : 'BREAKDOWN CONFIRMED';
+      if ($('dashEntryRationaleText')) $('dashEntryRationaleText').textContent = r.technical_basis || `Decisive 20-EMA pivot continuation with institutional buyer queue dominance and stochastic crossover alignment.`;
+      if ($('dashSlPriceDisplay')) $('dashSlPriceDisplay').textContent = `₹${fmt(sPrice)}`;
+      if ($('dashSlRiskTag')) $('dashSlRiskTag').textContent = `1.5× ATR DYNAMIC SL`;
+      if ($('dashSlRationaleText')) $('dashSlRationaleText').textContent = `Structural swing support shelf anchored at 1.5× ATR. Hard stop triggered on decisive close below this pivot floor.`;
+      if ($('dashTargetPriceDisplay')) $('dashTargetPriceDisplay').textContent = tPrice > 0 ? `₹${fmt(tPrice)}` : 'Dynamic Trailing SL';
+      if ($('dashTargetModeTag')) $('dashTargetModeTag').textContent = tPrice > 0 ? 'R : R ≥ 1 : 2.0' : 'ACTIVE TRAILING SL';
+      if ($('dashTargetRationaleText')) $('dashTargetRationaleText').textContent = tPrice > 0 ? `Fibonacci 1.618 expansion pivot target satisfying institutional minimum ₹500 profit constraint.` : `Open-ended trend runner. Trailing SL advances dynamically along the 20-EMA curve.`;
+      updateDashboardConfluenceTable(b, ltp, baseSym);
+    };
 
-    const isBull = String(rec.recommendation || rec.action || 'BUY').toUpperCase().includes('BUY');
-    const targetSig = isBull ? 'BUY' : 'SELL';
+    renderRecoViews(rec);
 
-    // Update Dual CE & PE Recommendation Cards & Excel Worksheet
-    if (typeof window.renderDualRecoCards === 'function') {
-      window.renderDualRecoCards(rec);
-    }
-    if (typeof window.renderExcelMatrix === 'function') {
-      window.renderExcelMatrix();
-    }
-
-    // Populate the 3 Dedicated Rationale Cards (Item 5)
-    const entryPrice = Number(rec.entry || ltp);
-    const slPrice = Number(rec.stop_loss || (isBull ? entryPrice * 0.985 : entryPrice * 1.015));
-    const tgtPrice = Number(rec.target || 0);
-
-    if ($('dashEntryPriceDisplay')) $('dashEntryPriceDisplay').textContent = `₹${fmt(entryPrice)}`;
-    if ($('dashEntryTriggerTag')) $('dashEntryTriggerTag').textContent = isBull ? 'BREAKOUT CONFIRMED' : 'BREAKDOWN CONFIRMED';
-    if ($('dashEntryRationaleText')) {
-      $('dashEntryRationaleText').textContent = rec.technical_basis || `Decisive 20-EMA pivot continuation with institutional buyer queue dominance and stochastic crossover alignment.`;
-    }
-
-    if ($('dashSlPriceDisplay')) $('dashSlPriceDisplay').textContent = `₹${fmt(slPrice)}`;
-    if ($('dashSlRiskTag')) $('dashSlRiskTag').textContent = `1.5× ATR DYNAMIC SL`;
-    if ($('dashSlRationaleText')) {
-      $('dashSlRationaleText').textContent = `Structural swing support shelf anchored at 1.5× ATR. Hard stop triggered on decisive close below this pivot floor.`;
-    }
-
-    if ($('dashTargetPriceDisplay')) $('dashTargetPriceDisplay').textContent = tgtPrice > 0 ? `₹${fmt(tgtPrice)}` : 'Dynamic Trailing SL';
-    if ($('dashTargetModeTag')) $('dashTargetModeTag').textContent = tgtPrice > 0 ? 'R : R ≥ 1 : 2.0' : 'ACTIVE TRAILING SL';
-    if ($('dashTargetRationaleText')) {
-      $('dashTargetRationaleText').textContent = tgtPrice > 0
-        ? `Fibonacci 1.618 expansion pivot target satisfying institutional minimum ₹500 profit constraint. Trailing SL locks gains upon crossing 50% distance.`
-        : `Open-ended trend runner. Trailing SL advances dynamically along the 20-EMA curve with no ceiling target restriction.`;
-    }
-
-    // Populate Confluence Table
-    updateDashboardConfluenceTable(isBull, ltp, baseSym);
+    // Asynchronously fetch fresh recommendations in background without blocking initial paint
+    fetchApi(`/api/recommendations/${encodeURIComponent(sym)}`, { timeoutMs: 8000 }).then(rd => {
+      if (rd && (rd.recommendation || rd.action)) {
+        window.__caCurrentChartReco = rd;
+        try { sessionStorage.setItem('ca_reco_' + baseSym, JSON.stringify(rd)); } catch(_) {}
+        renderRecoViews(rd);
+      }
+    }).catch(() => {});
 
     // Update Auto-Reco strip badges
     updateAutoRecoDashboardStrip();
@@ -20931,15 +20924,13 @@ setTimeout(() => {
     // Greeks Cards values
     const step = baseSym.includes('BANK') ? 100 : 50;
     const atmStrike = Math.round(ltp / step) * step;
+    const isBull = String(rec.recommendation || rec.action || 'BUY').toUpperCase().includes('BUY');
     const activeOpt = window.__caPinnedOptionContract || `${baseSym} ${atmStrike} ${isBull ? 'CE' : 'PE'}`;
     if ($('chartGreeksContractBadge')) $('chartGreeksContractBadge').textContent = `Contract: ${activeOpt}`;
     if ($('cgDelta')) $('cgDelta').textContent = isBull ? '0.512' : '-0.488';
     if ($('cgGamma')) $('cgGamma').textContent = '0.0014';
     if ($('cgTheta')) $('cgTheta').textContent = '-14.200';
     if ($('cgVega')) $('cgVega').textContent = '16.500';
-
-    // Load Recommendation History
-    if (typeof loadRecommendationHistory === 'function') void loadRecommendationHistory();
   }
   window.loadDashboard = loadDashboard;
 
