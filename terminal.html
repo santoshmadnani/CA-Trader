@@ -8238,6 +8238,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     window.__CA_WL_QUOTES=window.__CA_WL_QUOTES||{};
     window.__CA_WS_LAST_TICK=Date.now();
     window.__CA_WS_TICKS[key]=Date.now();
+    const cached=window.__CA_WL_QUOTES[key]||{};
     if(normKey) window.__CA_WS_TICKS[normKey]=Date.now();
     const cached=window.__CA_WL_QUOTES[key]||(normKey ? window.__CA_WL_QUOTES[normKey] : null)||{};
     const sessionOpenRaw=d.session_open ?? d.open ?? cached.session_open ?? cached.open ?? null;
@@ -8249,23 +8250,27 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     if(normKey) window.__CA_WL_QUOTES[normKey]=q;
 
     document.querySelectorAll('.wl-item').forEach(row=>{
+      if(String(row.dataset.symbol||'').toUpperCase()!==key)return;
       const rowSym=normalizeSym(row.dataset.symbol);
       if(String(row.dataset.symbol||'').toUpperCase()!==key && rowSym!==normKey)return;
       const l=row.querySelector('.wl-ltp');if(l){const op=Number(l.dataset.prevLtp||l.textContent.replace(/[^0-9.-]/g,''));l.dataset.prevLtp=ltp;l.textContent=fmt(ltp);triggerPriceFlicker(l,ltp,op);}
       const c=row.querySelector('.wl-chg');if(c){c.textContent=net==null?'–':`${net>0?'+':''}${fmt(net)}${pct!=null?` (${pct>0?'+':''}${fmt(pct)}%)`:''}`;c.className='wl-chg '+(net>0?'up':net<0?'down':'')}
     });
     document.querySelectorAll('[data-pos-symbol]').forEach(row=>{
+      if(String(row.dataset.posSymbol||'').toUpperCase()!==key)return;
       const rowSym=normalizeSym(row.dataset.posSymbol);
       if(String(row.dataset.posSymbol||'').toUpperCase()!==key && rowSym!==normKey)return;
       const l=row.querySelector('.pos-ltp');if(l)l.textContent=fmt(ltp);
       const avg=Number(row.dataset.avg||0),qty=Number(row.dataset.qty||0),side=String(row.dataset.side||'BUY').toUpperCase();
       const pnl=(side==='BUY'?(ltp-avg):(avg-ltp))*qty;const pe=row.querySelector('.pos-pnl');if(pe){pe.textContent=fmtMoney(pnl);pe.className='pos-pnl '+(pnl>=0?'cell-up':'cell-down')}
     });
+    document.querySelectorAll('[data-order-symbol]').forEach(row=>{if(String(row.dataset.orderSymbol||'').toUpperCase()===key){const el=row.querySelector('.order-ltp');if(el)el.textContent=fmt(ltp)}});
     document.querySelectorAll('[data-order-symbol]').forEach(row=>{
       const rowSym=normalizeSym(row.dataset.orderSymbol);
       if(String(row.dataset.orderSymbol||'').toUpperCase()===key || rowSym===normKey){const el=row.querySelector('.order-ltp');if(el)el.textContent=fmt(ltp)}
     });
     document.querySelectorAll('[data-mover-symbol]').forEach(row=>{
+      if(String(row.dataset.moverSymbol||'').toUpperCase()!==key)return;const l=row.querySelector('.mover-ltp')||row.querySelector('td:nth-child(2)');if(l)l.textContent=fmt(ltp);
       const rowSym=normalizeSym(row.dataset.moverSymbol);
       if(String(row.dataset.moverSymbol||'').toUpperCase()!==key && rowSym!==normKey)return;
       const l=row.querySelector('.mover-ltp')||row.querySelector('td:nth-child(2)');if(l)l.textContent=fmt(ltp);
@@ -8273,11 +8278,14 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     });
     document.querySelectorAll('#dashboardOptionMini [data-option-key],[data-option-key]').forEach(row=>{if(d.instrument_key&&row.dataset.optionKey===d.instrument_key){const el=row.querySelector('.option-live-ltp')||row.querySelector('[data-option-ltp]');if(el)el.textContent=fmt(ltp);row.dataset.ltp=ltp;}});
     document.querySelectorAll('#optionChainTable [data-call-key],#optionChainTable [data-put-key]').forEach(row=>{if(d.instrument_key===row.dataset.callKey){const el=row.querySelector('.call-ltp');if(el)el.textContent=fmt(ltp)}if(d.instrument_key===row.dataset.putKey){const el=row.querySelector('.put-ltp');if(el)el.textContent=fmt(ltp)}});
+    if(key===String(S||'').toUpperCase()){
     
     const activeNorm=normalizeSym(S);
     const isCurrentSymbol=(key===String(S||'').toUpperCase()) || (normKey && normKey===activeNorm);
     if(isCurrentSymbol){
       APP_CACHE.quote=q;state.latestLive=ltp;state.priceState='LIVE';updateHeader(q);
+      if(state.candles?.length&&document.querySelector('.navtab.active')?.dataset.tab==='charts')updateLiveCandle(ltp,q.timestamp);
+      const de=document.getElementById('dashboardSelectedLtp');if(de){const op=Number(de.dataset.prevLtp||de.textContent.replace(/[^0-9.-]/g,''));de.dataset.prevLtp=ltp;de.textContent=fmt(ltp);triggerPriceFlicker(de,ltp,op);}const oe=document.getElementById('optionsLtp');if(oe){oe.textContent=fmt(ltp);triggerPriceFlicker(oe,ltp);}
       const isChartsActive = document.getElementById('panel-charts')?.classList.contains('active') ||
                              document.querySelector('.navtab.active')?.dataset.tab==='charts' ||
                              document.querySelector('.mobile-dock-item.active')?.dataset.tab==='charts' ||
@@ -8402,6 +8410,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           to_time: tTime,
           timestamp: tTime,
           confidence: conf,
+       
+... [truncated for diff preview]
           prediction: pred,
           signal: pred.includes('Bullish') ? 'BUY' : pred.includes('Bearish') ? 'SELL' : 'NEUTRAL'
         });

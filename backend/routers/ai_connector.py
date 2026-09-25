@@ -6,6 +6,7 @@ import py_compile
 from datetime import datetime, timezone, timedelta
 from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/mcp", tags=["AI & MCP Connector"])
@@ -42,6 +43,20 @@ class SqlQueryIn(BaseModel):
 @router.get("/openapi.json")
 async def get_mcp_openapi():
     """Returns a focused OpenAPI 3.0.1 specification tailored for ChatGPT Actions, Gemini, and MCP clients."""
+    return _build_openapi_spec()
+
+@router.get("/openapi.yaml", response_class=PlainTextResponse)
+async def get_mcp_openapi_yaml():
+    """Returns the OpenAPI 3.0.1 specification in YAML format for direct import into ChatGPT Actions."""
+    spec = _build_openapi_spec()
+    try:
+        import yaml
+        return yaml.dump(spec, sort_keys=False)
+    except Exception:
+        import json
+        return json.dumps(spec, indent=2)
+
+def _build_openapi_spec():
     return {
         "openapi": "3.0.1",
         "info": {
@@ -117,7 +132,7 @@ async def get_mcp_openapi():
             "/api/recommendations/{instrument}": {
                 "get": {
                     "summary": "Get Live AI Trade Recommendation for Symbol",
-                    "description": "Returns current live algorithmic trade setup with calculated Entry, Target, Stop Loss, Greeks, and confidence for any stock or index.",
+                    "description": "Returns current live algorithmic trade setup with calculated Entry, Target, Stop Loss, Greeks, and confidence for any stock or index (e.g. NIFTY, BANKNIFTY, RELIANCE, CRUDEOIL). Always use this when the user asks for current or latest trade setups for a specific symbol.",
                     "operationId": "getRecommendationForSymbol",
                     "parameters": [
                         {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. NIFTY, BANKNIFTY, RELIANCE)"},
@@ -239,6 +254,7 @@ async def get_mcp_openapi():
             }
         },
         "components": {
+            "schemas": {},
             "schemas": {
                 "MarketQuote": {
                     "type": "object",
@@ -616,3 +632,4 @@ async def mcp_sql(payload: SqlQueryIn, request: Request):
         return {"count": len(rows), "rows": rows}
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e)})
+
