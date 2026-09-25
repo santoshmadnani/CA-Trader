@@ -1641,9 +1641,6 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85) !important;
 }
 
-/* Item 24: Mobile Responsive CE/PE Cards Stacking & Tables Scroll */
-@media (max-width: 768px) {
-/* Item 24: Responsive CE/PE Cards Stacking & Grid Dimensions */
 /* Item 24: Responsive 3-Card Stacking & Grid Dimensions (Underlying + Best CE + Best PE) */
 /* Recommendation Cards: Desktop 3-Card Grid Layout */
 .dash-reco-grid,
@@ -1660,23 +1657,14 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
     grid-template-columns: 1fr !important;
   }
 }
-#dashCardCe, #dashCardPe {
-#dashCardUnderlying, #dashCardCe, #dashCardPe {
-#dashCardSpot, #dashCardUnderlying, #dashCardCe, #dashCardPe {
-
 #dashCardSpot,
 #dashCardUnderlying,
 #dashCardCe,
 #dashCardPe {
   min-width: 0 !important;
   box-sizing: border-box !important;
-  padding: 16px 18px !important;
   padding: 14px 16px !important;
 }
-#dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
-#dashCardUnderlying .metric-clickable-box, #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
-  padding: 8px 4px !important;
-#dashCardSpot .metric-clickable-box, #dashCardUnderlying .metric-clickable-box, #dashCardCe .metric-clickable-box, #dashCardPe .metric-clickable-box {
 
 #dashCardSpot .metric-clickable-box,
 #dashCardUnderlying .metric-clickable-box,
@@ -1687,10 +1675,6 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
-#dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
-#dashCardUnderlying .metric-clickable-box div:first-child, #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
-  font-size: 9.5px !important;
-#dashCardSpot .metric-clickable-box div:first-child, #dashCardUnderlying .metric-clickable-box div:first-child, #dashCardCe .metric-clickable-box div:first-child, #dashCardPe .metric-clickable-box div:first-child {
 
 #dashCardSpot .metric-clickable-box div:first-child,
 #dashCardUnderlying .metric-clickable-box div:first-child,
@@ -1698,16 +1682,11 @@ input, textarea, [contenteditable="true"], .notepad-content, .notepad-title, .no
 #dashCardPe .metric-clickable-box div:first-child {
   font-size: 8.5px !important;
   font-weight: 700 !important;
-  letter-spacing: 0.5px !important;
   letter-spacing: 0.3px !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
-#dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
-#dashCardUnderlying .metric-clickable-box div:last-child, #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
-  font-size: 13.5px !important;
-#dashCardSpot .metric-clickable-box div:last-child, #dashCardUnderlying .metric-clickable-box div:last-child, #dashCardCe .metric-clickable-box div:last-child, #dashCardPe .metric-clickable-box div:last-child {
 
 #dashCardSpot .metric-clickable-box div:last-child,
 #dashCardUnderlying .metric-clickable-box div:last-child,
@@ -1820,7 +1799,6 @@ select, .select-box select, .tool-input select, #noteEditorFolder, #chartRecoOpt
 }
 
 /* Item 23: Chart Mobile Forced Landscape Transformation */
-.chart-shell.chart-forced-landscape {
 /* Chart Video Player-like Full Screen & Landscape Overlay */
 .chart-shell:fullscreen,
 .chart-shell:-webkit-full-screen,
@@ -1830,23 +1808,17 @@ select, .select-box select, .tool-input select, #noteEditorFolder, #chartRecoOpt
   inset: 0 !important;
   top: 0 !important;
   left: 0 !important;
-  width: 100vh !important;
-  height: 100vw !important;
-  transform: rotate(90deg) translateY(-100%) !important;
-  transform-origin: top left !important;
   width: 100vw !important;
   height: 100vh !important;
   z-index: 999999 !important;
   background: var(--bg) !important;
-  padding: 10px !important;
   padding: 6px !important;
   box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
   transform: none !important;
 }
-.chart-shell.chart-forced-landscape .chart-area-pro {
-  height: calc(100vw - 110px) !important;
+
 .chart-shell:fullscreen .chart-area-pro,
 .chart-shell:-webkit-full-screen .chart-area-pro,
 .chart-shell.chart-forced-landscape .chart-area-pro,
@@ -2280,8 +2252,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.b
 @keyframes softPulse{0%,100%{box-shadow:0 0 0 0 rgba(38,217,166,.45);}70%{box-shadow:0 0 0 7px rgba(38,217,166,0);}}
 @keyframes glowPulse{0%,100%{filter:drop-shadow(0 0 0px rgba(38,217,166,0));}50%{filter:drop-shadow(0 0 6px rgba(38,217,166,.55));}}
 @keyframes shimmerMove{0%{background-position:-300px 0;}100%{background-position:300px 0;}}
-@keyframes tickFlashUp{0%{background:rgba(38,217,166,.55);color:#26D9A6;text-shadow:0 0 8px rgba(38,217,166,.6);}40%{background:rgba(38,217,166,.25);}100%{background:transparent;}}100%{background:transparent;}}
-@keyframes tickFlashDown{0%{background:rgba(255,92,114,.55);color:#FF5C72;text-shadow:0 0 8px rgba(255,92,114,.6);}40%{background:rgba(255,92,114,.25);}100%{background:transparent;}}100%{background:transparent;}}
+@keyframes tickFlashUp{0%{background:rgba(38,217,166,.55);color:#26D9A6;text-shadow:0 0 8px rgba(38,217,166,.6);}40%{background:rgba(38,217,166,.25);}100%{background:transparent;}}
+@keyframes tickFlashDown{0%{background:rgba(255,92,114,.55);color:#FF5C72;text-shadow:0 0 8px rgba(255,92,114,.6);}40%{background:rgba(255,92,114,.25);}100%{background:transparent;}}
 @keyframes toastPop{0%{opacity:0;transform:translateY(-10px) scale(.96);}60%{opacity:1;transform:translateY(2px) scale(1.01);}100%{opacity:1;transform:translateY(0) scale(1);}}
 @keyframes spinSmooth{to{transform:rotate(360deg);}}
 
@@ -7056,7 +7028,19 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   });
   function openToolModal(name,kind,defaults){return new Promise(resolve=>{const m=document.getElementById('toolModal'),field=document.getElementById('toolParameterField'),label=document.getElementById('toolParameterLabel'),input=document.getElementById('toolParams'),color=document.getElementById('toolColor'); const originalParent=m.parentElement; if(document.fullscreenElement&&document.fullscreenElement.id==='chartShell') document.fullscreenElement.appendChild(m);document.getElementById('toolModalTitle').textContent=`Configure ${name}`;field.style.display=kind==='indicator'?'block':'none';document.getElementById('toolColorField').style.display='block';label.textContent='Simple parameter';input.placeholder=kind==='indicator'?'e.g. 20 or 12,26,9':'';input.value=defaults||'';color.value='#E8B84B';m.classList.add('open');m.setAttribute('aria-hidden','false');const done=v=>{closeModal('toolModal'); if(originalParent&&!originalParent.contains(m)) originalParent.appendChild(m); ['toolModalSave','toolModalCancel','toolModalClose'].forEach(id=>document.getElementById(id).onclick=null);resolve(v)};document.getElementById('toolModalSave').onclick=()=>done({params:input.value.trim(),color:color.value});document.getElementById('toolModalCancel').onclick=()=>done(null);document.getElementById('toolModalClose').onclick=()=>done(null)})}
 
-  function resizeCanvas(){const c=document.getElementById('upstoxCandles'),v=document.getElementById('chartViewport');if(!c||!v)return;const d=devicePixelRatio||1;c.width=Math.max(1,v.clientWidth)*d;c.height=Math.max(1,v.clientHeight)*d;c.style.width=v.clientWidth+'px';c.style.height=v.clientHeight+'px'}
+  function resizeCanvas(){
+    const c = document.getElementById('upstoxCandles'), v = document.getElementById('chartViewport');
+    if(!c || !v) return;
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    const tw = Math.max(1, Math.floor(v.clientWidth * d));
+    const th = Math.max(1, Math.floor(v.clientHeight * d));
+    if(c.width !== tw) c.width = tw;
+    if(c.height !== th) c.height = th;
+    const sw = v.clientWidth + 'px';
+    const sh = v.clientHeight + 'px';
+    if(c.style.width !== sw) c.style.width = sw;
+    if(c.style.height !== sh) c.style.height = sh;
+  }
   let __chartLayoutRetry = 0;
   function ensureChartLayout(reset = false){
     if(reset) __chartLayoutRetry = 0;
@@ -7067,18 +7051,28 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       resizeCanvas();
       return true;
     }
-    if(__chartLayoutRetry < 15){
+    if(__chartLayoutRetry < 10){
       __chartLayoutRetry++;
       setTimeout(()=>{
         if(ensureChartLayout(false)){
           if(window.state && window.state.candles && window.state.candles.length && typeof draw === 'function') draw();
         }
-      }, 100);
+      }, 150);
     }
     return false;
   }
   window.ensureChartLayout = ensureChartLayout;
-  if(window.ResizeObserver){const ro=new ResizeObserver(()=>{if(ensureChartLayout()&&state.candles.length)draw()});const v0=document.getElementById('chartViewport');if(v0)ro.observe(v0);}
+  if(window.ResizeObserver){
+    let __roTimer = null;
+    const ro = new ResizeObserver(()=>{
+      if(__roTimer) clearTimeout(__roTimer);
+      __roTimer = setTimeout(()=>{
+        if(ensureChartLayout() && state.candles?.length) draw();
+      }, 100);
+    });
+    const v0 = document.getElementById('chartViewport');
+    if(v0) ro.observe(v0);
+  }
 
   function candleIntervalMs(){if(state.tf==='1D')return 86400000;if(state.tf==='60m')return 3600000;return Number(state.tf.replace('m',''))*60000}
   function xTickLabel(ts){const d=new Date(ts);if(state.tf==='1D')return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit',timeZone:'Asia/Kolkata'});return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'})}
@@ -8207,15 +8201,14 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   
   window.triggerPriceFlicker = function(el, newPrice, oldPrice) {
     if (!el) return;
+    const isDown = oldPrice != null && Number.isFinite(Number(oldPrice)) && Number.isFinite(Number(newPrice))
+      ? Number(newPrice) < Number(oldPrice)
+      : true;
+    const cls = isDown ? 'flash-down' : 'flash-up';
     el.classList.remove('flash-down', 'flash-up');
-    void el.offsetWidth;
-    if (oldPrice != null && Number.isFinite(Number(oldPrice)) && Number.isFinite(Number(newPrice))) {
-      if (Number(newPrice) < Number(oldPrice)) el.classList.add('flash-down');
-      else if (Number(newPrice) > Number(oldPrice)) el.classList.add('flash-up');
-      else el.classList.add('flash-down');
-    } else {
-      el.classList.add('flash-down');
-    }
+    requestAnimationFrame(() => {
+      el.classList.add(cls);
+    });
   };
 
   function normalizeSym(str){
@@ -8238,7 +8231,6 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     window.__CA_WL_QUOTES=window.__CA_WL_QUOTES||{};
     window.__CA_WS_LAST_TICK=Date.now();
     window.__CA_WS_TICKS[key]=Date.now();
-    const cached=window.__CA_WL_QUOTES[key]||{};
     if(normKey) window.__CA_WS_TICKS[normKey]=Date.now();
     const cached=window.__CA_WL_QUOTES[key]||(normKey ? window.__CA_WL_QUOTES[normKey] : null)||{};
     const sessionOpenRaw=d.session_open ?? d.open ?? cached.session_open ?? cached.open ?? null;
@@ -8250,27 +8242,23 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     if(normKey) window.__CA_WL_QUOTES[normKey]=q;
 
     document.querySelectorAll('.wl-item').forEach(row=>{
-      if(String(row.dataset.symbol||'').toUpperCase()!==key)return;
       const rowSym=normalizeSym(row.dataset.symbol);
       if(String(row.dataset.symbol||'').toUpperCase()!==key && rowSym!==normKey)return;
       const l=row.querySelector('.wl-ltp');if(l){const op=Number(l.dataset.prevLtp||l.textContent.replace(/[^0-9.-]/g,''));l.dataset.prevLtp=ltp;l.textContent=fmt(ltp);triggerPriceFlicker(l,ltp,op);}
       const c=row.querySelector('.wl-chg');if(c){c.textContent=net==null?'–':`${net>0?'+':''}${fmt(net)}${pct!=null?` (${pct>0?'+':''}${fmt(pct)}%)`:''}`;c.className='wl-chg '+(net>0?'up':net<0?'down':'')}
     });
     document.querySelectorAll('[data-pos-symbol]').forEach(row=>{
-      if(String(row.dataset.posSymbol||'').toUpperCase()!==key)return;
       const rowSym=normalizeSym(row.dataset.posSymbol);
       if(String(row.dataset.posSymbol||'').toUpperCase()!==key && rowSym!==normKey)return;
       const l=row.querySelector('.pos-ltp');if(l)l.textContent=fmt(ltp);
       const avg=Number(row.dataset.avg||0),qty=Number(row.dataset.qty||0),side=String(row.dataset.side||'BUY').toUpperCase();
       const pnl=(side==='BUY'?(ltp-avg):(avg-ltp))*qty;const pe=row.querySelector('.pos-pnl');if(pe){pe.textContent=fmtMoney(pnl);pe.className='pos-pnl '+(pnl>=0?'cell-up':'cell-down')}
     });
-    document.querySelectorAll('[data-order-symbol]').forEach(row=>{if(String(row.dataset.orderSymbol||'').toUpperCase()===key){const el=row.querySelector('.order-ltp');if(el)el.textContent=fmt(ltp)}});
     document.querySelectorAll('[data-order-symbol]').forEach(row=>{
       const rowSym=normalizeSym(row.dataset.orderSymbol);
       if(String(row.dataset.orderSymbol||'').toUpperCase()===key || rowSym===normKey){const el=row.querySelector('.order-ltp');if(el)el.textContent=fmt(ltp)}
     });
     document.querySelectorAll('[data-mover-symbol]').forEach(row=>{
-      if(String(row.dataset.moverSymbol||'').toUpperCase()!==key)return;const l=row.querySelector('.mover-ltp')||row.querySelector('td:nth-child(2)');if(l)l.textContent=fmt(ltp);
       const rowSym=normalizeSym(row.dataset.moverSymbol);
       if(String(row.dataset.moverSymbol||'').toUpperCase()!==key && rowSym!==normKey)return;
       const l=row.querySelector('.mover-ltp')||row.querySelector('td:nth-child(2)');if(l)l.textContent=fmt(ltp);
@@ -8278,14 +8266,11 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     });
     document.querySelectorAll('#dashboardOptionMini [data-option-key],[data-option-key]').forEach(row=>{if(d.instrument_key&&row.dataset.optionKey===d.instrument_key){const el=row.querySelector('.option-live-ltp')||row.querySelector('[data-option-ltp]');if(el)el.textContent=fmt(ltp);row.dataset.ltp=ltp;}});
     document.querySelectorAll('#optionChainTable [data-call-key],#optionChainTable [data-put-key]').forEach(row=>{if(d.instrument_key===row.dataset.callKey){const el=row.querySelector('.call-ltp');if(el)el.textContent=fmt(ltp)}if(d.instrument_key===row.dataset.putKey){const el=row.querySelector('.put-ltp');if(el)el.textContent=fmt(ltp)}});
-    if(key===String(S||'').toUpperCase()){
     
     const activeNorm=normalizeSym(S);
     const isCurrentSymbol=(key===String(S||'').toUpperCase()) || (normKey && normKey===activeNorm);
     if(isCurrentSymbol){
       APP_CACHE.quote=q;state.latestLive=ltp;state.priceState='LIVE';updateHeader(q);
-      if(state.candles?.length&&document.querySelector('.navtab.active')?.dataset.tab==='charts')updateLiveCandle(ltp,q.timestamp);
-      const de=document.getElementById('dashboardSelectedLtp');if(de){const op=Number(de.dataset.prevLtp||de.textContent.replace(/[^0-9.-]/g,''));de.dataset.prevLtp=ltp;de.textContent=fmt(ltp);triggerPriceFlicker(de,ltp,op);}const oe=document.getElementById('optionsLtp');if(oe){oe.textContent=fmt(ltp);triggerPriceFlicker(oe,ltp);}
       const isChartsActive = document.getElementById('panel-charts')?.classList.contains('active') ||
                              document.querySelector('.navtab.active')?.dataset.tab==='charts' ||
                              document.querySelector('.mobile-dock-item.active')?.dataset.tab==='charts' ||

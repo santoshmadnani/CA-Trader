@@ -17,10 +17,13 @@
 - **Canonical Database**: `ca_trader.sqlite3` (SQLite3, WAL mode).
 - **Never Query Basis Blobs**: When querying the `recommendations` table, never execute `SELECT *`. The columns `option_basis`, `news_basis`, and `technical_basis` contain ~60KB of JSON per row (200MB+ in total). Always project explicit lightweight columns (`id`, `symbol`, `recommendation`, `entry`, `target`, `stop_loss`, `final_pnl`, `rationale`, `created_at`, `status`).
 
-## 2. Fast Static Tag & DOM Validation (0.1s)
-- After every edit to `terminal.html`, immediately run:
-  `python tools/check_terminal.py`
-- Confirms zero unclosed/extra `<div>` tags, verifies that all 14 panels remain direct descendants of `.main`, and ensures critical window exports exist.
+## 2. Fast Static Tag & Pre-Commit Integrity Gate (Mandatory /learn Check)
+- **Mandatory Pre-Commit & Pre-Deploy Gate**: Before ANY commit, push, or deployment, ALWAYS run:
+  `python scripts/validate_integrity.py`
+  - Validates Python compilation across `app.py` and `backend/routers/`
+  - Validates CSS brace balance across all `<style>` tags in `terminal.html` (prevents WebKit/Safari mobile crashes)
+  - Validates full JavaScript syntax across all `<script>` tags in `terminal.html` using the real V8 engine (catches duplicate declarations, unclosed blocks, and syntax errors that cause blank data and disabled buttons)
+  - **Zero Tolerance**: If any check fails, do NOT push to Git or deploy until fixed.
 
 ## 3. Automated Local Verification Suite (8s)
 - Run the server locally using `python run_server.py` (forces Windows `SelectorEventLoop` to avoid IOCP `[WinError 64]` disconnect crashes).
@@ -30,14 +33,16 @@
 - Maintain the dark mode palette (`#1890ff`, `#0b0e14`, `#151b26`).
 - Preserve the flex layout hierarchy (`.layout > .sidebar + .main`). Never displace panels outside `.main`.
 
-## 5. Automated Production Deployment Protocol (Oracle Cloud 24/7)
-- **Strict Prohibition**: Never transfer files directly from the Windows laptop via SCP, SFTP, or rsync to avoid corporate Sophos security popups.
-- **Automated Deployment Flow**:
-  1. Commit and push to Git: `git push origin CA-Trader-Bifurcated`.
-  2. Immediately execute: `python tools/deploy_to_oracle.py` (which connects to Oracle Cloud VM `80.225.236.5`, pulls the latest commit, and reloads `catrader.service` in ~5 seconds).
-  3. Verify `https://catrader.site/health` returns 200 OK with browser User-Agent.
-- **Mandatory Live Verification Rule**:
-  Whenever code changes are made to `terminal.html` or `app.py`, NEVER declare the task complete based on local files alone. Always execute the automated deployment and verify that the live production site (`https://catrader.site/terminal`) reflects the change with 0 unhandled console exceptions.
+## 5. Production Deployment Protocol & Corporate IT Safety
+- **STRICT CORPORATE IT DIRECTIVE (No Outbound SSH/SCP)**:
+  - Following the Sophos security alert on laptop `AMD-122024-0169`, **NEVER** run outbound SSH, SCP, SFTP, or remote PowerShell scripts (e.g. `python tools/deploy_to_oracle.py` or `ssh ubuntu@80.225.236.5`) from this Windows laptop.
+  - All deployments must follow the clean Git-mediated workflow:
+    1. Run `python scripts/validate_integrity.py` to ensure 100% test pass.
+    2. Commit and push cleanly: `git push origin CA-Trader-Bifurcated`.
+    3. Production updates are handled on the Oracle server side (auto-sync pull or triggered via server console/webhook), leaving zero EDR/Sophos footprint on the office laptop.
+- **Mandatory Production Verification**:
+  - Verify `https://catrader.site/health` returns 200 OK via HTTPS.
+  - Verify that the live site (`https://catrader.site/terminal`) reflects changes with 0 console syntax errors.
 
 ## 6. Post-Task Efficiency Audit & Self-Optimization Protocol
 Upon completing any user request or feature implementation:
