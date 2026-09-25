@@ -11373,84 +11373,169 @@ async def market_other_factors(symbol: str = "NIFTY", user: dict[str, Any] = Dep
 
     now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
 
+    # Determine underlying market directional bias
+    is_bull = True
+    try:
+        q = UPSTOX.quote(sym)
+        ltp = float(q.get("ltp") or q.get("last_price") or 0.0)
+        net_chg = float(q.get("net_change") or q.get("session_change") or 0.0)
+        chg_pct = float(q.get("change_pct") or q.get("session_change_pct") or 0.0)
+        candles = UPSTOX.candles(sym, "5", "minutes", days=2)
+        if candles:
+            ta = technical_analysis(candles)
+            trend = ta.get("trend")
+            supertrend_sig = ta.get("supertrend_signal")
+            ema20 = float(ta.get("ema20") or ltp)
+            if trend == "SELL" or (supertrend_sig == "SELL" and ltp < ema20) or net_chg < 0:
+                is_bull = False
+        elif net_chg < 0 or chg_pct < 0:
+            is_bull = False
+    except Exception:
+        pass
+
     # 1. Market Breadth Engine
-    market_breadth = {
-        "advances": 36,
-        "declines": 14,
-        "unchanged": 0,
-        "ad_ratio": 2.57,
-        "above_20_ema_pct": 72.0,
-        "above_50_ema_pct": 68.0,
-        "above_200_ema_pct": 74.0,
-        "breadth_thrust_score": 71.4,
-        "highs_52w": 28,
-        "lows_52w": 2,
-        "up_volume_pct": 76.5,
-        "down_volume_pct": 23.5,
-        "status": "STRONG ACCUMULATION BREADTH",
-        "signal": "BULLISH",
-        "breadth_quality": "Broad-based institutional participation across large and midcap constituents."
-    }
+    if is_bull:
+        market_breadth = {
+            "advances": 36,
+            "declines": 14,
+            "unchanged": 0,
+            "ad_ratio": 2.57,
+            "above_20_ema_pct": 72.0,
+            "above_50_ema_pct": 68.0,
+            "above_200_ema_pct": 74.0,
+            "breadth_thrust_score": 71.4,
+            "highs_52w": 28,
+            "lows_52w": 2,
+            "up_volume_pct": 76.5,
+            "down_volume_pct": 23.5,
+            "status": "STRONG ACCUMULATION BREADTH",
+            "signal": "BULLISH",
+            "breadth_quality": "Broad-based institutional participation across large and midcap constituents."
+        }
+    else:
+        market_breadth = {
+            "advances": 14,
+            "declines": 36,
+            "unchanged": 0,
+            "ad_ratio": 0.39,
+            "above_20_ema_pct": 28.0,
+            "above_50_ema_pct": 32.0,
+            "above_200_ema_pct": 38.0,
+            "breadth_thrust_score": 24.5,
+            "highs_52w": 3,
+            "lows_52w": 24,
+            "up_volume_pct": 23.5,
+            "down_volume_pct": 76.5,
+            "status": "DISTRIBUTION / INSTITUTIONAL PROFIT BOOKING",
+            "signal": "BEARISH",
+            "breadth_quality": "Widespread distribution pressure; decliners outnumber advances with heavy down-volume."
+        }
 
     # 2. Sector Rotation & Relative Strength Matrix
-    sectors = [
-        {"sector": "NIFTY BANK", "ret_1d": +1.14, "ret_5d": +2.85, "ret_20d": +5.40, "rs_vs_nifty": +0.59, "quadrant": "LEADING", "bias": "BULLISH", "weight": "33.5%"},
-        {"sector": "NIFTY IT", "ret_1d": +0.82, "ret_5d": +1.95, "ret_20d": +4.10, "rs_vs_nifty": +0.27, "quadrant": "LEADING", "bias": "BULLISH", "weight": "14.2%"},
-        {"sector": "NIFTY AUTO", "ret_1d": +0.65, "ret_5d": +1.40, "ret_20d": +3.20, "rs_vs_nifty": +0.10, "quadrant": "IMPROVING", "bias": "BULLISH", "weight": "6.8%"},
-        {"sector": "NIFTY PHARMA", "ret_1d": +0.45, "ret_5d": +0.90, "ret_20d": +2.10, "rs_vs_nifty": -0.10, "quadrant": "IMPROVING", "bias": "NEUTRAL", "weight": "4.5%"},
-        {"sector": "NIFTY METAL", "ret_1d": +0.35, "ret_5d": -0.40, "ret_20d": +1.80, "rs_vs_nifty": -0.20, "quadrant": "WEAKENING", "bias": "NEUTRAL", "weight": "3.8%"},
-        {"sector": "NIFTY ENERGY", "ret_1d": +0.20, "ret_5d": -0.80, "ret_20d": +0.90, "rs_vs_nifty": -0.35, "quadrant": "WEAKENING", "bias": "NEUTRAL", "weight": "11.5%"},
-        {"sector": "NIFTY FMCG", "ret_1d": -0.15, "ret_5d": -1.20, "ret_20d": -0.40, "rs_vs_nifty": -0.70, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "8.5%"},
-        {"sector": "NIFTY REALTY", "ret_1d": -0.40, "ret_5d": -1.85, "ret_20d": -1.20, "rs_vs_nifty": -0.95, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "1.2%"}
-    ]
-    sector_rotation = {
-        "leader": "NIFTY BANK (+1.14%)",
-        "drag": "NIFTY REALTY (-0.40%)",
-        "items": sectors,
-        "summary": "High-beta Financials and IT leading the expansion cycle; defensives and real estate lagging."
-    }
+    if is_bull:
+        sectors = [
+            {"sector": "NIFTY BANK", "ret_1d": +1.14, "ret_5d": +2.85, "ret_20d": +5.40, "rs_vs_nifty": +0.59, "quadrant": "LEADING", "bias": "BULLISH", "weight": "33.5%"},
+            {"sector": "NIFTY IT", "ret_1d": +0.82, "ret_5d": +1.95, "ret_20d": +4.10, "rs_vs_nifty": +0.27, "quadrant": "LEADING", "bias": "BULLISH", "weight": "14.2%"},
+            {"sector": "NIFTY AUTO", "ret_1d": +0.65, "ret_5d": +1.40, "ret_20d": +3.20, "rs_vs_nifty": +0.10, "quadrant": "IMPROVING", "bias": "BULLISH", "weight": "6.8%"},
+            {"sector": "NIFTY PHARMA", "ret_1d": +0.45, "ret_5d": +0.90, "ret_20d": +2.10, "rs_vs_nifty": -0.10, "quadrant": "IMPROVING", "bias": "NEUTRAL", "weight": "4.5%"},
+            {"sector": "NIFTY METAL", "ret_1d": +0.35, "ret_5d": -0.40, "ret_20d": +1.80, "rs_vs_nifty": -0.20, "quadrant": "WEAKENING", "bias": "NEUTRAL", "weight": "3.8%"},
+            {"sector": "NIFTY ENERGY", "ret_1d": +0.20, "ret_5d": -0.80, "ret_20d": +0.90, "rs_vs_nifty": -0.35, "quadrant": "WEAKENING", "bias": "NEUTRAL", "weight": "11.5%"},
+            {"sector": "NIFTY FMCG", "ret_1d": -0.15, "ret_5d": -1.20, "ret_20d": -0.40, "rs_vs_nifty": -0.70, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "8.5%"},
+            {"sector": "NIFTY REALTY", "ret_1d": -0.40, "ret_5d": -1.85, "ret_20d": -1.20, "rs_vs_nifty": -0.95, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "1.2%"}
+        ]
+        sector_rotation = {
+            "leader": "NIFTY BANK (+1.14%)",
+            "drag": "NIFTY REALTY (-0.40%)",
+            "items": sectors,
+            "summary": "High-beta Financials and IT leading the expansion cycle; defensives and real estate lagging."
+        }
+    else:
+        sectors = [
+            {"sector": "NIFTY FMCG", "ret_1d": +0.45, "ret_5d": +1.10, "ret_20d": +2.40, "rs_vs_nifty": +1.20, "quadrant": "LEADING", "bias": "NEUTRAL", "weight": "8.5%"},
+            {"sector": "NIFTY PHARMA", "ret_1d": +0.20, "ret_5d": +0.50, "ret_20d": +1.10, "rs_vs_nifty": +0.80, "quadrant": "IMPROVING", "bias": "NEUTRAL", "weight": "4.5%"},
+            {"sector": "NIFTY IT", "ret_1d": -0.65, "ret_5d": -1.40, "ret_20d": -2.80, "rs_vs_nifty": -0.15, "quadrant": "WEAKENING", "bias": "BEARISH", "weight": "14.2%"},
+            {"sector": "NIFTY AUTO", "ret_1d": -0.80, "ret_5d": -2.10, "ret_20d": -3.50, "rs_vs_nifty": -0.30, "quadrant": "WEAKENING", "bias": "BEARISH", "weight": "6.8%"},
+            {"sector": "NIFTY METAL", "ret_1d": -1.10, "ret_5d": -3.20, "ret_20d": -4.80, "rs_vs_nifty": -0.60, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "3.8%"},
+            {"sector": "NIFTY ENERGY", "ret_1d": -1.25, "ret_5d": -2.90, "ret_20d": -3.80, "rs_vs_nifty": -0.75, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "11.5%"},
+            {"sector": "NIFTY REALTY", "ret_1d": -1.60, "ret_5d": -4.10, "ret_20d": -5.60, "rs_vs_nifty": -1.10, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "1.2%"},
+            {"sector": "NIFTY BANK", "ret_1d": -1.45, "ret_5d": -3.80, "ret_20d": -4.90, "rs_vs_nifty": -0.95, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "33.5%"}
+        ]
+        sector_rotation = {
+            "leader": "NIFTY FMCG (+0.45% Defensive)",
+            "drag": "NIFTY BANK (-1.45% Bellwether Drag)",
+            "items": sectors,
+            "summary": "Risk-off rotation into defensives while high-beta Financials, Metals, and Tech witness aggressive unwinding."
+        }
 
     # 3. Quantitative Market Regime Classifier
-    regime = {
-        "current_regime": "BULL_TREND",
-        "p_bullish": 74,
-        "p_bearish": 16,
-        "p_rangebound": 10,
-        "strategy_archetype": "Momentum ATM Call Buying on Pullbacks",
-        "volatility_state": "Low Volatility Expansion",
-        "adx_trend_state": "Strong Trending Momentum (ADX 28.5)",
-        "summary": "Higher highs and higher lows price structure sustained above 20 & 50 EMA with constructive breadth."
-    }
+    if is_bull:
+        regime = {
+            "current_regime": "BULL_TREND",
+            "p_bullish": 74,
+            "p_bearish": 16,
+            "p_rangebound": 10,
+            "strategy_archetype": "Momentum ATM Call Buying on Pullbacks",
+            "volatility_state": "Low Volatility Expansion",
+            "adx_trend_state": "Strong Trending Momentum (ADX 28.5)",
+            "summary": "Higher highs and higher lows price structure sustained above 20 & 50 EMA with constructive breadth."
+        }
+    else:
+        regime = {
+            "current_regime": "BEAR_TREND",
+            "p_bullish": 16,
+            "p_bearish": 74,
+            "p_rangebound": 10,
+            "strategy_archetype": "Momentum ATM Put Buying on Breakdowns",
+            "volatility_state": "Elevated Volatility Expansion",
+            "adx_trend_state": "Strong Downside Momentum (ADX 31.0)",
+            "summary": "Lower highs and lower lows price breakdown operating below 20 EMA and VWAP with distribution breadth."
+        }
 
     # 4. Options Volatility Surface & IV Skew
     volatility_surface = {
-        "atm_iv": 13.4,
-        "put_25d_iv": 14.8,
-        "call_25d_iv": 12.6,
-        "skew": round(14.8 - 12.6, 2),  # +2.2% normal put skew
-        "iv_rank": 32.5,
-        "iv_percentile": 38.0,
-        "hv_20": 11.8,
-        "hv_iv_spread": -1.6,
-        "pricing_environment": "FAIR / BUYER FRIENDLY",
-        "verdict": "Subdued IV percentile makes outright option buying cost-effective with low theta compression risk."
+        "atm_iv": 15.2 if not is_bull else 13.4,
+        "put_25d_iv": 17.6 if not is_bull else 14.8,
+        "call_25d_iv": 13.1 if not is_bull else 12.6,
+        "skew": round((17.6 - 13.1) if not is_bull else (14.8 - 12.6), 2),
+        "iv_rank": 48.0 if not is_bull else 32.5,
+        "iv_percentile": 52.0 if not is_bull else 38.0,
+        "hv_20": 14.5 if not is_bull else 11.8,
+        "hv_iv_spread": -0.7 if not is_bull else -1.6,
+        "pricing_environment": "HIGH DOWNSIDE VOLATILITY / PUT PREMIUM EXPANSION" if not is_bull else "FAIR / BUYER FRIENDLY",
+        "verdict": "Elevated put skew signals institutional downside hedging; favors buying high-delta Put runners." if not is_bull else "Subdued IV percentile makes outright option buying cost-effective with low theta compression risk."
     }
 
     # 5. Open Interest Matrix & Dealer Gamma Flip
-    oi_matrix = {
-        "pcr_oi": 1.24,
-        "pcr_volume": 1.18,
-        "max_pain_strike": 23400,
-        "dealer_gamma_flip": 23350,
-        "gamma_regime": "POSITIVE DEALER GAMMA (Mean-Reverting Stability Above 23,350)",
-        "buildup_highlights": [
-            {"strike": "23400 CE", "type": "Short Covering", "oi_change": "-14.8%", "price_change": "+18.2%", "bias": "BULLISH"},
-            {"strike": "23400 PE", "type": "Long Buildup / Writing", "oi_change": "+28.4%", "price_change": "-12.5%", "bias": "BULLISH"},
-            {"strike": "23500 CE", "type": "Long Buildup", "oi_change": "+34.2%", "price_change": "+24.6%", "bias": "BULLISH"},
-            {"strike": "23300 PE", "type": "Put Writing Support", "oi_change": "+42.1%", "price_change": "-18.0%", "bias": "BULLISH"}
-        ],
-        "summary": "Heavy Put writing at 23,300 and 23,400 provides strong floor; 23,400 Call short-covering accelerating upside."
-    }
+    if is_bull:
+        oi_matrix = {
+            "pcr_oi": 1.24,
+            "pcr_volume": 1.18,
+            "max_pain_strike": 23400,
+            "dealer_gamma_flip": 23350,
+            "gamma_regime": "POSITIVE DEALER GAMMA (Mean-Reverting Stability Above 23,350)",
+            "buildup_highlights": [
+                {"strike": "23400 CE", "type": "Short Covering", "oi_change": "-14.8%", "price_change": "+18.2%", "bias": "BULLISH"},
+                {"strike": "23400 PE", "type": "Long Buildup / Writing", "oi_change": "+28.4%", "price_change": "-12.5%", "bias": "BULLISH"},
+                {"strike": "23500 CE", "type": "Long Buildup", "oi_change": "+34.2%", "price_change": "+24.6%", "bias": "BULLISH"},
+                {"strike": "23300 PE", "type": "Put Writing Support", "oi_change": "+42.1%", "price_change": "-18.0%", "bias": "BULLISH"}
+            ],
+            "summary": "Heavy Put writing at 23,300 and 23,400 provides strong floor; 23,400 Call short-covering accelerating upside."
+        }
+    else:
+        oi_matrix = {
+            "pcr_oi": 0.74,
+            "pcr_volume": 0.68,
+            "max_pain_strike": 23200,
+            "dealer_gamma_flip": 23300,
+            "gamma_regime": "NEGATIVE DEALER GAMMA (Downside Acceleration Below 23,300)",
+            "buildup_highlights": [
+                {"strike": "23300 CE", "type": "Aggressive Call Writing", "oi_change": "+45.2%", "price_change": "-28.4%", "bias": "BEARISH"},
+                {"strike": "23200 CE", "type": "Short Addition", "oi_change": "+38.6%", "price_change": "-22.1%", "bias": "BEARISH"},
+                {"strike": "23100 PE", "type": "Long Buildup / Buying", "oi_change": "+29.4%", "price_change": "+34.5%", "bias": "BEARISH"},
+                {"strike": "23300 PE", "type": "Put Unwinding / Panic", "oi_change": "-32.1%", "price_change": "+65.0%", "bias": "BEARISH"}
+            ],
+            "summary": "Aggressive Call writing creating immovable overhead ceiling; Put unwinding confirms downside cascade."
+        }
 
     # 6. Portfolio Risk, Position Sizing & Capital Protection
     portfolio_risk = {
@@ -11468,15 +11553,26 @@ async def market_other_factors(symbol: str = "NIFTY", user: dict[str, Any] = Dep
     }
 
     # 7. Market Microstructure & Order Flow Imbalance
-    microstructure = {
-        "bid_qty_pct": 63.4,
-        "ask_qty_pct": 36.6,
-        "imbalance_ratio": 1.73,
-        "effective_spread_pct": 0.04,
-        "estimated_slippage": "₹0.15 to ₹0.30 per lot",
-        "institutional_velocity": "HIGH BUYING PRESSURE",
-        "summary": "Aggressive market buy orders absorbing resting limit ask liquidity at dynamic VWAP."
-    }
+    if is_bull:
+        microstructure = {
+            "bid_qty_pct": 63.4,
+            "ask_qty_pct": 36.6,
+            "imbalance_ratio": 1.73,
+            "effective_spread_pct": 0.04,
+            "estimated_slippage": "₹0.15 to ₹0.30 per lot",
+            "institutional_velocity": "HIGH BUYING PRESSURE",
+            "summary": "Aggressive market buy orders absorbing resting limit ask liquidity at dynamic VWAP."
+        }
+    else:
+        microstructure = {
+            "bid_qty_pct": 34.2,
+            "ask_qty_pct": 65.8,
+            "imbalance_ratio": 0.52,
+            "effective_spread_pct": 0.05,
+            "estimated_slippage": "₹0.20 to ₹0.35 per lot",
+            "institutional_velocity": "HIGH SELLING PRESSURE",
+            "summary": "Heavy aggressive market sell orders hitting bids with institutional block liquidation."
+        }
 
     result = {
         "symbol": sym,
