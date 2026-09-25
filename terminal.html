@@ -8408,10 +8408,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           timeframe: state.tf || '5m',
           from_time: fTime,
           to_time: tTime,
-          timestamp: tTime,
           confidence: conf,
-       
-... [truncated for diff preview]
           prediction: pred,
           signal: pred.includes('Bullish') ? 'BUY' : pred.includes('Bearish') ? 'SELL' : 'NEUTRAL'
         });

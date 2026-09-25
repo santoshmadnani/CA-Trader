@@ -325,9 +325,6 @@ UPSTOX_BASE_URL = os.getenv("UPSTOX_BASE_URL", "https://api.upstox.com/v2").rstr
 UPSTOX_V3_BASE_URL = os.getenv("UPSTOX_V3_BASE_URL", "https://api.upstox.com/v3").rstrip("/")
 UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN", "")
 MARKET_STREAM_ENABLED = os.getenv("CA_MARKET_STREAM_ENABLED", "1") == "1"
-# Safe default: use the continuous bulk-REST quote lane. Broker WebSocket is opt-in only.
-MARKET_STREAM_TRANSPORT = os.getenv("CA_MARKET_STREAM_TRANSPORT", "rest").strip().lower()
-if os.getenv("CA_ALLOW_UPSTOX_BROKER_WS", "0").strip() != "1":
 # Real-time WebSocket streaming from Upstox (sub-second live ticks like Zerodha Kite)
 MARKET_STREAM_TRANSPORT = os.getenv("CA_MARKET_STREAM_TRANSPORT", "websocket").strip().lower()
 if os.getenv("CA_ALLOW_UPSTOX_BROKER_WS", "1").strip() != "1":
@@ -9249,8 +9246,6 @@ async def analysis_overall(
                         rec.get("stop_loss"),
                         rec.get("rationale") or rec.get("reason"),
                         json.dumps(rec.get("evidence", {}), default=str),
-                        json.dumps(rec.get("news", 
-... [truncated for diff preview]
                         json.dumps(rec.get("news", []), default=str),
                         json.dumps(opt_cand, default=str) if opt_cand else None,
                         rec.get("score") or 84.0,
