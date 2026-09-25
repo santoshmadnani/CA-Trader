@@ -325,9 +325,9 @@ UPSTOX_BASE_URL = os.getenv("UPSTOX_BASE_URL", "https://api.upstox.com/v2").rstr
 UPSTOX_V3_BASE_URL = os.getenv("UPSTOX_V3_BASE_URL", "https://api.upstox.com/v3").rstrip("/")
 UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN", "")
 MARKET_STREAM_ENABLED = os.getenv("CA_MARKET_STREAM_ENABLED", "1") == "1"
-# Safe default: use the continuous bulk-REST quote lane. Broker WebSocket is opt-in only.
-MARKET_STREAM_TRANSPORT = os.getenv("CA_MARKET_STREAM_TRANSPORT", "rest").strip().lower()
-if os.getenv("CA_ALLOW_UPSTOX_BROKER_WS", "0").strip() != "1":
+# Real-time WebSocket streaming from Upstox (sub-second live ticks like Zerodha Kite)
+MARKET_STREAM_TRANSPORT = os.getenv("CA_MARKET_STREAM_TRANSPORT", "websocket").strip().lower()
+if os.getenv("CA_ALLOW_UPSTOX_BROKER_WS", "1").strip() != "1":
     MARKET_STREAM_TRANSPORT = "rest"
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
 GNEWS_DAILY_LIMIT = int(os.getenv("GNEWS_DAILY_LIMIT", "100"))
@@ -14633,7 +14633,7 @@ class MarketStreamManager:
                         log.debug("Market REST fallback failed: %s",text)
             except Exception:
                 pass
-            time.sleep(1.5)
+            time.sleep(1.0)
 
     def _run(self)->None:
         """Single-owner native Upstox WebSocket loop.
