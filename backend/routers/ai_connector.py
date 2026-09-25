@@ -80,7 +80,7 @@ def _build_openapi_spec():
             "/api/mcp/query": {
                 "post": {
                     "summary": "Universal CA Trader Query & Tool Dispatcher",
-                    "description": "Universal gateway for CA Trader. Use this to execute ANY query, retrieval, calculation, or task: live quotes, historical prices for any date, option chains, trade setups, positions, portfolio funds, server deployment info, diagnostics, news, or custom trading questions. Dynamically routes to all backend tools and data sources without requiring schema updates.",
+                    "description": "Universal gateway for CA Trader. Executes any query or task: live quotes, historical prices for any date, option chains, trade setups, positions, funds, deployment info, and diagnostics.",
                     "operationId": "universalQuery",
                     "requestBody": {
                         "required": True,
@@ -125,7 +125,7 @@ def _build_openapi_spec():
             "/api/market/historical/{instrument}": {
                 "get": {
                     "summary": "Get Historical Stock/Index Prices & Daily OHLC",
-                    "description": "Returns official historical OHLC prices (Open, High, Low, Close, Volume, and Change) for any stock or index on a specific date (e.g. 2026-09-24) or over a historical range. Always use this when the user asks for closing price on a past date or historical market data.",
+                    "description": "Returns official historical OHLC prices and volume for any stock or index on a specific date (e.g. 2026-09-24) or over a historical range.",
                     "operationId": "getHistoricalPrices",
                     "parameters": [
                         {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. RELIANCE, NIFTY, BANKNIFTY, TCS)"},
