@@ -39,9 +39,9 @@ class SqlQueryIn(BaseModel):
 
 @router.get("/openapi.json")
 async def get_mcp_openapi():
-    """Returns a focused OpenAPI 3.0 specification tailored for ChatGPT Actions and Gemini Function Calling."""
+    """Returns a focused OpenAPI 3.0.1 specification tailored for ChatGPT Actions, Gemini, and MCP clients."""
     return {
-        "openapi": "3.1.0",
+        "openapi": "3.0.1",
         "info": {
             "title": "CA Trader AI Assistant & MCP API",
             "description": "Secure READ-ONLY API connector for ChatGPT, Gemini, and AI assistants to inspect live market quotes, option chains, portfolios, and algorithmic trade setups.",
@@ -59,7 +59,16 @@ async def get_mcp_openapi():
                     "parameters": [
                         {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. NIFTY, BANKNIFTY, RELIANCE, TCS)"}
                     ],
-                    "responses": {"200": {"description": "Live quote data"}}
+                    "responses": {
+                        "200": {
+                            "description": "Live quote data",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/MarketQuote"}
+                                }
+                            }
+                        }
+                    }
                 }
             },
             "/api/options/{underlying}/expiries": {
@@ -70,7 +79,16 @@ async def get_mcp_openapi():
                     "parameters": [
                         {"name": "underlying", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Underlying symbol (e.g. NIFTY, BANKNIFTY)"}
                     ],
-                    "responses": {"200": {"description": "List of active expiry dates"}}
+                    "responses": {
+                        "200": {
+                            "description": "List of active expiry dates",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/OptionExpiries"}
+                                }
+                            }
+                        }
+                    }
                 }
             },
             "/api/options/{underlying}/chain": {
@@ -82,7 +100,16 @@ async def get_mcp_openapi():
                         {"name": "underlying", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Underlying symbol (e.g. NIFTY)"},
                         {"name": "expiry", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Target expiry date (YYYY-MM-DD)"}
                     ],
-                    "responses": {"200": {"description": "Complete option chain table"}}
+                    "responses": {
+                        "200": {
+                            "description": "Complete option chain table",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/OptionChain"}
+                                }
+                            }
+                        }
+                    }
                 }
             },
             "/api/recommendations/{instrument}": {
@@ -94,7 +121,16 @@ async def get_mcp_openapi():
                         {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. NIFTY, BANKNIFTY, RELIANCE)"},
                         {"name": "timeframe", "in": "query", "required": False, "schema": {"type": "string", "default": "5m"}, "description": "Analysis timeframe (e.g. 1m, 5m, 15m, 1h)"}
                     ],
-                    "responses": {"200": {"description": "Algorithmic trade setup details"}}
+                    "responses": {
+                        "200": {
+                            "description": "Algorithmic trade setup details",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/TradeRecommendation"}
+                                }
+                            }
+                        }
+                    }
                 }
             },
             "/api/recommendations/history": {
@@ -102,7 +138,16 @@ async def get_mcp_openapi():
                     "summary": "Get AI Trade Recommendations History",
                     "description": "Returns recent AI trade setups audit history with entry, target, stop-loss, and rationale.",
                     "operationId": "getRecommendationsHistory",
-                    "responses": {"200": {"description": "Recent recommendations history"}}
+                    "responses": {
+                        "200": {
+                            "description": "Recent recommendations history",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/RecommendationHistory"}
+                                }
+                            }
+                        }
+                    }
                 }
             },
             "/api/positions": {
@@ -110,7 +155,16 @@ async def get_mcp_openapi():
                     "summary": "Get Active Trading Positions",
                     "description": "Returns open positions, quantity, buy price, current LTP, and unrealized P&L.",
                     "operationId": "getPositions",
-                    "responses": {"200": {"description": "List of positions"}}
+                    "responses": {
+                        "200": {
+                            "description": "List of positions",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/PositionList"}
+                                }
+                            }
+                        }
+                    }
                 }
             },
             "/api/funds": {
@@ -118,7 +172,16 @@ async def get_mcp_openapi():
                     "summary": "Get Account Funds & Margin",
                     "description": "Returns available cash, margin used, and trading capital breakdown.",
                     "operationId": "getFunds",
-                    "responses": {"200": {"description": "Account funds breakdown"}}
+                    "responses": {
+                        "200": {
+                            "description": "Account funds breakdown",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/FundSummary"}
+                                }
+                            }
+                        }
+                    }
                 }
             },
             "/health": {
@@ -126,12 +189,123 @@ async def get_mcp_openapi():
                     "summary": "Get Server & Provider Health",
                     "description": "Checks server health and Upstox API connectivity status.",
                     "operationId": "getHealth",
-                    "responses": {"200": {"description": "System health status"}}
+                    "responses": {
+                        "200": {
+                            "description": "System health status",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/HealthStatus"}
+                                }
+                            }
+                        }
+                    }
                 }
             }
         },
         "components": {
-            "schemas": {},
+            "schemas": {
+                "MarketQuote": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string", "description": "Trading instrument symbol"},
+                        "ltp": {"type": "number", "description": "Last traded price"},
+                        "open": {"type": "number", "description": "Session opening price"},
+                        "high": {"type": "number", "description": "Session high"},
+                        "low": {"type": "number", "description": "Session low"},
+                        "close": {"type": "number", "description": "Previous close price"},
+                        "volume": {"type": "number", "description": "Total traded volume"}
+                    }
+                },
+                "OptionExpiries": {
+                    "type": "object",
+                    "properties": {
+                        "underlying": {"type": "string"},
+                        "expiries": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    }
+                },
+                "OptionChain": {
+                    "type": "object",
+                    "properties": {
+                        "underlying": {"type": "string"},
+                        "spot": {"type": "number"},
+                        "expiry": {"type": "string"},
+                        "pcr": {"type": "number"},
+                        "strikes": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "strike": {"type": "number"},
+                                    "call_ltp": {"type": "number"},
+                                    "call_oi": {"type": "number"},
+                                    "put_ltp": {"type": "number"},
+                                    "put_oi": {"type": "number"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "TradeRecommendation": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string"},
+                        "recommendation": {"type": "string", "description": "BUY, SELL, BUY CALL, BUY PUT, or NO_TRADE"},
+                        "timeframe": {"type": "string"},
+                        "entry": {"type": "number"},
+                        "target": {"type": "number"},
+                        "stop_loss": {"type": "number"},
+                        "confidence": {"type": "number"},
+                        "risk_reward": {"type": "number"},
+                        "rationale": {"type": "string"}
+                    }
+                },
+                "RecommendationHistory": {
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/TradeRecommendation"}
+                        }
+                    }
+                },
+                "PositionList": {
+                    "type": "object",
+                    "properties": {
+                        "positions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "symbol": {"type": "string"},
+                                    "quantity": {"type": "integer"},
+                                    "buy_price": {"type": "number"},
+                                    "current_price": {"type": "number"},
+                                    "pnl": {"type": "number"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "FundSummary": {
+                    "type": "object",
+                    "properties": {
+                        "available_cash": {"type": "number"},
+                        "margin_used": {"type": "number"},
+                        "total_balance": {"type": "number"}
+                    }
+                },
+                "HealthStatus": {
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string"},
+                        "time": {"type": "string"},
+                        "auth_enabled": {"type": "boolean"}
+                    }
+                }
+            },
             "securitySchemes": {
                 "ApiKeyAuth": {
                     "type": "apiKey",
