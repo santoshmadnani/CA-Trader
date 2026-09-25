@@ -42,6 +42,7 @@ class SqlQueryIn(BaseModel):
 
 @router.get("/openapi.json")
 async def get_mcp_openapi():
+    """Returns a focused OpenAPI 3.0 specification tailored for ChatGPT Actions and Gemini Function Calling."""
     """Returns a focused OpenAPI 3.0.1 specification tailored for ChatGPT Actions, Gemini, and MCP clients."""
     return _build_openapi_spec()
 
@@ -58,7 +59,7 @@ async def get_mcp_openapi_yaml():
 
 def _build_openapi_spec():
     return {
-        "openapi": "3.0.1",
+        "openapi": "3.1.0",
         "info": {
             "title": "CA Trader AI Assistant & MCP API",
             "description": "Secure API connector for ChatGPT, Gemini, and AI assistants to inspect live market quotes, option chains, portfolios, trade setups, deployment history, and server diagnostics.",
@@ -132,7 +133,7 @@ def _build_openapi_spec():
             "/api/recommendations/{instrument}": {
                 "get": {
                     "summary": "Get Live AI Trade Recommendation for Symbol",
-                    "description": "Returns current live algorithmic trade setup with calculated Entry, Target, Stop Loss, Greeks, and confidence for any stock or index (e.g. NIFTY, BANKNIFTY, RELIANCE, CRUDEOIL). Always use this when the user asks for current or latest trade setups for a specific symbol.",
+                    "description": "Returns current live algorithmic trade setup with calculated Entry, Target, Stop Loss, Greeks, and confidence for any stock or index.",
                     "operationId": "getRecommendationForSymbol",
                     "parameters": [
                         {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. NIFTY, BANKNIFTY, RELIANCE)"},
@@ -254,7 +255,6 @@ def _build_openapi_spec():
             }
         },
         "components": {
-            "schemas": {},
             "schemas": {
                 "MarketQuote": {
                     "type": "object",
