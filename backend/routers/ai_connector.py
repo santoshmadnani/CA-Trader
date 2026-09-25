@@ -984,22 +984,25 @@ async def execute_universal_query(payload: UniversalQueryIn, request: Request | 
     params = payload.params or {}
 
     # Infer action if not specified
+    def has_any(words: list[str]) -> bool:
+        return any(bool(re.search(r"\b" + re.escape(w) + r"\b", q_lower, re.I)) for w in words)
+
     if not action:
-        if any(w in q_lower for w in ("deploy", "commit", "git", "version", "last update", "last deployed")):
+        if has_any(["deploy", "deployment", "commit", "git", "version", "last update", "last deployed"]):
             action = "deployment"
-        elif any(w in q_lower for w in ("diagnostic", "syntax", "error", "integrity", "health", "status")):
+        elif has_any(["diagnostic", "diagnostics", "syntax", "error", "integrity", "health", "status"]):
             action = "diagnostics"
-        elif date_val or any(w in q_lower for w in ("historical", "closing price on", "close on", "price on", "yesterday", "past date")):
+        elif date_val or has_any(["historical", "yesterday"]) or "closing price on" in q_lower or "close on" in q_lower or "price on" in q_lower:
             action = "historical"
-        elif any(w in q_lower for w in ("option", "chain", "pcr", "strike", "expiry", "ce", "pe")) and not any(w in q_lower for w in ("recommendation", "setup")):
+        elif has_any(["option", "options", "chain", "pcr", "strike", "expiry", "call option", "put option", "ce", "pe"]) and not has_any(["recommendation", "setup"]):
             action = "options"
-        elif any(w in q_lower for w in ("recommendation", "setup", "signal", "trade idea", "entry", "target", "stoploss")):
+        elif has_any(["recommendation", "setup", "signal", "trade idea", "entry", "target", "stoploss"]):
             action = "setup"
-        elif any(w in q_lower for w in ("position", "holding", "open trade")):
+        elif has_any(["position", "positions", "holding", "holdings", "open trade"]):
             action = "positions"
-        elif any(w in q_lower for w in ("fund", "balance", "margin", "capital")):
+        elif has_any(["fund", "funds", "balance", "margin", "capital"]):
             action = "funds"
-        elif any(w in q_lower for w in ("news", "headline")):
+        elif has_any(["news", "headline", "headlines"]):
             action = "news"
         else:
             action = "quote"
