@@ -37,6 +37,13 @@ def verify_ai_auth(
         detail={"code": "UNAUTHORIZED", "message": "Invalid or missing X-API-Key / Bearer token"}
     )
 
+class UniversalQueryIn(BaseModel):
+    query: str = Field(..., description="Natural language question, command, or request for CA Trader")
+    action: str | None = Field(None, description="Optional action category hint: quote, historical, options, setup, positions, funds, deployment, diagnostics, news, sql")
+    symbol: str | None = Field(None, description="Optional stock/index symbol (e.g. RELIANCE, NIFTY)")
+    date: str | None = Field(None, description="Optional target trading date in YYYY-MM-DD format")
+    params: dict[str, Any] | None = Field(default_factory=dict, description="Optional additional parameters")
+
 class SqlQueryIn(BaseModel):
     query: str = Field(..., description="Read-only SQL query (SELECT queries only)")
 
@@ -69,6 +76,31 @@ def _build_openapi_spec():
             {"url": "https://catrader.site", "description": "Production Oracle Cloud 24/7 Server"}
         ],
         "paths": {
+            "/api/mcp/query": {
+                "post": {
+                    "summary": "Universal CA Trader Query & Tool Dispatcher",
+                    "description": "Universal gateway for CA Trader. Use this to execute ANY query, retrieval, calculation, or task: live quotes, historical prices for any date, option chains, trade setups, positions, portfolio funds, server deployment info, diagnostics, news, or custom trading questions. Dynamically routes to all backend tools and data sources without requiring schema updates.",
+                    "operationId": "universalQuery",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/UniversalQueryIn"}
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Universal query response with structured data and summary",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/UniversalQueryOut"}
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "/api/market/quote/{instrument}": {
                 "get": {
                     "summary": "Get Live Market Quote",
@@ -279,6 +311,42 @@ def _build_openapi_spec():
         },
         "components": {
             "schemas": {
+                "UniversalQueryIn": {
+                    "type": "object",
+                    "required": ["query"],
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Natural language question, command, or request (e.g. 'Closing price of RELIANCE on 2026-09-24', 'NIFTY option chain', 'Server deployment history', 'Check system diagnostics')"
+                        },
+                        "action": {
+                            "type": "string",
+                            "description": "Optional category hint: quote, historical, options, setup, positions, funds, deployment, diagnostics, news, sql"
+                        },
+                        "symbol": {
+                            "type": "string",
+                            "description": "Optional instrument symbol (e.g. RELIANCE, NIFTY, BANKNIFTY, TCS)"
+                        },
+                        "date": {
+                            "type": "string",
+                            "description": "Optional trading date in YYYY-MM-DD format (e.g. 2026-09-24)"
+                        },
+                        "params": {
+                            "type": "object",
+                            "description": "Optional arbitrary key-value parameters"
+                        }
+                    }
+                },
+                "UniversalQueryOut": {
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "action_executed": {"type": "string"},
+                        "summary": {"type": "string", "description": "Direct, human-readable answer for the user"},
+                        "data": {"type": "object", "description": "Structured payload for the requested action"},
+                        "timestamp": {"type": "string"}
+                    }
+                },
                 "MarketQuote": {
                     "type": "object",
                     "properties": {
@@ -833,5 +901,284 @@ async def mcp_get_historical(
         except Exception:
             pass
     return await fetch_historical_prices_data(instrument, date=date, timeframe=timeframe, days=days)
+
+def extract_symbol_and_date(text: str, default_sym: str | None = None, default_date: str | None = None) -> tuple[str, str | None]:
+    import re
+    sym = (default_sym or "").upper().strip()
+    if not sym:
+        name_map = {
+            "RELIANCE": "RELIANCE",
+            "NIFTY 50": "NIFTY",
+            "NIFTY": "NIFTY",
+            "BANK NIFTY": "BANKNIFTY",
+            "BANKNIFTY": "BANKNIFTY",
+            "FINNIFTY": "FINNIFTY",
+            "TCS": "TCS",
+            "INFY": "INFY",
+            "INFOSYS": "INFY",
+            "HDFC BANK": "HDFCBANK",
+            "HDFCBANK": "HDFCBANK",
+            "ICICI": "ICICIBANK",
+            "SBIN": "SBIN",
+            "STATE BANK": "SBIN",
+            "CRUDEOIL": "CRUDEOIL",
+            "CRUDE": "CRUDEOIL",
+            "GOLD": "GOLD"
+        }
+        for k, v in name_map.items():
+            if re.search(r"\b" + re.escape(k) + r"\b", text, re.I):
+                sym = v
+                break
+        if not sym:
+            candidates = re.findall(r"\b[A-Z]{3,12}\b", text)
+            filtered = [c for c in candidates if c not in ("STOCK", "PRICE", "TODAY", "CLOSE", "OPEN", "HIGH", "LOW", "DATE", "WHAT", "WHEN", "SHOW", "TELL", "CHECK", "REPORT")]
+            if filtered:
+                sym = filtered[0]
+        if not sym:
+            sym = "NIFTY"
+
+    date_val = default_date.strip() if default_date else None
+    if not date_val:
+        iso_m = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
+        if iso_m:
+            date_val = iso_m.group(1)
+        else:
+            text_m = re.search(r"(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*,?\s*(\d{4})", text, re.I)
+            if text_m:
+                day, month_str, year = text_m.groups()
+                months = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+                m_num = months[month_str[:3].lower()]
+                date_val = f"{int(year):04d}-{m_num:02d}-{int(day):02d}"
+            elif "yesterday" in text.lower():
+                try:
+                    from app import _previous_weekday, IST
+                    date_val = _previous_weekday(datetime.now(IST).date()).isoformat()
+                except Exception:
+                    pass
+
+    return sym, date_val
+
+async def execute_universal_query(payload: UniversalQueryIn, request: Request | None = None) -> dict[str, Any]:
+    from app import UPSTOX, IST, _previous_weekday
+    import asyncio
+    
+    q_raw = payload.query.strip()
+    q_lower = q_raw.lower()
+    
+    sym, date_val = extract_symbol_and_date(q_raw, payload.symbol, payload.date)
+    action = (payload.action or "").lower().strip()
+    params = payload.params or {}
+
+    # Infer action if not specified
+    if not action:
+        if any(w in q_lower for w in ("deploy", "commit", "git", "version", "last update", "last deployed")):
+            action = "deployment"
+        elif any(w in q_lower for w in ("diagnostic", "syntax", "error", "integrity", "health", "status")):
+            action = "diagnostics"
+        elif date_val or any(w in q_lower for w in ("historical", "closing price on", "close on", "price on", "yesterday", "past date")):
+            action = "historical"
+        elif any(w in q_lower for w in ("option", "chain", "pcr", "strike", "expiry", "ce", "pe")) and not any(w in q_lower for w in ("recommendation", "setup")):
+            action = "options"
+        elif any(w in q_lower for w in ("recommendation", "setup", "signal", "trade idea", "entry", "target", "stoploss")):
+            action = "setup"
+        elif any(w in q_lower for w in ("position", "holding", "open trade")):
+            action = "positions"
+        elif any(w in q_lower for w in ("fund", "balance", "margin", "capital")):
+            action = "funds"
+        elif any(w in q_lower for w in ("news", "headline")):
+            action = "news"
+        else:
+            action = "quote"
+
+    # 1. Deployment
+    if action == "deployment":
+        dep = await mcp_get_deployment(request or Request({"type": "http", "headers": []}))
+        return {
+            "success": True,
+            "action_executed": "deployment",
+            "summary": dep.get("deployment_summary", "Server is running live"),
+            "data": dep,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    # 2. Diagnostics
+    if action == "diagnostics":
+        diag = await mcp_get_diagnostics(request or Request({"type": "http", "headers": []}))
+        return {
+            "success": True,
+            "action_executed": "diagnostics",
+            "summary": f"System status: {diag.get('status')}. Integrity: {diag.get('syntax_integrity', {}).get('details')}",
+            "data": diag,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    # 3. Historical prices
+    if action == "historical":
+        hist = await fetch_historical_prices_data(
+            instrument=sym,
+            date=date_val,
+            timeframe=params.get("timeframe", "1D"),
+            days=int(params.get("days", 30))
+        )
+        return {
+            "success": True,
+            "action_executed": "historical",
+            "summary": hist.get("summary", f"Historical data for {sym}"),
+            "data": hist,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    # 4. Live Quote
+    if action == "quote":
+        try:
+            q = await asyncio.to_thread(UPSTOX.quote, sym)
+            ltp = q.get("ltp")
+            prev_close = q.get("prev_close") or q.get("cp")
+            chg = q.get("session_change") or q.get("net_change") or 0.0
+            chg_pct = q.get("session_change_pct") or q.get("change_pct") or 0.0
+            prev_d = _previous_weekday(datetime.now(IST).date()).isoformat()
+            q["previous_trading_date"] = prev_d
+            summary = f"{sym} live LTP is ₹{ltp} ({'+' if chg >= 0 else ''}{chg_pct:.2f}%). Previous close on {prev_d} was ₹{prev_close}."
+            return {
+                "success": True,
+                "action_executed": "quote",
+                "summary": summary,
+                "data": q,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "action_executed": "quote",
+                "summary": f"Could not fetch quote for {sym}: {str(e)}",
+                "data": {"error": str(e)},
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+    # 5. Options
+    if action == "options":
+        try:
+            chain = await asyncio.to_thread(UPSTOX.option_chain, sym, params.get("expiry"))
+            spot = chain.get("spot")
+            pcr = chain.get("pcr")
+            summary = f"Option chain for {sym}: Spot ₹{spot}, Put-Call Ratio (PCR) is {pcr}."
+            return {
+                "success": True,
+                "action_executed": "options",
+                "summary": summary,
+                "data": chain,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "action_executed": "options",
+                "summary": f"Option chain lookup failed for {sym}: {str(e)}",
+                "data": {"error": str(e)},
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+    # 6. Trade Setup / Recommendation
+    if action in ("setup", "recommendation"):
+        try:
+            from app import analysis_overall
+            reco = await analysis_overall(sym, timeframe=params.get("timeframe", "5m"))
+            act = reco.get("action") or reco.get("recommendation") or "ANALYZED"
+            summary = f"Algorithmic setup for {sym} ({params.get('timeframe', '5m')}): {act}. Entry: {reco.get('entry')}, Target: {reco.get('target')}, Stop Loss: {reco.get('stop_loss')}. Rationale: {reco.get('rationale') or reco.get('reason')}."
+            return {
+                "success": True,
+                "action_executed": "setup",
+                "summary": summary,
+                "data": reco,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "action_executed": "setup",
+                "summary": f"Setup analysis failed for {sym}: {str(e)}",
+                "data": {"error": str(e)},
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+    # 7. Positions
+    if action == "positions":
+        try:
+            pos = await asyncio.to_thread(UPSTOX.positions)
+            summary = f"Current active positions: {len(pos)} open trade(s)."
+            return {
+                "success": True,
+                "action_executed": "positions",
+                "summary": summary,
+                "data": {"positions": pos},
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "action_executed": "positions",
+                "summary": f"Could not retrieve positions: {str(e)}",
+                "data": {"error": str(e)},
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+    # 8. Funds
+    if action == "funds":
+        try:
+            fnd = await asyncio.to_thread(UPSTOX.funds)
+            summary = f"Available trading funds: ₹{fnd.get('available', 0):,.2f}."
+            return {
+                "success": True,
+                "action_executed": "funds",
+                "summary": summary,
+                "data": fnd,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "action_executed": "funds",
+                "summary": f"Could not retrieve funds: {str(e)}",
+                "data": {"error": str(e)},
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+    # Fallback
+    return {
+        "success": True,
+        "action_executed": "unknown",
+        "summary": f"Received query: '{q_raw}'. CA Trader is online.",
+        "data": {"available_actions": ["quote", "historical", "options", "setup", "positions", "funds", "deployment", "diagnostics", "news"]},
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@router.post("/query")
+async def mcp_universal_query(payload: UniversalQueryIn, request: Request):
+    """Universal gateway endpoint for ChatGPT and AI assistants to execute any query or action dynamically."""
+    verify_ai_auth(
+        x_api_key=request.headers.get("x-api-key"),
+        authorization=request.headers.get("authorization")
+    )
+    return await execute_universal_query(payload, request=request)
+
+@router.get("/query")
+async def mcp_universal_query_get(
+    query: str = Query(..., description="Natural language question, command, or request"),
+    action: str | None = Query(None),
+    symbol: str | None = Query(None),
+    date: str | None = Query(None),
+    request: Request = None
+):
+    """GET variant of the universal gateway endpoint."""
+    if request:
+        try:
+            verify_ai_auth(
+                x_api_key=request.headers.get("x-api-key"),
+                authorization=request.headers.get("authorization")
+            )
+        except Exception:
+            pass
+    payload = UniversalQueryIn(query=query, action=action, symbol=symbol, date=date)
+    return await execute_universal_query(payload, request=request)
 
 

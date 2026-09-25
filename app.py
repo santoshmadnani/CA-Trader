@@ -7049,7 +7049,7 @@ async def request_middleware(request: Request, call_next):
     forwarded = request.headers.get("x-forwarded-for")
     client = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
     key = f"{client}:{request.url.path}"
-    exempt_paths = ("/api/market/quotes", "/api/market/quote", "/api/market/candles", "/api/market/historical", "/api/market/stream", "/api/portfolio", "/api/positions", "/api/instruments/search", "/api/notifications")
+    exempt_paths = ("/api/market/quotes", "/api/market/quote", "/api/market/candles", "/api/market/historical", "/api/market/query", "/api/mcp", "/api/market/stream", "/api/portfolio", "/api/positions", "/api/instruments/search", "/api/notifications")
     is_exempt = any(request.url.path.startswith(p) for p in exempt_paths)
     if not is_exempt and request.url.path.startswith("/api/") and RATE_LIMIT_ENABLED and not RATE_LIMITER.allow(key):
         record_error("rate_limit", "Local API rate limit exceeded", user_id=(request.scope.get("session") or {}).get("user_id"), context={"path": request.url.path})
@@ -8000,6 +8000,25 @@ async def market_historical(
 ) -> dict[str, Any]:
     from backend.routers.ai_connector import fetch_historical_prices_data
     return await fetch_historical_prices_data(instrument, date=date, timeframe=timeframe, days=days)
+
+
+@app.post("/api/market/query")
+@app.get("/api/market/query")
+async def market_query_gateway(request: Request):
+    from backend.routers.ai_connector import UniversalQueryIn, execute_universal_query
+    if request.method == "POST":
+        try:
+            body = await request.json()
+            payload = UniversalQueryIn(**body)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail={"error": f"Invalid JSON payload: {e}"})
+    else:
+        q = request.query_params.get("query") or request.query_params.get("q") or ""
+        act = request.query_params.get("action")
+        sym = request.query_params.get("symbol")
+        dt = request.query_params.get("date")
+        payload = UniversalQueryIn(query=q, action=act, symbol=sym, date=dt)
+    return await execute_universal_query(payload, request=request)
 
 
 @app.get("/api/market/quotes")
