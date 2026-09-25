@@ -791,18 +791,32 @@ async def fetch_historical_prices_data(
         except Exception:
             pass
 
-    # Fetch candles via robust candle pipeline
+    # Fetch candles via live Upstox feed first for freshest daily data
     raw_candles = []
     try:
-        raw_candles = await asyncio.to_thread(analysis_candles_robust, sym, tf, days)
+        raw_candles = await asyncio.to_thread(UPSTOX.candles, sym, '1' if tf in ('1D','day') else tf.rstrip('m'), 'days' if tf in ('1D','day') else 'minutes', min(days, 365))
     except Exception:
         raw_candles = []
         
     if not raw_candles:
         try:
-            raw_candles = await asyncio.to_thread(UPSTOX.candles, sym, '1' if tf in ('1D','day') else tf.rstrip('m'), 'days' if tf in ('1D','day') else 'minutes', min(days, 365))
+            raw_candles = await asyncio.to_thread(analysis_candles_robust, sym, tf, days)
         except Exception:
             raw_candles = []
+
+    # If a specific date is requested and not in candles yet, probe candles_between
+    if date and req_d:
+        has_req = any(_candle_ist_date(c) == req_d for c in raw_candles if _candle_ist_date(c))
+        if not has_req:
+            try:
+                from_probe = req_d - timedelta(days=7)
+                to_probe = req_d + timedelta(days=2)
+                probe = await asyncio.to_thread(UPSTOX.candles_between, sym, '1' if tf in ('1D','day') else tf.rstrip('m'), 'days' if tf in ('1D','day') else 'minutes', from_probe, to_probe)
+                if probe:
+                    from app import _merge_candle_series
+                    raw_candles = _merge_candle_series(raw_candles, probe)
+            except Exception:
+                pass
             
     enriched_candles = []
     prev_close = None
