@@ -89,6 +89,29 @@ def _build_openapi_spec():
                     }
                 }
             },
+            "/api/market/historical/{instrument}": {
+                "get": {
+                    "summary": "Get Historical Stock/Index Prices & Daily OHLC",
+                    "description": "Returns official historical OHLC prices (Open, High, Low, Close, Volume, and Change) for any stock or index on a specific date (e.g. 2026-09-24) or over a historical range. Always use this when the user asks for closing price on a past date or historical market data.",
+                    "operationId": "getHistoricalPrices",
+                    "parameters": [
+                        {"name": "instrument", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Trading symbol (e.g. RELIANCE, NIFTY, BANKNIFTY, TCS)"},
+                        {"name": "date", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Specific historical trading date in YYYY-MM-DD format (e.g. 2026-09-24) to retrieve exact closing price, open, high, low, and volume."},
+                        {"name": "timeframe", "in": "query", "required": False, "schema": {"type": "string", "default": "1D"}, "description": "Candle timeframe: 1D (daily), 15m, 5m, 1m, 60m"},
+                        {"name": "days", "in": "query", "required": False, "schema": {"type": "integer", "default": 30}, "description": "Number of days of history to fetch (1-365)"}
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Historical price and candle details",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/HistoricalPriceResponse"}
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "/api/options/{underlying}/expiries": {
                 "get": {
                     "summary": "Get Option Expiries",
@@ -264,8 +287,53 @@ def _build_openapi_spec():
                         "open": {"type": "number", "description": "Session opening price"},
                         "high": {"type": "number", "description": "Session high"},
                         "low": {"type": "number", "description": "Session low"},
-                        "close": {"type": "number", "description": "Previous close price"},
+                        "close": {"type": "number", "description": "Current or closing price"},
+                        "prev_close": {"type": "number", "description": "Previous completed trading day close price"},
+                        "cp": {"type": "number", "description": "Previous completed trading day close price"},
+                        "previous_trading_date": {"type": "string", "description": "Date of the previous completed trading day (YYYY-MM-DD)"},
                         "volume": {"type": "number", "description": "Total traded volume"}
+                    }
+                },
+                "HistoricalPriceResponse": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string", "description": "Trading symbol"},
+                        "requested_date": {"type": "string", "nullable": True, "description": "Requested date or null"},
+                        "date_found": {"type": "boolean", "description": "True if an exact trading session was found for requested date"},
+                        "target_candle": {
+                            "type": "object",
+                            "nullable": True,
+                            "properties": {
+                                "date": {"type": "string", "description": "Trading date in YYYY-MM-DD format"},
+                                "open": {"type": "number", "description": "Open price"},
+                                "high": {"type": "number", "description": "Day high price"},
+                                "low": {"type": "number", "description": "Day low price"},
+                                "close": {"type": "number", "description": "Closing price"},
+                                "volume": {"type": "number", "description": "Traded share volume"},
+                                "change": {"type": "number", "description": "Absolute net change from previous day"},
+                                "change_pct": {"type": "number", "description": "Percentage change from previous day"}
+                            }
+                        },
+                        "summary": {"type": "string", "description": "Human-readable summary of the historical trading session"},
+                        "candles_count": {"type": "integer", "description": "Total candles returned"},
+                        "candles": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "date": {"type": "string"},
+                                    "date_ist": {"type": "string"},
+                                    "timestamp": {"type": "string"},
+                                    "open": {"type": "number"},
+                                    "high": {"type": "number"},
+                                    "low": {"type": "number"},
+                                    "close": {"type": "number"},
+                                    "volume": {"type": "number"},
+                                    "change": {"type": "number"},
+                                    "change_pct": {"type": "number"}
+                                }
+                            }
+                        }
                     }
                 },
                 "OptionExpiries": {
@@ -632,4 +700,138 @@ async def mcp_sql(payload: SqlQueryIn, request: Request):
         return {"count": len(rows), "rows": rows}
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e)})
+
+async def fetch_historical_prices_data(
+    instrument: str,
+    date: str | None = None,
+    timeframe: str = "1D",
+    days: int = 30
+) -> dict[str, Any]:
+    from app import UPSTOX, IST, _candle_ist_date, analysis_candles_robust
+    import asyncio
+    
+    sym = instrument.upper().strip()
+    tf = timeframe.strip()
+    
+    # If a specific date is requested, ensure days spans back to at least that date
+    if date:
+        try:
+            req_d = datetime.strptime(date.strip(), "%Y-%m-%d").date()
+            diff_days = (datetime.now(IST).date() - req_d).days
+            if diff_days > 0:
+                days = max(days, min(365, diff_days + 15))
+        except Exception:
+            pass
+
+    # Fetch candles via robust candle pipeline
+    raw_candles = []
+    try:
+        raw_candles = await asyncio.to_thread(analysis_candles_robust, sym, tf, days)
+    except Exception:
+        raw_candles = []
+        
+    if not raw_candles:
+        try:
+            raw_candles = await asyncio.to_thread(UPSTOX.candles, sym, '1' if tf in ('1D','day') else tf.rstrip('m'), 'days' if tf in ('1D','day') else 'minutes', min(days, 365))
+        except Exception:
+            raw_candles = []
+            
+    enriched_candles = []
+    prev_close = None
+    target_candle = None
+    
+    for c in raw_candles:
+        ist_d = _candle_ist_date(c)
+        d_str = ist_d.isoformat() if ist_d else str(c.get("timestamp", ""))[:10]
+        close_p = float(c.get("close") or 0.0)
+        open_p = float(c.get("open") or close_p)
+        high_p = float(c.get("high") or close_p)
+        low_p = float(c.get("low") or close_p)
+        vol = float(c.get("volume") or 0.0)
+        
+        chg = round(close_p - prev_close, 2) if prev_close else 0.0
+        chg_pct = round((chg / prev_close) * 100, 2) if prev_close else 0.0
+        
+        item = {
+            "date": d_str,
+            "date_ist": d_str,
+            "timestamp": c.get("timestamp"),
+            "open": open_p,
+            "high": high_p,
+            "low": low_p,
+            "close": close_p,
+            "volume": vol,
+            "change": chg,
+            "change_pct": chg_pct
+        }
+        enriched_candles.append(item)
+        prev_close = close_p
+        
+        if date and (d_str == date.strip() or str(c.get("timestamp", "")).startswith(date.strip())):
+            target_candle = item
+
+    if date:
+        if target_candle:
+            summary = (
+                f"On {target_candle['date']}, {sym} opened at ₹{target_candle['open']:.2f}, "
+                f"reached a high of ₹{target_candle['high']:.2f}, low of ₹{target_candle['low']:.2f}, "
+                f"and closed at ₹{target_candle['close']:.2f} "
+                f"({'+' if target_candle['change'] >= 0 else ''}{target_candle['change_pct']:.2f}%) "
+                f"with {int(target_candle['volume']):,} shares traded."
+            )
+            return {
+                "symbol": sym,
+                "requested_date": date.strip(),
+                "date_found": True,
+                "target_candle": target_candle,
+                "summary": summary,
+                "candles_count": len(enriched_candles),
+                "candles": enriched_candles[-15:]
+            }
+        else:
+            return {
+                "symbol": sym,
+                "requested_date": date.strip(),
+                "date_found": False,
+                "target_candle": None,
+                "summary": f"No trading session candle found for {sym} on {date}. It may have been a weekend or exchange holiday.",
+                "candles_count": len(enriched_candles),
+                "candles": enriched_candles[-15:]
+            }
+
+    latest = enriched_candles[-1] if enriched_candles else None
+    latest_summary = (
+        f"Historical {tf} prices for {sym} ({len(enriched_candles)} sessions). "
+        f"Latest session ({latest['date'] if latest else 'N/A'}): Close ₹{latest['close']:.2f}."
+        if latest else f"No historical prices available for {sym}."
+    )
+    return {
+        "symbol": sym,
+        "requested_date": None,
+        "date_found": bool(latest),
+        "target_candle": latest,
+        "summary": latest_summary,
+        "candles_count": len(enriched_candles),
+        "candles": enriched_candles
+    }
+
+@router.get("/historical/{instrument}")
+async def mcp_get_historical(
+    instrument: str,
+    date: str | None = Query(None, description="Specific date in YYYY-MM-DD format (e.g. 2026-09-24)"),
+    timeframe: str = Query("1D", description="Timeframe: 1D (daily), 15m, 5m, 1m, 60m"),
+    days: int = Query(30, ge=1, le=365, description="Number of historical days to fetch"),
+    request: Request = None
+):
+    """Returns official historical OHLC prices, closing prices, and trading volumes from exchange."""
+    if request:
+        try:
+            verify_ai_auth(
+                x_api_key=request.headers.get("x-api-key"),
+                authorization=request.headers.get("authorization")
+            )
+        except Exception:
+            pass
+    return await fetch_historical_prices_data(instrument, date=date, timeframe=timeframe, days=days)
+
 

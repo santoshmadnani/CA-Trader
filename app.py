@@ -7049,7 +7049,7 @@ async def request_middleware(request: Request, call_next):
     forwarded = request.headers.get("x-forwarded-for")
     client = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
     key = f"{client}:{request.url.path}"
-    exempt_paths = ("/api/market/quotes", "/api/market/quote", "/api/market/candles", "/api/market/stream", "/api/portfolio", "/api/positions", "/api/instruments/search", "/api/notifications")
+    exempt_paths = ("/api/market/quotes", "/api/market/quote", "/api/market/candles", "/api/market/historical", "/api/market/stream", "/api/portfolio", "/api/positions", "/api/instruments/search", "/api/notifications")
     is_exempt = any(request.url.path.startswith(p) for p in exempt_paths)
     if not is_exempt and request.url.path.startswith("/api/") and RATE_LIMIT_ENABLED and not RATE_LIMITER.allow(key):
         record_error("rate_limit", "Local API rate limit exceeded", user_id=(request.scope.get("session") or {}).get("user_id"), context={"path": request.url.path})
@@ -7976,6 +7976,11 @@ async def market_quote(instrument: str, user: dict[str, Any] = Depends(require_u
         q = UPSTOX.quote(instrument)
         if str(q.get("exchange") or "").upper().find("MCX") >= 0 or str(q.get("instrument_key") or "").upper().startswith("MCX"):
             CACHE.set(f"closed-quote:{key_hint}", q, 300.0)
+        try:
+            prev_d = _previous_weekday(datetime.now(IST).date())
+            q["previous_trading_date"] = prev_d.isoformat()
+        except Exception:
+            pass
         return q
     except Exception as exc:
         log.warning("market_quote fallback for %s: %s", instrument, safe_text(exc))
@@ -7983,6 +7988,18 @@ async def market_quote(instrument: str, user: dict[str, Any] = Depends(require_u
         if cached:
             return {**cached, "degraded": True, "fresh": False}
         return {"instrument": instrument, "symbol": instrument, "ltp": None, "degraded": True, "fresh": False}
+
+
+@app.get("/api/market/historical/{instrument}")
+async def market_historical(
+    instrument: str,
+    date: str | None = Query(None, description="Specific historical date in YYYY-MM-DD format (e.g. 2026-09-24)"),
+    timeframe: str = Query("1D", description="Candle timeframe: 1D (daily), 15m, 5m, 1m, 60m"),
+    days: int = Query(30, ge=1, le=365, description="Number of historical days to fetch"),
+    user: dict[str, Any] | None = Depends(current_user)
+) -> dict[str, Any]:
+    from backend.routers.ai_connector import fetch_historical_prices_data
+    return await fetch_historical_prices_data(instrument, date=date, timeframe=timeframe, days=days)
 
 
 @app.get("/api/market/quotes")
