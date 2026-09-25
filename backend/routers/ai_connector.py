@@ -131,6 +131,7 @@ async def get_mcp_openapi():
             }
         },
         "components": {
+            "schemas": {},
             "securitySchemes": {
                 "ApiKeyAuth": {
                     "type": "apiKey",
