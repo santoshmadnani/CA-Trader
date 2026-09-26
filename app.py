@@ -9088,11 +9088,13 @@ async def analysis_chart_mtf(instrument: str, timeframe: str = "5m", user: dict[
     if cached is not None: return cached
     try:
         d=30 if timeframe in {"1m","3m","5m","15m"} else 90 if timeframe in {"30m","60m"} else 365
+        candles=analysis_candles_robust(instrument,timeframe,d)
         candles=await asyncio.to_thread(analysis_candles_robust, instrument, timeframe, d)
         if not candles:
             raise ProviderUnavailable("No historical candles returned for selected timeframe")
         items=await _analysis_mtf_items(instrument,timeframe,candles)
         out={"instrument":instrument,"timeframe":timeframe,"items":items,"provider":"upstox","timestamp":now_iso()}
+        CACHE.set(cache_key,out,20.0)
         CACHE.set(cache_key,out,120.0)
         return out
     except Exception as exc:
@@ -9114,6 +9116,7 @@ async def analysis_chart_bundle(instrument: str, timeframe: str = "5m", include_
         unit="days" if timeframe=="1D" else "hours" if timeframe=="60m" else "minutes"
         interval="1" if timeframe in {"1D","60m"} else timeframe[:-1]
         days=30 if timeframe in {"1m","3m","5m","15m"} else 90 if timeframe in {"30m","60m"} else 365
+        candles=analysis_candles_robust(instrument,timeframe,days)
         candles=await asyncio.to_thread(analysis_candles_robust, instrument, timeframe, days)
         if not candles:
             raise ProviderUnavailable("No historical candles returned for this timeframe")
@@ -9144,6 +9147,7 @@ async def analysis_chart_bundle(instrument: str, timeframe: str = "5m", include_
                 "structure":{"instrument":instrument,"timeframe":timeframe,"candles_used":len(window),"trend":wta.get("trend"),"trend_strength":wta.get("trend_strength"),"structure":structure,"pattern_signals":detect_candlestick_patterns(window,timeframe)[-5:],"last_candle_change_pct":round(move,3),"expected_outcome":outcome,"technical":wta},
                 "chart_patterns":{"instrument":instrument,"timeframe":timeframe,"patterns":cpats,"provider":"upstox"},
                 "timestamp":now_iso()}
+        CACHE.set(cache_key,result,20.0)
         CACHE.set(cache_key,result,60.0)
         return result
     except Exception as exc:
@@ -9155,6 +9159,7 @@ async def analysis_chart_patterns(instrument: str, timeframe: str = "5m", user: 
         unit="days" if timeframe=="1D" else "hours" if timeframe=="60m" else "minutes"
         interval="1" if timeframe in {"1D","60m"} else timeframe[:-1]
         days=60 if timeframe in {"1D","60m"} else 20
+        candles=analysis_candles_robust(instrument,timeframe,days)
         candles=await asyncio.to_thread(analysis_candles_robust, instrument, timeframe, days)
         return {"instrument":instrument,"timeframe":timeframe,"patterns":detect_chart_patterns(candles),"definitions":{
             "Double Top":"Two similar highs; bearish confirmation on neckline break.",
@@ -9249,7 +9254,6 @@ async def analysis_overall(
     except Exception as exc:
         log.warning("analysis_overall failed for %s: %s", instrument, safe_text(exc))
         rec = fallback_recommendation_quick(instrument, uid, dp_clean)
-        # Save actionable recommendation into recommendations table
     reco_action = str(rec.get("recommendation") or "").upper()
     if reco_action in ("BUY", "SELL"):
         try:
