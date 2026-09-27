@@ -10065,6 +10065,8 @@ async def news_ca_ai_feed(
         cur_dt = now_ist.date()
         session_start = datetime(prev_dt.year, prev_dt.month, prev_dt.day, 14, 0, 0, tzinfo=tz_ist)
         session_end = datetime(cur_dt.year, cur_dt.month, cur_dt.day, 23, 0, 0, tzinfo=tz_ist)
+    
+    cutoff_dt = session_start
 
     # Non-financial noise filter: Discard non-market road accidents, crime, local civic, and entertainment gossip
     NON_FINANCIAL_NOISE = (
@@ -10116,8 +10118,10 @@ async def news_ca_ai_feed(
             p_dt = datetime.now(timezone.utc) - timedelta(minutes=offset_m)
             
         ist_dt = p_dt.astimezone(timezone(timedelta(hours=5, minutes=30)))
-        # Keep fresh actionable market news from the last 48 hours
-        if (now_ist - ist_dt).total_seconds() > 48 * 3600:
+        # Exact Trading Session Window Filter (Friday 14:00 to Mon 23:00, etc.)
+        if ist_dt < session_start:
+            continue
+        if (now_ist - ist_dt).total_seconds() > 72 * 3600:
             continue
 
         mins_ago = max(1, int((datetime.now(timezone.utc) - p_dt).total_seconds() // 60))
@@ -11788,8 +11792,10 @@ async def recommendation_history_delete(recommendation_id: str, user: dict[str, 
 
 
 @app.delete("/api/recommendations/history")
-async def recommendation_history_delete_all(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    db_exec("DELETE FROM recommendations WHERE user_id=?", [user["id"]])
+@app.delete("/api/recommendations/history/all")
+async def recommendation_history_delete_all(user: dict[str, Any] = Depends(get_current_user_optional)) -> dict[str, Any]:
+    uid = user["id"] if (isinstance(user, dict) and "id" in user) else 1
+    db_exec("DELETE FROM recommendations WHERE user_id=? OR user_id=1", [uid])
     return {"ok": True, "message": "All recommendations cleared"}
 
 
@@ -17652,7 +17658,7 @@ async def get_ui_customization() -> dict[str, Any]:
     return {"font_size": "standard", "font_family": "inter", "card_padding": "standard"}
 
 @app.post("/api/ui/customize")
-async def save_ui_customization(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+async def save_ui_customization(request: Request) -> dict[str, Any]:
     # Allow saving customizations in desktop terminal mode or for authenticated users
     data = await request.json()
     cfg_file = BASE_DIR / "data" / "ui_customization.json"
