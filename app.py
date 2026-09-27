@@ -11791,6 +11791,13 @@ async def recommendation_history_delete(recommendation_id: str, user: dict[str, 
     return {"ok": True, "id": recommendation_id}
 
 
+def get_current_user_optional(request: Request) -> dict[str, Any] | None:
+    try:
+        return current_user(request)
+    except Exception:
+        return None
+
+
 @app.delete("/api/recommendations/history")
 @app.delete("/api/recommendations/history/all")
 async def recommendation_history_delete_all(user: dict[str, Any] = Depends(get_current_user_optional)) -> dict[str, Any]:
