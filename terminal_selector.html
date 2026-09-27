@@ -140,21 +140,6 @@
         </div>
         <button class="btn primary" onclick="choose('fitness')">Open</button>
       </div>
-
-      <!-- 3. AI Video Studio (Admin Only) -->
-      <div class="card" id="videoCard" style="display:none;border-color:rgba(56,189,248,0.35);">
-        <div style="display:flex;gap:14px;align-items:center">
-          <div class="icon">🎬</div>
-          <div>
-            <div class="title" style="display:flex;align-items:center;gap:8px;">
-              AI Video Generation Studio
-              <span class="admin-pill">ADMIN ONLY</span>
-            </div>
-            <div class="desc">Google Veo 3.1 cinema engine, Gemini prompt director &amp; MP4 player.</div>
-          </div>
-        </div>
-        <button class="btn primary" style="background:linear-gradient(135deg,#0284c7,#38bdf8);color:#031726;" onclick="choose('video')">Open</button>
-      </div>
     </div>
 
     <div class="foot">
@@ -178,8 +163,6 @@
       }
       if (t === 'fitness') {
         location.href = '/fitness';
-      } else if (t === 'video') {
-        location.href = '/video';
       } else {
         location.href = '/terminal';
       }
@@ -189,8 +172,7 @@
       .then(r => r.json())
       .then(d => {
         document.getElementById('hello').textContent = 'Welcome ' + (d.user?.full_name || d.user?.email || 'back') + '. Choose your terminal.';
-        if (d.is_admin || d.video_allowlisted) {
-          document.getElementById('videoCard').style.display = 'flex';
+        if (d.is_admin) {
           document.getElementById('accessTag').textContent = 'Administrator Privileges';
           document.getElementById('accessTag').style.background = 'rgba(245,158,11,0.2)';
           document.getElementById('accessTag').style.color = '#fbbf24';
