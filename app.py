@@ -9319,7 +9319,7 @@ async def analysis_overall(
     user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
     if instrument.lower() == "history":
-        return await recommendation_history(request, user)
+        return await recommendation_history(request, symbol=request.query_params.get("symbol"), user=user)
     uid = user.get("id") if isinstance(user, dict) else (getattr(user, "id", None) or 1)
     is_scalp = bool(expiry_scalp and str(expiry_scalp).lower() in ("1", "true", "yes", "on"))
     try:
@@ -10536,8 +10536,12 @@ def _calc_reco_pnl(r: dict[str, Any], live_price: float | None = None) -> tuple[
 @app.get("/api/recommendations/history")
 async def recommendation_history(request: Request, symbol: str | None = None, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     try:
+        if isinstance(symbol, dict):
+            user = symbol
+            symbol = None
         uid = user["id"] if isinstance(user, dict) and "id" in user else 1
-        req_sym = (symbol or request.query_params.get("symbol") or "").upper().strip()
+        raw_sym = str(symbol) if (symbol and not isinstance(symbol, dict)) else (request.query_params.get("symbol") or "")
+        req_sym = raw_sym.upper().strip()
         root_filter = req_sym.replace("FUT", "").replace("EXP", "").strip() if req_sym else ""
         cache_key = f"reco_history:{uid}:{root_filter}"
         cached = CACHE.get(cache_key)
