@@ -3014,11 +3014,73 @@ def resolve_lot_size(sym: str, default: int = 1) -> int:
     if "SILVER" in s: return 30
     if "COPPER" in s: return 2500
     if "ZINC" in s: return 5000
-    if "NIFTY BANK" in s or "BANKNIFTY" in s: return 30
-    if "FINNIFTY" in s: return 60
+    if "NIFTY BANK" in s or "BANKNIFTY" in s: return 15
+    if "FINNIFTY" in s: return 65
     if "MIDCPNIFTY" in s: return 120
-    if "NIFTY" in s: return 65
+    if "NIFTY" in s: return 75
     return default
+
+
+def last_weekday_of_month(year: int, month: int, target_weekday: int) -> datetime:
+    """Find the last occurrence of target_weekday (0=Mon, 1=Tue, ..., 6=Sun) in the given year/month."""
+    if month == 12:
+        last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+    offset = (last_day.weekday() - target_weekday) % 7
+    return last_day - timedelta(days=offset)
+
+
+def get_sebi_compliant_expiry(symbol: str, ref_date: datetime | None = None) -> str:
+    """
+    Calculate 100% exchange-compliant expiry date based on official SEBI index derivative rules:
+    - NIFTY 50: Weekly allowed -> every Thursday.
+    - BANKNIFTY: MONTHLY ONLY -> Last Tuesday of the month (SEBI Single Weekly Index Rule).
+    - FINNIFTY: MONTHLY ONLY -> Last Tuesday of the month.
+    - MIDCPNIFTY: MONTHLY ONLY -> Last Monday of the month.
+    - Stocks (RELIANCE, HDFCBANK, TCS, etc.): MONTHLY ONLY -> Last Thursday of the month.
+    - Commodities: Standard contract monthly schedule.
+    """
+    root = extract_root_symbol(symbol).upper()
+    now_ist = ref_date or datetime.now(timezone(timedelta(hours=5, minutes=30)))
+
+    # 1. NIFTY 50: Weekly allowed (Thursdays, target_weekday = 3)
+    if root == "NIFTY":
+        days_ahead = (3 - now_ist.weekday() + 7) % 7
+        if days_ahead == 0 and (now_ist.hour > 15 or (now_ist.hour == 15 and now_ist.minute >= 30)):
+            days_ahead = 7
+        exp_dt = now_ist + timedelta(days=days_ahead)
+        return exp_dt.strftime("%d %b %Y").upper()
+
+    # 2. BANKNIFTY: Monthly only (Last Tuesday of the month, target_weekday = 1)
+    if "BANK" in root:
+        target_weekday = 1
+        cand_exp = last_weekday_of_month(now_ist.year, now_ist.month, target_weekday)
+        is_today = (now_ist.date() == cand_exp.date())
+        if now_ist.date() > cand_exp.date() or (is_today and (now_ist.hour > 15 or (now_ist.hour == 15 and now_ist.minute >= 30))):
+            next_month = 1 if now_ist.month == 12 else now_ist.month + 1
+            next_year = now_ist.year + 1 if now_ist.month == 12 else now_ist.year
+            cand_exp = last_weekday_of_month(next_year, next_month, target_weekday)
+        return cand_exp.strftime("%d %b %Y").upper()
+
+    # 3. FINNIFTY: Monthly only (Last Tuesday)
+    if "FINNIFTY" in root:
+        target_weekday = 1
+        cand_exp = last_weekday_of_month(now_ist.year, now_ist.month, target_weekday)
+        if now_ist.date() > cand_exp.date():
+            next_month = 1 if now_ist.month == 12 else now_ist.month + 1
+            next_year = now_ist.year + 1 if now_ist.month == 12 else now_ist.year
+            cand_exp = last_weekday_of_month(next_year, next_month, target_weekday)
+        return cand_exp.strftime("%d %b %Y").upper()
+
+    # 4. Equities / Stocks: Monthly only (Last Thursday, target_weekday = 3)
+    target_weekday = 3
+    cand_exp = last_weekday_of_month(now_ist.year, now_ist.month, target_weekday)
+    if now_ist.date() > cand_exp.date():
+        next_month = 1 if now_ist.month == 12 else now_ist.month + 1
+        next_year = now_ist.year + 1 if now_ist.month == 12 else now_ist.year
+        cand_exp = last_weekday_of_month(next_year, next_month, target_weekday)
+    return cand_exp.strftime("%d %b %Y").upper()
 
 
 def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: int | None = None) -> dict[str, Any] | None:
@@ -3095,7 +3157,7 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
                     "option_type": bias_tag,
                     "side": bias_tag,
                     "expiry": exp,
-                    "lot_size": 100 if "CRUDE" in root else (30 if "BANK" in root else (65 if "NIFTY" in root else 1))
+                    "lot_size": 100 if "CRUDE" in root else (15 if "BANK" in root else (75 if "NIFTY" in root else 1))
                 }
     except Exception as e:
         log.warning("Option chain strike selection fallback: %s", safe_text(e))
@@ -5819,8 +5881,23 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         elif (news_score <= -1.0 or pattern_bias < 0 or chg_pct <= -0.3) and rsi_val <= 52:
             side = "SELL"; confidence = max(confidence, 65)
 
+    # INSTITUTIONAL VWAP & GAP-TRAP FILTERS:
+    # 1. Under no circumstances recommend a CALL if spot is trading below session VWAP with negative momentum/RSI
+    if last_price < vwap_val and (rsi_val < 50 or net_chg < 0 or technical_side == "SELL"):
+        if side == "BUY":
+            side = "NO_TRADE"
+    # 2. Under no circumstances recommend a PUT if spot is trading above session VWAP with positive momentum/RSI
+    if last_price > vwap_val and (rsi_val > 50 or net_chg > 0 or technical_side == "BUY"):
+        if side == "SELL":
+            side = "NO_TRADE"
+
     evidence = {"technical": ta, "patterns": patterns, "news": news}
-    opt_bias = side if side in {"BUY", "SELL"} else ("BUY" if (net_chg > 0 or rsi_val >= 50 or last_price >= ema20) else "SELL")
+    if last_price < vwap_val and (rsi_val < 50 or net_chg < 0):
+        opt_bias = "SELL"
+    elif last_price > vwap_val and (rsi_val > 50 or net_chg > 0):
+        opt_bias = "BUY"
+    else:
+        opt_bias = side if side in {"BUY", "SELL"} else ("BUY" if (net_chg > 0 or rsi_val >= 50 or last_price >= ema20) else "SELL")
     root = extract_root_symbol(symbol).upper()
     is_fut = is_future_symbol(symbol) or root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "NIFTY", "BANKNIFTY"}
     
@@ -5877,19 +5954,7 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         strike_val = float(opt_parsed.get("strike") or c_node.get("strike") or 0.0) if opt_parsed else float(c_node.get("strike") or 0.0)
         expiry_val = (opt_parsed.get("expiry") if opt_parsed else None) or c_node.get("expiry")
         if not expiry_val:
-            try:
-                d_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-                thursday = d_ist + timedelta(days=((3 - d_ist.weekday() + 7) % 7 or 7))
-                expiry_val = thursday.strftime("%d %b %Y")
-                exp_weekday = 1 if root in ("NIFTY", "FINNIFTY") else 3
-                days_ahead = (exp_weekday - d_ist.weekday() + 7) % 7
-                if days_ahead == 0 and (d_ist.hour > 15 or (d_ist.hour == 15 and d_ist.minute >= 30)):
-                    days_ahead = 7
-                exp_dt = d_ist + timedelta(days=days_ahead)
-                expiry_val = exp_dt.strftime("%d %b %Y").upper()
-            except Exception:
-                expiry_val = "Weekly Expiry"
-                expiry_val = "22 SEP 2026" if root in ("NIFTY", "FINNIFTY") else "24 SEP 2026"
+            expiry_val = get_sebi_compliant_expiry(root)
         else:
             try:
                 if "-" in str(expiry_val):
@@ -9350,8 +9415,8 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         "SILVER": {"spot": 88200.0, "step": 500.0, "lot": 30, "iv": 22.0, "default_exp": "25 SEP 2026"},
         "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": "30 SEP 2026"},
         "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": "30 SEP 2026"},
-        "BANKNIFTY": {"spot": 51250.0, "step": 100.0, "lot": 30, "iv": 15.0, "default_exp": "24 SEP 2026"},
-        "NIFTY": {"spot": 23400.0, "step": 50.0, "lot": 65, "iv": 13.0, "default_exp": "22 SEP 2026"},
+        "BANKNIFTY": {"spot": 55500.0, "step": 100.0, "lot": 15, "iv": 15.0, "default_exp": get_sebi_compliant_expiry("BANKNIFTY")},
+        "NIFTY": {"spot": 24500.0, "step": 50.0, "lot": 75, "iv": 13.0, "default_exp": get_sebi_compliant_expiry("NIFTY")},
     }
     
     # Try fetching live quote for accurate spot
@@ -9397,7 +9462,7 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         step = cfg["step"]
         lot = cfg["lot"]
         iv = cfg["iv"]
-        default_exp = cfg.get("default_exp", "24 SEP 2026")
+        default_exp = cfg.get("default_exp") or get_sebi_compliant_expiry(root)
     else:
         # Stock equity configuration (RELIANCE, TCS, INFY, HDFCBANK, etc.)
         if spot is None: spot = 1250.0
@@ -9409,7 +9474,7 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         else: step = 2.5
         lot = 250 if spot > 1000 else 500
         iv = 22.0
-        default_exp = "24 SEP 2026"
+        default_exp = get_sebi_compliant_expiry(root)
 
     atm_strike = round(spot / step) * step
     exp_str = expiry or default_exp
