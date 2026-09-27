@@ -107,6 +107,33 @@ def _patch(mod):
                     return wait_signal(instrument)
             route.endpoint = guarded
             route._ca_guard = True
+    for route in getattr(mod.app, "routes", []):
+        if getattr(route, "path", "") == "/api/options/{underlying}/expiries" and not getattr(route, "_ca_expiry_guard", False):
+            original_expiry = route.endpoint
+            async def live_expiries(underlying, user=None):
+                root = mod.extract_root_symbol(underlying).upper()
+                if root not in MCX_ROOTS:
+                    return await original_expiry(underlying, user)
+                rows = (await asyncio.to_thread(mod.UPSTOX.search_instruments, root, exchanges="MCX", segments="ALL")).get("data") or []
+                vals = set()
+                today = datetime.now(IST).date()
+                for row in rows:
+                    if str(row.get("instrument_type") or "").upper() not in {"CE", "PE"}:
+                        continue
+                    exp = str(row.get("expiry") or row.get("expiry_date") or "").strip().upper()
+                    try:
+                        day = datetime.strptime(exp, "%Y-%m-%d").date()
+                    except Exception:
+                        try:
+                            day = datetime.strptime(exp, "%d %b %Y").date()
+                        except Exception:
+                            continue
+                    if day >= today:
+                        vals.add(day)
+                return {"underlying": root, "expiries": [d.strftime("%d %b %Y").upper() for d in sorted(vals)],
+                        "provider": "upstox_mcx_live", "timestamp": mod.client_now_iso()}
+            route.endpoint = live_expiries
+            route._ca_expiry_guard = True
     mod._ca_runtime_guard = True
 
 def _boot():
