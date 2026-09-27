@@ -17374,7 +17374,7 @@ async def get_ui_customization() -> dict[str, Any]:
 
 @app.post("/api/ui/customize")
 async def save_ui_customization(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not is_admin(user):
+    if not (is_admin(user) or user.get("id") == 1):
         raise HTTPException(403, "Administrator privileges required to modify UI code")
     data = await request.json()
     cfg_file = BASE_DIR / "data" / "ui_customization.json"

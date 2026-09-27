@@ -4014,7 +4014,6 @@ select#watchlistSelect, select.watchlist-select {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             <span>Pop-out</span>
           </button>
-          <button class="btn gold" id="chartAiSuggestBtnMobile" style="display:none;font-weight:700;padding:4px 8px;font-size:11px;" title="CA AI Indicator & Trendline Suggestions"> CA AI Indicators</button>
           <button class="btn gold" id="chartAiSuggestBtnMobile" style="display:none;font-weight:700;padding:4px 8px;font-size:11px;align-items:center;gap:4px;" title="CA AI Indicator & Trendline Suggestions" onclick="window.toggleChartAiPanel && window.toggleChartAiPanel(undefined, this)"> CA AI Suggestions <span class="badge" id="chartAiBadgeMobile" style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span></button>
           <button class="btn gold" id="chartBuyBtn">Buy</button>
           <button class="btn ghost" id="chartSellBtn">Sell</button>
@@ -4123,7 +4122,6 @@ select#watchlistSelect, select.watchlist-select {
           </label>
 
           <!-- CA AI Suggestions Pill -->
-          <button class="btn gold small" id="chartAiSuggestBtn" title="CA AI Indicator &amp; Trendline Suggestions" style="font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:linear-gradient(135deg,rgba(239,251,245,0.12),rgba(38,217,166,0.18));border:1px solid var(--buy);color:var(--text);cursor:pointer;">
           <button class="btn gold small" id="chartAiSuggestBtn" title="CA AI Indicator &amp; Trendline Suggestions" onclick="window.toggleChartAiPanel && window.toggleChartAiPanel(undefined, this)" style="font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:linear-gradient(135deg,rgba(239,251,245,0.12),rgba(38,217,166,0.18));border:1px solid var(--buy);color:var(--text);cursor:pointer;">
              CA AI Suggestions <span class="badge" id="chartAiBadge" style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span>
           </button>
@@ -6688,6 +6686,8 @@ var optionState = window.optionState;
 // ===== EDIT UI SYSTEM =====
 let caEditMode = false;
 window.__caUiCustomOverrides = {};
+window.__caEditUndoStack = [];
+window.__caEditRedoStack = [];
 
 const caEditBar = document.createElement('div');
 caEditBar.className = 'ca-edit-bar';
@@ -6701,9 +6701,20 @@ caEditBar.innerHTML = `
       Right-click any button, card, box, or text to customize / remove / resize. Drag cards (⠿) to reorder.
     </span>
   </div>
-  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <button id="caSaveCodeAdmin" class="btn small" style="background:#0F5132;color:#ffffff;border:1px solid #198754;font-size:11px;font-weight:700;border-radius:4px;cursor:pointer;padding:4px 10px;">💾 Save to App Code (Admin)</button>
-    <button id="caResetLayout" class="btn ghost small" style="font-size:11px;color:#0B2A1E;border-color:rgba(0,0,0,0.35);">↺ Reset All</button>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <button id="caEditUndoBtn" class="btn ghost small" disabled title="Undo last edit (Ctrl+Z)" style="font-size:11px;color:#0B2A1E;border-color:rgba(0,0,0,0.35);font-weight:700;display:inline-flex;align-items:center;gap:4px;opacity:0.45;cursor:not-allowed;padding:4px 9px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+      Undo
+    </button>
+    <button id="caEditRedoBtn" class="btn ghost small" disabled title="Redo last undone edit (Ctrl+Y)" style="font-size:11px;color:#0B2A1E;border-color:rgba(0,0,0,0.35);font-weight:700;display:inline-flex;align-items:center;gap:4px;opacity:0.45;cursor:not-allowed;padding:4px 9px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+      Redo
+    </button>
+    <button id="caSaveCodeAdmin" class="btn small" style="background:#0F5132;color:#ffffff;border:1px solid #198754;font-size:11px;font-weight:700;border-radius:4px;cursor:pointer;padding:4px 10px;display:inline-flex;align-items:center;gap:4px;" title="Persist customizations to server backend so changes load permanently on all devices">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save to App Code (Admin)
+    </button>
+    <button id="caResetLayout" class="btn ghost small" style="font-size:11px;color:#0B2A1E;border-color:rgba(0,0,0,0.35);font-weight:600;padding:4px 9px;" title="Reset all UI customizations and layout to defaults">↺ Reset All</button>
     <button id="caEditDone" style="background:var(--primary);color:#ffffff;border:none;padding:5px 14px;border-radius:5px;font-weight:800;cursor:pointer;font-size:12px;">✓ Done</button>
   </div>
 `;
@@ -6715,6 +6726,31 @@ caEditContextMenu.id = 'caEditContextMenu';
 caEditContextMenu.className = 'ca-edit-context-menu';
 caEditContextMenu.style.cssText = 'position:fixed;display:none;z-index:999999;background:var(--surface);border:1.5px solid var(--gold);box-shadow:0 12px 36px rgba(0,0,0,0.8);border-radius:8px;padding:10px;min-width:260px;max-width:320px;font-size:12px;color:var(--text);backdrop-filter:blur(10px);';
 document.body.appendChild(caEditContextMenu);
+
+function updateUndoRedoButtons() {
+  const undoBtn = document.getElementById('caEditUndoBtn');
+  const redoBtn = document.getElementById('caEditRedoBtn');
+  if (undoBtn) {
+    const canUndo = window.__caEditUndoStack && window.__caEditUndoStack.length > 0;
+    undoBtn.disabled = !canUndo;
+    undoBtn.style.opacity = canUndo ? '1' : '0.45';
+    undoBtn.style.cursor = canUndo ? 'pointer' : 'not-allowed';
+  }
+  if (redoBtn) {
+    const canRedo = window.__caEditRedoStack && window.__caEditRedoStack.length > 0;
+    redoBtn.disabled = !canRedo;
+    redoBtn.style.opacity = canRedo ? '1' : '0.45';
+    redoBtn.style.cursor = canRedo ? 'pointer' : 'not-allowed';
+  }
+}
+
+function recordEditAction(action) {
+  if (!window.__caEditUndoStack) window.__caEditUndoStack = [];
+  window.__caEditUndoStack.push(action);
+  if (window.__caEditUndoStack.length > 50) window.__caEditUndoStack.shift();
+  window.__caEditRedoStack = [];
+  updateUndoRedoButtons();
+}
 
 function getCaElementSelector(el) {
   if (!el || el === document.body) return '';
@@ -6745,11 +6781,18 @@ function getCaElementSelector(el) {
   return path.join(' > ');
 }
 
-function setCaElementOverride(el, prop, val) {
-  const sel = getCaElementSelector(el);
+function setCaElementOverride(elOrSel, prop, val) {
+  const sel = typeof elOrSel === 'string' ? elOrSel : getCaElementSelector(elOrSel);
   if (!sel) return;
   window.__caUiCustomOverrides[sel] = window.__caUiCustomOverrides[sel] || {};
-  window.__caUiCustomOverrides[sel][prop] = val;
+  if (val === undefined || val === '' || (prop === 'hidden' && val === false)) {
+    delete window.__caUiCustomOverrides[sel][prop];
+    if (Object.keys(window.__caUiCustomOverrides[sel]).length === 0) {
+      delete window.__caUiCustomOverrides[sel];
+    }
+  } else {
+    window.__caUiCustomOverrides[sel][prop] = val;
+  }
   try {
     localStorage.setItem('ca_ui_custom_overrides', JSON.stringify(window.__caUiCustomOverrides));
   } catch(_) {}
@@ -6757,22 +6800,141 @@ function setCaElementOverride(el, prop, val) {
 
 window.applyCustomUiOverrides = function() {
   try {
-    const saved = JSON.parse(localStorage.getItem('ca_ui_custom_overrides') || '{}');
+    const saved = window.__caUiCustomOverrides || JSON.parse(localStorage.getItem('ca_ui_custom_overrides') || '{}');
     window.__caUiCustomOverrides = saved;
     Object.keys(saved).forEach(sel => {
       try {
-        const el = document.querySelector(sel);
-        if (!el) return;
+        const els = document.querySelectorAll(sel);
+        if (!els || els.length === 0) return;
         const cfg = saved[sel];
-        if (cfg.hidden) el.style.display = 'none';
-        if (cfg.text !== undefined) el.textContent = cfg.text;
-        if (cfg.fontSize) el.style.fontSize = cfg.fontSize;
-        if (cfg.fontFamily) el.style.fontFamily = cfg.fontFamily;
-        if (cfg.width) el.style.width = cfg.width;
-        if (cfg.padding) el.style.padding = cfg.padding;
+        els.forEach(el => {
+          if (cfg.hidden === true) {
+            el.style.display = 'none';
+          } else if (cfg.hidden === false && el.style.display === 'none') {
+            el.style.display = '';
+          }
+          if (cfg.text !== undefined) el.textContent = cfg.text;
+          if (cfg.fontSize !== undefined) el.style.fontSize = cfg.fontSize;
+          if (cfg.fontFamily !== undefined) el.style.fontFamily = cfg.fontFamily;
+          if (cfg.width !== undefined) el.style.width = cfg.width;
+          if (cfg.padding !== undefined) el.style.padding = cfg.padding;
+        });
       } catch(_) {}
     });
   } catch(_) {}
+};
+
+window.caEditUndo = function() {
+  if (!window.__caEditUndoStack || window.__caEditUndoStack.length === 0) {
+    toast('Nothing to undo', 'info');
+    return;
+  }
+  const action = window.__caEditUndoStack.pop();
+  try {
+    if (action.type === 'hide') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => { el.style.display = action.prevVal || ''; });
+      setCaElementOverride(action.selector, 'hidden', false);
+    } else if (action.type === 'text') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => { el.textContent = action.prevVal; });
+      setCaElementOverride(action.selector, 'text', action.prevVal);
+    } else if (action.type === 'style') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => { el.style[action.prop] = action.prevVal || ''; });
+      setCaElementOverride(action.selector, action.prop, action.prevVal || '');
+    } else if (action.type === 'reorder') {
+      const card = document.getElementById(action.cardId);
+      if (card && card.parentNode) {
+        if (action.prevNextSiblingId) {
+          const nextEl = document.getElementById(action.prevNextSiblingId);
+          if (nextEl) card.parentNode.insertBefore(card, nextEl);
+          else card.parentNode.appendChild(card);
+        } else {
+          card.parentNode.appendChild(card);
+        }
+        saveCardLayouts();
+      }
+    } else if (action.type === 'reset') {
+      if (action.prevOverrides) {
+        window.__caUiCustomOverrides[action.selector] = action.prevOverrides;
+        try { localStorage.setItem('ca_ui_custom_overrides', JSON.stringify(window.__caUiCustomOverrides)); } catch(_) {}
+      }
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => {
+        if (action.prevStyles) {
+          el.style.display = action.prevStyles.display || '';
+          el.style.fontSize = action.prevStyles.fontSize || '';
+          el.style.fontFamily = action.prevStyles.fontFamily || '';
+          if (action.card) {
+            action.card.style.width = action.prevStyles.width || '';
+            action.card.style.padding = action.prevStyles.padding || '';
+          }
+        }
+      });
+    }
+    if (!window.__caEditRedoStack) window.__caEditRedoStack = [];
+    window.__caEditRedoStack.push(action);
+    updateUndoRedoButtons();
+    toast(`Undone: ${action.desc || 'Action'}`);
+  } catch(e) {
+    console.warn('[Edit UI Undo Error]', e);
+    toast('Undo failed: ' + e.message, 'error');
+  }
+};
+
+window.caEditRedo = function() {
+  if (!window.__caEditRedoStack || window.__caEditRedoStack.length === 0) {
+    toast('Nothing to redo', 'info');
+    return;
+  }
+  const action = window.__caEditRedoStack.pop();
+  try {
+    if (action.type === 'hide') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => { el.style.display = action.newVal || 'none'; });
+      setCaElementOverride(action.selector, 'hidden', true);
+    } else if (action.type === 'text') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => { el.textContent = action.newVal; });
+      setCaElementOverride(action.selector, 'text', action.newVal);
+    } else if (action.type === 'style') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => { el.style[action.prop] = action.newVal || ''; });
+      setCaElementOverride(action.selector, action.prop, action.newVal || '');
+    } else if (action.type === 'reorder') {
+      const card = document.getElementById(action.cardId);
+      if (card && card.parentNode) {
+        if (action.newNextSiblingId) {
+          const nextEl = document.getElementById(action.newNextSiblingId);
+          if (nextEl) card.parentNode.insertBefore(card, nextEl);
+          else card.parentNode.appendChild(card);
+        } else {
+          card.parentNode.appendChild(card);
+        }
+        saveCardLayouts();
+      }
+    } else if (action.type === 'reset') {
+      delete window.__caUiCustomOverrides[action.selector];
+      try { localStorage.setItem('ca_ui_custom_overrides', JSON.stringify(window.__caUiCustomOverrides)); } catch(_) {}
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => {
+        el.style.display = '';
+        el.style.fontSize = '';
+        el.style.fontFamily = '';
+        if (action.card) {
+          action.card.style.width = '';
+          action.card.style.padding = '';
+        }
+      });
+    }
+    window.__caEditUndoStack.push(action);
+    updateUndoRedoButtons();
+    toast(`Redone: ${action.desc || 'Action'}`);
+  } catch(e) {
+    console.warn('[Edit UI Redo Error]', e);
+    toast('Redo failed: ' + e.message, 'error');
+  }
 };
 
 window.saveUiCustomizationToServer = async function() {
@@ -6781,13 +6943,40 @@ window.saveUiCustomizationToServer = async function() {
     const res = await fetch('/api/ui/customize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(payload)
     });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.detail || 'Save failed');
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d?.detail?.message || d?.detail || d?.message || `HTTP ${res.status}`);
     toast('UI customizations saved permanently to application code!');
   } catch(err) {
     toast(`Failed to save to code: ${err.message}`, 'error');
+  }
+};
+
+window.loadUiCustomizationsFromServer = async function() {
+  try {
+    const res = await fetch('/api/ui/customize', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && typeof data === 'object') {
+      const serverOverrides = {};
+      Object.keys(data).forEach(k => {
+        if (k.startsWith('#') || k.startsWith('.') || k.startsWith('[') || k.includes('>') ||
+            (data[k] && typeof data[k] === 'object' && (data[k].hidden !== undefined || data[k].text !== undefined || data[k].fontSize !== undefined || data[k].fontFamily !== undefined || data[k].width !== undefined || data[k].padding !== undefined))) {
+          serverOverrides[k] = data[k];
+        }
+      });
+      if (Object.keys(serverOverrides).length > 0) {
+        window.__caUiCustomOverrides = { ...serverOverrides, ...(window.__caUiCustomOverrides || {}) };
+        try {
+          localStorage.setItem('ca_ui_custom_overrides', JSON.stringify(window.__caUiCustomOverrides));
+        } catch(_) {}
+        applyCustomUiOverrides();
+      }
+    }
+  } catch(e) {
+    console.debug('[CA UI] Server customizations fetch error:', e);
   }
 };
 
@@ -6801,15 +6990,34 @@ window.resetAllCustomUi = function() {
 
 document.getElementById('caSaveCodeAdmin')?.addEventListener('click', window.saveUiCustomizationToServer);
 document.getElementById('caResetLayout')?.addEventListener('click', window.resetAllCustomUi);
+document.getElementById('caEditUndoBtn')?.addEventListener('click', () => window.caEditUndo());
+document.getElementById('caEditRedoBtn')?.addEventListener('click', () => window.caEditRedo());
 
-// Close context menu on outside click or Escape
-document.addEventListener('click', (e) => {
-  if (caEditContextMenu.style.display !== 'none' && !caEditContextMenu.contains(e.target)) {
-    caEditContextMenu.style.display = 'none';
-  }
-});
+// Keyboard shortcuts for Undo (Ctrl+Z) and Redo (Ctrl+Y / Ctrl+Shift+Z)
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && caEditContextMenu.style.display !== 'none') {
+    caEditContextMenu.style.display = 'none';
+  }
+  if (!caEditMode) return;
+  const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
+
+  const isZ = e.key === 'z' || e.key === 'Z';
+  const isY = e.key === 'y' || e.key === 'Y';
+  const ctrlOrMeta = e.ctrlKey || e.metaKey;
+
+  if (ctrlOrMeta && isZ && !e.shiftKey) {
+    e.preventDefault();
+    window.caEditUndo();
+  } else if ((ctrlOrMeta && isY) || (ctrlOrMeta && isZ && e.shiftKey)) {
+    e.preventDefault();
+    window.caEditRedo();
+  }
+});
+
+// Close context menu on outside click
+document.addEventListener('click', (e) => {
+  if (caEditContextMenu.style.display !== 'none' && !caEditContextMenu.contains(e.target)) {
     caEditContextMenu.style.display = 'none';
   }
 });
@@ -6921,26 +7129,50 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
   // Wire Remove Buttons
   document.getElementById('caCtxRemoveBtn')?.addEventListener('click', () => {
     if (btn) {
+      const sel = getCaElementSelector(btn);
+      recordEditAction({
+        type: 'hide',
+        selector: sel,
+        prevVal: btn.style.display,
+        newVal: 'none',
+        desc: 'Remove button'
+      });
       btn.style.display = 'none';
       setCaElementOverride(btn, 'hidden', true);
-      toast('Button removed');
+      toast('Button removed (Undo available)');
       caEditContextMenu.style.display = 'none';
     }
   });
 
   document.getElementById('caCtxRemoveCard')?.addEventListener('click', () => {
     if (card) {
+      const sel = getCaElementSelector(card);
+      recordEditAction({
+        type: 'hide',
+        selector: sel,
+        prevVal: card.style.display,
+        newVal: 'none',
+        desc: 'Remove card'
+      });
       card.style.display = 'none';
       setCaElementOverride(card, 'hidden', true);
-      toast('Box / Card removed');
+      toast('Box / Card removed (Undo available)');
       caEditContextMenu.style.display = 'none';
     }
   });
 
   document.getElementById('caCtxRemoveTarget')?.addEventListener('click', () => {
+    const sel = getCaElementSelector(target);
+    recordEditAction({
+      type: 'hide',
+      selector: sel,
+      prevVal: target.style.display,
+      newVal: 'none',
+      desc: 'Remove element'
+    });
     target.style.display = 'none';
     setCaElementOverride(target, 'hidden', true);
-    toast('Element removed');
+    toast('Element removed (Undo available)');
     caEditContextMenu.style.display = 'none';
   });
 
@@ -6949,17 +7181,34 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
     caEditContextMenu.style.display = 'none';
     const curVal = (target.textContent || '').trim();
     const newVal = prompt('Edit text content:', curVal);
-    if (newVal !== null) {
+    if (newVal !== null && newVal !== curVal) {
+      const sel = getCaElementSelector(target);
+      recordEditAction({
+        type: 'text',
+        selector: sel,
+        prevVal: curVal,
+        newVal: newVal,
+        desc: 'Edit text'
+      });
       target.textContent = newVal;
       setCaElementOverride(target, 'text', newVal);
-      toast('Text updated');
+      toast('Text updated (Undo available)');
     }
   });
 
   document.getElementById('caCtxClearText')?.addEventListener('click', () => {
+    const curVal = target.textContent || '';
+    const sel = getCaElementSelector(target);
+    recordEditAction({
+      type: 'text',
+      selector: sel,
+      prevVal: curVal,
+      newVal: '',
+      desc: 'Clear text'
+    });
     target.textContent = '';
     setCaElementOverride(target, 'text', '');
-    toast('Text cleared');
+    toast('Text cleared (Undo available)');
     caEditContextMenu.style.display = 'none';
   });
 
@@ -6967,35 +7216,73 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
   caEditContextMenu.querySelectorAll('[data-ca-size]').forEach(b => {
     b.onclick = () => {
       const sz = b.dataset.caSize;
+      const curSz = target.style.fontSize || '';
+      const sel = getCaElementSelector(target);
+      recordEditAction({
+        type: 'style',
+        prop: 'fontSize',
+        selector: sel,
+        prevVal: curSz,
+        newVal: sz,
+        desc: `Font size: ${sz}`
+      });
       target.style.fontSize = sz;
       setCaElementOverride(target, 'fontSize', sz);
-      toast(`Font size: ${sz}`);
+      toast(`Font size: ${sz} (Undo available)`);
     };
   });
 
   document.getElementById('caCtxSizeInc')?.addEventListener('click', () => {
     const curSz = parseFloat(window.getComputedStyle(target).fontSize) || 12;
     const newSz = `${Math.round(curSz + 1)}px`;
+    const sel = getCaElementSelector(target);
+    recordEditAction({
+      type: 'style',
+      prop: 'fontSize',
+      selector: sel,
+      prevVal: target.style.fontSize || `${Math.round(curSz)}px`,
+      newVal: newSz,
+      desc: `Font size: ${newSz}`
+    });
     target.style.fontSize = newSz;
     setCaElementOverride(target, 'fontSize', newSz);
-    toast(`Font size: ${newSz}`);
+    toast(`Font size: ${newSz} (Undo available)`);
   });
 
   document.getElementById('caCtxSizeDec')?.addEventListener('click', () => {
     const curSz = parseFloat(window.getComputedStyle(target).fontSize) || 12;
     const newSz = `${Math.max(9, Math.round(curSz - 1))}px`;
+    const sel = getCaElementSelector(target);
+    recordEditAction({
+      type: 'style',
+      prop: 'fontSize',
+      selector: sel,
+      prevVal: target.style.fontSize || `${Math.round(curSz)}px`,
+      newVal: newSz,
+      desc: `Font size: ${newSz}`
+    });
     target.style.fontSize = newSz;
     setCaElementOverride(target, 'fontSize', newSz);
-    toast(`Font size: ${newSz}`);
+    toast(`Font size: ${newSz} (Undo available)`);
   });
 
   // Wire Font Family
   caEditContextMenu.querySelectorAll('[data-ca-font]').forEach(b => {
     b.onclick = () => {
       const fn = b.dataset.caFont;
+      const curFn = target.style.fontFamily || '';
+      const sel = getCaElementSelector(target);
+      recordEditAction({
+        type: 'style',
+        prop: 'fontFamily',
+        selector: sel,
+        prevVal: curFn,
+        newVal: fn,
+        desc: 'Font family'
+      });
       target.style.fontFamily = fn;
       setCaElementOverride(target, 'fontFamily', fn);
-      toast(`Font family updated`);
+      toast(`Font family updated (Undo available)`);
     };
   });
 
@@ -7004,35 +7291,73 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
     caEditContextMenu.querySelectorAll('[data-ca-width]').forEach(b => {
       b.onclick = () => {
         const w = b.dataset.caWidth;
+        const curW = card.style.width || '';
+        const sel = getCaElementSelector(card);
+        recordEditAction({
+          type: 'style',
+          prop: 'width',
+          selector: sel,
+          prevVal: curW,
+          newVal: w,
+          desc: `Box width: ${w}`
+        });
         card.style.width = w;
         setCaElementOverride(card, 'width', w);
-        toast(`Box width: ${w}`);
+        toast(`Box width: ${w} (Undo available)`);
       };
     });
 
     caEditContextMenu.querySelectorAll('[data-ca-pad]').forEach(b => {
       b.onclick = () => {
         const p = b.dataset.caPad;
+        const curP = card.style.padding || '';
+        const sel = getCaElementSelector(card);
+        recordEditAction({
+          type: 'style',
+          prop: 'padding',
+          selector: sel,
+          prevVal: curP,
+          newVal: p,
+          desc: `Box padding updated`
+        });
         card.style.padding = p;
         setCaElementOverride(card, 'padding', p);
-        toast(`Box padding updated`);
+        toast(`Box padding updated (Undo available)`);
       };
     });
 
     document.getElementById('caCtxMoveUp')?.addEventListener('click', () => {
       if (card.previousElementSibling && card.parentNode) {
-        card.parentNode.insertBefore(card, card.previousElementSibling);
+        const parent = card.parentNode;
+        const prevNext = card.nextElementSibling;
+        recordEditAction({
+          type: 'reorder',
+          cardId: card.id,
+          prevNextSiblingId: prevNext ? prevNext.id : null,
+          newNextSiblingId: card.previousElementSibling.id,
+          desc: 'Move card up'
+        });
+        parent.insertBefore(card, card.previousElementSibling);
         saveCardLayouts();
-        toast('Card moved up');
+        toast('Card moved up (Undo available)');
         caEditContextMenu.style.display = 'none';
       }
     });
 
     document.getElementById('caCtxMoveDown')?.addEventListener('click', () => {
       if (card.nextElementSibling && card.parentNode) {
-        card.parentNode.insertBefore(card.nextElementSibling, card);
+        const parent = card.parentNode;
+        const prevNext = card.nextElementSibling;
+        recordEditAction({
+          type: 'reorder',
+          cardId: card.id,
+          prevNextSiblingId: prevNext ? prevNext.id : null,
+          newNextSiblingId: prevNext.nextElementSibling ? prevNext.nextElementSibling.id : null,
+          desc: 'Move card down'
+        });
+        parent.insertBefore(card.nextElementSibling, card);
         saveCardLayouts();
-        toast('Card moved down');
+        toast('Card moved down (Undo available)');
         caEditContextMenu.style.display = 'none';
       }
     });
@@ -7041,6 +7366,22 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
   // Wire Reset Element
   document.getElementById('caCtxResetElem')?.addEventListener('click', () => {
     const sel = getCaElementSelector(target);
+    const prevOverrides = window.__caUiCustomOverrides[sel] ? JSON.parse(JSON.stringify(window.__caUiCustomOverrides[sel])) : null;
+    const prevStyles = {
+      display: target.style.display,
+      fontSize: target.style.fontSize,
+      fontFamily: target.style.fontFamily,
+      width: card ? card.style.width : '',
+      padding: card ? card.style.padding : ''
+    };
+    recordEditAction({
+      type: 'reset',
+      selector: sel,
+      card: card,
+      prevOverrides: prevOverrides,
+      prevStyles: prevStyles,
+      desc: 'Reset element styles'
+    });
     if (sel && window.__caUiCustomOverrides[sel]) {
       delete window.__caUiCustomOverrides[sel];
       try {
@@ -7054,7 +7395,7 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
       card.style.width = '';
       card.style.padding = '';
     }
-    toast('Element styles reset');
+    toast('Element styles reset (Undo available)');
     caEditContextMenu.style.display = 'none';
   });
 }
@@ -7095,6 +7436,7 @@ function enableEditMode(){
   caEditMode = true;
   document.body.classList.add('ca-edit-mode');
   caEditBar.classList.add('active');
+  updateUndoRedoButtons();
 
   const btn = document.getElementById('caToggleCompactButtons');
   if(btn){
@@ -7128,6 +7470,14 @@ function enableEditMode(){
       e.preventDefault();
       const dragging = document.querySelector('.ca-card-dragging');
       if(dragging && dragging !== card && card.parentNode === dragging.parentNode){
+        const prevNext = card.nextElementSibling;
+        recordEditAction({
+          type: 'reorder',
+          cardId: dragging.id,
+          prevNextSiblingId: prevNext ? prevNext.id : null,
+          newNextSiblingId: card.id,
+          desc: 'Drag & drop card'
+        });
         card.parentNode.insertBefore(dragging, card);
         saveCardLayouts();
       }
@@ -7150,8 +7500,9 @@ function disableEditMode(){
 document.getElementById('caEditDone')?.addEventListener('click', disableEditMode);
 document.getElementById('editUIBtn')?.addEventListener('click', enableEditMode);
 
-// Auto-restore saved card layouts and custom UI overrides on load
+// Auto-restore saved card layouts and custom UI overrides on load, plus sync from server
 applySavedCardLayouts();
+window.loadUiCustomizationsFromServer();
 
 // ===== SIDEBAR RESIZE =====
 const sidebarResizer = document.getElementById('sidebarResizer');
