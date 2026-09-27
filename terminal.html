@@ -3413,10 +3413,6 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
     Option Chain
   </div>
-  <div class="navtab" data-tab="reco" role="button" tabindex="0" onclick="showTab('reco')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
-    Recommendation History
-  </div>
   <div class="navtab" data-tab="ask-ai" role="button" tabindex="0" onclick="showTab('ask-ai')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 3.3 2 6.2 5 7.4V20a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2.6c3-1.2 5-4.1 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/><path d="M10 13a3.5 3.5 0 0 0 4 0"/></svg>
     Ask CA AI
@@ -3924,103 +3920,6 @@ select#watchlistSelect, select.watchlist-select {
         </div>
       </div>
     </div> <!-- END panel-dashboard -->
-
-  <div class="panel" id="panel-reco">
-      <!-- ============ INTEGRATED AUTO ANALYZE DAY RECOMMENDATIONS (Item 3) ============ -->
-      
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:10px;align-items:end;">
-          <div>
-            <label style="display:block;font-size:10.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;margin-bottom:4px;">Trading Day</label>
-            <input type="date" id="autoAnalyzeDayPicker" class="tool-input" style="width:100%;height:30px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-family:var(--font-mono);font-size:12px;">
-          </div>
-          <div>
-            <label style="display:block;font-size:10.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;margin-bottom:4px;">Instrument</label>
-            <select id="autoAnalyzeSymbol" class="form-select" style="width:100%;height:30px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;">
-              <option value="NIFTY" selected>NIFTY 50</option>
-              <option value="BANKNIFTY">BANK NIFTY</option>
-              <option value="FINNIFTY">FINNIFTY</option>
-              <option value="CRUDEOIL">CRUDEOIL</option>
-              <option value="RELIANCE">RELIANCE</option>
-              <option value="TCS">TCS</option>
-              <option value="HDFCBANK">HDFC BANK</option>
-            </select>
-          </div>
-          <div>
-            <label style="display:block;font-size:10.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;margin-bottom:4px;">Timeframe</label>
-            <select id="autoAnalyzeTf" class="form-select" style="width:100%;height:30px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;">
-              <option value="1m">1m (Scalp)</option>
-              <option value="3m">3m (Quick Scalp)</option>
-              <option value="5m" selected>5m (Intraday Momentum)</option>
-              <option value="15m">15m (Swing)</option>
-            </select>
-          </div>
-          <div>
-            <button type="button" class="btn gold" id="autoAnalyzeDayBtn" onclick="runAutoAnalyzeDayTrades()" style="width:100%;height:30px;font-weight:700;font-size:11.5px;display:inline-flex;align-items:center;justify-content:center;gap:4px;">
-              Auto Analyze Day Trades
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="page-head" style="margin-bottom:12px;">
-        <div>
-          <div class="page-title" style="display:flex;align-items:center;gap:8px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
-            Recommendation History &amp; Audited Track Record
-          </div>
-          <div class="page-sub">Independent audited trade signals, execution outcomes (Target Hit, SL Hit, Active Trail) and realized P&amp;L</div>
-        </div>
-        <div class="head-actions">
-          <button class="btn ghost small" id="recoHistoryRefreshBtn" onclick="loadRecommendationHistory()">Refresh History</button>
-        </div>
-      </div>
-
-      <!-- Win-Rate & Performance Summary Bar -->
-      <div class="grid grid-4" style="margin-bottom:14px;gap:10px;">
-        <div class="card" style="padding:12px 14px;background:var(--surface);">
-          <div class="muted" style="font-size:10.5px;text-transform:uppercase;">Auto Reco Win Rate</div>
-          <div id="recoAutoWinRate" style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:var(--buy);margin-top:4px;">—</div>
-          <div id="recoAutoWins" class="muted" style="font-size:10px;margin-top:2px;">No data</div>
-        </div>
-        <div class="card" style="padding:12px 14px;background:var(--surface);">
-          <div class="muted" style="font-size:10.5px;text-transform:uppercase;">Manual Reco Win Rate</div>
-          <div id="recoOnDemandWinRate" style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:var(--buy);margin-top:4px;">—</div>
-          <div id="recoOnDemandWins" class="muted" style="font-size:10px;margin-top:2px;">No data</div>
-        </div>
-        <div class="card" style="padding:12px 14px;background:var(--surface);">
-          <div class="muted" style="font-size:10.5px;text-transform:uppercase;">Combined Win Rate</div>
-          <div id="recoCombinedWinRate" style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:var(--text);margin-top:4px;">—</div>
-          <div id="recoCombinedCount" class="muted" style="font-size:10px;margin-top:2px;">0 recommendations</div>
-        </div>
-        <div class="card" style="padding:12px 14px;background:var(--surface);">
-          <div class="muted" style="font-size:10.5px;text-transform:uppercase;">Audited Net P&amp;L</div>
-          <div id="recoNetPnl" style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:var(--buy);margin-top:4px;">—</div>
-          <div class="muted" style="font-size:10px;margin-top:2px;">Real-time target &amp; stop tracking</div>
-        </div>
-      </div>
-
-      <!-- Recommendation History Table Card -->
-      <div class="card" style="margin-bottom:14px;padding:14px 16px;">
-        <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <b style="font-size:13px;color:var(--text);">Recommendation History Log</b>
-            <span class="tag neutral" id="recoHistoryCountBadge" style="font-size:10px;">0 records</span>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-            <span style="font-size:11px;color:var(--text-faint);">From:</span>
-            <input type="date" id="recoFilterFrom" class="tool-input compact-date-input" title="From Date" onchange="loadRecommendationHistory()">
-            <span style="font-size:11px;color:var(--text-faint);">To:</span>
-            <input type="date" id="recoFilterTo" class="tool-input compact-date-input" title="To Date" onchange="loadRecommendationHistory()">
-            <button class="btn ghost small" id="recoClearAllBtn" style="font-size:10.5px;">Clear History</button>
-          </div>
-        </div>
-        <div id="recommendationHistory"><div class="data-empty">Loading history…</div></div>
-      </div>
-    </div>
-
-
-    
-    
 
     <!-- ============ ASK CA AI (Requirement 13) ============ -->
     <div class="panel" id="panel-ask-ai">
@@ -6619,6 +6518,12 @@ window.isInstrumentMarketOpen = function(sym) {
 
 function showTab(name){
   if(!name) return;
+  if(name === 'reco'){
+    name = 'dashboard';
+    setTimeout(() => {
+      document.getElementById('dashRecoHistoryCard')?.scrollIntoView({ behavior: 'smooth' });
+    }, 120);
+  }
   if(window.navIsDragging || (Date.now() - (window.__navDragEndTime || 0) < 350)) return;
   const panelName = name;
   document.querySelectorAll('.navtab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
@@ -29570,22 +29475,40 @@ window.runDashboardBacktest = async function(){
   }
   
   try {
-    const res = await fetch('/api/recommendations/backtest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol: root, date: chosenDate })
-    });
-    const d = await res.json();
-    if(!res.ok) throw new Error(d.detail || 'Backtest analysis failed');
+    let d = {};
+    if (typeof api === 'function') {
+      d = await api('/api/recommendations/backtest', {
+        method: 'POST',
+        body: JSON.stringify({ symbol: root, date: chosenDate })
+      });
+    } else {
+      const res = await fetch('/api/recommendations/backtest', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: root, date: chosenDate })
+      });
+      d = await res.json();
+      if (!res.ok) throw new Error(d.detail || 'Backtest analysis failed');
+    }
     
-    if(typeof toast === 'function') toast(`Reconstructed 5 best setups for ${root} on ${chosenDate} without lookahead bias!`);
+    // Cache setups in localStorage for immediate client-side persistence
+    if (d.recommendations && d.recommendations.length) {
+      try {
+        const existing = JSON.parse(localStorage.getItem('ca_backtest_recos_history_v1') || '[]');
+        const updated = [...d.recommendations, ...existing].slice(0, 100);
+        localStorage.setItem('ca_backtest_recos_history_v1', JSON.stringify(updated));
+      } catch(_) {}
+    }
+    
+    if (typeof toast === 'function') toast(`Reconstructed 5 best setups for ${root} on ${chosenDate} without lookahead bias!`);
     
     // Refresh history immediately
-    if(typeof window.loadRecommendationHistory === 'function'){
+    if (typeof window.loadRecommendationHistory === 'function') {
       await window.loadRecommendationHistory(root);
     }
   } catch(e) {
-    if(typeof toast === 'function') toast(`Backtest error: ${e.message}`);
+    if (typeof toast === 'function') toast(`Backtest error: ${e.message}`);
   } finally {
     if(btn){
       btn.disabled = false;
@@ -29611,11 +29534,30 @@ window.loadRecommendationHistory = async function(targetSym){
     const toVal = document.getElementById('recoFilterTo')?.value || '';
     let url = `/api/recommendations/history?symbol=${encodeURIComponent(root)}`;
     if(fromVal) url += `&from=${encodeURIComponent(fromVal)}`;
-    if(toVal) url += `&to=${encodeURIComponent(toVal)}`;
+    let d = {};
+    if (typeof api === 'function') {
+      d = await api(url, { timeoutMs: 8000 }).catch(() => ({ items: [] }));
+    } else {
+      const r = await fetch(url, { credentials: 'include' });
+      d = await r.json().catch(() => ({ items: [] }));
+    }
+    let items = (d && d.items) || [];
     
-    const r = await fetch(url);
-    const d = await r.json();
-    const items = d.items || [];
+    // Merge any locally stored forensic backtest setups for this root
+    try {
+      const btRecos = JSON.parse(localStorage.getItem('ca_backtest_recos_history_v1') || '[]');
+      if (btRecos.length) {
+        const matching = btRecos.filter(x => !root || (x.symbol && x.symbol.toUpperCase().includes(root)) || (x.underlying && x.underlying.toUpperCase().includes(root)));
+        const existingIds = new Set(items.map(x => String(x.id)));
+        for (const m of matching) {
+          if (!existingIds.has(String(m.id))) {
+            items.push(m);
+          }
+        }
+      }
+    } catch(_) {}
+    
+    items.sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     
     const countBadge = document.getElementById('recoHistoryCountBadge');
     if(countBadge) countBadge.textContent = `${items.length} records`;

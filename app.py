@@ -10453,174 +10453,221 @@ async def recommendation_on_demand(payload: RecommendationIn, request: Request, 
     return {"id": rid, "source": "on-demand", **rec, "ai": ai, "user_id": user["id"]}
 
 
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    try:
+        if val is None:
+            return default
+        s = str(val).replace(",", "").replace("₹", "").replace("$", "").strip()
+        return float(s) if s else default
+    except Exception:
+        return default
+
+
 def _calc_reco_pnl(r: dict[str, Any], live_price: float | None = None) -> tuple[float, str, int | None]:
-    entry = float(r.get("entry") or 0)
-    target = float(r.get("target") or 0)
-    sl = float(r.get("stop_loss") or 0)
-    side = str(r.get("recommendation") or "BUY").upper()
-    sym = str(r.get("symbol") or "")
-    if not entry:
+    try:
+        entry = _safe_float(r.get("entry"))
+        target = _safe_float(r.get("target"))
+        sl = _safe_float(r.get("stop_loss"))
+        side = str(r.get("recommendation") or "BUY").upper()
+        sym = str(r.get("symbol") or "")
+        if not entry:
+            return (0.0, "Pending Setup", 0)
+
+        # Validate market hours in Asia/Kolkata
+        now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+        is_mcx = any(x in sym for x in ("CRUDE", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "MCX"))
+        is_weekend = now_ist.weekday() in (5, 6)
+        if is_mcx:
+            mkt_open = not is_weekend and ((now_ist.hour > 9 or (now_ist.hour == 9 and now_ist.minute >= 0)) and (now_ist.hour < 23 or (now_ist.hour == 23 and now_ist.minute <= 30)))
+        else:
+            mkt_open = not is_weekend and ((now_ist.hour > 9 or (now_ist.hour == 9 and now_ist.minute >= 15)) and (now_ist.hour < 15 or (now_ist.hour == 15 and now_ist.minute <= 30)))
+
+        if not mkt_open:
+            return (0.0, "Next Session Setup", 0)
+
+        lot = 65 if "NIFTY" in sym else 15 if "BANK" in sym else 100 if "CRUDE" in sym else 10
+        cur_price = live_price if (live_price and live_price > 0) else entry
+        pnl_per_share = (cur_price - entry) if "BUY" in side else (entry - cur_price)
+        live_pnl = round(pnl_per_share * lot, 2)
+
+        if "BUY" in side:
+            if target > 0 and cur_price >= target:
+                return (round((target - entry) * lot, 2), "Target Hit", 1)
+            elif sl > 0 and cur_price <= sl:
+                return (round((sl - entry) * lot, 2), "SL Hit", 0)
+            elif target == 0 or target is None:
+                return (live_pnl, "Active Trailing", None)
+            else:
+                return (live_pnl, "Active Signal", None)
+        else:
+            if target > 0 and cur_price <= target:
+                return (round((entry - target) * lot, 2), "Target Hit", 1)
+            elif sl > 0 and cur_price <= sl:
+                return (round((entry - sl) * lot, 2), "SL Hit", 0)
+            elif target == 0 or target is None:
+                return (live_pnl, "Active Trailing", None)
+            else:
+                return (live_pnl, "Active Signal", None)
+    except Exception:
         return (0.0, "Pending Setup", 0)
-
-    # Validate market hours in Asia/Kolkata
-    now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    is_mcx = any(x in sym for x in ("CRUDE", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "MCX"))
-    is_weekend = now_ist.weekday() in (5, 6)
-    if is_mcx:
-        mkt_open = not is_weekend and ((now_ist.hour > 9 or (now_ist.hour == 9 and now_ist.minute >= 0)) and (now_ist.hour < 23 or (now_ist.hour == 23 and now_ist.minute <= 30)))
-    else:
-        mkt_open = not is_weekend and ((now_ist.hour > 9 or (now_ist.hour == 9 and now_ist.minute >= 15)) and (now_ist.hour < 15 or (now_ist.hour == 15 and now_ist.minute <= 30)))
-
-    if not mkt_open:
-        return (0.0, "Next Session Setup", 0)
-
-    lot = 65 if "NIFTY" in sym else 15 if "BANK" in sym else 100 if "CRUDE" in sym else 10
-    cur_price = live_price if (live_price and live_price > 0) else entry
-    pnl_per_share = (cur_price - entry) if "BUY" in side else (entry - cur_price)
-    live_pnl = round(pnl_per_share * lot, 2)
-
-    if "BUY" in side:
-        if target > 0 and cur_price >= target:
-            return (round((target - entry) * lot, 2), "Target Hit", 1)
-        elif sl > 0 and cur_price <= sl:
-            return (round((sl - entry) * lot, 2), "SL Hit", 0)
-        elif target == 0 or target is None:
-            return (live_pnl, "Active Trailing", None)
-        else:
-            return (live_pnl, "Active Signal", None)
-    else:
-        if target > 0 and cur_price <= target:
-            return (round((entry - target) * lot, 2), "Target Hit", 1)
-        elif sl > 0 and cur_price >= sl:
-            return (round((entry - sl) * lot, 2), "SL Hit", 0)
-        elif target == 0 or target is None:
-            return (live_pnl, "Active Trailing", None)
-        else:
-            return (live_pnl, "Active Signal", None)
 
 
 @app.get("/api/recommendations/history")
 async def recommendation_history(request: Request, symbol: str | None = None, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    # Do not auto-scrap recommendations after 2 minutes; preserve audit trail
-    uid = user["id"] if isinstance(user, dict) and "id" in user else 1
-    req_sym = (symbol or request.query_params.get("symbol") or "").upper().strip()
-    root_filter = req_sym.replace("FUT", "").replace("EXP", "").strip() if req_sym else ""
-    cache_key = f"reco_history:{uid}:{root_filter}"
-    cached = CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-    pass
-    # 1. Fetch user's active watchlist symbols
-    watch = user_watchlist_symbols(user["id"])
-    allowed_symbols = set(watch)
-    for s in list(allowed_symbols):
-        if ":" in s: allowed_symbols.add(s.split(":")[-1])
-        if "|" in s: allowed_symbols.add(s.split("|")[-1])
-    if not allowed_symbols:
-        allowed_symbols = {"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN", "TATAMOTORS", "NIFTY", "BANKNIFTY", "CRUDEOIL"}
+    try:
+        uid = user["id"] if isinstance(user, dict) and "id" in user else 1
+        req_sym = (symbol or request.query_params.get("symbol") or "").upper().strip()
+        root_filter = req_sym.replace("FUT", "").replace("EXP", "").strip() if req_sym else ""
+        cache_key = f"reco_history:{uid}:{root_filter}"
+        cached = CACHE.get(cache_key)
+        if cached is not None:
+            return cached
 
-    # 2. Fetch raw rows - strictly actionable BUY/SELL recommendations without heavy basis blobs
-    rows = db_exec(
-        "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, score, outcome, final_pnl, success, exit_reason, created_at, status FROM recommendations WHERE (user_id=? OR user_id IS NULL OR user_id=1) AND UPPER(recommendation) IN ('BUY', 'SELL') ORDER BY created_at DESC LIMIT 300",
-        [user["id"]],
-        "all"
-    )
-
-    # 3. Filter strictly to user's watchlist symbols, BUT always include on-demand recommendations!
-    filtered = []
-    pending_db_updates = []
-    for r in rows:
-        sym = str(r.get("symbol") or "").upper().strip()
-        underlying = str(r.get("underlying") or "").upper().strip()
-        base_sym = sym.split("|")[-1] if "|" in sym else sym.split(":")[-1] if ":" in sym else sym
-        is_on_demand = str(r.get("source") or "") in ("on-demand", "backtest")
-        
-        # Requirement 8: If symbol is specified, filter exclusively to that stock/index and its options
-        if root_filter:
-            matches_inst = (root_filter in sym or root_filter in underlying or underlying in root_filter)
-            if not matches_inst:
-                continue
-        else:
-            is_in_watchlist = bool(sym in allowed_symbols or base_sym in allowed_symbols or underlying in allowed_symbols or any(w in sym for w in allowed_symbols))
-            if not (is_on_demand or is_in_watchlist):
-                continue
-
-        if str(r.get("recommendation") or "").upper() in {"BUY", "SELL"}:
-            pnl_val, outcome_val, success_val = _calc_reco_pnl(r)
-            if r.get("outcome") is None or r.get("outcome") in ("SCRAPPED", "PENDING"):
-                r["final_pnl"] = pnl_val
-                r["outcome"] = outcome_val
-                r["success"] = success_val
-                pending_db_updates.append((pnl_val, outcome_val, success_val, r["id"], user["id"]))
-            else:
-                r["final_pnl"] = r.get("final_pnl") if r.get("final_pnl") is not None else pnl_val
-                r["outcome"] = r.get("outcome") or outcome_val
-                r["success"] = r.get("success") if r.get("success") is not None else success_val
-            # Sanitize display symbol to eliminate raw tokens like NSE_FO|69811
-            raw_sym = str(r.get("symbol") or "")
-            if "|" in raw_sym or "NSE_FO" in raw_sym or "MCX_FO" in raw_sym or raw_sym.isdigit():
-                rat = str(r.get("rationale") or "")
-                m = re.search(r'\b([A-Z0-9_]+ \d+ (?:CE|PE)(?: \d+ [A-Z]+ \d+)?)\b', rat)
-                if m:
-                    r["symbol"] = m.group(1)
-                else:
-                    und = str(r.get("underlying") or "BANKNIFTY")
-                    tok = raw_sym.split("|")[-1].strip()
-                    r["symbol"] = f"{und} Option" if tok.isdigit() else f"{und} {tok}"
-            # Item 24 & Requirement 8: Enforce options contracts only in recommendation history
-            clean_sym = str(r.get("symbol") or "").upper()
-            is_opt = (
-                str(r.get("instrument_kind") or "").upper() == "OPTION" or
-                " CE" in clean_sym or " PE" in clean_sym or clean_sym.endswith("CE") or clean_sym.endswith("PE") or
-                "OPTION" in clean_sym or "CALL" in clean_sym or "PUT" in clean_sym
-            )
-            has_entry = r.get("entry") is not None and float(r.get("entry") or 0) > 0
-            if (is_opt or is_on_demand) and has_entry:
-                filtered.append(r)
-
-    if pending_db_updates:
-        def _flush_reco_updates(updates):
-            try:
-                for up in updates:
-                    db_exec("UPDATE recommendations SET final_pnl=?, outcome=?, success=? WHERE id=? AND user_id=?", list(up))
-            except Exception:
-                pass
+        # 1. Fetch user's active watchlist symbols
+        allowed_symbols = set()
         try:
-            asyncio.create_task(asyncio.to_thread(_flush_reco_updates, pending_db_updates))
+            watch = user_watchlist_symbols(uid)
+            allowed_symbols = set(watch)
+            for s in list(allowed_symbols):
+                if ":" in s: allowed_symbols.add(s.split(":")[-1])
+                if "|" in s: allowed_symbols.add(s.split("|")[-1])
         except Exception:
             pass
+        if not allowed_symbols:
+            allowed_symbols = {"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN", "TATAMOTORS", "NIFTY", "BANKNIFTY", "CRUDEOIL"}
 
-    # 4. Aggregates
-    totals = {"auto": 0, "on-demand": 0, "combined": 0, "auto_wins": 0, "on_demand_wins": 0, "wins": 0, "pnl": 0.0}
-    for r in filtered:
-        src = r["source"] if r["source"] in {"auto", "on-demand"} else "on-demand"
-        totals[src] += 1
-        totals["combined"] += 1
-        if r.get("success"):
-            totals["wins"] += 1
-            totals["auto_wins" if src == "auto" else "on_demand_wins"] += 1
-        totals["pnl"] += float(r.get("final_pnl") or 0)
-    totals["pnl"] = round(totals["pnl"], 2)
-    totals["win_rate"] = round((totals["wins"] / totals["combined"] * 100), 1) if totals["combined"] else 0.0
-    totals["loss_rate"] = round(100 - totals["win_rate"], 1) if totals["combined"] else 0.0
+        # 2. Fetch raw rows
+        rows = []
+        try:
+            rows = db_exec(
+                "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, news_basis, score, outcome, final_pnl, success, exit_reason, created_at, status FROM recommendations WHERE (user_id=? OR user_id IS NULL OR user_id=1) AND UPPER(recommendation) IN ('BUY', 'SELL') ORDER BY created_at DESC LIMIT 300",
+                [uid],
+                "all"
+            ) or []
+        except Exception as e_sql:
+            # Fallback if technical_basis column is missing
+            try:
+                rows = db_exec(
+                    "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, score, outcome, final_pnl, success, exit_reason, created_at, status FROM recommendations WHERE (user_id=? OR user_id IS NULL OR user_id=1) AND UPPER(recommendation) IN ('BUY', 'SELL') ORDER BY created_at DESC LIMIT 300",
+                    [uid],
+                    "all"
+                ) or []
+            except Exception:
+                rows = []
 
-    # 5. Session Date & Title (post 12:00 IST rolls over properly)
-    now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    session_dt = now_ist
-    if session_dt.weekday() == 5: session_dt -= timedelta(days=1)
-    elif session_dt.weekday() == 6: session_dt -= timedelta(days=2)
-    session_title = f"Recommendations of {session_dt.strftime('%A, %d %b %Y')}"
+        # 3. Filter strictly to user's watchlist symbols, BUT always include on-demand recommendations!
+        filtered = []
+        pending_db_updates = []
+        for r in rows:
+            try:
+                sym = str(r.get("symbol") or "").upper().strip()
+                underlying = str(r.get("underlying") or "").upper().strip()
+                base_sym = sym.split("|")[-1] if "|" in sym else sym.split(":")[-1] if ":" in sym else sym
+                is_on_demand = str(r.get("source") or "") in ("on-demand", "backtest")
+                
+                # Requirement 8: If symbol is specified, filter exclusively to that stock/index and its options
+                if root_filter:
+                    matches_inst = (root_filter in sym or root_filter in underlying or underlying in root_filter)
+                    if not matches_inst:
+                        continue
+                else:
+                    is_in_watchlist = bool(sym in allowed_symbols or base_sym in allowed_symbols or underlying in allowed_symbols or any(w in sym for w in allowed_symbols))
+                    if not (is_on_demand or is_in_watchlist):
+                        continue
 
-    result = {
-        "items": filtered,
-        "totals": totals,
-        "stats": totals,
-        "session_title": session_title,
-        "title": session_title,
-        "generated_at": now_iso()
-    }
-    CACHE.set(cache_key, result, 30.0)  # Cache for 30s to avoid repeated 13s calls
-    return result
+                if str(r.get("recommendation") or "").upper() in {"BUY", "SELL"}:
+                    pnl_val, outcome_val, success_val = _calc_reco_pnl(r)
+                    if r.get("outcome") is None or r.get("outcome") in ("SCRAPPED", "PENDING"):
+                        r["final_pnl"] = pnl_val
+                        r["outcome"] = outcome_val
+                        r["success"] = success_val
+                        pending_db_updates.append((pnl_val, outcome_val, success_val, r["id"], uid))
+                    else:
+                        r["final_pnl"] = _safe_float(r.get("final_pnl"), pnl_val)
+                        r["outcome"] = r.get("outcome") or outcome_val
+                        r["success"] = r.get("success") if r.get("success") is not None else success_val
+
+                    # Sanitize display symbol to eliminate raw tokens like NSE_FO|69811
+                    raw_sym = str(r.get("symbol") or "")
+                    if "|" in raw_sym or "NSE_FO" in raw_sym or "MCX_FO" in raw_sym or raw_sym.isdigit():
+                        rat = str(r.get("rationale") or "")
+                        m = re.search(r'\b([A-Z0-9_]+ \d+ (?:CE|PE)(?: \d+ [A-Z]+ \d+)?)\b', rat)
+                        if m:
+                            r["symbol"] = m.group(1)
+                        else:
+                            und = str(r.get("underlying") or "BANKNIFTY")
+                            tok = raw_sym.split("|")[-1].strip()
+                            r["symbol"] = f"{und} Option" if tok.isdigit() else f"{und} {tok}"
+
+                    clean_sym = str(r.get("symbol") or "").upper()
+                    is_opt = (
+                        str(r.get("instrument_kind") or "").upper() == "OPTION" or
+                        " CE" in clean_sym or " PE" in clean_sym or clean_sym.endswith("CE") or clean_sym.endswith("PE") or
+                        "OPTION" in clean_sym or "CALL" in clean_sym or "PUT" in clean_sym
+                    )
+                    has_entry = _safe_float(r.get("entry")) > 0
+                    if (is_opt or is_on_demand) and has_entry:
+                        filtered.append(r)
+            except Exception:
+                continue
+
+        if pending_db_updates:
+            def _flush_reco_updates(updates):
+                try:
+                    for up in updates:
+                        db_exec("UPDATE recommendations SET final_pnl=?, outcome=?, success=? WHERE id=? AND user_id=?", list(up))
+                except Exception:
+                    pass
+            try:
+                asyncio.create_task(asyncio.to_thread(_flush_reco_updates, pending_db_updates))
+            except Exception:
+                pass
+
+        # 4. Aggregates
+        totals = {"auto": 0, "on-demand": 0, "combined": 0, "auto_wins": 0, "on_demand_wins": 0, "wins": 0, "pnl": 0.0}
+        for r in filtered:
+            try:
+                src = r.get("source") if r.get("source") in {"auto", "on-demand"} else "on-demand"
+                totals[src] = totals.get(src, 0) + 1
+                totals["combined"] += 1
+                if r.get("success"):
+                    totals["wins"] += 1
+                    totals["auto_wins" if src == "auto" else "on_demand_wins"] = totals.get("auto_wins" if src == "auto" else "on_demand_wins", 0) + 1
+                totals["pnl"] += _safe_float(r.get("final_pnl"))
+            except Exception:
+                pass
+        totals["pnl"] = round(totals["pnl"], 2)
+        totals["win_rate"] = round((totals["wins"] / totals["combined"] * 100), 1) if totals["combined"] else 0.0
+        totals["loss_rate"] = round(100 - totals["win_rate"], 1) if totals["combined"] else 0.0
+
+        # 5. Session Date & Title
+        now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+        session_dt = now_ist
+        if session_dt.weekday() == 5: session_dt -= timedelta(days=1)
+        elif session_dt.weekday() == 6: session_dt -= timedelta(days=2)
+        session_title = f"Recommendations of {session_dt.strftime('%A, %d %b %Y')}"
+
+        result = {
+            "items": filtered,
+            "totals": totals,
+            "stats": totals,
+            "session_title": session_title,
+            "title": session_title,
+            "generated_at": now_iso()
+        }
+        CACHE.set(cache_key, result, 30.0)
+        return result
+    except Exception as exc:
+        log.exception("recommendation_history handler error: %s", exc)
+        return {
+            "items": [],
+            "totals": {"auto": 0, "on-demand": 0, "combined": 0, "wins": 0, "pnl": 0.0, "win_rate": 0.0},
+            "stats": {"auto": 0, "on-demand": 0, "combined": 0, "wins": 0, "pnl": 0.0, "win_rate": 0.0},
+            "session_title": "Recommendations",
+            "title": "Recommendations",
+            "error": str(exc),
+            "generated_at": now_iso()
+        }
 
 
 # ===========================================================================
