@@ -422,14 +422,30 @@ def db_insert(sql: str, params: Iterable[Any] = ()) -> int:
 
 
 def db_exec(sql: str, params: Iterable[Any] = (), fetch: str | None = None) -> Any:
-    # Avoid COMMIT on SELECT/PRAGMA reads; this materially reduces SQLite lock contention
-    # when dashboard/news/background workers are active concurrently.
-    with _DB_LOCK:
+    # In SQLite WAL mode, concurrent reads (SELECT/PRAGMA) do not block readers or writers.
+    # We only take the exclusive Python _DB_LOCK for write transactions (INSERT, UPDATE, DELETE, etc.)
+    # to maximize parallel read throughput across dashboard, option chain, and background workers.
+    sql_clean = sql.strip().upper()
+    is_write = not (sql_clean.startswith("SELECT") or sql_clean.startswith("PRAGMA") or sql_clean.startswith("EXPLAIN"))
+
+    if is_write:
+        with _DB_LOCK:
+            conn = db_conn()
+            try:
+                cur = conn.execute(sql, tuple(params))
+                conn.commit()
+                if fetch == "one":
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+                if fetch == "all":
+                    return [dict(r) for r in cur.fetchall()]
+                return cur.rowcount
+            finally:
+                conn.close()
+    else:
         conn = db_conn()
         try:
             cur = conn.execute(sql, tuple(params))
-            if cur.description is None:
-                conn.commit()
             if fetch == "one":
                 row = cur.fetchone()
                 return dict(row) if row else None
@@ -1392,9 +1408,21 @@ def fitness_chicken_price() -> tuple[float,str]:
 # ---------------------------------------------------------------------------
 
 class TTLCache:
-    def __init__(self) -> None:
+    def __init__(self, max_size: int = 5000) -> None:
         self._data: dict[str, tuple[float, Any]] = {}
         self._lock = threading.RLock()
+        self._max_size = max_size
+        self._last_prune = time.monotonic()
+
+    def _prune_expired(self) -> None:
+        now = time.monotonic()
+        expired = [k for k, (exp, _) in self._data.items() if now > exp]
+        for k in expired:
+            self._data.pop(k, None)
+        if len(self._data) > self._max_size:
+            to_remove = sorted(self._data.keys(), key=lambda k: self._data[k][0])[:len(self._data) // 5]
+            for k in to_remove:
+                self._data.pop(k, None)
 
     def get(self, key: str) -> Any:
         with self._lock:
@@ -1409,7 +1437,11 @@ class TTLCache:
 
     def set(self, key: str, value: Any, ttl: float) -> None:
         with self._lock:
-            self._data[key] = (time.monotonic() + ttl, value)
+            now = time.monotonic()
+            if now - self._last_prune > 300.0 or len(self._data) >= self._max_size:
+                self._prune_expired()
+                self._last_prune = now
+            self._data[key] = (now + ttl, value)
 
     def delete(self, key: str) -> None:
         with self._lock:
@@ -1426,7 +1458,7 @@ class TTLCache:
         with self._lock:
             self._data.clear()
 
-CACHE = TTLCache()
+CACHE = TTLCache(max_size=5000)
 
 def prune_transient_cache(max_age_days: int = 3) -> dict[str, int]:
     """Purge transient cached data older than max_age_days.

@@ -12,6 +12,28 @@
 <script>
 /* CA TRADER DEFENSIVE RESILIENCY SHIELD (Guarantees zero blank data & working buttons) */
 (function(){
+  // Universal Page Visibility & Background Battery Saver Throttler
+  window._isPageVisible = !document.hidden;
+  document.addEventListener('visibilitychange', function(){
+    window._isPageVisible = !document.hidden;
+    if (window._isPageVisible) {
+      if (typeof window.loadDashboard === 'function') try { window.loadDashboard(); } catch(_) {}
+      if (typeof window.refreshOptionChain === 'function') try { window.refreshOptionChain(); } catch(_) {}
+      if (typeof window.refreshWatchlist === 'function') try { window.refreshWatchlist(); } catch(_) {}
+    }
+  });
+
+  const _origSetInterval = window.setInterval;
+  window.setInterval = function(fn, delay, ...args) {
+    if (delay && delay < 10000) {
+      return _origSetInterval(function(){
+        if (!window._isPageVisible) return; // Sleep when tab is backgrounded
+        try { fn(...args); } catch(err) { console.debug('Interval tick skipped:', err); }
+      }, delay);
+    }
+    return _origSetInterval(fn, delay, ...args);
+  };
+
   window.__CA_SHIELD_ERRORS__ = [];
   
   // 1. Capture all unhandled errors
