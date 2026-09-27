@@ -3109,7 +3109,36 @@ def get_sebi_compliant_expiry(symbol: str, ref_date: datetime | None = None) -> 
             cand_exp = last_weekday_of_month(next_year, next_month, target_weekday)
         return cand_exp.strftime("%d %b %Y").upper()
 
-    # 4. Equities / Stocks: Monthly only (Last Thursday, target_weekday = 3)
+    # 4. Commodities (MCX: CRUDEOIL, NATURALGAS, GOLD, SILVER, etc.)
+    mcx_day_map = {
+        "CRUDEOIL": 19,
+        "NATURALGAS": 25,
+        "GOLD": 26,
+        "SILVER": 25,
+        "COPPER": 30,
+        "ZINC": 30,
+        "ALUMINIUM": 30,
+        "LEAD": 30
+    }
+    if root in mcx_day_map:
+        target_day = mcx_day_map[root]
+        cand_date = datetime(now_ist.year, now_ist.month, min(target_day, 28), tzinfo=now_ist.tzinfo)
+        # Adjust for weekend
+        if cand_date.weekday() == 5:
+            cand_date -= timedelta(days=1)
+        elif cand_date.weekday() == 6:
+            cand_date -= timedelta(days=2)
+        if now_ist.date() >= cand_date.date():
+            next_month = 1 if now_ist.month == 12 else now_ist.month + 1
+            next_year = now_ist.year + 1 if now_ist.month == 12 else now_ist.year
+            cand_date = datetime(next_year, next_month, min(target_day, 28), tzinfo=now_ist.tzinfo)
+            if cand_date.weekday() == 5:
+                cand_date -= timedelta(days=1)
+            elif cand_date.weekday() == 6:
+                cand_date -= timedelta(days=2)
+        return cand_date.strftime("%d %b %Y").upper()
+
+    # 5. Equities / Stocks: Monthly only (Last Thursday, target_weekday = 3)
     target_weekday = 3
     cand_exp = last_weekday_of_month(now_ist.year, now_ist.month, target_weekday)
     if now_ist.date() > cand_exp.date():
@@ -3294,103 +3323,27 @@ def fallback_recommendation_quick(instrument: str, user_id: int | None = None, d
             "timestamp": now_iso()
         }
 
-    if is_opt:
-        opt_type = opt_info["option_type"]
-        action = "BUY"
-        reward = max(round(ltp * 0.25, 2), round(500.0 / lot, 2))
-        tgt = round(ltp + reward, 2)
-        sl = round(max(0.05, ltp - reward / 2.2), 2)
-        inst_obj = {"kind": "OPTION", "symbol": instrument, "display": instrument, "underlying": underlying_sym, "entry": ltp, "lot_size": lot, "option_type": opt_type}
-        ach = evaluate_achievable_option_move(instrument, opt_info, ltp, underlying_spot=float(opt_info.get("strike") or ltp), underlying_atr=max(ltp * 0.1, 40.0), lot_size=lot, desired_profit=dp, segment=seg)
-        ach = evaluate_achievable_option_move(instrument, opt_info, ltp, underlying_spot=float(opt_info.get("strike") or ltp), underlying_atr=max(ltp * 0.1, 40.0), lot_size=lot, desired_profit=dp, segment=seg, expiry_scalp=expiry_scalp)
-        ach = evaluate_achievable_option_move(instrument, opt_info, ltp, underlying_spot=float(opt_info.get("strike") or ltp), underlying_atr=max(ltp * 0.1, 40.0), lot_size=lot, desired_profit=dp, segment=seg, expiry_scalp=expiry_scalp, timeframe=timeframe)
-        if not ach["achievable"]:
-            return {
-                "qualifies": False,
-                "recommendation": "NO_TRADE",
-                "confidence": 0,
-                "entry": None,
-                "stop_loss": None,
-                "target": None,
-                "risk_reward": None,
-                "symbol": instrument,
-                "display_symbol": instrument,
-                "underlying": underlying_sym,
-                "rationale": f"No Recommendation: {ach['reason']}",
-                "reason": ach["reason"],
-                "instrument": inst_obj,
-                "provider": "ca_trader_greeks_engine",
-                "timestamp": now_iso()
-            }
-        tgt = ach["target"]
-        sl = ach["stop_loss"]
-        rr = ach["risk_reward"]
-        greeks = ach["greeks"]
-        inst_obj = {"kind": "OPTION", "symbol": instrument, "display": instrument, "underlying": underlying_sym, "entry": ltp, "lot_size": lot, "option_type": opt_info["option_type"]}
-        rat = f"Connected via root initials '{root}' from {underlying_sym}: Option {instrument} · Entry Rs.{ltp:.2f}, Target Rs.{tgt:.2f} (Est. Profit ₹{ach['realistic_profit']:,.0f}/lot), SL Rs.{sl:.2f} (R:R 1:{rr:.2f}). Greeks: Δ {abs(greeks['delta']):.2f}, Γ {greeks['gamma']:.4f}, Θ {greeks['theta']:.1f}/d · Achievable in {ach['time_horizon']}m." if is_fut else f"Option Setup: {instrument} · Entry Rs.{ltp:.2f}, Target Rs.{tgt:.2f} (Est. Profit ₹{ach['realistic_profit']:,.0f}/lot), SL Rs.{sl:.2f} (R:R 1:{rr:.2f}). Greeks: Δ {abs(greeks['delta']):.2f}, Γ {greeks['gamma']:.4f}, Θ {greeks['theta']:.1f}/d · Achievable in {ach['time_horizon']}m."
-        return {
-            "qualifies": True,
-            "recommendation": action,
-            "confidence": 85.0,
-            "entry": ltp,
-            "stop_loss": sl,
-            "target": tgt,
-            "risk_reward": f"1:{rr:.2f}",
-            "symbol": instrument,
-            "display_symbol": instrument,
-            "underlying": underlying_sym,
-            "rationale": rat,
-            "instrument": inst_obj,
-            "provider": "ca_trader_greeks_engine",
-            "timestamp": now_iso()
-        }
-    else:
-        action = "BUY"
-        reward = round(ltp * 0.03, 2)
-        tgt = round(ltp + reward, 2)
-        sl = round(max(0.05, ltp - reward / 2.2), 2)
-        ach = evaluate_achievable_equity_move(instrument, ltp, atr=ltp * 0.02, desired_profit=dp)
-        ach = evaluate_achievable_equity_move(instrument, ltp, atr=ltp * 0.02, desired_profit=dp, expiry_scalp=expiry_scalp)
-        ach = evaluate_achievable_equity_move(instrument, ltp, atr=ltp * 0.02, desired_profit=dp, expiry_scalp=expiry_scalp, timeframe=timeframe)
-        if not ach["achievable"]:
-            return {
-                "qualifies": False,
-                "recommendation": "NO_TRADE",
-                "confidence": 0,
-                "entry": None,
-                "stop_loss": None,
-                "target": None,
-                "risk_reward": None,
-                "symbol": instrument,
-                "display_symbol": instrument,
-                "underlying": underlying_sym,
-                "rationale": f"No Recommendation: {ach['reason']}",
-                "reason": ach["reason"],
-                "instrument": {"kind": "EQUITY", "symbol": instrument, "display": instrument, "entry": ltp, "lot_size": 1},
-                "provider": "ca_trader_engine",
-                "timestamp": now_iso()
-            }
-        tgt = ach["target"]
-        sl = ach["stop_loss"]
-        rr = ach["risk_reward"]
-        inst_obj = {"kind": "EQUITY", "symbol": instrument, "display": instrument, "entry": ltp, "lot_size": 1}
-        rat = f"Institutional Alignment: {instrument} · Entry Rs.{ltp:.2f}, Target Rs.{tgt:.2f}, SL Rs.{sl:.2f} (R:R 1:{rr:.2f}). Achievable in {ach['time_horizon']}m."
-        return {
-            "qualifies": True,
-            "recommendation": action,
-            "confidence": 85.0,
-            "entry": ltp,
-            "stop_loss": sl,
-            "target": tgt,
-            "risk_reward": f"1:{rr:.2f}",
-            "symbol": instrument,
-            "display_symbol": instrument,
-            "underlying": underlying_sym,
-            "rationale": rat,
-            "instrument": inst_obj,
-            "provider": "ca_trader_engine",
-            "timestamp": now_iso()
-        }
+    # Runtime guard: NEVER publish synthetic BUY/SELL while live analysis is pending/loading.
+    return {
+        "qualifies": False,
+        "loading": True,
+        "recommendation": "WAIT",
+        "action": "WAIT",
+        "signal": "WAIT",
+        "confidence": 0,
+        "entry": None,
+        "stop_loss": None,
+        "target": None,
+        "risk_reward": None,
+        "symbol": str(instrument),
+        "display_symbol": str(instrument),
+        "underlying": str(underlying_sym),
+        "rationale": "Live analysis is loading. No signal is published until fresh market data is confirmed.",
+        "reason": "LIVE_DATA_PENDING",
+        "instrument": {"kind": "OPTION" if is_opt else "EQUITY", "symbol": instrument, "display": instrument, "underlying": underlying_sym, "entry": ltp, "lot_size": lot},
+        "provider": "ca_trader_live_guard",
+        "timestamp": now_iso()
+    }
 
 
 def normalize_option_chain(underlying: str, key: str, meta: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
@@ -9385,7 +9338,7 @@ async def analysis_overall(
     try:
         rec = await asyncio.wait_for(
             asyncio.to_thread(overall_recommendation, instrument, timeframe, dp_clean, bl_clean, None, {"enabled": True}, False, uid, is_scalp),
-            timeout=12.0
+            timeout=4.5
         )
     except asyncio.TimeoutError:
         rec = fallback_recommendation_quick(instrument, uid, dp_clean)
@@ -9454,12 +9407,12 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         underlying = parsed["underlying"]
     root = extract_root_symbol(underlying).upper()
     commodity_configs = {
-        "CRUDEOIL": {"spot": 6250.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": "17 SEP 2026"},
-        "NATURALGAS": {"spot": 245.0, "step": 5.0, "lot": 1250, "iv": 48.0, "default_exp": "24 SEP 2026"},
-        "GOLD": {"spot": 74500.0, "step": 200.0, "lot": 100, "iv": 14.0, "default_exp": "25 SEP 2026"},
-        "SILVER": {"spot": 88200.0, "step": 500.0, "lot": 30, "iv": 22.0, "default_exp": "25 SEP 2026"},
-        "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": "30 SEP 2026"},
-        "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": "30 SEP 2026"},
+        "CRUDEOIL": {"spot": 6250.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": get_sebi_compliant_expiry("CRUDEOIL")},
+        "NATURALGAS": {"spot": 245.0, "step": 5.0, "lot": 1250, "iv": 48.0, "default_exp": get_sebi_compliant_expiry("NATURALGAS")},
+        "GOLD": {"spot": 74500.0, "step": 200.0, "lot": 100, "iv": 14.0, "default_exp": get_sebi_compliant_expiry("GOLD")},
+        "SILVER": {"spot": 88200.0, "step": 500.0, "lot": 30, "iv": 22.0, "default_exp": get_sebi_compliant_expiry("SILVER")},
+        "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": get_sebi_compliant_expiry("COPPER")},
+        "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": get_sebi_compliant_expiry("ZINC")},
         "BANKNIFTY": {"spot": 55500.0, "step": 100.0, "lot": 15, "iv": 15.0, "default_exp": get_sebi_compliant_expiry("BANKNIFTY")},
         "NIFTY": {"spot": 24500.0, "step": 50.0, "lot": 75, "iv": 13.0, "default_exp": get_sebi_compliant_expiry("NIFTY")},
     }
@@ -9671,24 +9624,50 @@ async def option_expiries(underlying: str, user: dict[str, Any] = Depends(requir
     expiries = []
     is_mcx = root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "LEAD", "ALUMINIUM"}
     
-    if root == "CRUDEOIL":
-        # CRUDEOIL Options expire around the 17th of the month, distinct from futures which expire on the 21st
-        expiries = ["17 SEP 2026", "19 OCT 2026", "17 NOV 2026", "18 DEC 2026"]
-    elif not is_mcx:
+    if is_mcx:
+        # Dynamically calculate future MCX expiries so past dates are never served
+        now_d = datetime.now(IST).date()
+        target_day = {"CRUDEOIL": 19, "NATURALGAS": 25, "GOLD": 26, "SILVER": 25}.get(root, 28)
+        dyn = []
+        cy = now_d.year
+        cm = now_d.month
+        for _ in range(6):
+            try:
+                c_date = datetime(cy, cm, min(target_day, 28)).date()
+            except ValueError:
+                c_date = last_weekday_of_month(cy, cm, 4).date()
+            if c_date.weekday() == 5:
+                c_date -= timedelta(days=1)
+            elif c_date.weekday() == 6:
+                c_date -= timedelta(days=2)
+            if c_date >= now_d:
+                dyn.append(c_date.strftime("%d %b %Y").upper())
+            cm += 1
+            if cm > 12:
+                cm = 1
+                cy += 1
+        expiries = dyn[:4]
+    else:
         try:
             payload = await asyncio.wait_for(asyncio.to_thread(UPSTOX.option_contracts, root), timeout=3.0)
             rows = payload.get("data") or []
-            expiries = sorted({str(x.get("expiry")) for x in rows if isinstance(x, dict) and x.get("expiry")})
+            today_d = datetime.now(IST).date()
+            valid_exp = set()
+            for x in rows:
+                if isinstance(x, dict) and x.get("expiry"):
+                    exp_str = str(x["expiry"]).strip().upper()
+                    try:
+                        ed = datetime.strptime(exp_str, "%d %b %Y").date()
+                        if ed >= today_d:
+                            valid_exp.add(exp_str)
+                    except Exception:
+                        valid_exp.add(exp_str)
+            expiries = sorted(valid_exp)
         except Exception:
             expiries = []
 
     if not expiries:
-        if is_mcx:
-            expiries = ["17 SEP 2026", "19 OCT 2026", "17 NOV 2026", "18 DEC 2026"]
-        elif root in ("NIFTY", "FINNIFTY"):
-            expiries = ["22 SEP 2026", "29 SEP 2026", "06 OCT 2026", "13 OCT 2026", "29 OCT 2026"]
-        else:
-            expiries = ["24 SEP 2026", "01 OCT 2026", "08 OCT 2026", "29 OCT 2026", "26 NOV 2026"]
+        expiries = [get_sebi_compliant_expiry(root)]
             
     result = {"underlying": root, "expiries": expiries, "provider": "upstox+ca_engine", "timestamp": now_iso()}
     CACHE.set(key, result, 30)
