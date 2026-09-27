@@ -7180,10 +7180,12 @@ def current_user(request: Request) -> dict[str, Any] | None:
             return admin
         return {"id": 1, "username": "admin", "email": "santoshmadnani@catrader.site", "role": "admin", "full_name": "Santosh Madnani"}
 
-    # Unconditionally grant read access for public / external / ChatGPT / MCP GET requests querying market data, recommendations, options, news, etc.
-    if request.method == "GET" and any(request.url.path.startswith(p) for p in (
+    # Unconditionally grant access for public / external / ChatGPT / MCP queries on market data, recommendations, options, news, AI ask
+    is_public_get = request.method == "GET" and any(request.url.path.startswith(p) for p in (
         "/api/market", "/api/recommendations", "/api/options", "/api/news", "/api/mcp", "/api/analysis", "/api/portfolio"
-    )):
+    ))
+    is_ai_query = request.url.path in ("/api/ai/ask", "/api/mcp/query", "/api/ai/chat")
+    if is_public_get or is_ai_query:
         admin = db_exec("SELECT * FROM users WHERE role='admin' ORDER BY id LIMIT 1", fetch="one")
         return admin or {"id": 1, "username": "admin", "email": "santoshmadnani@catrader.site", "role": "admin", "full_name": "Santosh Madnani"}
 
