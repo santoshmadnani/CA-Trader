@@ -13,7 +13,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to Oracle Cloud VM & Run Calibrated StockMantra Reconciliation
-      - name: Deploy to Oracle Cloud VM & Run Backtests
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ORACLE_HOST }}
@@ -24,13 +23,6 @@ jobs:
             git fetch origin CA-Trader-Bifurcated
             git reset --hard origin/CA-Trader-Bifurcated
             /home/ubuntu/venv/bin/pip install -r requirements.txt --quiet
-            if [ -f "scripts/run_banknifty_backtest.py" ]; then
-              echo "=========================================================="
-              echo ">>> EXECUTING BANKNIFTY 5-TIMEFRAME BLINDFOLD BACKTEST <<<"
-              echo "=========================================================="
-              /home/ubuntu/venv/bin/python3 scripts/run_banknifty_backtest.py
-              echo "=========================================================="
-            fi
             if [ -f "stockmantra_3months.json" ]; then
               echo "=========================================================="
               echo ">>> EXECUTING CALIBRATED STOCKMANTRA RECONCILIATION <<<"
@@ -42,10 +34,9 @@ jobs:
             fi
             sudo systemctl restart catrader
             sleep 4
-            sleep 5
             sudo systemctl is-active catrader
 
       - name: Verify Live Site Health
         run: |
-          sleep 10
-          curl -f -A "Mozilla/5.0" https://catrader.site/health || exit 1
+          sleep 6
+          curl -f https://catrader.site/health || exit 1
