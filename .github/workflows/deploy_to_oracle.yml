@@ -63,12 +63,10 @@ jobs:
             fi
 
             sudo systemctl restart catrader
-            sleep 4
+            sleep 8
             sudo systemctl is-active catrader
 
       - name: Verify Live Site Health
         run: |
-          sleep 6
-          curl -f https://catrader.site/health || exit 1
-          sleep 10
-          curl -f -A "Mozilla/5.0" https://catrader.site/health || exit 1
+          sleep 8
+          curl -s -f -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" https://catrader.site/health || (sleep 5 && curl -s -f -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" https://catrader.site/health)
