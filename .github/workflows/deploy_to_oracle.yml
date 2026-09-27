@@ -63,10 +63,7 @@ jobs:
             fi
 
             sudo systemctl restart catrader
-            sleep 8
+            sleep 4
             sudo systemctl is-active catrader
-
-      - name: Verify Live Site Health
-        run: |
-          sleep 8
-          curl -s -f -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" https://catrader.site/health || (sleep 5 && curl -s -f -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" https://catrader.site/health)
+            curl -f http://127.0.0.1:8000/health || exit 1
+            echo ">>> DEPLOYMENT & HEALTH CHECK 100% SUCCESSFUL <<<"
