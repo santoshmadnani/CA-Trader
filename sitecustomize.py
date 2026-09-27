@@ -131,7 +131,7 @@ def _patch(mod):
                     if day >= today:
                         vals.add(day)
                 return {"underlying": root, "expiries": [d.strftime("%d %b %Y").upper() for d in sorted(vals)],
-                        "provider": "upstox_mcx_live", "timestamp": mod.client_now_iso()}
+                        "provider": "upstox_mcx_live", "timestamp": mod.now_iso()}
             route.endpoint = live_expiries
             route._ca_expiry_guard = True
     mod._ca_runtime_guard = True
