@@ -12,6 +12,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Deploy to Oracle Cloud VM & Run Calibrated StockMantra Reconciliation
       - name: Deploy to Oracle Cloud VM & Arrange Server Directory Structure
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -47,6 +48,8 @@ jobs:
             fi
 
             /home/ubuntu/venv/bin/pip install -r requirements.txt --quiet
+            if [ -f "stockmantra_3months.json" ]; then
+              echo "=========================================================="
 
             # Run calibrated scripts
             if [ -f "scripts/run_banknifty_backtest.py" ]; then
@@ -55,7 +58,11 @@ jobs:
             fi
             if [ -f "scripts/reconcile_stockmantra.py" ]; then
               echo ">>> EXECUTING CALIBRATED STOCKMANTRA RECONCILIATION <<<"
+              echo "=========================================================="
               /home/ubuntu/venv/bin/python3 scripts/reconcile_stockmantra.py
+              echo "=========================================================="
+            else
+              echo "[WARN] stockmantra_3months.json not found in /home/ubuntu/CA-Trader"
             fi
 
             sudo systemctl restart catrader
@@ -64,5 +71,7 @@ jobs:
 
       - name: Verify Live Site Health
         run: |
+          sleep 6
+          curl -f https://catrader.site/health || exit 1
           sleep 10
           curl -f -A "Mozilla/5.0" https://catrader.site/health || exit 1
