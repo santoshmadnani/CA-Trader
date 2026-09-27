@@ -1287,6 +1287,49 @@ input:focus,textarea:focus,select:focus{outline:none!important;box-shadow:none!i
 .ca-edit-mode .card:hover .ca-resize-grip{opacity:1;}
 .ca-edit-bar{position:fixed;top:0;left:0;right:0;z-index:5000;background:var(--gold);color:#0B2A1E;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;box-shadow:0 2px 12px rgba(0,0,0,.3);transform:translateY(-100%);transition:transform .2s;}
 .ca-edit-bar.active{transform:translateY(0);}
+
+/* Edit UI Mode Enhanced Context Menu & Visual Highlights */
+.ca-edit-mode button:hover,
+.ca-edit-mode .btn:hover,
+.ca-edit-mode .btn-tf:hover,
+.ca-edit-mode .chip-filter:hover,
+.ca-edit-mode .opt-bs-btn:hover {
+  outline: 2px dashed var(--gold) !important;
+  cursor: context-menu !important;
+}
+.ca-edit-mode h1:hover, .ca-edit-mode h2:hover, .ca-edit-mode h3:hover,
+.ca-edit-mode h4:hover, .ca-edit-mode p:hover, .ca-edit-mode span:hover {
+  outline: 1px dotted var(--gold-dim) !important;
+  cursor: context-menu !important;
+}
+.ca-ctx-section {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.ca-ctx-btn {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.ca-ctx-btn:hover {
+  background: var(--surface-3);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.ca-ctx-btn.danger {
+  background: rgba(239,68,68,0.12);
+  border-color: var(--sell);
+  color: var(--sell);
+}
+.ca-ctx-btn.danger:hover {
+  background: var(--sell);
+  color: #fff;
+}
 /* Watchlist resize handle */
 #sidebarResizer{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:col-resize;z-index:200;background:transparent;}
 #sidebarResizer:hover,#sidebarResizer.dragging{background:var(--gold-dim);}
@@ -3936,10 +3979,6 @@ select#watchlistSelect, select.watchlist-select {
             <button type="button" class="btn-tf active" id="askAiModeData" onclick="window.switchAskAiMode('data')" style="padding:4px 10px;font-size:11px;border-radius:4px;border:none;background:var(--gold);color:#000;font-weight:700;cursor:pointer;">📊 Market &amp; Data Pull</button>
             <button type="button" class="btn-tf" id="askAiModeCode" onclick="window.switchAskAiMode('code')" style="padding:4px 10px;font-size:11px;border-radius:4px;border:none;background:transparent;color:var(--text-dim);cursor:pointer;">🛠️ Code &amp; GitHub (Admin)</button>
           </div>
-          <button type="button" class="btn ghost small" onclick="window.enableEditMode && window.enableEditMode()" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            Edit UI
-          </button>
         </div>
       </div>
 
@@ -6648,25 +6687,376 @@ var optionState = window.optionState;
 
 // ===== EDIT UI SYSTEM =====
 let caEditMode = false;
+window.__caUiCustomOverrides = {};
+
 const caEditBar = document.createElement('div');
 caEditBar.className = 'ca-edit-bar';
 caEditBar.innerHTML = `
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span style="font-weight:700;color:var(--gold);"> Edit UI Mode</span>
-    <span class="muted" style="font-size:11px;">Drag cards (⠿) to reposition stacked layout</span>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span style="font-weight:800;color:var(--gold);display:flex;align-items:center;gap:6px;font-size:12.5px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Edit UI Active
+    </span>
+    <span style="font-size:11px;color:#0B2A1E;font-weight:600;">
+      Right-click any button, card, box, or text to customize / remove / resize. Drag cards (⠿) to reorder.
+    </span>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <button id="caResetLayout" class="btn ghost small" style="font-size:11px;">Reset Layout</button>
-    <button id="caEditDone" style="background:var(--primary);color:#ffffff;border:none;padding:4px 12px;border-radius:5px;font-weight:700;cursor:pointer;font-size:11.5px;"> Done</button>
+    <button id="caSaveCodeAdmin" class="btn small" style="background:#0F5132;color:#ffffff;border:1px solid #198754;font-size:11px;font-weight:700;border-radius:4px;cursor:pointer;padding:4px 10px;">💾 Save to App Code (Admin)</button>
+    <button id="caResetLayout" class="btn ghost small" style="font-size:11px;color:#0B2A1E;border-color:rgba(0,0,0,0.35);">↺ Reset All</button>
+    <button id="caEditDone" style="background:var(--primary);color:#ffffff;border:none;padding:5px 14px;border-radius:5px;font-weight:800;cursor:pointer;font-size:12px;">✓ Done</button>
   </div>
 `;
 document.body.appendChild(caEditBar);
 
-// Initialize compact buttons mode from localStorage
-if(localStorage.getItem('ca_compact_buttons') === '1'){
-  document.body.classList.add('compact-ui-buttons');
-  const btn = document.getElementById('caToggleCompactButtons');
-  if(btn) btn.textContent = '⊙ Normal Buttons';
+// Context Menu Element
+const caEditContextMenu = document.createElement('div');
+caEditContextMenu.id = 'caEditContextMenu';
+caEditContextMenu.className = 'ca-edit-context-menu';
+caEditContextMenu.style.cssText = 'position:fixed;display:none;z-index:999999;background:var(--surface);border:1.5px solid var(--gold);box-shadow:0 12px 36px rgba(0,0,0,0.8);border-radius:8px;padding:10px;min-width:260px;max-width:320px;font-size:12px;color:var(--text);backdrop-filter:blur(10px);';
+document.body.appendChild(caEditContextMenu);
+
+function getCaElementSelector(el) {
+  if (!el || el === document.body) return '';
+  if (el.id) return '#' + el.id;
+  const dataKey = el.getAttribute('data-action') || el.getAttribute('data-view') || el.getAttribute('data-tf') || el.getAttribute('data-sym');
+  if (dataKey) {
+    return `${el.tagName.toLowerCase()}[data-${dataKey ? 'action' : ''}="${dataKey}"]`;
+  }
+  let path = [];
+  let curr = el;
+  while (curr && curr !== document.body && curr !== document.documentElement) {
+    if (curr.id) {
+      path.unshift('#' + curr.id);
+      break;
+    }
+    let tag = curr.tagName.toLowerCase();
+    let parent = curr.parentElement;
+    if (parent) {
+      let siblings = Array.from(parent.children).filter(c => c.tagName === curr.tagName);
+      if (siblings.length > 1) {
+        let index = siblings.indexOf(curr) + 1;
+        tag += `:nth-of-type(${index})`;
+      }
+    }
+    path.unshift(tag);
+    curr = parent;
+  }
+  return path.join(' > ');
+}
+
+function setCaElementOverride(el, prop, val) {
+  const sel = getCaElementSelector(el);
+  if (!sel) return;
+  window.__caUiCustomOverrides[sel] = window.__caUiCustomOverrides[sel] || {};
+  window.__caUiCustomOverrides[sel][prop] = val;
+  try {
+    localStorage.setItem('ca_ui_custom_overrides', JSON.stringify(window.__caUiCustomOverrides));
+  } catch(_) {}
+}
+
+window.applyCustomUiOverrides = function() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ca_ui_custom_overrides') || '{}');
+    window.__caUiCustomOverrides = saved;
+    Object.keys(saved).forEach(sel => {
+      try {
+        const el = document.querySelector(sel);
+        if (!el) return;
+        const cfg = saved[sel];
+        if (cfg.hidden) el.style.display = 'none';
+        if (cfg.text !== undefined) el.textContent = cfg.text;
+        if (cfg.fontSize) el.style.fontSize = cfg.fontSize;
+        if (cfg.fontFamily) el.style.fontFamily = cfg.fontFamily;
+        if (cfg.width) el.style.width = cfg.width;
+        if (cfg.padding) el.style.padding = cfg.padding;
+      } catch(_) {}
+    });
+  } catch(_) {}
+};
+
+window.saveUiCustomizationToServer = async function() {
+  try {
+    const payload = window.__caUiCustomOverrides || {};
+    const res = await fetch('/api/ui/customize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.detail || 'Save failed');
+    toast('UI customizations saved permanently to application code!');
+  } catch(err) {
+    toast(`Failed to save to code: ${err.message}`, 'error');
+  }
+};
+
+window.resetAllCustomUi = function() {
+  if (!confirm('Reset all customized element styles, removed buttons, and layouts to default?')) return;
+  localStorage.removeItem('ca_ui_custom_overrides');
+  localStorage.removeItem('ca_card_layouts');
+  window.__caUiCustomOverrides = {};
+  location.reload();
+};
+
+document.getElementById('caSaveCodeAdmin')?.addEventListener('click', window.saveUiCustomizationToServer);
+document.getElementById('caResetLayout')?.addEventListener('click', window.resetAllCustomUi);
+
+// Close context menu on outside click or Escape
+document.addEventListener('click', (e) => {
+  if (caEditContextMenu.style.display !== 'none' && !caEditContextMenu.contains(e.target)) {
+    caEditContextMenu.style.display = 'none';
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && caEditContextMenu.style.display !== 'none') {
+    caEditContextMenu.style.display = 'none';
+  }
+});
+
+// Right click handler for in-context editing
+document.addEventListener('contextmenu', (e) => {
+  if (!caEditMode) return;
+  e.preventDefault();
+
+  const el = e.target;
+  const selText = window.getSelection ? window.getSelection().toString().trim() : '';
+  const btn = el.closest('button, .btn, .btn-tf, .chip-filter, .opt-bs-btn');
+  const card = el.closest('.card, .stat-card, .chart-card, .tool-card');
+  const textEl = el.closest('h1, h2, h3, h4, h5, p, span, label, b, strong, td, th');
+  const target = btn || (selText ? el : (textEl || card || el));
+
+  renderCaEditContextMenu(e.clientX, e.clientY, target, card, btn, selText);
+});
+
+function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
+  const tagName = target.tagName ? target.tagName.toUpperCase() : 'ELEMENT';
+  const preview = (selText || target.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 20);
+  const targetLabel = btn ? `🔘 Button: "${preview}"` : (card && target === card ? `📦 Box: ${card.id || 'Card'}` : `🔤 ${tagName}: "${preview}"`);
+
+  let html = `
+    <div style="font-weight:800;color:var(--gold);font-size:11.5px;padding-bottom:6px;border-bottom:1px solid var(--border-soft);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+      <span>${esc(targetLabel)}</span>
+      <span style="font-size:10px;cursor:pointer;color:var(--text-dim);" onclick="document.getElementById('caEditContextMenu').style.display='none'">✕</span>
+    </div>
+    
+    <div class="ca-ctx-section">
+      <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;">Element Actions</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        ${btn ? `<button type="button" class="ca-ctx-btn danger" id="caCtxRemoveBtn">🗑️ Remove this button</button>` : ''}
+        ${card ? `<button type="button" class="ca-ctx-btn danger" id="caCtxRemoveCard">🗑️ Remove this box / card</button>` : ''}
+        <button type="button" class="ca-ctx-btn danger" id="caCtxRemoveTarget">🗑️ Remove / Hide Element</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxEditText">✏️ Edit Text Content</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxClearText">🗑️ Clear Text</button>
+      </div>
+    </div>
+
+    <div class="ca-ctx-section">
+      <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;">Font Size</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+        <button type="button" class="ca-ctx-btn" data-ca-size="11px">11px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-size="12px">12px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-size="13px">13px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-size="15px">15px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-size="18px">18px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-size="22px">22px</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxSizeDec" title="Decrease font size">-</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxSizeInc" title="Increase font size">+</button>
+      </div>
+    </div>
+
+    <div class="ca-ctx-section">
+      <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;">Font Type / Family</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+        <button type="button" class="ca-ctx-btn" data-ca-font="'Inter', sans-serif">Inter</button>
+        <button type="button" class="ca-ctx-btn" data-ca-font="'JetBrains Mono', monospace">Mono</button>
+        <button type="button" class="ca-ctx-btn" data-ca-font="system-ui, sans-serif">System</button>
+        <button type="button" class="ca-ctx-btn" data-ca-font="'Georgia', serif">Serif</button>
+      </div>
+    </div>
+
+    ${card ? `
+    <div class="ca-ctx-section">
+      <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;">Box Size &amp; Padding</div>
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;flex-wrap:wrap;">
+        <span style="font-size:10px;color:var(--text-dim);width:38px;">Width:</span>
+        <button type="button" class="ca-ctx-btn" data-ca-width="100%">100%</button>
+        <button type="button" class="ca-ctx-btn" data-ca-width="50%">50%</button>
+        <button type="button" class="ca-ctx-btn" data-ca-width="33.3%">33%</button>
+        <button type="button" class="ca-ctx-btn" data-ca-width="auto">Auto</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;flex-wrap:wrap;">
+        <span style="font-size:10px;color:var(--text-dim);width:38px;">Pad:</span>
+        <button type="button" class="ca-ctx-btn" data-ca-pad="4px 8px">Tight</button>
+        <button type="button" class="ca-ctx-btn" data-ca-pad="12px 14px">Normal</button>
+        <button type="button" class="ca-ctx-btn" data-ca-pad="18px 20px">Spacious</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+        <span style="font-size:10px;color:var(--text-dim);width:38px;">Order:</span>
+        <button type="button" class="ca-ctx-btn" id="caCtxMoveUp">⬆ Move Before</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxMoveDown">⬇ Move After</button>
+      </div>
+    </div>
+    ` : ''}
+
+    <div style="margin-top:6px;display:flex;align-items:center;justify-content:space-between;">
+      <button type="button" class="ca-ctx-btn" id="caCtxResetElem" style="font-size:10px;color:var(--text-dim);">↺ Reset Styles</button>
+      <button type="button" class="ca-ctx-btn" onclick="document.getElementById('caEditContextMenu').style.display='none'" style="font-size:10px;color:var(--gold);font-weight:700;">Done</button>
+    </div>
+  `;
+
+  caEditContextMenu.innerHTML = html;
+
+  // Positioning
+  const menuW = 280;
+  const menuH = 340;
+  let posX = clientX;
+  let posY = clientY;
+  if (posX + menuW > window.innerWidth) posX = window.innerWidth - menuW - 12;
+  if (posY + menuH > window.innerHeight) posY = window.innerHeight - menuH - 12;
+  caEditContextMenu.style.left = `${Math.max(10, posX)}px`;
+  caEditContextMenu.style.top = `${Math.max(10, posY)}px`;
+  caEditContextMenu.style.display = 'block';
+
+  // Wire Remove Buttons
+  document.getElementById('caCtxRemoveBtn')?.addEventListener('click', () => {
+    if (btn) {
+      btn.style.display = 'none';
+      setCaElementOverride(btn, 'hidden', true);
+      toast('Button removed');
+      caEditContextMenu.style.display = 'none';
+    }
+  });
+
+  document.getElementById('caCtxRemoveCard')?.addEventListener('click', () => {
+    if (card) {
+      card.style.display = 'none';
+      setCaElementOverride(card, 'hidden', true);
+      toast('Box / Card removed');
+      caEditContextMenu.style.display = 'none';
+    }
+  });
+
+  document.getElementById('caCtxRemoveTarget')?.addEventListener('click', () => {
+    target.style.display = 'none';
+    setCaElementOverride(target, 'hidden', true);
+    toast('Element removed');
+    caEditContextMenu.style.display = 'none';
+  });
+
+  // Wire Edit Text
+  document.getElementById('caCtxEditText')?.addEventListener('click', () => {
+    caEditContextMenu.style.display = 'none';
+    const curVal = (target.textContent || '').trim();
+    const newVal = prompt('Edit text content:', curVal);
+    if (newVal !== null) {
+      target.textContent = newVal;
+      setCaElementOverride(target, 'text', newVal);
+      toast('Text updated');
+    }
+  });
+
+  document.getElementById('caCtxClearText')?.addEventListener('click', () => {
+    target.textContent = '';
+    setCaElementOverride(target, 'text', '');
+    toast('Text cleared');
+    caEditContextMenu.style.display = 'none';
+  });
+
+  // Wire Font Size
+  caEditContextMenu.querySelectorAll('[data-ca-size]').forEach(b => {
+    b.onclick = () => {
+      const sz = b.dataset.caSize;
+      target.style.fontSize = sz;
+      setCaElementOverride(target, 'fontSize', sz);
+      toast(`Font size: ${sz}`);
+    };
+  });
+
+  document.getElementById('caCtxSizeInc')?.addEventListener('click', () => {
+    const curSz = parseFloat(window.getComputedStyle(target).fontSize) || 12;
+    const newSz = `${Math.round(curSz + 1)}px`;
+    target.style.fontSize = newSz;
+    setCaElementOverride(target, 'fontSize', newSz);
+    toast(`Font size: ${newSz}`);
+  });
+
+  document.getElementById('caCtxSizeDec')?.addEventListener('click', () => {
+    const curSz = parseFloat(window.getComputedStyle(target).fontSize) || 12;
+    const newSz = `${Math.max(9, Math.round(curSz - 1))}px`;
+    target.style.fontSize = newSz;
+    setCaElementOverride(target, 'fontSize', newSz);
+    toast(`Font size: ${newSz}`);
+  });
+
+  // Wire Font Family
+  caEditContextMenu.querySelectorAll('[data-ca-font]').forEach(b => {
+    b.onclick = () => {
+      const fn = b.dataset.caFont;
+      target.style.fontFamily = fn;
+      setCaElementOverride(target, 'fontFamily', fn);
+      toast(`Font family updated`);
+    };
+  });
+
+  // Wire Box Width & Padding
+  if (card) {
+    caEditContextMenu.querySelectorAll('[data-ca-width]').forEach(b => {
+      b.onclick = () => {
+        const w = b.dataset.caWidth;
+        card.style.width = w;
+        setCaElementOverride(card, 'width', w);
+        toast(`Box width: ${w}`);
+      };
+    });
+
+    caEditContextMenu.querySelectorAll('[data-ca-pad]').forEach(b => {
+      b.onclick = () => {
+        const p = b.dataset.caPad;
+        card.style.padding = p;
+        setCaElementOverride(card, 'padding', p);
+        toast(`Box padding updated`);
+      };
+    });
+
+    document.getElementById('caCtxMoveUp')?.addEventListener('click', () => {
+      if (card.previousElementSibling && card.parentNode) {
+        card.parentNode.insertBefore(card, card.previousElementSibling);
+        saveCardLayouts();
+        toast('Card moved up');
+        caEditContextMenu.style.display = 'none';
+      }
+    });
+
+    document.getElementById('caCtxMoveDown')?.addEventListener('click', () => {
+      if (card.nextElementSibling && card.parentNode) {
+        card.parentNode.insertBefore(card.nextElementSibling, card);
+        saveCardLayouts();
+        toast('Card moved down');
+        caEditContextMenu.style.display = 'none';
+      }
+    });
+  }
+
+  // Wire Reset Element
+  document.getElementById('caCtxResetElem')?.addEventListener('click', () => {
+    const sel = getCaElementSelector(target);
+    if (sel && window.__caUiCustomOverrides[sel]) {
+      delete window.__caUiCustomOverrides[sel];
+      try {
+        localStorage.setItem('ca_ui_custom_overrides', JSON.stringify(window.__caUiCustomOverrides));
+      } catch(_) {}
+    }
+    target.style.display = '';
+    target.style.fontSize = '';
+    target.style.fontFamily = '';
+    if (card) {
+      card.style.width = '';
+      card.style.padding = '';
+    }
+    toast('Element styles reset');
+    caEditContextMenu.style.display = 'none';
+  });
 }
 
 function applySavedCardLayouts(){
@@ -6681,6 +7071,7 @@ function applySavedCardLayouts(){
       }
     });
   } catch(_) {}
+  applyCustomUiOverrides();
 }
 
 function saveCardLayouts(){
@@ -6710,7 +7101,7 @@ function enableEditMode(){
     btn.textContent = document.body.classList.contains('compact-ui-buttons') ? '⊙ Normal Buttons' : '⊙ Compact Buttons';
   }
 
-  // Add drag handles & resize controls to cards
+  // Add drag handles to cards
   document.querySelectorAll('.panel.active .card, #panel-charts .card').forEach((card, idx) => {
     if(!card.id) card.id = 'ca-card-auto-' + idx;
 
@@ -6732,8 +7123,6 @@ function enableEditMode(){
       card.appendChild(handle);
     }
 
-    // Cards stack full width by default (Item 36 & 37)
-
     card.ondragover = (e) => { e.preventDefault(); };
     card.ondrop = (e) => {
       e.preventDefault();
@@ -6746,12 +7135,14 @@ function enableEditMode(){
   });
 
   document.getElementById('userMenu')?.classList.remove('open');
+  toast('Edit UI Mode active · Right click any button, card, or text to customize');
 }
 
 function disableEditMode(){
   caEditMode = false;
   document.body.classList.remove('ca-edit-mode');
   caEditBar.classList.remove('active');
+  caEditContextMenu.style.display = 'none';
   saveCardLayouts();
   toast('Edit UI mode closed · Layout saved');
 }
@@ -6759,26 +7150,7 @@ function disableEditMode(){
 document.getElementById('caEditDone')?.addEventListener('click', disableEditMode);
 document.getElementById('editUIBtn')?.addEventListener('click', enableEditMode);
 
-document.getElementById('caToggleCompactButtons')?.addEventListener('click', () => {
-  const isCompact = document.body.classList.toggle('compact-ui-buttons');
-  localStorage.setItem('ca_compact_buttons', isCompact ? '1' : '0');
-  const btn = document.getElementById('caToggleCompactButtons');
-  if(btn) btn.textContent = isCompact ? '⊙ Normal Buttons' : '⊙ Compact Buttons';
-  toast(isCompact ? 'Compact buttons enabled across UI' : 'Standard button sizing restored');
-});
-
-document.getElementById('caResetLayout')?.addEventListener('click', () => {
-  if(!confirm('Reset all customized card sizes and layouts to default?')) return;
-  localStorage.removeItem('ca_card_layouts');
-  document.querySelectorAll('.card').forEach(card => {
-    card.classList.remove('ca-col-1', 'ca-col-2', 'ca-col-full', 'card-compact');
-    card.style.width = '';
-    card.style.height = '';
-  });
-  toast('UI layouts reset to defaults');
-});
-
-// Auto-restore saved card layouts on load
+// Auto-restore saved card layouts and custom UI overrides on load
 applySavedCardLayouts();
 
 // ===== SIDEBAR RESIZE =====
@@ -11512,7 +11884,7 @@ window.handleNotificationClick = function(n){
       if(document.getElementById('optionsProviderStatus')) document.getElementById('optionsProviderStatus').textContent='Loading live option chain…';
       let expiries = [];
       try{
-        const ex = await A('/api/options/' + encodeURIComponent(underSym) + '/expiries', {timeoutMs:3500});
+        const ex = await A('/api/options/' + encodeURIComponent(underSym) + '/expiries', {timeoutMs:12000});
         expiries = ex.expiries || [];
       }catch(_){}
       if(!optionState.expiry) optionState.expiry = expiries[0] || 'current_week';
@@ -11560,7 +11932,7 @@ window.handleNotificationClick = function(n){
       await fetchOptionChain();
     }catch(e){
       const host = document.getElementById('optionChainTable') || document.getElementById('zerodhaOptionChainContainer');
-      if(host) host.innerHTML = `<div class="options-empty">${e.message}</div>`;
+      if(host && (!host.children.length || host.querySelector('.options-empty'))) host.innerHTML = `<div class="options-empty">${e.message}</div>`;
     }
   }
 
@@ -11569,7 +11941,7 @@ window.handleNotificationClick = function(n){
     if(!host) return;
     try{
       const underSym = extractUnderlying(S);
-      const d = await A('/api/options/' + encodeURIComponent(underSym) + (optionState.expiry ? `?expiry=${encodeURIComponent(optionState.expiry)}` : ''), {timeoutMs:5000});
+      const d = await A('/api/options/' + encodeURIComponent(underSym) + (optionState.expiry ? `?expiry=${encodeURIComponent(optionState.expiry)}` : ''), {timeoutMs:12000});
       APP_CACHE.options = d;
       optionState.chain = d;
       const spot = Number(d.spot || 0);
@@ -11865,7 +12237,11 @@ window.handleNotificationClick = function(n){
       }
 
     }catch(e){
-      host.innerHTML = `<div class="options-empty">${e.message}</div>`;
+      if(!host.children.length || host.querySelector('.options-empty')){
+        host.innerHTML = `<div class="options-empty">${e.message}</div>`;
+      } else {
+        if(document.getElementById('optionsProviderStatus')) document.getElementById('optionsProviderStatus').textContent = 'Option chain active (cached)';
+      }
     }
   }
   window.fetchOptionChain = fetchOptionChain;
@@ -12568,6 +12944,80 @@ window.handleNotificationClick = function(n){
     if(typeof window.loadNewsByCaAi === 'function') window.loadNewsByCaAi();
   };
 
+  function renderCaAiNewsList(items, d, sym, host) {
+    if (!host) return;
+    let irrelevantKeys = [];
+    try { irrelevantKeys = JSON.parse(localStorage.getItem('ca_irrelevant_news') || '[]'); } catch(_) {}
+
+    if ($('newsUpdated')) $('newsUpdated').textContent = `Updated ${d?.updated_at || 'Just now'} · Auto-refreshes every 60s`;
+    if ($('newsItemCountBadge')) $('newsItemCountBadge').textContent = `${items.length} stories`;
+
+    recalculateNewsSentiment(items);
+
+    if (!items.length) {
+      host.innerHTML = '<div class="data-empty">No high-impact news in this window for the selected criteria.</div>';
+      return;
+    }
+
+    host.innerHTML = items.map(it => {
+      const k = String(it?.url || it?.headline || it?.title || '');
+      const isIrrelevant = irrelevantKeys.includes(k);
+      const isBull = it.sentiment === 'BULLISH';
+      const isBear = it.sentiment === 'BEARISH';
+      const badgeClass = isBull ? 'buy' : isBear ? 'sell' : 'neutral';
+      const borderLeftColor = isIrrelevant ? 'var(--border-soft)' : (isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--border-soft)');
+      
+      const rawImpact = parseFloat(String(it.impact_pct || '1.0').replace(/[^0-9.-]/g, '')) || 1.0;
+      const probVal = (rawImpact >= 50 && rawImpact <= 100) ? Math.round(rawImpact) : Math.min(95, Math.max(62, Math.round(65 + Math.abs(rawImpact) * 20)));
+      const probText = `${probVal}% ${isBull ? 'Bullish' : isBear ? 'Bearish' : 'Neutral'} Probability`;
+      const cleanInsight = String(it.ca_ai_insight || '').replace(/^CA AI Decision:\s*/i, '');
+
+      return `
+        <div class="news-card" data-news-item="${encodeURIComponent(JSON.stringify(it))}" style="cursor:pointer;background:var(--surface);border:1px solid var(--border-soft);border-left:4px solid ${borderLeftColor};border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:transform 0.15s ease,border-color 0.15s ease;opacity:${isIrrelevant ? '0.7' : '1'};">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <input type="checkbox" class="news-select-check" data-news-key="${esc(k)}" onclick="event.stopPropagation();" style="accent-color:var(--gold);width:15px;height:15px;cursor:pointer;">
+              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);background:var(--surface-2);padding:2px 8px;border-radius:4px;border:1px solid var(--border-soft);">${esc(it.source)}</span>
+              <span style="font-size:11px;color:var(--text-faint);">Time: ${esc(it.time)}</span>
+              <span class="tag neutral" style="font-size:10px;text-transform:uppercase;">${esc(it.scope === 'stock' ? (sym + ' Specific') : 'Global Macro')}</span>
+              ${isIrrelevant ? '<span class="tag sell" style="font-size:9.5px;padding:1px 5px;background:rgba(239,68,68,0.15);color:var(--sell);border:1px solid var(--sell);">Not in Score</span>' : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="tag ${badgeClass}" style="font-weight:700;font-size:11px;padding:3px 9px;border-radius:5px;">
+                ${esc(probText)}
+              </span>
+              <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.toggleSingleNewsRelevance('${esc(k)}')" style="font-size:10px;padding:2px 7px;" title="Toggle whether this story counts toward overall sentiment score">
+                ${isIrrelevant ? ' Include' : 'Exclude'}
+              </button>
+              <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.deleteSingleNews('${esc(k)}')" style="color:var(--sell);font-size:10px;padding:2px 6px;" title="Dismiss Story">Close</button>
+            </div>
+          </div>
+
+          <div style="font-size:13.5px;font-weight:600;line-height:1.45;color:var(--text);margin-top:2px;">
+            <a href="${esc(it.url || it.link || '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--text);text-decoration:underline;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" onclick="event.stopPropagation();">
+              ${esc(it.headline)} <span style="font-size:11px;color:var(--gold);text-decoration:none;">↗</span>
+            </a>
+          </div>
+
+          <div style="background:var(--surface-2);border-radius:6px;padding:8px 12px;font-size:11.5px;line-height:1.45;color:var(--text-dim);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div><b style="color:var(--gold);">CA AI Decision:</b> ${esc(cleanInsight)}</div>
+            <span class="tag neutral" style="font-size:10px;cursor:pointer;">Discuss / Counter-Question</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    host.querySelectorAll('.news-card').forEach(card => {
+      card.onclick = (e) => {
+        if(e.target.closest('a')) return;
+        try {
+          const item = JSON.parse(decodeURIComponent(card.dataset.newsItem));
+          openNewsDiscussionModal(item);
+        } catch(err){}
+      };
+    });
+  }
+
   async function loadNewsByCaAi(mode = caAiNewsMode) {
     caAiNewsMode = mode;
     const rawSym = selectedSymbol() || 'NIFTY';
@@ -12580,93 +13030,28 @@ window.handleNotificationClick = function(n){
     }
     if ($('newsStockTab')) $('newsStockTab').textContent = `${sym} Impact`;
 
+    // Stale-While-Revalidate: render cached news instantly at 0ms
+    if (Array.isArray(window.__caCurrentNewsItems) && window.__caCurrentNewsItems.length > 0) {
+      renderCaAiNewsList(window.__caCurrentNewsItems, { updated_at: 'Instant cache' }, sym, host);
+    }
+
     try {
-      const d = await api(`/api/news/ca-ai-feed?symbol=${encodeURIComponent(sym)}&mode=${encodeURIComponent(mode)}`, { timeoutMs: 7000 });
+      const d = await api(`/api/news/ca-ai-feed?symbol=${encodeURIComponent(sym)}&mode=${encodeURIComponent(mode)}`, { timeoutMs: 12000 });
       let rawItems = Array.isArray(d.items) ? d.items : [];
       let dismissedKeys = [];
-      let irrelevantKeys = [];
       try { dismissedKeys = JSON.parse(localStorage.getItem('ca_dismissed_news') || '[]'); } catch(_) {}
-      try { irrelevantKeys = JSON.parse(localStorage.getItem('ca_irrelevant_news') || '[]'); } catch(_) {}
 
       const items = rawItems.filter(x => {
         const k = String(x?.url || x?.headline || x?.title || '');
         return !dismissedKeys.includes(k);
       });
       window.__caCurrentNewsItems = items;
-
-      if ($('newsUpdated')) $('newsUpdated').textContent = `Updated ${d.updated_at || 'Just now'} · Auto-refreshes every 60s`;
-      if ($('newsItemCountBadge')) $('newsItemCountBadge').textContent = `${items.length} stories`;
-
-      // Recalculate sentiment score with irrelevant news excluded
-      recalculateNewsSentiment(items);
-
-      if (!items.length) {
-        host.innerHTML = '<div class="data-empty">No high-impact news in this window for the selected criteria.</div>';
-        return;
-      }
-
-      host.innerHTML = items.map(it => {
-        const k = String(it?.url || it?.headline || it?.title || '');
-        const isIrrelevant = irrelevantKeys.includes(k);
-        const isBull = it.sentiment === 'BULLISH';
-        const isBear = it.sentiment === 'BEARISH';
-        const badgeClass = isBull ? 'buy' : isBear ? 'sell' : 'neutral';
-        const borderLeftColor = isIrrelevant ? 'var(--border-soft)' : (isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--border-soft)');
-        
-        // Dynamic probability calibration
-        const rawImpact = parseFloat(String(it.impact_pct || '1.0').replace(/[^0-9.-]/g, '')) || 1.0;
-        const probVal = (rawImpact >= 50 && rawImpact <= 100) ? Math.round(rawImpact) : Math.min(95, Math.max(62, Math.round(65 + Math.abs(rawImpact) * 20)));
-        const probText = `${probVal}% ${isBull ? 'Bullish' : isBear ? 'Bearish' : 'Neutral'} Probability`;
-        const cleanInsight = String(it.ca_ai_insight || '').replace(/^CA AI Decision:\s*/i, '');
-
-        return `
-          <div class="news-card" data-news-item="${encodeURIComponent(JSON.stringify(it))}" style="cursor:pointer;background:var(--surface);border:1px solid var(--border-soft);border-left:4px solid ${borderLeftColor};border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:transform 0.15s ease,border-color 0.15s ease;opacity:${isIrrelevant ? '0.7' : '1'};">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <input type="checkbox" class="news-select-check" data-news-key="${esc(k)}" onclick="event.stopPropagation();" style="accent-color:var(--gold);width:15px;height:15px;cursor:pointer;">
-                <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--gold);background:var(--surface-2);padding:2px 8px;border-radius:4px;border:1px solid var(--border-soft);">${esc(it.source)}</span>
-                <span style="font-size:11px;color:var(--text-faint);">Time: ${esc(it.time)}</span>
-                <span class="tag neutral" style="font-size:10px;text-transform:uppercase;">${esc(it.scope === 'stock' ? (sym + ' Specific') : 'Global Macro')}</span>
-                ${isIrrelevant ? '<span class="tag sell" style="font-size:9.5px;padding:1px 5px;background:rgba(239,68,68,0.15);color:var(--sell);border:1px solid var(--sell);">Not in Score</span>' : ''}
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span class="tag ${badgeClass}" style="font-weight:700;font-size:11px;padding:3px 9px;border-radius:5px;">
-                  ${esc(probText)}
-                </span>
-                <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.toggleSingleNewsRelevance('${esc(k)}')" style="font-size:10px;padding:2px 7px;" title="Toggle whether this story counts toward overall sentiment score">
-                  ${isIrrelevant ? ' Include' : 'Exclude'}
-                </button>
-                <button type="button" class="btn ghost small" onclick="event.stopPropagation(); window.deleteSingleNews('${esc(k)}')" style="color:var(--sell);font-size:10px;padding:2px 6px;" title="Dismiss Story">Close</button>
-              </div>
-            </div>
-
-            <div style="font-size:13.5px;font-weight:600;line-height:1.45;color:var(--text);margin-top:2px;">
-              <a href="${esc(it.url || it.link || '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--text);text-decoration:underline;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" onclick="event.stopPropagation();">
-                ${esc(it.headline)} <span style="font-size:11px;color:var(--gold);text-decoration:none;">↗</span>
-              </a>
-            </div>
-
-            <div style="background:var(--surface-2);border-radius:6px;padding:8px 12px;font-size:11.5px;line-height:1.45;color:var(--text-dim);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-              <div><b style="color:var(--gold);">CA AI Decision:</b> ${esc(cleanInsight)}</div>
-              <span class="tag neutral" style="font-size:10px;cursor:pointer;">Discuss / Counter-Question</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-        // Wire click handler on each news card to open discussion modal
-        host.querySelectorAll('.news-card').forEach(card => {
-          card.onclick = (e) => {
-            if(e.target.closest('a')) return;
-            try {
-              const item = JSON.parse(decodeURIComponent(card.dataset.newsItem));
-              openNewsDiscussionModal(item);
-            } catch(err){}
-          };
-        });
+      renderCaAiNewsList(items, d, sym, host);
     } catch(e) {
-      if (host) host.innerHTML = `<div class="data-empty">News feed temporarily unavailable: ${esc(e.message)}</div>`;
-      if ($('newsUpdated')) $('newsUpdated').textContent = 'Feed offline';
+      if (host && (!host.children.length || host.querySelector('.data-empty'))) {
+        host.innerHTML = `<div class="data-empty">News feed temporarily unavailable: ${esc(e.message)}</div>`;
+      }
+      if ($('newsUpdated')) $('newsUpdated').textContent = 'Using cached news';
     }
   }
 
@@ -29369,21 +29754,51 @@ window.updateAllSectionHeaders = function(sym, ltp, chg, chgPct){
   const isPos = curChg >= 0;
   const sign = isPos ? '+' : '';
   const color = isPos ? 'var(--buy)' : 'var(--sell)';
+  const colorClass = isPos ? 'up' : 'down';
   const fmtLtp = typeof _fmtNum === 'function' ? _fmtNum(curLtp) : curLtp.toFixed(2);
   const fmtChg = typeof _fmtNum === 'function' ? _fmtNum(curChg) : curChg.toFixed(2);
   const fmtChgPct = Math.abs(curChgPct).toFixed(2);
-  
-  const formattedHtml = `
-    <span style="font-weight:800;font-size:18px;color:var(--text);">${root}</span>
-    <span style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--text);margin-left:10px;">₹${fmtLtp}</span>
-    <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:${color};margin-left:8px;">${sign}${fmtChg} (${sign}${fmtChgPct}%)</span>
-  `;
 
-  // Apply to all standard header elements across all terminal sections
-  const targets = ['dashSymbolTitle', 'chartSymbolTitle', 'optionsSymbol', 'newsSymbol', 'fundSymbol', 'askAiSymbol', 'moversSymbol'];
-  targets.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = formattedHtml;
+  const sectionPairs = [
+    { title: 'dashSymbolTitle', ltp: 'dashSymbolLtp', chg: 'dashSymbolChange' },
+    { title: 'chartSymbolTitle', ltp: 'chartSymbolLtp', chg: 'chartSymbolChange' },
+    { title: 'optionsSymbol', ltp: 'optionsLtp', chg: 'optionsChange' },
+    { title: 'askAiSymbol', ltp: 'askAiLtp', chg: 'askAiChange' },
+    { title: 'newsSymbol', ltp: 'newsLtp', chg: 'newsChange' },
+    { title: 'fundSymbol', ltp: 'fundLtp', chg: 'fundChange' },
+    { title: 'moversSymbol', ltp: 'moversLtp', chg: 'moversChange' }
+  ];
+
+  sectionPairs.forEach(p => {
+    const tEl = document.getElementById(p.title);
+    const lEl = document.getElementById(p.ltp);
+    const cEl = document.getElementById(p.chg);
+    
+    if (tEl) {
+      tEl.textContent = root;
+      tEl.style.fontWeight = '800';
+      tEl.style.fontSize = '18px';
+      tEl.style.color = 'var(--text)';
+    }
+    if (lEl) {
+      lEl.textContent = `₹${fmtLtp}`;
+      lEl.style.fontFamily = 'var(--font-mono)';
+      lEl.style.fontSize = '18px';
+      lEl.style.fontWeight = '700';
+      lEl.style.color = 'var(--text)';
+      lEl.style.marginLeft = '8px';
+      lEl.style.display = 'inline-block';
+    }
+    if (cEl) {
+      cEl.textContent = `${sign}${fmtChg} (${sign}${fmtChgPct}%)`;
+      cEl.className = `chart-symbol-change ${colorClass}`;
+      cEl.style.fontFamily = 'var(--font-mono)';
+      cEl.style.fontSize = '13.5px';
+      cEl.style.fontWeight = '700';
+      cEl.style.color = color;
+      cEl.style.marginLeft = '6px';
+      cEl.style.display = 'inline-block';
+    }
   });
   
   // Hide or clean subheaders that repeat the section name
@@ -29654,6 +30069,111 @@ window.applyAskAiPreset = function(promptText){
   }
 };
 
+window.formatAiMarkdown = function(md) {
+  if (!md) return '';
+  let s = String(md);
+
+  // 1. Parse Markdown tables
+  const tableRegex = /((?:^[ \t]*\|.+?\|[ \t]*\r?\n){2,})/gm;
+  s = s.replace(tableRegex, function(match) {
+    const rawLines = match.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (rawLines.length < 2) return match;
+    
+    const isDivider = (line) => /^\|(?:\s*:?-+:?\s*\|)+$/.test(line);
+    let headerLine = rawLines[0];
+    let bodyLines = [];
+    
+    if (isDivider(rawLines[1])) {
+      bodyLines = rawLines.slice(2);
+    } else {
+      headerLine = null;
+      bodyLines = rawLines;
+    }
+
+    const parseCells = (line) => {
+      const parts = line.split('|');
+      if (parts.length > 2) {
+        return parts.slice(1, -1).map(c => c.trim());
+      }
+      return [line];
+    };
+
+    let tableHtml = '<div class="ca-markdown-table-wrap" style="overflow-x:auto;margin:12px 0;border-radius:8px;border:1px solid var(--border-soft);background:var(--surface);box-shadow:0 2px 8px rgba(0,0,0,0.25);">';
+    tableHtml += '<table class="ca-markdown-table" style="width:100%;border-collapse:collapse;font-size:11.5px;text-align:left;line-height:1.45;">';
+    
+    if (headerLine) {
+      const ths = parseCells(headerLine);
+      tableHtml += '<thead><tr style="background:var(--surface-3);border-bottom:2px solid var(--gold);">';
+      ths.forEach(th => {
+        tableHtml += `<th style="padding:8px 10px;font-weight:700;color:var(--gold);border-right:1px solid var(--border-soft);white-space:nowrap;">${th}</th>`;
+      });
+      tableHtml += '</tr></thead>';
+    }
+
+    tableHtml += '<tbody>';
+    bodyLines.forEach((rowLine, idx) => {
+      if (isDivider(rowLine)) return;
+      const tds = parseCells(rowLine);
+      const bg = idx % 2 === 0 ? 'background:transparent;' : 'background:rgba(255,255,255,0.02);';
+      tableHtml += `<tr style="${bg}border-bottom:1px solid var(--border-soft);transition:background 0.15s ease;">`;
+      tds.forEach((td) => {
+        let cellContent = td;
+        cellContent = cellContent.replace(/\bBUY\b/g, '<span style="background:rgba(34,197,94,0.18);color:var(--buy);font-weight:800;padding:2px 6px;border-radius:4px;border:1px solid var(--buy);display:inline-block;">BUY</span>');
+        cellContent = cellContent.replace(/\bSELL\b/g, '<span style="background:rgba(239,68,68,0.18);color:var(--sell);font-weight:800;padding:2px 6px;border-radius:4px;border:1px solid var(--sell);display:inline-block;">SELL</span>');
+        cellContent = cellContent.replace(/Target (?:Zone )?Reached\.?/gi, '<span style="color:var(--buy);font-weight:700;">🎯 Target Reached</span>');
+        cellContent = cellContent.replace(/Trailing SL Hit in Profit/gi, '<span style="color:var(--buy);font-weight:700;">🛡️ Trailing SL (+Profit)</span>');
+        cellContent = cellContent.replace(/Stop Loss Hit|SL Hit/gi, '<span style="color:var(--sell);font-weight:700;">🛑 SL Hit</span>');
+        cellContent = cellContent.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+        tableHtml += `<td style="padding:8px 10px;border-right:1px solid var(--border-soft);color:var(--text);vertical-align:top;">${cellContent}</td>`;
+      });
+      tableHtml += '</tr>';
+    });
+    tableHtml += '</tbody></table></div>';
+    return tableHtml;
+  });
+
+  // 2. Callout alerts: > [!TIP] or > text
+  s = s.replace(/^>\s*\[!(TIP|NOTE|IMPORTANT|WARNING|CAUTION)\]\s*\n((?:>.*(?:\n|$))*)/gmi, function(_, type, text) {
+    const cleanText = text.replace(/^>\s?/gm, '').trim();
+    const colors = {
+      'TIP': { border: 'var(--gold)', bg: 'rgba(212,175,55,0.08)', icon: '💡' },
+      'NOTE': { border: 'var(--primary)', bg: 'rgba(59,130,246,0.08)', icon: 'ℹ️' },
+      'IMPORTANT': { border: 'var(--gold)', bg: 'rgba(212,175,55,0.12)', icon: '⭐' },
+      'WARNING': { border: 'var(--sell)', bg: 'rgba(239,68,68,0.1)', icon: '⚠️' }
+    };
+    const c = colors[type.toUpperCase()] || colors['TIP'];
+    return `<div style="border-left:3px solid ${c.border};background:${c.bg};padding:10px 14px;margin:10px 0;border-radius:6px;font-size:12px;line-height:1.5;"><b style="color:${c.border};">${c.icon} ${type.toUpperCase()}:</b> ${cleanText}</div>`;
+  });
+
+  s = s.replace(/^>\s+(.*?)$/gm, '<blockquote style="border-left:3px solid var(--gold);padding:6px 12px;margin:8px 0;background:rgba(255,255,255,0.03);border-radius:4px;color:var(--text-dim);font-size:12px;">$1</blockquote>');
+
+  // 3. Headers
+  s = s.replace(/^### (.*?)$/gm, '<h4 style="margin:12px 0 6px;color:var(--gold);font-size:14px;font-weight:800;letter-spacing:0.2px;">$1</h4>');
+  s = s.replace(/^#### (.*?)$/gm, '<h5 style="margin:10px 0 4px;color:var(--text);font-size:13px;font-weight:700;">$1</h5>');
+  s = s.replace(/^## (.*?)$/gm, '<h3 style="margin:14px 0 8px;color:var(--gold);font-size:15px;font-weight:800;">$1</h3>');
+
+  // 4. Horizontal rules
+  s = s.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border-soft);margin:14px 0;">');
+
+  // 5. Bold & Italic
+  s = s.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  s = s.replace(/\*(.*?)\*/g, '<i>$1</i>');
+
+  // 6. Bullet lists
+  s = s.replace(/^[ \t]*[-*]\s+(.+)$/gm, '<li style="margin-left:18px;margin-bottom:4px;list-style-type:disc;color:var(--text);">$1</li>');
+
+  // 7. Regular text line breaks (avoid double br inside rendered blocks)
+  const parts = s.split(/(<div class="ca-markdown-table-wrap"[\s\S]*?<\/div>|<blockquote[\s\S]*?<\/blockquote>|<div style="border-left:[\s\S]*?<\/div>)/gi);
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 0) {
+      parts[i] = parts[i].replace(/\n/g, '<br>');
+      parts[i] = parts[i].replace(/(?:<br>\s*){3,}/g, '<br><br>');
+    }
+  }
+  return parts.join('');
+};
+
 window.sendAskAiMessage = async function(){
   const inp = document.getElementById('askAiInput');
   const msgBox = document.getElementById('askAiMessages');
@@ -29688,12 +30208,7 @@ window.sendAskAiMessage = async function(){
     aiMsg.className = 'ai-msg';
     aiMsg.style.cssText = 'background:var(--surface-2);border-radius:8px;padding:14px;border-left:3px solid var(--gold);font-size:12.5px;line-height:1.55;color:var(--text);';
     
-    // Simple markdown conversion for bold, tables, alerts
-    let formatted = d.reply || '';
-    formatted = formatted.replace(/### (.*?)\n/g, '<h4 style="margin:4px 0 8px;color:var(--gold);font-size:13.5px;">$1</h4>');
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-    formatted = formatted.replace(/\n/g, '<br>');
-    aiMsg.innerHTML = formatted;
+    aiMsg.innerHTML = window.formatAiMarkdown(d.reply || '');
     msgBox.appendChild(aiMsg);
   } catch(e) {
     const errMsg = document.createElement('div');
