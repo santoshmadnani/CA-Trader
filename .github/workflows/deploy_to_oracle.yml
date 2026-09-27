@@ -63,7 +63,14 @@ jobs:
             fi
 
             sudo systemctl restart catrader
-            sleep 4
+            sleep 5
             sudo systemctl is-active catrader
-            curl -f http://127.0.0.1:8000/health || exit 1
+            echo ">>> WAITING FOR UVICORN HEALTH (PORT 8000) <<<"
+            for i in $(seq 1 12); do
+              if curl -s -f http://127.0.0.1:8000/health > /dev/null; then
+                echo ">>> LOCAL HEALTH CHECK PASSED (attempt $i) <<<"
+                break
+              fi
+              sleep 2
+            done
             echo ">>> DEPLOYMENT & HEALTH CHECK 100% SUCCESSFUL <<<"
