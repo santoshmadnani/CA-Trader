@@ -759,6 +759,26 @@ def init_db() -> None:
         is_active INTEGER NOT NULL DEFAULT 1
     );
     CREATE INDEX IF NOT EXISTS idx_reco_calib_sym ON reco_calibration(symbol, is_active);
+
+    CREATE TABLE IF NOT EXISTS historical_options (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        trade_date TEXT NOT NULL,
+        expiry_date TEXT NOT NULL,
+        strike REAL NOT NULL,
+        option_type TEXT NOT NULL,
+        open_price REAL,
+        high_price REAL,
+        low_price REAL,
+        close_price REAL,
+        settle_price REAL,
+        volume INTEGER DEFAULT 0,
+        open_interest INTEGER DEFAULT 0,
+        source TEXT DEFAULT 'NSE_BHAVCOPY',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(symbol, trade_date, expiry_date, strike, option_type)
+    );
+    CREATE INDEX IF NOT EXISTS idx_hist_opt_sym ON historical_options(symbol, trade_date, expiry_date);
     """
     with _DB_LOCK:
         conn = db_conn()
@@ -11365,6 +11385,81 @@ async def backtest_quick_history_get(
     history = db_exec("SELECT * FROM backtest_quick_history WHERE user_id=? ORDER BY id DESC LIMIT 50", [uid], "all")
     return {"ok": True, "history": history or []}
 
+
+@app.get("/api/options/historical")
+async def get_historical_options_api(
+    symbol: str = Query("BANKNIFTY", description="Underlying symbol e.g. BANKNIFTY"),
+    trade_date: str = Query(..., description="Trade date in YYYY-MM-DD format"),
+    expiry_date: str | None = Query(None, description="Expiry date in YYYY-MM-DD format"),
+    strike: float | None = Query(None, description="Specific strike"),
+    opt_type: str | None = Query(None, description="CE or PE"),
+    user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Retrieve historical option contracts, traded volumes, and settlement prices from database or BSM archive."""
+    root = extract_root_symbol(symbol).upper()
+    query = "SELECT * FROM historical_options WHERE symbol=? AND trade_date=?"
+    params: list[Any] = [root, trade_date]
+    if expiry_date:
+        query += " AND expiry_date=?"
+        params.append(expiry_date)
+    if strike:
+        query += " AND strike=?"
+        params.append(strike)
+    if opt_type:
+        query += " AND option_type=?"
+        params.append(opt_type.upper())
+    query += " ORDER BY strike ASC, option_type ASC"
+    rows = db_exec(query, params, "all") or []
+    
+    # If no stored rows in DB, dynamically synthesize historical chain using spot and BSM
+    if not rows:
+        try:
+            d_obj = datetime.strptime(trade_date, "%Y-%m-%d").date()
+            c_rows = UPSTOX.candles_between(root, "day", "days", d_obj, d_obj)
+            spot_close = float(c_rows[0].get("close", 49000.0)) if c_rows else (49000.0 if "BANK" in root else 23500.0)
+        except Exception:
+            spot_close = 49000.0 if "BANK" in root else 23500.0
+            
+        step = 100.0 if "BANK" in root else 50.0
+        atm = round(spot_close / step) * step
+        vix = 14.5
+        synthetic_rows = []
+        for i in range(-5, 6):
+            stk = atm + (i * step)
+            for ot in ("CE", "PE"):
+                p = bs_price(spot_close, stk, t_years=2.0/365.0, sigma=vix/100.0, opt_type=ot)
+                synthetic_rows.append({
+                    "symbol": root,
+                    "trade_date": trade_date,
+                    "expiry_date": expiry_date or trade_date,
+                    "strike": stk,
+                    "option_type": ot,
+                    "open_price": round(p * 0.98, 2),
+                    "high_price": round(p * 1.35, 2),
+                    "low_price": round(p * 0.82, 2),
+                    "close_price": p,
+                    "settle_price": p,
+                    "volume": 25000,
+                    "open_interest": 120000,
+                    "source": "SYNTHETIC_BSM"
+                })
+        return {
+            "symbol": root,
+            "trade_date": trade_date,
+            "expiry_date": expiry_date,
+            "count": len(synthetic_rows),
+            "data": synthetic_rows,
+            "source": "SYNTHETIC_BSM"
+        }
+        
+    return {
+        "symbol": root,
+        "trade_date": trade_date,
+        "expiry_date": expiry_date,
+        "count": len(rows),
+        "data": rows,
+        "source": "HISTORICAL_DB"
+    }
 
 
 @app.post("/api/recommendations/history/bulk-delete")
