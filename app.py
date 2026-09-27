@@ -3041,8 +3041,8 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
         strikes = chain.get("strikes") or []
         if spot > 0 and strikes:
             atm_strike = round(spot / step) * step
-            # Target near-ATM strike: exactly ATM or 1 strike near-OTM for maximum institutional leverage
-            target_strike = atm_strike + (step if is_bull else -step)
+            # Anchor strictly to At-The-Money (ATM) Delta 0.50 for high 5m velocity and maximum gamma
+            target_strike = atm_strike
             best_row = min(strikes, key=lambda r: abs(float(r.get("strike") or 0) - target_strike))
             if best_row:
                 opt_node = best_row.get("call" if is_bull else "put") or {}
@@ -5149,15 +5149,17 @@ def fundamental_data(instrument: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 DEFAULT_CALIBRATION_PARAMS = {
-    "target_atr_multiplier": 0.95,      # 5m target reach multiplier (0.8 - 1.2x ATR)
-    "sl_atr_multiplier": 1.40,          # Stop loss safety buffer
-    "scalp_gain_pct": 0.045,            # 4.5% option premium target / 0.45% index target
-    "rsi_buy_min": 49.0,                # RSI confirmation threshold for BUY
-    "rsi_sell_max": 51.0,               # RSI confirmation threshold for SELL
-    "adx_min_strength": 18.0,           # Minimum ADX directional momentum
-    "ema_alignment_required": True,     # Price must align with EMA20
-    "volume_filter": True,              # Volume must exceed average
-    "min_confidence": 72.0,             # Minimum confidence score
+    "target_atr_multiplier": 1.05,     # 5m target reach multiplier (calibrated for momentum burst)
+    "sl_atr_multiplier": 1.25,         # Stop loss safety buffer (trailing breakeven after +15%)
+    "scalp_gain_pct": 0.08,            # 8.0% option premium 5m quick scalp target (~10-25 pts)
+    "runner_gain_pct": 0.40,           # 40% - 80% runner target for overall day trend continuation
+    "trailing_breakeven_pct": 0.15,    # Move SL to cost as soon as +15% is gained
+    "rsi_buy_min": 48.0,               # RSI confirmation threshold for BUY
+    "rsi_sell_max": 52.0,              # RSI confirmation threshold for SELL
+    "adx_min_strength": 16.0,          # Minimum ADX directional momentum
+    "ema_alignment_required": True,    # Price must align with EMA20 / VWAP
+    "volume_filter": True,             # Volume must exceed average
+    "min_confidence": 70.0,            # Minimum confidence score
 }
 
 _ACTIVE_CALIBRATION_CACHE: dict[str, dict[str, Any]] = {}
@@ -5904,12 +5906,15 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         tgt_mult = 1.35 if opt_type == "CE" else 1.38
         # Dynamic Calibrated Target & SL for high probability 5m reach
         calib = get_active_calibration(symbol)
-        calib_tgt_pct = float(calib.get("scalp_gain_pct", 0.045))
-        calib_sl_ratio = float(calib.get("sl_atr_multiplier", 1.40)) / max(0.1, float(calib.get("target_atr_multiplier", 0.95)))
-        tgt_gain = round(max(2.5, min(opt_entry * 0.15, max(opt_entry * calib_tgt_pct, 15.0))), 2)
-        sl_dist = round(max(1.5, tgt_gain / max(1.1, calib_sl_ratio)), 2)
+        calib_tgt_pct = float(calib.get("scalp_gain_pct", 0.08))
+        calib_runner_pct = float(calib.get("runner_gain_pct", 0.40))
+        calib_sl_ratio = float(calib.get("sl_atr_multiplier", 1.25)) / max(0.1, float(calib.get("target_atr_multiplier", 1.05)))
+        tgt_gain = round(max(3.0, min(opt_entry * 0.18, max(opt_entry * calib_tgt_pct, 12.0))), 2)
+        sl_dist = round(max(2.0, tgt_gain / max(1.0, calib_sl_ratio)), 2)
         opt_target = round(opt_entry + tgt_gain, 2)
         opt_sl = round(max(0.05, opt_entry - sl_dist), 2)
+        opt_runner_target = round(opt_entry + max(tgt_gain * 3.0, opt_entry * calib_runner_pct), 2)
+        opt_breakeven_trigger = round(opt_entry + tgt_gain * 0.75, 2)
         # Derive smart-money perfect limit entry for option candidate
         # Robust Volatility-Adjusted Target & SL (stock_option_pricing_chat.md)
         # Prevents overly tight stops by incorporating Option ATR, spot invalidation & bid-ask spread
@@ -5988,6 +5993,9 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "cmp": round(opt_entry, 2),
             "stop_loss": opt_sl,
             "target": opt_target,
+            "runner_target": opt_runner_target,
+            "target_open": True,
+            "trailing_breakeven_trigger": opt_breakeven_trigger,
             "perfect_entry_details": opt_perf,
             "spec_levels": spec,
             "structural_risk": spec["structural_risk"],
