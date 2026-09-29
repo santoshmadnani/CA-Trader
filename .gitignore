@@ -13,5 +13,12 @@ terminal_modular.html
 server_host/bin/
 server_host/logs/
 server_host/backups/
+*.key
+*.pem
+*.pub
+*.exe
+dist/
+build/
+.desktop_cache/
 
 

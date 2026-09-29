@@ -1,0 +1,44 @@
+/**
+ * Feature 10 POC: Institutional Micro-Interaction Polish & High-FPS Hardware Rendering
+ * Upstox Pro and Zerodha Kite level animations, glowing price flashes, and zero-shift layout rules.
+ */
+
+/* Glowing real-time tick pulse for bid/ask price updates */
+@keyframes tickGlowUp {
+  0% { background-color: rgba(38, 217, 166, 0.35); text-shadow: 0 0 8px rgba(38, 217, 166, 0.8); }
+  100% { background-color: transparent; text-shadow: none; }
+}
+
+@keyframes tickGlowDown {
+  0% { background-color: rgba(255, 92, 114, 0.35); text-shadow: 0 0 8px rgba(255, 92, 114, 0.8); }
+  100% { background-color: transparent; text-shadow: none; }
+}
+
+.cell-tick-up {
+  animation: tickGlowUp 0.6s ease-out forwards;
+}
+
+.cell-tick-down {
+  animation: tickGlowDown 0.6s ease-out forwards;
+}
+
+/* Zero Cumulative Layout Shift (CLS = 0) and 120 FPS Scrolling */
+.table-wrap, .panel, .card {
+  contain: content;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Institutional Tabular Numbers across all market tickers */
+.chart-symbol-ltp, .sticky-symbol-price, .cell-num, .strike-val {
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Glowing Neon Cyan Cyberpunk Borders on active card hover */
+.card:hover {
+  border-color: rgba(0, 240, 255, 0.4) !important;
+  box-shadow: 0 8px 24px rgba(0, 240, 255, 0.06);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}

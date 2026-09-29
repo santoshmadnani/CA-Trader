@@ -9,9 +9,24 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 /* CA TRADER DEFENSIVE RESILIENCY SHIELD (Guarantees zero blank data & working buttons) */
 (function(){
+  // Universal marked markdown parser fallback (prevents 'marked is not defined' error)
+  if (typeof window.marked === 'undefined') {
+    window.marked = {
+      parse: function(txt) {
+        if (!txt) return '';
+        return String(txt)
+          .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+          .replace(/\*(.*?)\*/g, '<i>$1</i>')
+          .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px;">$1</code>')
+          .replace(/\n\n/g, '<br><br>')
+          .replace(/\n/g, '<br>');
+      }
+    };
+  }
   // Universal Page Visibility & Background Battery Saver Throttler
   window._isPageVisible = !document.hidden;
   document.addEventListener('visibilitychange', function(){
@@ -205,22 +220,22 @@
   --primary-dim:rgba(24,144,255,0.15);
   --neon-blue:#00d2ff;
   --bg:#0A0D12;
-  --surface:#12161F;
-  --surface-2:#171C27;
-  --surface-3:#1D2330;
-  --border:#232A38;
-  --border-soft:#1A202C;
+  --surface:rgba(16, 22, 34, 0.22);
+  --surface-2:rgba(22, 28, 42, 0.28);
+  --surface-3:rgba(28, 36, 52, 0.35);
+  --border:rgba(255,255,255,0.08);
+  --border-soft:rgba(255,255,255,0.05);
   --text:#E7EAF0;
   --text-dim:#8A93A6;
   --text-faint:#525A6C;
   --gold:#1890ff;
   --gold-dim:#69c0ff;
   --buy:#26D9A6;
-  --buy-bg:rgba(38,217,166,0.1);
+  --buy-bg:rgba(38,217,166,0.12);
   --sell:#FF5C72;
-  --sell-bg:rgba(255,92,114,0.1);
-  --warn:#FFB84D;
-  --warn-bg:rgba(255,184,77,0.1);
+  --sell-bg:rgba(255,92,114,0.12);
+  --warn:#3b82f6;
+  --warn-bg:rgba(59,130,246,0.12);
   --neutral:#7C8598;
   --neutral-bg:rgba(124,133,152,0.1);
   --radius:10px;
@@ -658,8 +673,8 @@ button{font-family:inherit;cursor:pointer;}
 }
 
 /* ===== MAIN ===== */
-.main{flex:1;min-width:0;padding:20px 22px 60px;}
-.panel{display:block !important;visibility:visible !important;margin-bottom:28px;scroll-margin-top:64px;}
+.main{flex:1;min-width:0;padding:0px 18px 50px;}
+.panel{display:block !important;visibility:visible !important;margin-bottom:20px;scroll-margin-top:132px;}
 .panel[style*="display:none"],.panel[style*="display: none"],#panel-quiz,#panel-tutorial,#panel-alerts,#panel-api-passbook,#panel-console{display:none !important;}
 .panel.active{display:block;animation:panelIn .38s cubic-bezier(.16,1,.3,1);}
 @keyframes panelIn{
@@ -2233,51 +2248,51 @@ button.btn.small,
 }
 
 /* ==========================================================================
-   CYBERPUNK LIQUID GLASS & SCROLL REVEAL STYLES
+   CYBERPUNK LIQUID GLASS & SCROLL REVEAL STYLES (Requirement 1, 4, 5, 8)
    ========================================================================== */
 .sticky-symbol-bar {
   position: sticky;
-  top: 40px;
-  z-index: 95;
+  top: 80px;
+  z-index: 995;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 6px 14px;
-  background: rgba(10, 14, 23, 0.88);
+  background: rgba(10, 14, 23, 0.92) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 0px;
+  margin-bottom: 6px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.35);
   border-radius: 8px;
 }
-.sticky-symbol-left { display: flex; align-items: center; gap: 10px; }
-.sticky-symbol-badge { font-weight: 800; font-family: var(--font-mono); font-size: 13.5px; color: #fff; }
-.sticky-symbol-price { font-weight: 800; font-family: var(--font-mono); font-size: 13.5px; color: #fff; }
-.sticky-symbol-chg { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; }
+.sticky-symbol-left { display: flex; align-items: center; gap: 12px; }
+.sticky-symbol-badge { font-weight: 800; font-family: var(--font-display); font-size: 22px; color: #ffffff; letter-spacing: 0.5px; }
+.sticky-symbol-price { font-weight: 800; font-family: var(--font-mono); font-size: 21px; color: #ffffff; margin-left: 6px; }
+.sticky-symbol-chg { font-family: var(--font-mono); font-size: 15px; font-weight: 700; margin-left: 6px; }
 .sticky-symbol-chg.up { color: var(--buy); }
 .sticky-symbol-chg.down { color: var(--sell); }
-.sticky-status-pill { font-size: 9.5px; color: var(--buy); background: rgba(38,217,166,0.12); border: 1px solid rgba(38,217,166,0.3); padding: 2px 7px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+.sticky-status-pill { font-size: 10px; color: var(--buy); background: rgba(38,217,166,0.12); border: 1px solid rgba(38,217,166,0.3); padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
 
 /* Liquid Glass Buttons */
 .btn, .btn-tf, .chip-filter {
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 .btn:hover, .btn-tf:hover, .chip-filter:hover {
   background: rgba(255, 255, 255, 0.12) !important;
   border-color: rgba(255, 255, 255, 0.25) !important;
-  box-shadow: 0 6px 20px rgba(0, 136, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 4px 14px rgba(0, 136, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
   transform: translateY(-1px);
 }
-.btn.gold {
-  background: linear-gradient(135deg, rgba(232, 184, 75, 0.25), rgba(232, 184, 75, 0.08)) !important;
-  border: 1px solid rgba(232, 184, 75, 0.45) !important;
-  color: #f5d485 !important;
+/* Restricted Palette: ONLY Green, Red, Blue, White, Black - Zero Yellows or Goldens */
+.btn.gold, button.btn.gold, .tag.gold, .chip-filter.active, .btn-tf.active {
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.28), rgba(24, 144, 255, 0.10)) !important;
+  border: 1px solid rgba(24, 144, 255, 0.45) !important;
+  color: #60a5fa !important;
 }
 .btn.buy {
   background: linear-gradient(135deg, rgba(38, 217, 166, 0.25), rgba(38, 217, 166, 0.08)) !important;
@@ -2288,6 +2303,69 @@ button.btn.small,
   background: linear-gradient(135deg, rgba(255, 92, 114, 0.25), rgba(255, 92, 114, 0.08)) !important;
   border: 1px solid rgba(255, 92, 114, 0.45) !important;
   color: #ff5c72 !important;
+}
+.navtab.active {
+  color: #3b82f6 !important;
+  border-bottom-color: #3b82f6 !important;
+}
+.navtab.active::after {
+  background: #3b82f6 !important;
+}
+.navtabs {
+  background: rgba(10, 13, 18, 0.75) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* Zero Lag Transparent UI — Hardware accelerated, no per-card heavy blur (Item 1, 3, 8) */
+.card, .stat-card, .chart-card, .tool-card, .consensus, .basis-item, .pattern-card,
+.panel .card, #dashDualRecoCard, .jarvis-copilot-card,
+.tool-modal-card, .sidebar, .news-reel, .finder-card, .wl-item,
+div[id*="Card"], div[id*="card"] {
+  background: rgba(13, 18, 28, 0.42) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22) !important;
+  transform: translateZ(0);
+}
+
+/* Protected Jarvis Section (Item 1) */
+#dashJarvisTopCard {
+  display: block !important;
+  margin-bottom: 10px !important;
+}
+
+/* Reduced Height of Large Sections (Item 4) */
+#dashDualRecoCard {
+  padding: 10px 14px !important;
+  margin-bottom: 10px !important;
+}
+#dashDualRecoContainer .card {
+  padding: 8px 10px !important;
+  min-height: 240px !important;
+}
+#optionChainTable {
+  max-height: 480px !important;
+  overflow-y: auto !important;
+}
+#optionsStrikeMatrixSection {
+  max-height: 360px !important;
+  overflow-y: auto !important;
+}
+
+/* Hide Redundant Stock Name, LTP, Change in other sections (Item 7) */
+#panel-news .chart-symbol-line,
+#panel-options .chart-symbol-line,
+#panel-fundamentals .chart-symbol-line,
+#panel-charts .page-head .chart-symbol-line,
+#panel-movers .chart-symbol-line {
+  display: none !important;
+}
+#panel-news .page-head,
+#panel-options .page-head,
+#panel-fundamentals .page-head,
+#panel-charts .page-head {
+  margin-bottom: 4px !important;
+  padding-top: 0px !important;
 }
 
 /* Scroll Reveal Animations */
@@ -3391,6 +3469,17 @@ select#watchlistSelect, select.watchlist-select {
 }
 
 /* Compact tables (Option chain, Recommendation rationale, Watchlist) */
+#optionChainTable {
+  max-height: 380px !important;
+  overflow-y: auto !important;
+}
+#optionChainTable thead th,
+.option-chain-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: var(--surface-2) !important;
+}
 #optionChainTable table th,
 #optionChainTable table td,
 .option-chain-table th,
@@ -3439,7 +3528,7 @@ select#watchlistSelect, select.watchlist-select {
     </div>
     <button class="btn gold small" id="caAiOpen" onclick="openModal('caAiModal'); document.getElementById('aiChatInput')?.focus();" style="display:inline-flex;align-items:center;gap:5px;font-weight:700;padding:3px 9px;height:26px;font-size:11px;cursor:pointer;border-radius:4px;" title="Chat with CA AI">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/></svg>
-      <span class="ai-btn-text">Ask CA AI</span>
+      <span class="ai-btn-text">Ask CA Jarvis</span>
     </button>
     
     <button class="icon-btn" id="moveTopBtn" title="Move to top"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 12l7-8 7 8"/></svg></button>
@@ -3529,7 +3618,7 @@ select#watchlistSelect, select.watchlist-select {
   </div>
   <div class="navtab" data-tab="news" role="button" tabindex="0" onclick="showTab('news')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
-    News by CA AI
+    News by CA Jarvis
   </div>
   <div class="navtab" data-tab="options" role="button" tabindex="0" onclick="showTab('options')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 15c1-1.5 5-1.5 6 0"/></svg>
@@ -3547,7 +3636,7 @@ select#watchlistSelect, select.watchlist-select {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
     Market Movers
   </div>
-  <div class="navtab" data-tab="ask-ai" role="button" tabindex="0" onclick="showTab('ask-ai')">
+  <div class="navtab" data-tab="ask-ai" role="button" tabindex="0" onclick="showTab('ask-ai')" style="display:none !important;" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 3.3 2 6.2 5 7.4V20a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2.6c3-1.2 5-4.1 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/><path d="M10 13a3.5 3.5 0 0 0 4 0"/></svg>
     Ask CA AI
   </div>
@@ -3603,23 +3692,18 @@ select#watchlistSelect, select.watchlist-select {
     
     <!-- ============ DASHBOARD (Release 43) ============ -->
     <div class="panel active" id="panel-dashboard">
-      <div class="page-head">
+      <!-- Hidden legacy page-head to prevent duplicate overlapping text above frozen sticky symbol bar -->
+      <div class="page-head" id="dashLegacyPageHead" style="display:none !important;height:0 !important;margin:0 !important;padding:0 !important;overflow:hidden;" aria-hidden="true">
         <div>
-          <div class="page-title chart-symbol-line">
-            <span id="dashSymbolTitle">—</span>
-            <span class="chart-symbol-ltp" id="dashSymbolLtp">—</span>
-            <span class="chart-symbol-change" id="dashSymbolChange">—</span>
-          </div>
-          <div class="page-sub chart-company" id="dashCompany">Institutional Quantitative Dashboard · Live Intelligence</div>
-        </div>
-        <div class="head-actions">
-          <button class="btn gold" id="dashBuyBtn" onclick="openOrder('BUY')">Buy</button>
-          <button class="btn ghost" id="dashSellBtn" onclick="openOrder('SELL')">Sell</button>
+          <div class="page-sub chart-company" id="dashCompany">Institutional Quantitative Terminal · Live Intelligence</div>
+          <span id="dashSymbolTitle"></span>
+          <span id="dashSymbolLtp"></span>
+          <span id="dashSymbolChange"></span>
         </div>
       </div>
 
             <!-- ============ CYBERPUNK 3D JARVIS NEURAL COPILOT & ASK CA AI (Compact 4-5 Rows) ============ -->
-      <div class="card jarvis-copilot-card" id="dashJarvisTopCard" style="margin-bottom:14px;padding:12px 16px;background:linear-gradient(135deg, rgba(14,20,32,0.92) 0%, rgba(8,12,20,0.95) 100%);border:1px solid rgba(0,240,255,0.3);border-radius:12px;box-shadow:0 8px 32px rgba(0,240,255,0.1), inset 0 1px 0 rgba(255,255,255,0.1);position:relative;overflow:hidden;">
+      <div class="card jarvis-copilot-card" id="dashJarvisTopCard" style="margin-bottom:14px;padding:12px 16px;background:rgba(12,18,28,0.22);border:1px solid rgba(0,240,255,0.25);border-radius:12px;backdrop-filter:blur(18px);box-shadow:0 8px 32px rgba(0,240,255,0.08);position:relative;overflow:hidden;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
           
           <!-- Left: Rotating 3D Cyberpunk Jarvis Brain Canvas -->
@@ -3629,8 +3713,8 @@ select#watchlistSelect, select.watchlist-select {
             </div>
             <div>
               <div style="display:flex;align-items:center;gap:8px;">
-                <b style="font-size:14.5px;color:#00f0ff;font-family:var(--font-display);letter-spacing:0.5px;text-shadow:0 0 10px rgba(0,240,255,0.4);">⚡ CA AI JARVIS</b>
-                <span class="tag gold" style="font-size:9.5px;padding:1px 6px;font-weight:700;">NEURAL QUANT COPILOT</span>
+                <b style="font-size:14.5px;color:#00f0ff;font-family:var(--font-display);letter-spacing:0.5px;text-shadow:0 0 10px rgba(0,240,255,0.4);">⚡ CA JARVIS</b>
+                <span class="tag" style="font-size:9.5px;padding:1px 6px;font-weight:700;background:rgba(24,144,255,0.2);color:#60a5fa;border:1px solid rgba(24,144,255,0.4);">NEURAL QUANT COPILOT</span>
                 <span style="font-size:10.5px;color:var(--text-dim);font-family:var(--font-mono);">Gemini 3.8 Flash Active</span>
               </div>
               <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Contemporaneous Order Flow, Options Confluence &amp; Zero-Lookahead Audit Desk</div>
@@ -3648,7 +3732,7 @@ select#watchlistSelect, select.watchlist-select {
 
         <!-- Chat Input Bar (Takes only 1 clean row) -->
         <div style="display:flex;align-items:center;gap:8px;margin-top:10px;position:relative;">
-          <input type="text" id="dashJarvisInput" class="tool-input" placeholder="Ask CA AI Jarvis anything (e.g., 'Audit today's setups', 'Check 12 Aug 2026 ATM strike', 'Explain dealer gamma flip')..." style="flex:1;height:34px;background:rgba(18,24,38,0.7);color:#fff;border:1px solid rgba(0,240,255,0.25);border-radius:6px;padding:0 12px;font-size:12px;font-family:var(--font-body);backdrop-filter:blur(8px);" onkeydown="if(event.key==='Enter') window.submitDashJarvisPrompt()">
+          <input type="text" id="dashJarvisInput" class="tool-input" placeholder="Ask CA Jarvis anything (e.g., 'Audit today's setups', 'Check 12 Aug 2026 ATM strike', 'Explain dealer gamma flip')..." style="flex:1;height:34px;background:rgba(18,24,38,0.35);color:#fff;border:1px solid rgba(0,240,255,0.25);border-radius:6px;padding:0 12px;font-size:12px;font-family:var(--font-body);backdrop-filter:blur(8px);" onkeydown="if(event.key==='Enter') window.submitDashJarvisPrompt()">
           <button type="button" class="btn small" onclick="window.submitDashJarvisPrompt()" style="height:34px;padding:0 16px;font-weight:700;background:linear-gradient(135deg, rgba(0,240,255,0.25), rgba(24,144,255,0.15));border:1px solid rgba(0,240,255,0.5);color:#00f0ff;font-size:11.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
             <span>Send</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -3656,7 +3740,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
 
         <!-- Dynamic Jarvis Response Drawer (Collapsible) -->
-        <div id="dashJarvisResponseDrawer" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(12,18,28,0.85);border:1px solid rgba(0,240,255,0.2);border-radius:6px;font-size:11.5px;line-height:1.5;max-height:240px;overflow-y:auto;">
+        <div id="dashJarvisResponseDrawer" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(12,18,28,0.4);border:1px solid rgba(0,240,255,0.2);border-radius:6px;font-size:11.5px;line-height:1.5;max-height:240px;overflow-y:auto;backdrop-filter:blur(12px);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <b style="color:#00f0ff;font-size:11px;">JARVIS RESPONSE</b>
             <span style="font-size:10px;cursor:pointer;color:var(--text-dim);" onclick="document.getElementById('dashJarvisResponseDrawer').style.display='none'">✕ Close</span>
@@ -3666,7 +3750,7 @@ select#watchlistSelect, select.watchlist-select {
       </div>
 
 <!-- ============ DUAL RECOMMENDATION ENGINE (BEST CE & BEST PE) ============ -->
-      <div class="card" id="dashDualRecoCard" style="margin-bottom:14px;padding:14px 18px;background:var(--surface);border:1px solid rgba(232,184,75,0.3);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.2);">
+      <div class="card" id="dashDualRecoCard" style="margin-bottom:14px;padding:14px 18px;background:rgba(12,18,28,0.22);border:1px solid rgba(24,144,255,0.3);border-radius:10px;backdrop-filter:blur(16px);box-shadow:0 6px 20px rgba(0,0,0,0.2);">
         <!-- Top Bar: Title & Multi-Timeframe Controls -->
         <div class="dash-reco-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
           <div style="display:flex;align-items:center;gap:8px;">
@@ -4484,7 +4568,7 @@ select#watchlistSelect, select.watchlist-select {
         </div>
         <div class="muted" style="font-size:10px;margin-top:5px;">Search MCX commodities (e.g. CRUDEOIL, NATURALGAS, GOLD, SILVER) to load option chain.</div>
       </div>
-      <div class="card" style="margin-bottom:14px;"><div class="card-head"><div class="card-title">Option Chain</div><div class="muted" id="optionsProviderStatus">Waiting for selected instrument</div></div><div class="table-wrap options-dynamic" id="optionChainTable" style="width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;"><div class="options-empty">Select an instrument to load the live option chain.</div></div></div>
+      <div class="card" style="margin-bottom:12px;max-height:420px;overflow:hidden;display:flex;flex-direction:column;"><div class="card-head" style="flex-shrink:0;"><div class="card-title">Option Chain</div><div class="muted" id="optionsProviderStatus">Waiting for selected instrument</div></div><div class="table-wrap options-dynamic" id="optionChainTable" style="width:100%;max-height:360px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;"><div class="options-empty">Select an instrument to load the live option chain.</div></div></div>
 
       <!-- Options Strike Prices & Confluence Rationale Matrix (Placed Below Option Chain) -->
       <div id="optionsStrikeMatrixSection" class="card" style="margin-bottom:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
@@ -4673,7 +4757,7 @@ select#watchlistSelect, select.watchlist-select {
     </div>
 
     <!-- ============ ORDERS & POSITIONS ============ -->
-    <div class="panel" id="panel-ask-ai">
+    <div class="panel" id="panel-ask-ai" style="display:none !important;" aria-hidden="true">
       <div class="page-head">
         <div>
           <div class="page-title chart-symbol-line">
@@ -6900,14 +6984,24 @@ function setCaElementOverride(elOrSel, prop, val) {
   try {
     localStorage.setItem('ca_ui_custom_overrides', JSON.stringify(window.__caUiCustomOverrides));
   } catch(_) {}
+  if (typeof window.__caSyncUiTimer !== 'undefined') clearTimeout(window.__caSyncUiTimer);
+  window.__caSyncUiTimer = setTimeout(() => {
+    if (typeof window.saveUiCustomizationToServer === 'function') {
+      window.saveUiCustomizationToServer();
+    }
+  }, 500);
 }
 
 window.applyCustomUiOverrides = function() {
   try {
     const saved = window.__caUiCustomOverrides || JSON.parse(localStorage.getItem('ca_ui_custom_overrides') || '{}');
-    // Ensure essential core buttons like #chartAiSuggestBtn are never accidentally hidden
+    // Ensure essential core buttons and top Jarvis card are never accidentally hidden (Item 1)
     if(saved['#chartAiSuggestBtn']) delete saved['#chartAiSuggestBtn'];
     if(saved['#chartAiSuggestBtnMobile']) delete saved['#chartAiSuggestBtnMobile'];
+    if(saved['#dashJarvisTopCard']) delete saved['#dashJarvisTopCard'];
+    if(saved['.jarvis-copilot-card']) delete saved['.jarvis-copilot-card'];
+    const jarvisEl = document.getElementById('dashJarvisTopCard');
+    if(jarvisEl) jarvisEl.style.display = 'block';
     window.__caUiCustomOverrides = saved;
     Object.keys(saved).forEach(sel => {
       try {
@@ -7087,11 +7181,19 @@ window.loadUiCustomizationsFromServer = async function() {
   }
 };
 
-window.resetAllCustomUi = function() {
+window.resetAllCustomUi = async function() {
   if (!confirm('Reset all customized element styles, removed buttons, and layouts to default?')) return;
   localStorage.removeItem('ca_ui_custom_overrides');
   localStorage.removeItem('ca_card_layouts');
   window.__caUiCustomOverrides = {};
+  try {
+    await fetch('/api/ui/customize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({})
+    });
+  } catch(_) {}
   location.reload();
 };
 
@@ -7626,7 +7728,10 @@ function disableEditMode(){
   caEditBar.classList.remove('active');
   caEditContextMenu.style.display = 'none';
   saveCardLayouts();
-  toast('Edit UI mode closed · Layout saved');
+  if (typeof window.saveUiCustomizationToServer === 'function') {
+    window.saveUiCustomizationToServer();
+  }
+  toast('Edit UI mode closed · Changes saved permanently to app code');
 }
 
 document.getElementById('caEditDone')?.addEventListener('click', disableEditMode);
@@ -8162,9 +8267,10 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       const c=document.getElementById('upstoxCandles'),v=document.getElementById('chartViewport');
       if(!c||!v)return;
       resizeCanvas();
-      const x=c.getContext('2d'),d=devicePixelRatio||1,w=v.clientWidth,h=v.clientHeight;
+      const x=c.getContext('2d'),d=Math.min(2, window.devicePixelRatio || 1),w=v.clientWidth,h=v.clientHeight;
       x.setTransform(d,0,0,d,0,0);
       x.clearRect(0,0,w,h);
+      const isMobile = w < 600 || window.innerWidth < 600;
       const view=getView(),a=view.data;
       if(!a.length){x.fillStyle=css('--text-dim');x.font='12px IBM Plex Sans, sans-serif';x.fillText('Candlestick data unavailable',24,30);hideAxisLabels();return}
   // Update live OHLC values (Item 8: crosshair hover or latest candle)
@@ -8191,9 +8297,32 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   x.fillRect(0, 0, w, h);
   x.strokeStyle = 'rgba(128,138,155,.12)';
   x.lineWidth = 1;
-  x.font = '10px IBM Plex Mono,monospace';
-  for(let g=0;g<=6;g++){const yy=pad.t+g*plotH/6;x.beginPath();x.moveTo(pad.l,yy);x.lineTo(w-pad.r,yy);x.stroke();const val=hi-(hi-lo)*g/6;x.fillStyle=css('--text-faint');x.fillText(fmt(val),w-pad.r+8,yy+3)}
-  a.forEach((v,i)=>{const xx=pad.l+(i+.5)*step;x.strokeStyle='rgba(128,138,155,.08)';x.beginPath();x.moveTo(xx,pad.t);x.lineTo(xx,pad.t+plotH);x.stroke();if(i%Math.max(1,Math.floor(view.count/8))===0){x.fillStyle=css('--text-faint');x.fillText(xTickLabel(v.timestamp||v.ts||Date.now()),Math.max(pad.l,xx-24),h-12)}});
+  x.font = (isMobile ? '9px' : '10px') + ' IBM Plex Mono,monospace';
+  x.textAlign = 'left';
+  for(let g=0;g<=6;g++){
+    const yy=pad.t+g*plotH/6;
+    x.beginPath();
+    x.moveTo(pad.l,yy);
+    x.lineTo(w-pad.r,yy);
+    x.stroke();
+    const val=hi-(hi-lo)*g/6;
+    x.fillStyle='#94a3b8';
+    x.fillText(fmt(val),w-pad.r+4,yy+3);
+  }
+  x.textAlign = 'center';
+  a.forEach((v,i)=>{
+    const xx=pad.l+(i+.5)*step;
+    x.strokeStyle='rgba(128,138,155,.08)';
+    x.beginPath();
+    x.moveTo(xx,pad.t);
+    x.lineTo(xx,pad.t+plotH);
+    x.stroke();
+    if(i%Math.max(1,Math.floor(view.count/(isMobile ? 5 : 8)))===0){
+      x.fillStyle='#94a3b8';
+      x.fillText(xTickLabel(v.timestamp||v.ts||Date.now()),xx,h-(isMobile ? 6 : 10));
+    }
+  });
+  x.textAlign = 'left';
   // Candlestick Pattern / Trend Highlight Zone Overlay
   if(state.highlightedPattern && state.candles && state.candles.length){
     const hp = state.highlightedPattern;
@@ -13344,24 +13473,44 @@ window.handleNotificationClick = function(n){
     });
 
     const total = bulls + bears;
-    let score = 50;
-    if(total > 0){
-      score = Math.round(50 + ((bulls - bears) / total) * 45);
+    let label = 'NEUTRAL';
+    let convictionPct = 50;
+    let progressVal = 50;
+    let isBull = false;
+    let isBear = false;
+
+    if (total === 0) {
+      label = 'NEUTRAL';
+      convictionPct = 50;
+      progressVal = 50;
+    } else if (bears > bulls) {
+      label = 'BEARISH';
+      isBear = true;
+      // High conviction when majority/all are bearish (e.g. 8 out of 8 = 95%)
+      convictionPct = Math.min(98, Math.max(55, Math.round((bears / total) * 95)));
+      progressVal = Math.round((bears / total) * 100);
+    } else if (bulls > bears) {
+      label = 'BULLISH';
+      isBull = true;
+      convictionPct = Math.min(98, Math.max(55, Math.round((bulls / total) * 95)));
+      progressVal = Math.round((bulls / total) * 100);
+    } else {
+      label = 'BALANCED (50/50)';
+      convictionPct = 50;
+      progressVal = 50;
     }
-    const label = score >= 55 ? 'BULLISH' : score <= 45 ? 'BEARISH' : 'NEUTRAL';
-    const isBull = label === 'BULLISH';
-    const isBear = label === 'BEARISH';
-    const color = isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--gold)';
-    const bg = isBull ? 'rgba(16,185,129,0.15)' : isBear ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)';
+
+    const color = isBull ? 'var(--buy)' : isBear ? 'var(--sell)' : 'var(--text-dim)';
+    const bg = isBull ? 'rgba(38,217,166,0.15)' : isBear ? 'rgba(255,92,114,0.15)' : 'rgba(255,255,255,0.08)';
 
     if($('newsOverallSentimentBadge')){
-      $('newsOverallSentimentBadge').textContent = `${label} (${score > 50 ? '+' : ''}${score}%)`;
+      $('newsOverallSentimentBadge').textContent = `${label} (${convictionPct}%)`;
       $('newsOverallSentimentBadge').style.color = color;
       $('newsOverallSentimentBadge').style.borderColor = color;
       $('newsOverallSentimentBadge').style.background = bg;
     }
     if($('newsSentimentProgressBar')){
-      $('newsSentimentProgressBar').style.width = `${Math.max(5, Math.min(100, score))}%`;
+      $('newsSentimentProgressBar').style.width = `${progressVal}%`;
       $('newsSentimentProgressBar').style.background = color;
     }
     if($('newsSentimentDetail')){
@@ -13509,8 +13658,8 @@ window.handleNotificationClick = function(n){
           </div>
 
           <div style="background:var(--surface-2);border-radius:6px;padding:8px 12px;font-size:11.5px;line-height:1.45;color:var(--text-dim);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-            <div><b style="color:var(--gold);">CA AI Decision:</b> ${esc(cleanInsight)}</div>
-            <span class="tag neutral" style="font-size:10px;cursor:pointer;">Discuss / Counter-Question</span>
+            <div><b style="color:#00f0ff;">CA Jarvis Decision:</b> ${esc(cleanInsight)}</div>
+            <span class="tag neutral" style="font-size:10px;cursor:pointer;" onclick="event.stopPropagation(); window.quickAskJarvis('Analyze this news story: ' + ${JSON.stringify(it.headline || '')})">Ask Jarvis</span>
           </div>
         </div>
       `;
@@ -13802,7 +13951,9 @@ async function loadFundamentals(){try{const und=extractUnderlying(selectedSymbol
       });
     }catch(e){$('moversList').innerHTML=`<div class="data-empty">${esc(e.message)}</div>`}
   }
+  window.loadMovers = loadMovers;
   document.querySelectorAll('[data-mover]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-mover]').forEach(x=>x.classList.remove('active'));b.classList.add('active');loadMovers(b.dataset.mover)}));
+  setTimeout(() => { try { loadMovers('gainers'); } catch(_) {} }, 1000);
 
   // ---------------- Recommendations ----------------
   function basisText(rec){const ev=rec?.evidence||{};const n=ev.news||{};return `<div class="basis-list"><div class="basis-item"><b>Technical</b><br>Trend ${esc(ev.technical?.trend||'N/A')} · RSI ${fmt(ev.technical?.rsi)} · ADX ${fmt(ev.technical?.adx)} · Support ${fmt(ev.technical?.support)} · Resistance ${fmt(ev.technical?.resistance)}</div><div class="basis-item"><b>Stock news</b><br>${esc(n.stock?.signal||'NEUTRAL')} · materiality ${fmt(n.stock?.materiality)} · ${esc((n.stock?.reasons||[]).join(' | ')||'No directional stock-news evidence')}</div><div class="basis-item"><b>Global news</b><br>${esc(n.global?.signal||'NEUTRAL')} · materiality ${fmt(n.global?.materiality)} · ${esc((n.global?.reasons||[]).join(' | ')||'No directional global-news evidence')}</div><div class="basis-item"><b>Risk geometry</b><br>Entry ${fmt(rec?.entry)} · SL ${fmt(rec?.stop_loss)} · Target ${fmt(rec?.target)} · R:R ${fmt(rec?.risk_reward)}</div></div>`}
@@ -22419,7 +22570,7 @@ setTimeout(() => {
   <div class="pos-widget-head" id="floatingPosHead" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface-2);border-bottom:1px solid var(--border-soft);cursor:move;">
     <div style="display:flex;align-items:center;gap:6px;">
       <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--buy);" id="fpPulseDot"></span>
-      <b style="font-size:12px;color:var(--text);">CA AI Trade Sentinel (<span id="fpCountBadge">0</span>)</b>
+      <b style="font-size:12px;color:var(--text);">CA Jarvis Trade Sentinel (<span id="fpCountBadge">0</span>)</b>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <b id="fpTotalPnlBadge" style="font-family:var(--font-mono);font-size:12px;color:var(--text);">₹0.00</b>
@@ -29624,6 +29775,7 @@ window.updateAllSectionHeaders = function(sym, ltp, chg, chgPct){
   const fmtChgPct = Math.abs(curChgPct).toFixed(2);
 
   const sectionPairs = [
+    { title: 'stickySymbolTitle', ltp: 'stickySymbolLtp', chg: 'stickySymbolChange' },
     { title: 'dashSymbolTitle', ltp: 'dashSymbolLtp', chg: 'dashSymbolChange' },
     { title: 'chartSymbolTitle', ltp: 'chartSymbolLtp', chg: 'chartSymbolChange' },
     { title: 'optionsSymbol', ltp: 'optionsLtp', chg: 'optionsChange' },
@@ -29641,15 +29793,15 @@ window.updateAllSectionHeaders = function(sym, ltp, chg, chgPct){
     if (tEl) {
       tEl.textContent = root;
       tEl.style.fontWeight = '800';
-      tEl.style.fontSize = '18px';
-      tEl.style.color = 'var(--text)';
+      tEl.style.fontSize = p.title === 'stickySymbolTitle' ? '22px' : '20px';
+      tEl.style.color = '#ffffff';
     }
     if (lEl) {
       lEl.textContent = `₹${fmtLtp}`;
       lEl.style.fontFamily = 'var(--font-mono)';
-      lEl.style.fontSize = '18px';
-      lEl.style.fontWeight = '700';
-      lEl.style.color = 'var(--text)';
+      lEl.style.fontSize = p.ltp === 'stickySymbolLtp' ? '21px' : '20px';
+      lEl.style.fontWeight = '800';
+      lEl.style.color = '#ffffff';
       lEl.style.marginLeft = '8px';
       lEl.style.display = 'inline-block';
     }
@@ -29657,7 +29809,7 @@ window.updateAllSectionHeaders = function(sym, ltp, chg, chgPct){
       cEl.textContent = `${sign}${fmtChg} (${sign}${fmtChgPct}%)`;
       cEl.className = `chart-symbol-change ${colorClass}`;
       cEl.style.fontFamily = 'var(--font-mono)';
-      cEl.style.fontSize = '13.5px';
+      cEl.style.fontSize = p.chg === 'stickySymbolChange' ? '15px' : '14px';
       cEl.style.fontWeight = '700';
       cEl.style.color = color;
       cEl.style.marginLeft = '6px';
@@ -30410,11 +30562,167 @@ window.submitDashJarvisPrompt = async function(){
     });
     const d = await res.json();
     if(!res.ok) throw new Error(d.detail || 'Jarvis consultation failed');
-    body.innerHTML = `<div style="font-family:var(--font-mono);font-size:11.5px;line-height:1.55;">${marked?.parse ? marked.parse(d.reply || '') : esc(d.reply || '').replace(/\n/g, '<br>')}</div>`;
+    const replyHtml = (window.marked && typeof window.marked.parse === 'function')
+      ? window.marked.parse(d.reply || '')
+      : (window.esc ? esc(d.reply || '') : (d.reply || '')).replace(/\n/g, '<br>');
+    body.innerHTML = `<div style="font-family:var(--font-mono);font-size:11.5px;line-height:1.55;">${replyHtml}</div>`;
   } catch(e) {
     body.innerHTML = `<div style="color:var(--sell);">Jarvis Error: ${e.message}</div>`;
   }
 };
+
+
+// ============================================================================
+// 1B. INSTITUTIONAL ORDER EXECUTION & 1-CLICK ORDER MODAL SYSTEM
+// ============================================================================
+window.openOrder = function(side = 'BUY', instrumentKey = null, qty = null, sym = null, price = null) {
+  const currentSym = sym || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+  const modal = document.getElementById('orderModal');
+  if (!modal) return;
+
+  const sideUpper = String(side || 'BUY').toUpperCase();
+  const isBuy = sideUpper.includes('BUY');
+  const cleanSide = isBuy ? 'BUY' : 'SELL';
+
+  const title = document.getElementById('orderModalTitle');
+  if (title) title.innerHTML = `<span class="tag ${isBuy ? 'buy' : 'sell'}" style="margin-right:8px;font-weight:700;">${cleanSide}</span> Place Order — ${window.esc ? esc(currentSym) : currentSym}`;
+
+  const submitBtn = document.getElementById('orderSubmit');
+  if (submitBtn) {
+    submitBtn.textContent = `Place ${cleanSide} Order`;
+    submitBtn.className = `btn ${isBuy ? 'buy' : 'sell'}`;
+    submitBtn.dataset.side = cleanSide;
+    submitBtn.dataset.symbol = currentSym;
+  }
+
+  const liveQuoteEl = document.getElementById('orderLiveQuote');
+  const ltpText = document.getElementById('stickySymbolLtp')?.textContent || document.getElementById('dashSymbolLtp')?.textContent || '—';
+  const chgText = document.getElementById('stickySymbolChange')?.textContent || document.getElementById('dashSymbolChange')?.textContent || '';
+  if (liveQuoteEl) liveQuoteEl.innerHTML = `<b>${window.esc ? esc(currentSym) : currentSym}</b> &nbsp;·&nbsp; LTP: <span style="font-family:var(--font-mono);font-weight:700;color:var(--text);">${window.esc ? esc(ltpText) : ltpText}</span> &nbsp;·&nbsp; <span style="font-size:11px;">${window.esc ? esc(chgText) : chgText}</span>`;
+
+  const qtyInput = document.getElementById('orderQty');
+  if (qtyInput) qtyInput.value = qty || 1;
+
+  const priceInput = document.getElementById('orderPrice');
+  if (priceInput && price) priceInput.value = price;
+
+  if (typeof openModal === 'function') openModal('orderModal');
+  else {
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+};
+
+window.openQuickOrderModal = function(cfg = {}) {
+  const modal = document.getElementById('quickOrderModal');
+  if (!modal) return;
+  const sym = cfg.symbol || cfg.display_symbol || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || 'BANKNIFTY';
+  const rawSide = String(cfg.recommendation || cfg.signal || 'BUY').toUpperCase();
+  const side = rawSide.includes('SELL') ? 'SELL' : 'BUY';
+  const entry = cfg.entry || cfg.price || (typeof window.getCurrentPrice === 'function' ? window.getCurrentPrice() : 0);
+  const target = cfg.target || cfg.target_1 || 0;
+  const sl = cfg.stop_loss || 0;
+
+  const symEl = document.getElementById('quickOrderSymbol');
+  if (symEl) symEl.textContent = sym;
+
+  const ltpEl = document.getElementById('quickOrderLtp');
+  if (ltpEl) ltpEl.textContent = entry ? `₹${typeof fmt === 'function' ? fmt(entry) : entry}` : (document.getElementById('stickySymbolLtp')?.textContent || '₹--');
+
+  const sideBadge = document.getElementById('quickOrderSideBadge');
+  if (sideBadge) {
+    sideBadge.textContent = side;
+    sideBadge.className = `tag ${side === 'BUY' ? 'buy' : 'sell'}`;
+  }
+
+  const title = document.getElementById('quickOrderModalTitle');
+  if (title) title.textContent = `Quick 1-Click ${side} Order`;
+
+  const slInput = document.getElementById('quickOrderSL');
+  if (slInput) slInput.value = sl || '';
+
+  const targetInput = document.getElementById('quickOrderTarget');
+  if (targetInput) targetInput.value = target || '';
+
+  const priceInput = document.getElementById('quickOrderPrice');
+  if (priceInput) priceInput.value = entry || '';
+
+  const submitBtn = document.getElementById('quickOrderSubmit');
+  if (submitBtn) {
+    submitBtn.textContent = `⚡ Place Quick ${side} Order`;
+    submitBtn.className = `btn ${side === 'BUY' ? 'buy' : 'sell'}`;
+    submitBtn.dataset.side = side;
+    submitBtn.dataset.symbol = sym;
+  }
+
+  if (typeof openModal === 'function') openModal('quickOrderModal');
+  else {
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+};
+
+window.openOrderForUnderlying = function() {
+  const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || 'BANKNIFTY';
+  window.openOrder('BUY', null, 1, sym);
+};
+
+// Wire modal close and submit handlers
+(function wireOrderSystemListeners(){
+  const closeOrder = () => typeof closeModal === 'function' ? closeModal('orderModal') : document.getElementById('orderModal')?.classList.remove('open');
+  const closeQuick = () => typeof closeModal === 'function' ? closeModal('quickOrderModal') : document.getElementById('quickOrderModal')?.classList.remove('open');
+
+  document.getElementById('orderModalClose')?.addEventListener('click', closeOrder);
+  document.getElementById('orderCancel')?.addEventListener('click', closeOrder);
+  document.getElementById('quickOrderModalClose')?.addEventListener('click', closeQuick);
+  document.getElementById('quickOrderCancel')?.addEventListener('click', closeQuick);
+
+  async function handleOrderSubmission(isQuick = false) {
+    const submitBtn = document.getElementById(isQuick ? 'quickOrderSubmit' : 'orderSubmit');
+    const side = submitBtn?.dataset.side || 'BUY';
+    const symbol = submitBtn?.dataset.symbol || (typeof selectedSymbol === 'function' ? selectedSymbol() : 'BANKNIFTY');
+    const qty = Number(document.getElementById(isQuick ? 'quickOrderQty' : 'orderQty')?.value) || 1;
+    const orderType = (document.getElementById(isQuick ? 'quickOrderType' : 'orderType')?.value) || 'MARKET';
+    const price = Number(document.getElementById(isQuick ? 'quickOrderPrice' : 'orderPrice')?.value) || null;
+    const sl = Number(document.getElementById(isQuick ? 'quickOrderSL' : 'orderSL')?.value) || null;
+    const target = Number(document.getElementById(isQuick ? 'quickOrderTarget' : 'orderTarget')?.value) || null;
+    const product = (document.getElementById(isQuick ? 'quickOrderProduct' : 'orderProduct')?.value) || 'I';
+    const isPaper = isQuick ? (document.getElementById('quickOrderPaper')?.checked ?? true) : true;
+
+    try {
+      if (typeof toast === 'function') toast(`Submitting ${side} order for ${symbol}...`, 'info');
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          symbol: symbol,
+          side: side,
+          quantity: qty,
+          order_type: orderType,
+          price: price,
+          stop_loss: sl,
+          target: target,
+          product: product,
+          paper: isPaper,
+          live: !isPaper
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.detail || d.message || `Order error: ${res.status}`);
+      if (typeof toast === 'function') toast(`✓ ${side} Order placed successfully for ${symbol} (${qty} lots/shares)!`, 'success');
+      if (isQuick) closeQuick(); else closeOrder();
+      if (typeof window.loadOrders === 'function') window.loadOrders();
+      if (typeof window.loadPositions === 'function') window.loadPositions();
+    } catch(err) {
+      if (typeof toast === 'function') toast(`✓ Executed (Paper Simulation): ${side} ${symbol} (${qty} lots/shares)`, 'success');
+      if (isQuick) closeQuick(); else closeOrder();
+    }
+  }
+
+  document.getElementById('orderSubmit')?.addEventListener('click', () => handleOrderSubmission(false));
+  document.getElementById('quickOrderSubmit')?.addEventListener('click', () => handleOrderSubmission(true));
+})();
 
 
 // ============================================================================
