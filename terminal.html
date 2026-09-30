@@ -2520,40 +2520,63 @@ button.btn.small,
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
+    height: 58px;
     background: #0c0f17;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     z-index: 99999;
     box-sizing: border-box;
     align-items: stretch;
-    justify-content: space-around;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    justify-content: flex-start;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 0 6px calc(2px + env(safe-area-inset-bottom, 0px)) 6px !important;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.45);
+    gap: 3px !important;
+  }
+  .mobile-bottom-dock::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
   .mobile-dock-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    flex: 0 0 auto !important;
+    min-width: 66px !important;
+    max-width: 76px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
     background: transparent;
     border: none;
     color: #8892b0;
     cursor: pointer;
-    font-size: 10.5px;
+    font-size: 10px !important;
     font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
     gap: 3px;
-    padding: 6px 0;
+    padding: 6px 3px !important;
     position: relative;
     transition: color 0.18s ease;
     text-decoration: none;
+    white-space: nowrap !important;
     -webkit-tap-highlight-color: transparent;
   }
   .mobile-dock-item svg {
-    width: 20px;
-    height: 20px;
+    width: 19px !important;
+    height: 19px !important;
     stroke: currentColor;
+    flex-shrink: 0;
     transition: stroke 0.18s ease, transform 0.18s ease;
+  }
+  .mobile-dock-item span {
+    display: block;
+    line-height: 1.1;
+    letter-spacing: -0.1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 72px;
   }
   .mobile-dock-item.active {
     color: #387ed1 !important; /* Zerodha blue */
@@ -2567,8 +2590,8 @@ button.btn.small,
     content: '';
     position: absolute;
     top: 0;
-    left: 18%;
-    right: 18%;
+    left: 14%;
+    right: 14%;
     height: 2.5px;
     background: #387ed1;
     border-radius: 0 0 2px 2px;
@@ -3744,6 +3767,7 @@ select#watchlistSelect, select.watchlist-select {
   }
 
   /* Metric boxes: Entry, SL, Target, R:R mobile fit */
+  /* Metric boxes: Entry, SL, Target, R:R mobile fit */
   .metric-clickable-box {
     padding: 4px 1px !important;
     min-width: 0 !important;
@@ -3753,6 +3777,13 @@ select#watchlistSelect, select.watchlist-select {
   #dashCardCe .metric-clickable-box,
   #dashCardPe .metric-clickable-box {
     padding: 4px 1px !important;
+    min-width: 0 !important;
+  }
+  #dashCardUnderlying > div:has(.metric-clickable-box),
+  #dashCardCe > div:has(.metric-clickable-box),
+  #dashCardPe > div:has(.metric-clickable-box) {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 3px !important;
     min-width: 0 !important;
   }
   #dashCardUnderlying .metric-clickable-box div:first-child,
@@ -3767,7 +3798,7 @@ select#watchlistSelect, select.watchlist-select {
   #dashCardUnderlying .metric-clickable-box div:last-child,
   #dashCardCe .metric-clickable-box div:last-child,
   #dashCardPe .metric-clickable-box div:last-child {
-    font-size: 10.5px !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
@@ -3866,7 +3897,6 @@ select#watchlistSelect, select.watchlist-select {
 
 </head>
 <body data-theme="ivory">
-<canvas id="bgCandleCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;opacity:0.08;"></canvas>
 <div id="caCursorGlow" style="position:fixed;width:280px;height:280px;border-radius:50%;pointer-events:none;z-index:1;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(0,240,255,0.06) 0%,rgba(255,0,128,0.02) 40%,transparent 70%);transition:transform 0.08s ease-out;display:block;"></div>
 
 
@@ -4697,23 +4727,37 @@ select#watchlistSelect, select.watchlist-select {
         </div>
       </div>
       
-      <!-- BACKTESTING REPLAY STRIP: Clean Toolbar (Date, Play, Seek bar only - Risk inherited from dashboard) -->
-      <div id="chartReplayToolbar" style="display:none;align-items:center;justify-content:space-between;gap:10px;padding:6px 12px;background:var(--surface-2);border-bottom:1px solid var(--border-soft);font-family:inherit;font-size:11px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:8px;">
+      <!-- FULLSCREEN INTEGRATED BACKTESTING & REPLAY DOCK -->
+      <div id="chartBacktestBar" class="chart-backtest-dock" style="display:none;position:relative;z-index:999999;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;background:var(--surface-2,#121824);border-bottom:1px solid rgba(0,210,255,0.3);font-family:inherit;font-size:11px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,0.5);">
+        <!-- Group 1: Replay Controls & Scrubber -->
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span style="font-weight:700;color:var(--gold);display:inline-flex;align-items:center;gap:4px;font-size:11px;">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Replay
           </span>
-          <label style="display:inline-flex;align-items:center;gap:4px;color:var(--text-dim);font-size:11px;font-weight:600;">
-            Date:
-            <input type="date" id="chartReplayDateInput" value="2026-09-17" onchange="loadChartReplaySession()" style="height:24px;padding:1px 6px;font-size:11px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;font-family:inherit;cursor:pointer;">
-          </label>
-          <button type="button" class="btn small gold" id="btnChartReplayPlayPause" onclick="toggleChartReplayPlay()" style="padding:2px 10px;font-size:11px;height:24px;font-family:inherit;font-weight:700;">▶ Play</button>
+          <input type="date" id="chartReplayDateInput" onchange="loadChartReplaySession()" style="height:24px;padding:1px 6px;font-size:11px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;font-family:inherit;cursor:pointer;">
+          <button type="button" class="btn small ghost" id="btStepBackBtn" title="Previous Bar" style="padding:1px 7px;font-size:11px;height:24px;">◀</button>
+          <button type="button" class="btn small gold" id="btPlayPauseBtn" style="padding:1px 10px;font-size:11px;height:24px;font-weight:700;">▶ Play</button>
+          <button type="button" class="btn small ghost" id="btStepForwardBtn" title="Next Bar" style="padding:1px 7px;font-size:11px;height:24px;">▶</button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" id="btScrubber" min="0" max="100" value="0" style="width:120px;height:5px;accent-color:var(--gold);cursor:pointer;">
+            <span id="btCandleTime" style="font-family:var(--font-mono);font-size:10.5px;color:var(--gold);white-space:nowrap;">09:15</span>
+          </div>
         </div>
 
-        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px;max-width:480px;">
-          <span style="font-size:10.5px;color:var(--text-dim);white-space:nowrap;">Seek Bar:</span>
-          <input type="range" id="chartReplaySlider" min="0" max="100" value="0" oninput="scrubChartReplay(this.value)" style="flex:1;height:5px;accent-color:var(--gold);cursor:pointer;">
+        <!-- Group 2: On-Chart Order Execution & Live Dynamic P&L -->
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="btn small buy" id="btChartBuyBtn" onclick="window.placeChartBacktestOrder('BUY')" style="padding:2px 10px;font-size:11px;font-weight:700;height:24px;background:#00b074;border:none;color:#fff;cursor:pointer;">Buy / Long</button>
+          <button type="button" class="btn small sell" id="btChartSellBtn" onclick="window.placeChartBacktestOrder('SELL')" style="padding:2px 10px;font-size:11px;font-weight:700;height:24px;background:#ff5c72;border:none;color:#fff;cursor:pointer;">Sell / Short</button>
+          
+          <!-- Dynamic Live P&L Badge -->
+          <div id="btChartLivePnlBadge" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:var(--surface);border:1px solid var(--border-soft);font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text);height:24px;">
+            <span style="font-size:9.5px;color:var(--text-dim);font-weight:600;">LIVE P&L:</span>
+            <span id="btChartLivePnl" style="color:var(--text-faint);">₹0.00</span>
+          </div>
+
+          <button type="button" class="btn small ghost" id="btChartSquareOffBtn" onclick="window.squareOffChartBacktest()" style="padding:2px 10px;font-size:11px;font-weight:700;height:24px;color:var(--gold);border-color:rgba(232,184,75,0.4);cursor:pointer;" title="Exit active backtest trade at current replay price">⚡ Square Off</button>
+          <button type="button" class="btn small ghost" id="btCloseBtn" title="Exit Backtesting" style="padding:2px 7px;font-size:11px;height:24px;color:var(--text-dim);cursor:pointer;">✕</button>
         </div>
       </div>
 
@@ -7108,6 +7152,18 @@ window.isInstrumentMarketOpen = function(sym) {
   return mins >= 555 && mins <= 930;
 };
 
+window.selectMobileDockTab = function(tabName){
+  if(tabName === 'watchlist'){
+    if(typeof window.toggleMobileWatchlistDrawer === 'function') window.toggleMobileWatchlistDrawer();
+  } else {
+    showTab(tabName);
+  }
+  const item = document.querySelector(`.mobile-dock-item[data-tab="${tabName}"]`);
+  if(item){
+    try { item.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } catch(_) {}
+  }
+};
+
 function showTab(name){
   if(!name) return;
   if(name === 'reco'){
@@ -7120,6 +7176,10 @@ function showTab(name){
   const panelName = name;
   document.querySelectorAll('.navtab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
   document.querySelectorAll('.mobile-dock-item').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  const activeDockBtn = document.querySelector(`.mobile-dock-item[data-tab="${name}"]`);
+  if(activeDockBtn){
+    try { activeDockBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } catch(_) {}
+  }
   const targetPanel = document.getElementById('panel-' + panelName) || document.getElementById(panelName);
   if(targetPanel){
     if(targetPanel.style.display === 'none'){
@@ -10817,19 +10877,19 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   let __caBacktestActive = false;
   let __caFullCandles = null;
   let __caReplayTimer = null;
+  window.__caActiveBtTrade = null;
 
   function initChartBacktest(){
-    const btn = $('btnChartBacktest');
     const bar = $('chartBacktestBar');
     const scrubber = $('btScrubber');
-    if(!btn || !bar) return;
+    if(!bar) return;
 
-    btn.addEventListener('click', () => {
-      __caBacktestActive = !__caBacktestActive;
+    window.toggleChartBacktest = function(enable){
+      __caBacktestActive = (enable !== undefined) ? !!enable : !__caBacktestActive;
+      const chk = $('toggleBacktestToolsCheckbox');
+      if(chk) chk.checked = __caBacktestActive;
+
       if(__caBacktestActive){
-        // Activate Backtesting Replay Mode
-        btn.style.background = 'var(--gold)';
-        btn.style.color = '#0B2A1E';
         bar.style.display = 'flex';
         __caFullCandles = (state.candles || []).map(c => ({...c}));
         if(scrubber && __caFullCandles.length > 5){
@@ -10838,12 +10898,17 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           scrubber.value = __caFullCandles.length;
           updateBacktestSlice(__caFullCandles.length);
         }
-        toast('Integrated Chart Backtesting mode activated. Scrub slider to test historical moments.');
+        toast('Integrated Chart Backtesting mode activated. Scrub slider or press Play to replay historical moments.');
       } else {
         exitChartBacktest();
       }
-    });
+    };
 
+    window.toggleBacktestReplayToolbar = function(show){
+      window.toggleChartBacktest(show);
+    };
+
+    $('btnChartBacktest')?.addEventListener('click', () => window.toggleChartBacktest());
     $('btCloseBtn')?.addEventListener('click', exitChartBacktest);
 
     scrubber?.addEventListener('input', (e) => {
@@ -10874,7 +10939,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       if(__caReplayTimer){
         clearInterval(__caReplayTimer);
         __caReplayTimer = null;
-        if(pBtn) pBtn.textContent = 'Play';
+        if(pBtn) pBtn.textContent = '▶ Play';
       } else {
         if(pBtn) pBtn.textContent = '⏸ Pause';
         __caReplayTimer = setInterval(() => {
@@ -10890,12 +10955,120 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
           } else {
             clearInterval(__caReplayTimer);
             __caReplayTimer = null;
-            if(pBtn) pBtn.textContent = 'Play';
+            if(pBtn) pBtn.textContent = '▶ Play';
           }
         }, 800);
       }
     });
   }
+
+  // On-Chart Backtest Order Execution: Buy / Long or Sell / Short
+  window.placeChartBacktestOrder = async function(side){
+    const lastClose = Number(state.latestLive) || Number(state.candles[state.candles.length - 1]?.close) || 0;
+    if(!lastClose){
+      toast('No price available to execute order');
+      return;
+    }
+    const sym = typeof selectedSymbol === 'function' ? selectedSymbol() : (state.symbol || 'NIFTY');
+    const curTime = state.candles[state.candles.length - 1]?.timestamp || new Date().toISOString();
+
+    try {
+      const resp = await api('/api/backtest/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: sym,
+          side: side,
+          quantity: 1,
+          price: lastClose,
+          candle_time: curTime
+        })
+      });
+
+      // Get open positions to track trade ID
+      let tradeId = null;
+      try {
+        const posResp = await api('/api/backtest/positions');
+        const openPos = (posResp?.open_positions || [])[0];
+        tradeId = openPos?.id || Date.now();
+      } catch(_) {
+        tradeId = Date.now();
+      }
+
+      const slDist = lastClose * 0.008;
+      const tgtDist = lastClose * 0.016;
+
+      window.__caActiveBtTrade = {
+        id: tradeId,
+        symbol: sym,
+        side: side,
+        entry_price: lastClose,
+        stop_loss: side === 'BUY' ? lastClose - slDist : lastClose + slDist,
+        target: side === 'BUY' ? lastClose + tgtDist : lastClose - tgtDist,
+        quantity: 1,
+        entry_time: curTime
+      };
+
+      const pnlEl = $('btChartLivePnl');
+      if(pnlEl){
+        pnlEl.textContent = '₹0.00';
+        pnlEl.style.color = 'var(--text)';
+      }
+
+      toast(`⚡ Backtest ${side} trade executed on ${sym} at ₹${fmt(lastClose)}`);
+    } catch(err) {
+      toast('Order error: ' + (err.message || 'Failed'));
+    }
+  };
+
+  // On-Chart Backtest Exit / Square Off
+  window.squareOffChartBacktest = async function(){
+    const trade = window.__caActiveBtTrade;
+    if(!trade){
+      toast('No open backtest trade to square off');
+      return;
+    }
+    const curPrice = Number(state.latestLive) || Number(state.candles[state.candles.length - 1]?.close) || trade.entry_price;
+    const curTime = state.candles[state.candles.length - 1]?.timestamp || new Date().toISOString();
+    const pnl = (curPrice - trade.entry_price) * trade.quantity * (trade.side === 'BUY' ? 1 : -1);
+
+    try {
+      await api('/api/backtest/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trade_id: trade.id,
+          exit_price: curPrice,
+          exit_time: curTime
+        })
+      });
+
+      const pnlFormatted = `${pnl >= 0 ? '+' : ''}₹${fmt(pnl)}`;
+      toast(`Trade squared off at ₹${fmt(curPrice)} (P&L: ${pnlFormatted})`);
+
+      // If trade closed at a loss, automatically trigger CA Jarvis Forensic Post-Mortem Analysis
+      if(pnl < 0 && typeof window.runFailedTradeDiagnosis === 'function'){
+        window.runFailedTradeDiagnosis({
+          symbol: trade.symbol,
+          side: trade.side,
+          entry_price: trade.entry_price,
+          stop_loss: trade.stop_loss,
+          exit_price: curPrice,
+          loss_amount: Math.abs(pnl),
+          timeframe: state.tf || '5m'
+        });
+      }
+
+      window.__caActiveBtTrade = null;
+      const pnlEl = $('btChartLivePnl');
+      if(pnlEl){
+        pnlEl.textContent = '₹0.00';
+        pnlEl.style.color = 'var(--text-faint)';
+      }
+    } catch(err) {
+      toast('Square off error: ' + (err.message || 'Failed'));
+    }
+  };
 
   function updateBacktestSlice(candleCount){
     if(!__caFullCandles || candleCount > __caFullCandles.length) return;
@@ -10903,7 +11076,9 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     state.candles = sliced;
     const last = sliced[sliced.length - 1];
     if(last && $('btCandleTime')){
-      $('btCandleTime').textContent = last.timestamp || last.ts || `Candle #${candleCount}`;
+      const rawT = last.timestamp || last.ts || `Bar #${candleCount}`;
+      const timeStr = rawT.includes('T') ? rawT.split('T')[1].slice(0, 5) : (rawT.length >= 16 ? rawT.slice(11, 16) : rawT);
+      $('btCandleTime').textContent = timeStr;
       state.latestLive = Number(last.close);
     }
     state.panX = Math.max(0, state.candles.length - Math.floor(state.visible / state.zoom));
@@ -10911,6 +11086,56 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
     // Cascade historical point through indicators, patterns & reco
     void loadChartBundle(true);
     if(typeof updateChartRecoBanner === 'function') void updateChartRecoBanner();
+
+    // Real-Time Dynamic P&L Calculation for Active Backtest Position
+    if(window.__caActiveBtTrade && last){
+      const curPrice = Number(last.close);
+      const trade = window.__caActiveBtTrade;
+      const pnl = (curPrice - trade.entry_price) * trade.quantity * (trade.side === 'BUY' ? 1 : -1);
+      const pnlEl = $('btChartLivePnl');
+      if(pnlEl){
+        pnlEl.textContent = `${pnl >= 0 ? '+' : ''}₹${fmt(pnl)}`;
+        pnlEl.style.color = pnl >= 0 ? '#26d9a6' : '#ff5c72';
+      }
+
+      // Check SL or Target breach during replay
+      let slBreached = false;
+      let tgtHit = false;
+      if(trade.side === 'BUY'){
+        if(trade.stop_loss && curPrice <= trade.stop_loss) slBreached = true;
+        else if(trade.target && curPrice >= trade.target) tgtHit = true;
+      } else if(trade.side === 'SELL'){
+        if(trade.stop_loss && curPrice >= trade.stop_loss) slBreached = true;
+        else if(trade.target && curPrice <= trade.target) tgtHit = true;
+      }
+
+      if(slBreached){
+        toast(`⚠️ Backtest Stop-Loss Triggered at ₹${fmt(curPrice)} (P&L: -₹${fmt(Math.abs(pnl))})`);
+        if(typeof window.runFailedTradeDiagnosis === 'function'){
+          window.runFailedTradeDiagnosis({
+            symbol: trade.symbol,
+            side: trade.side,
+            entry_price: trade.entry_price,
+            stop_loss: trade.stop_loss,
+            exit_price: curPrice,
+            loss_amount: Math.abs(pnl),
+            timeframe: state.tf || '5m'
+          });
+        }
+        window.__caActiveBtTrade = null;
+        if(pnlEl){
+          pnlEl.textContent = `SL Hit (-₹${fmt(Math.abs(pnl))})`;
+          pnlEl.style.color = '#ff5c72';
+        }
+      } else if(tgtHit){
+        toast(`🎯 Backtest Target Achieved at ₹${fmt(curPrice)} (P&L: +₹${fmt(pnl)})`);
+        window.__caActiveBtTrade = null;
+        if(pnlEl){
+          pnlEl.textContent = `Target Hit (+₹${fmt(pnl)})`;
+          pnlEl.style.color = '#26d9a6';
+        }
+      }
+    }
 
     if(last && sliced.length >= 5){
       const lastClose = Number(last.close || 0);
@@ -10973,6 +11198,8 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
   function exitChartBacktest(){
     __caBacktestActive = false;
     if(__caReplayTimer){ clearInterval(__caReplayTimer); __caReplayTimer = null; }
+    const chk = $('toggleBacktestToolsCheckbox');
+    if(chk) chk.checked = false;
     const btn = $('btnChartBacktest');
     if(btn){
       btn.style.background = 'rgba(232,184,75,0.08)';
@@ -10988,6 +11215,7 @@ document.getElementById('maxProfitRecommendationBtn')?.addEventListener('click',
       void loadChartBundle(true);
       if(typeof updateChartRecoBanner === 'function') void updateChartRecoBanner();
     }
+    window.__caActiveBtTrade = null;
     toast('Exited backtesting mode. Live market data restored.');
   }
   initChartBacktest();
@@ -13511,7 +13739,7 @@ window.handleNotificationClick = function(n){
 </script><script>
 (() => {
   const api = async (url, options={}) => {
-    const timeoutMs = Math.max(1200, Number(options.timeoutMs || 8000));
+    const timeoutMs = Math.max(5000, Number(options.timeoutMs || 25000));
     const ctrl = options.signal ? null : new AbortController();
     const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
     const {timeoutMs:_ignored, ...fetchOptions} = options;
@@ -13528,7 +13756,14 @@ window.handleNotificationClick = function(n){
     } catch(e) {
       if (e?.name === 'AbortError') {
         if (!options._retried) {
-          return api(url, {...options, _retried: true, timeoutMs: Math.max(timeoutMs, 8000), headers: {...(options.headers || {}), 'Cache-Control': 'no-cache'}});
+          return api(url, {...options, _retried: true, timeoutMs: 35000, headers: {...(options.headers || {}), 'Cache-Control': 'no-cache'}});
+        }
+        console.warn(`[CA Trader API] Request timed out for ${url} after ${Math.round(timeoutMs / 1000)}s`);
+        if (url.includes('/api/options/')) {
+          return { strikes: [], is_fallback: true, error: 'Option chain temporarily unavailable' };
+        }
+        if (url.includes('/api/news/')) {
+          return { events: [], is_fallback: true, error: 'News feed temporarily unavailable' };
         }
         throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds`);
       }
@@ -19585,7 +19820,7 @@ document.querySelectorAll('.navtab').forEach(t=>t.addEventListener('click',(e)=>
           const baseSym = String(sym).replace(/ (CE|PE)$/, '').split(' ')[0].toUpperCase();
           const apiFn = window.A || window.api;
           if(apiFn && baseSym) {
-            apiFn('/api/options/' + encodeURIComponent(baseSym) + '/chain', {timeoutMs:3500}).then(d => {
+            apiFn('/api/options/' + encodeURIComponent(baseSym) + '/chain', {timeoutMs:15000}).then(d => {
               if(!d || !d.strikes) return;
               // Find ATM row and update chartGreeksGrid
               const curLtp = Number(window.state?.latestLive || 0);
@@ -19634,9 +19869,9 @@ document.querySelectorAll('.navtab').forEach(t=>t.addEventListener('click',(e)=>
         const sym = typeof extractUnderlying === 'function' ? extractUnderlying(selectedSymbol()) : selectedSymbol();
         const apiFn = window.A || window.api;
         if(apiFn && sym) {
-          apiFn('/api/news/stock/'+encodeURIComponent(sym)+'?limit=60&_='+Date.now(), {timeoutMs:3000,cache:'no-store'})
+          apiFn('/api/news/stock/'+encodeURIComponent(sym)+'?limit=60&_='+Date.now(), {timeoutMs:15000,cache:'no-store'})
             .then(d => { if((d.events||[]).length) APP_CACHE.newsStock = d; }).catch(()=>{});
-          apiFn('/api/news/global?limit=60&_='+Date.now(), {timeoutMs:3000,cache:'no-store'})
+          apiFn('/api/news/global?limit=60&_='+Date.now(), {timeoutMs:15000,cache:'no-store'})
             .then(d => { if((d.events||[]).length) APP_CACHE.newsGlobal = d; }).catch(()=>{});
         }
       }
@@ -27279,27 +27514,47 @@ setTimeout(() => {
 </script>
 <div id="rightSideNotificationContainer" style="position:fixed;top:70px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none;max-width:340px;width:calc(100% - 32px);"></div>
 
-<!-- REVERSIBLE MOBILE BOTTOM APP DOCK (Visible on mobile only when active) -->
+<!-- REVERSIBLE MOBILE BOTTOM APP DOCK (Sliding Bar with all sections) -->
 <nav class="mobile-bottom-dock" id="mobileBottomDock" aria-label="Mobile App Navigation">
-  <button class="mobile-dock-item" data-tab="watchlist" onclick="window.toggleMobileWatchlistDrawer()" id="dockBtnWatchlist">
+  <button class="mobile-dock-item" data-tab="watchlist" onclick="window.selectMobileDockTab('watchlist')" id="dockBtnWatchlist">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
     <span>Watchlist</span>
   </button>
-  <button class="mobile-dock-item" data-tab="orders" onclick="showTab('orders')" id="dockBtnTrades">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6l1 4H8z"/><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M9 12h6M9 16h6"/></svg>
-    <span>Orders</span>
-  </button>
-  <button class="mobile-dock-item active" data-tab="dashboard" onclick="showTab('dashboard')" id="dockBtnDashboard">
+  <button class="mobile-dock-item active" data-tab="dashboard" onclick="window.selectMobileDockTab('dashboard')" id="dockBtnDashboard">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
     <span>Dashboard</span>
   </button>
-  <button class="mobile-dock-item" data-tab="charts" onclick="showTab('charts')" id="dockBtnCharts">
+  <button class="mobile-dock-item" data-tab="charts" onclick="window.selectMobileDockTab('charts')" id="dockBtnCharts">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 5-7"/></svg>
     <span>Charts</span>
   </button>
-  <button class="mobile-dock-item" data-tab="news" onclick="showTab('news')" id="dockBtnNews">
+  <button class="mobile-dock-item" data-tab="orders" onclick="window.selectMobileDockTab('orders')" id="dockBtnTrades">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6l1 4H8z"/><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M9 12h6M9 16h6"/></svg>
+    <span>Orders</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="options" onclick="window.selectMobileDockTab('options')" id="dockBtnOptions">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    <span>Options</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="backtesting" onclick="window.selectMobileDockTab('backtesting')" id="dockBtnBacktest">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+    <span>Backtest</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="news" onclick="window.selectMobileDockTab('news')" id="dockBtnNews">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
     <span>News / AI</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="fundamentals" onclick="window.selectMobileDockTab('fundamentals')" id="dockBtnFund">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+    <span>Fundam.</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="funds" onclick="window.selectMobileDockTab('funds')" id="dockBtnFunds">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="16" cy="15" r="1.5"/></svg>
+    <span>Funds</span>
+  </button>
+  <button class="mobile-dock-item" data-tab="reports" onclick="window.selectMobileDockTab('reports')" id="dockBtnReports">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <span>Reports</span>
   </button>
 </nav>
 <script src="/static/js/core/audio_engine.js"></script>
@@ -27713,9 +27968,11 @@ setTimeout(() => {
 
 // 1. Toggle Backtest Replay Toolbar
 window.toggleBacktestReplayToolbar = function(show){
-  const tb = document.getElementById('chartReplayToolbar');
-  if(tb){
-    tb.style.display = show ? 'flex' : 'none';
+  if(typeof window.toggleChartBacktest === 'function'){
+    window.toggleChartBacktest(show);
+  } else {
+    const tb = document.getElementById('chartBacktestBar') || document.getElementById('chartReplayToolbar');
+    if(tb) tb.style.display = show ? 'flex' : 'none';
   }
 };
 
@@ -30950,6 +31207,64 @@ window.submitDashJarvisPrompt = async function(){
   }
 };
 
+window.runFailedTradeDiagnosis = async function(tradeInfo){
+  if(!tradeInfo) return;
+  const drawer = document.getElementById('dashJarvisResponseDrawer');
+  const body = document.getElementById('dashJarvisResponseBody');
+  if(drawer && body){
+    drawer.style.display = 'block';
+    body.innerHTML = `<div style="padding:10px;background:rgba(255,92,114,0.1);border-left:3px solid var(--sell);border-radius:6px;margin-bottom:8px;">
+      <div style="font-weight:700;color:var(--sell);font-size:13px;display:flex;align-items:center;gap:6px;">
+        <span>🚨</span> CA Jarvis Post-Mortem Forensic Analysis
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:2px;">
+        Diagnosing stop-loss breach on ${window.esc ? esc(tradeInfo.symbol || '') : tradeInfo.symbol}...
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin:8px 0;">
+      <span class="loading-spin"></span> Reconstructing market structure & liquidity sweep...
+    </div>`;
+  }
+
+  try {
+    const res = await fetch('/api/ai/analyze-failed-trade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(tradeInfo)
+    });
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.detail || 'Forensic breakdown failed');
+    const diag = d.analysis || d;
+    const markdown = diag.markdown || '';
+    const formattedHtml = (window.marked && typeof window.marked.parse === 'function')
+      ? window.marked.parse(markdown)
+      : (window.formatAiMarkdown ? window.formatAiMarkdown(markdown) : markdown.replace(/\n/g, '<br>'));
+
+    if(body){
+      body.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-soft);padding-bottom:8px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="tag sell" style="font-size:10px;font-weight:700;">SL HIT POST-MORTEM</span>
+            <span style="font-weight:700;font-size:12px;color:var(--text);">${window.esc ? esc(diag.symbol || '') : diag.symbol}</span>
+          </div>
+          <span style="font-size:11px;color:var(--sell);font-weight:600;">Root: ${window.esc ? esc(diag.primary_root_cause || '') : diag.primary_root_cause}</span>
+        </div>
+        <div style="font-family:var(--font-sans);font-size:12px;line-height:1.6;color:var(--text);">
+          ${formattedHtml}
+        </div>
+      `;
+    }
+    if(typeof toast === 'function'){
+      toast(`⚠️ Jarvis Forensic Analysis ready for ${diag.symbol} SL hit`);
+    }
+  } catch(e) {
+    if(body){
+      body.innerHTML += `<div style="color:var(--sell);font-size:12px;margin-top:6px;">Analysis Error: ${e.message}</div>`;
+    }
+  }
+};
+
 
 // ============================================================================
 // 1B. INSTITUTIONAL ORDER EXECUTION & 1-CLICK ORDER MODAL SYSTEM
@@ -30991,6 +31306,33 @@ window.openOrder = function(side = 'BUY', instrumentKey = null, qty = null, sym 
     modal.setAttribute('aria-hidden', 'false');
   }
 };
+
+// Global Desktop Speed Trading Hotkeys (B = Quick Buy, S = Quick Sell, Esc = Close Modals)
+window.addEventListener('keydown', function(e) {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
+    if (e.key === 'Escape') e.target.blur();
+    return;
+  }
+  const key = e.key.toUpperCase();
+  if (key === 'B' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    if (typeof window.openOrder === 'function') {
+      window.openOrder('BUY');
+    }
+  } else if (key === 'S' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault();
+    if (typeof window.openOrder === 'function') {
+      window.openOrder('SELL');
+    }
+  } else if (e.key === 'Escape') {
+    document.querySelectorAll('.tool-modal.open, .tool-modal[aria-hidden="false"], #chartContextMenu').forEach(m => {
+      m.classList.remove('open');
+      m.setAttribute('aria-hidden', 'true');
+      if (m.id === 'chartContextMenu') m.style.display = 'none';
+    });
+  }
+});
 
 window.openQuickOrderModal = function(cfg = {}) {
   const modal = document.getElementById('quickOrderModal');
@@ -31104,94 +31446,8 @@ window.openOrderForUnderlying = function() {
 })();
 
 
-// ============================================================================
-// 2. CANDLESTICK BACKGROUND DRIFT ENGINE (Login Scene Canvas Ported)
-// ============================================================================
-(function initBgCandles(){
-  const canvas = document.getElementById('bgCandleCanvas');
-  if(!canvas) return;
-  const ctx = canvas.getContext('2d');
-  
-  function resize(){
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  resize();
-  window.addEventListener('resize', resize, { passive: true });
-
-  const storedOpacity = localStorage.getItem('ca_bg_candle_opacity') || '8';
-  canvas.style.opacity = (Number(storedOpacity) / 100).toFixed(2);
-  const slider = document.getElementById('bgCandleOpacitySlider');
-  if(slider) slider.value = storedOpacity;
-  const valBadge = document.getElementById('bgCandleOpacityVal');
-  if(valBadge) valBadge.textContent = `${storedOpacity}%`;
-
-  window.setBgCandleOpacity = function(val){
-    canvas.style.opacity = (Number(val) / 100).toFixed(2);
-    if(valBadge) valBadge.textContent = `${val}%`;
-    localStorage.setItem('ca_bg_candle_opacity', val);
-  };
-
-  const candleW = 8, gap = 4, slot = candleW + gap;
-  const candles = [];
-  let price = 55500;
-  const totalSlots = Math.ceil(window.innerWidth / slot) + 20;
-
-  for(let i=0; i<totalSlots; i++){
-    const chg = (Math.random() - 0.49) * 35;
-    const o = price;
-    const c = price + chg;
-    const h = Math.max(o, c) + Math.random() * 20;
-    const l = Math.min(o, c) - Math.random() * 20;
-    candles.push({ o, h, l, c });
-    price = c;
-  }
-
-  let driftX = 0;
-  function drawCandles(){
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    driftX += 0.35;
-    if(driftX >= slot){
-      driftX -= slot;
-      const last = candles[candles.length - 1];
-      const chg = (Math.random() - 0.49) * 35;
-      const o = last.c;
-      const c = o + chg;
-      const h = Math.max(o, c) + Math.random() * 20;
-      const l = Math.min(o, c) - Math.random() * 20;
-      candles.shift();
-      candles.push({ o, h, l, c });
-    }
-
-    const minP = Math.min(...candles.map(c => c.l));
-    const maxP = Math.max(...candles.map(c => c.h));
-    const range = Math.max(1, maxP - minP);
-    const hNorm = canvas.height * 0.7;
-    const yOff = canvas.height * 0.15;
-
-    candles.forEach((c, idx) => {
-      const x = idx * slot - driftX;
-      const yO = yOff + hNorm * (1 - (c.o - minP) / range);
-      const yC = yOff + hNorm * (1 - (c.c - minP) / range);
-      const yH = yOff + hNorm * (1 - (c.h - minP) / range);
-      const yL = yOff + hNorm * (1 - (c.l - minP) / range);
-      const isUp = c.c >= c.o;
-
-      ctx.strokeStyle = isUp ? 'rgba(38, 217, 166, 0.4)' : 'rgba(255, 92, 114, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x + candleW / 2, yH);
-      ctx.lineTo(x + candleW / 2, yL);
-      ctx.stroke();
-
-      ctx.fillStyle = isUp ? 'rgba(38, 217, 166, 0.65)' : 'rgba(255, 92, 114, 0.65)';
-      ctx.fillRect(x, Math.min(yO, yC), candleW, Math.max(2, Math.abs(yC - yO)));
-    });
-
-    requestAnimationFrame(drawCandles);
-  }
-  drawCandles();
-})();
+// Background candle animation removed for optimal light/dark mode performance
+window.setBgCandleOpacity = function(){};
 
 
 // ============================================================================

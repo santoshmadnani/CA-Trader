@@ -402,7 +402,6 @@ input:focus-visible,button:focus-visible,.link:focus-visible{outline:none;}
   <!-- ============= LEFT: LIVE MARKET SCENE ============= -->
   <div class="scene">
     <div class="grid-overlay"></div>
-    <canvas id="chart"></canvas>
     <div class="scene-fade"></div>
 
     <div class="scene-top">
@@ -441,7 +440,6 @@ input:focus-visible,button:focus-visible,.link:focus-visible{outline:none;}
 
   <!-- ============= RIGHT: AUTH CARD ============= -->
   <div class="auth">
-    <canvas id="chartRight"></canvas>
     <div class="card">
 
       <div class="tabs">
@@ -671,154 +669,8 @@ document.getElementById('forgotOverlay').addEventListener('click', (e)=>{
   if(e.target.id === 'forgotOverlay') closeForgot();
 });
 
-/* ---------- live candlestick market scene ---------- */
-/* Both canvases (left scene + right auth panel) now read from a
-   single shared candle stream laid out across one virtual strip
-   spanning the full page width. Each canvas just windows into
-   that shared strip at its own horizontal offset, so the candles
-   line up perfectly across the two panels — one uninterrupted
-   chart, not two independent ones. The strip is walked in the
-   opposite direction too: candles enter on the left and drift
-   right instead of right-to-left. */
+/* ---------- clean background pass: subtle institutional grid ---------- */
 
-const candleW = 10, gap = 6, slot = candleW + gap;
-const SCROLL_PX_PER_SEC = 26; // steady drift speed
-
-function createMarket(seedPrice){
-  const state = {
-    candles: [],
-    scrollX: 0,
-    price: seedPrice,
-    viewCenter: seedPrice,
-    viewRange: 130,
-    lastTs: 0
-  };
-
-  function nextClose(prevClose){
-    // gentle mean-reversion keeps the whole chart inside a fixed
-    // vertical band, but swings vary a lot in size — frequent small
-    // moves, with regular larger and occasional big/dramatic ones —
-    // so candle bodies range from tiny to reaching near the top or
-    // bottom of the chart.
-    const pull = (state.viewCenter - prevClose) * 0.05;
-    const r = Math.random();
-    let swing;
-    if(r < 0.08){        // rare, big move
-      swing = (Math.random()>0.5?1:-1) * (Math.random()*55 + 35);
-    } else if(r < 0.28){ // occasional, medium-large move
-      swing = (Math.random()>0.5?1:-1) * (Math.random()*22 + 10);
-    } else {              // typical, small move
-      swing = (Math.random()-0.5) * 8;
-    }
-    return prevClose + pull + swing;
-  }
-
-  function makeCandle(prevClose){
-    const open = prevClose;
-    const close = nextClose(prevClose);
-    const bigWick = Math.random() < 0.15;
-    const wickUp = Math.random()*4.5 + (bigWick ? Math.random()*30 : 0);
-    const wickDown = Math.random()*4.5 + (bigWick ? Math.random()*30 : 0);
-    const high = Math.max(open,close) + wickUp;
-    const low = Math.min(open,close) - wickDown;
-    return {open, close, high, low};
-  }
-
-  function ensureLength(totalWidth){
-    const needed = Math.ceil(totalWidth / slot) + 40;
-    while(state.candles.length < needed){
-      const c = makeCandle(state.price);
-      state.candles.push(c);
-      state.price = c.close;
-    }
-  }
-
-  function update(ts, totalWidth){
-    if(!state.lastTs) state.lastTs = ts;
-    const dt = Math.min(64, ts - state.lastTs); // clamp for tab-switch stalls
-    state.lastTs = ts;
-
-    state.scrollX += SCROLL_PX_PER_SEC * (dt/1000);
-    while(state.scrollX >= slot){
-      state.scrollX -= slot;
-      state.candles.shift();
-      const c = makeCandle(state.price);
-      state.candles.push(c);
-      state.price = c.close;
-    }
-    ensureLength(totalWidth);
-  }
-
-  state.update = update;
-  return state;
-}
-
-function drawScene(canvasEl, market, xOffset, totalWidth){
-  const ctx = canvasEl.getContext('2d');
-  const DPR = window.devicePixelRatio || 1;
-  const W = canvasEl.clientWidth, H = canvasEl.clientHeight;
-  if(canvasEl.width !== W*DPR || canvasEl.height !== H*DPR){
-    canvasEl.width = W*DPR; canvasEl.height = H*DPR;
-    ctx.setTransform(DPR,0,0,DPR,0,0);
-  }
-  ctx.clearRect(0,0,W,H);
-  if(W===0 || H===0) return;
-
-  // fixed price window — the scene never pans up or down
-  const min = market.viewCenter - market.viewRange;
-  const max = market.viewCenter + market.viewRange;
-  const scaleY = (v)=> H - ((v-min)/(max-min))*H;
-
-  market.candles.forEach((c,i)=>{
-    // position within the shared virtual strip, then mirrored so
-    // motion reads left-to-right instead of right-to-left
-    const gx = i*slot - market.scrollX;
-    const mirroredGx = totalWidth - gx - candleW;
-    const x = mirroredGx - xOffset;
-    if(x < -candleW || x > W+candleW) return;
-
-    const up = c.close >= c.open;
-    const color = up ? '#26D9A6' : '#FF5C72';
-    ctx.strokeStyle = color; ctx.fillStyle = color;
-
-    ctx.globalAlpha = 0.9;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(x+candleW/2, scaleY(c.high));
-    ctx.lineTo(x+candleW/2, scaleY(c.low));
-    ctx.stroke();
-
-    const yO = scaleY(c.open), yC = scaleY(c.close);
-    const top = Math.min(yO,yC), h = Math.max(Math.abs(yC-yO), 1.6);
-    ctx.globalAlpha = up ? 0.85 : 0.75;
-    ctx.fillRect(x, top, candleW, h);
-  });
-  ctx.globalAlpha = 1;
-}
-
-const chartLeftEl = document.getElementById('chart');
-const chartRightEl = document.getElementById('chartRight');
-const market = createMarket(100 + Math.random()*20);
-
-function loop(ts){
-  if(window.innerWidth <= 768){
-    // Skip heavy continuous canvas rendering on mobile devices to prevent iOS WebKit GPU crash
-    return;
-  }
-  const totalWidth = window.innerWidth;
-  market.update(ts, totalWidth);
-
-  if(chartLeftEl){
-    const off = chartLeftEl.getBoundingClientRect().left;
-    drawScene(chartLeftEl, market, off, totalWidth);
-  }
-  if(chartRightEl){
-    const off = chartRightEl.getBoundingClientRect().left;
-    drawScene(chartRightEl, market, off, totalWidth);
-  }
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
 
 /* ---------- polish pass: ripple + cursor-follow card glow ---------- */
 (() => {

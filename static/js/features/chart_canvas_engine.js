@@ -699,6 +699,74 @@
       }
       x.restore();
     }
+    // On-Chart Recommendation Horizontal Lines (Entry: Cyan, SL: Red, Target: Green)
+    const activeReco = window.__caCurrentChartReco || window.__caRecommendation;
+    if(activeReco && a && a.length){
+      const curLtp = Number(state.latestLive) || Number(a[a.length - 1]?.close) || 0;
+      let rEntry = Number(activeReco.entry || activeReco.entry_price || 0);
+      let rSl = Number(activeReco.stop_loss || activeReco.sl || 0);
+      let rTgt = Number(activeReco.target || activeReco.target_price || 0);
+
+      // If viewing underlying spot chart and reco has underlying levels, use those
+      if(activeReco.underlying_entry && curLtp > 0 && Math.abs(Number(activeReco.underlying_entry) - curLtp) / curLtp < 0.35){
+        rEntry = Number(activeReco.underlying_entry);
+        rSl = Number(activeReco.underlying_sl || activeReco.underlying_stop_loss || 0);
+        rTgt = Number(activeReco.underlying_target || 0);
+      }
+
+      // Only render if levels are coherent with current chart scale (prevents option price on spot chart)
+      if(rEntry > 0 && curLtp > 0 && Math.abs(rEntry - curLtp) / curLtp < 0.50){
+        const recoLines = [
+          { label: 'ENTRY', price: rEntry, color: '#00d2ff', bg: 'rgba(0,210,255,0.92)', text: '#07111a', dash: [5, 3] },
+          { label: 'SL', price: rSl, color: '#ff5c72', bg: 'rgba(255,92,114,0.95)', text: '#ffffff', dash: [4, 4] },
+          { label: 'TARGET', price: rTgt, color: '#26d9a6', bg: 'rgba(38,217,166,0.95)', text: '#07111a', dash: [6, 3] }
+        ];
+
+        recoLines.forEach(lvl => {
+          if(lvl.price && Number.isFinite(lvl.price) && lvl.price > 0){
+            const ly = y(lvl.price);
+            if(ly >= pad.t - 4 && ly <= h - pad.b + 4){
+              x.save();
+              // Dashed horizontal line across chart canvas
+              x.strokeStyle = lvl.color;
+              x.lineWidth = 1.6;
+              x.setLineDash(lvl.dash);
+              x.beginPath();
+              x.moveTo(pad.l, ly);
+              x.lineTo(w - pad.r, ly);
+              x.stroke();
+              x.setLineDash([]);
+
+              // Left-side small label pill
+              x.font = 'bold 9px IBM Plex Mono, monospace';
+              const leftTxt = lvl.label;
+              const lw = x.measureText(leftTxt).width + 8;
+              x.fillStyle = lvl.bg;
+              x.beginPath();
+              x.roundRect(pad.l + 4, Math.max(pad.t + 2, Math.min(h - pad.b - 16, ly - 7)), lw, 14, 3);
+              x.fill();
+              x.fillStyle = lvl.text;
+              x.fillText(leftTxt, pad.l + 8, Math.max(pad.t + 12, Math.min(h - pad.b - 6, ly + 3.5)));
+
+              // Right-side high-contrast price badge on price axis
+              x.font = 'bold 9.5px IBM Plex Mono, monospace';
+              const rightTxt = `${lvl.label} ${fmt(lvl.price)}`;
+              const rw = x.measureText(rightTxt).width + 10;
+              const by = Math.max(pad.t + 2, Math.min(h - pad.b - 18, ly - 9));
+              x.fillStyle = lvl.bg;
+              x.beginPath();
+              x.roundRect(w - pad.r + 2, by, rw, 18, 4);
+              x.fill();
+              x.fillStyle = lvl.text;
+              x.fillText(rightTxt, w - pad.r + 6, by + 12.5);
+
+              x.restore();
+            }
+          }
+        });
+      }
+    }
+
     if(Number.isFinite(Number(state.latestLive))){
       const lp=Number(state.latestLive), ly=y(lp);
       if(ly>=pad.t-2 && ly<=h-pad.b+2){
@@ -709,6 +777,51 @@
         x.restore();
       }
     }
+
+    // On-Chart Recommendation Horizontal Reference Lines (Entry, Stop-Loss, Target)
+    const activeReco = window.__caCurrentChartReco || window.__caRecommendation;
+    if(activeReco && (activeReco.entry || activeReco.stop_loss || activeReco.target)){
+      const entryP = Number(activeReco.entry || activeReco.entry_price || 0);
+      const slP = Number(activeReco.stop_loss || activeReco.sl || 0);
+      const tgtP = Number(activeReco.target || activeReco.tgt || 0);
+
+      const drawRefLine = (pVal, color, labelText) => {
+        if(!pVal || !Number.isFinite(pVal)) return;
+        const lineY = y(pVal);
+        if(lineY < pad.t - 4 || lineY > h - pad.b + 4) return;
+        x.save();
+        x.strokeStyle = color;
+        x.lineWidth = 1.2;
+        x.setLineDash([5, 4]);
+        x.beginPath();
+        x.moveTo(pad.l, lineY);
+        x.lineTo(w - pad.r, lineY);
+        x.stroke();
+        x.setLineDash([]);
+
+        // Price Badge on right margin
+        const badgeTxt = `${labelText} ${fmt(pVal)}`;
+        x.font = 'bold 9.5px IBM Plex Mono, monospace';
+        const txtW = x.measureText(badgeTxt).width + 10;
+        const badgeY = Math.max(pad.t + 2, Math.min(h - pad.b - 18, lineY - 8));
+        x.fillStyle = color;
+        if(typeof x.roundRect === 'function'){
+          x.beginPath();
+          x.roundRect(w - pad.r + 2, badgeY, txtW, 16, 3);
+          x.fill();
+        } else {
+          x.fillRect(w - pad.r + 2, badgeY, txtW, 16);
+        }
+        x.fillStyle = '#0a0e17';
+        x.fillText(badgeTxt, w - pad.r + 6, badgeY + 11.5);
+        x.restore();
+      };
+
+      if(entryP) drawRefLine(entryP, '#00d2ff', 'ENTRY');
+      if(slP) drawRefLine(slP, '#ff5c72', 'SL');
+      if(tgtP) drawRefLine(tgtP, '#26d9a6', 'TGT');
+    }
+
     if(state.cross){
       const cx=state.cross.x,cy=state.cross.y;
       x.save();
@@ -736,8 +849,95 @@
   }
 
   function updateCross(e){const r=document.getElementById('chartViewport').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,view=getView();if(!view.data.length)return;const i=indexFromX(x,view),c=view.data[i];const price=priceFromY(y,view);state.cross={x:Math.max(12,Math.min(r.width-72,x)),y:Math.max(18,Math.min(r.height-36,y)),price,label:xLabel(c?.timestamp||Date.now()),index:view.start+i};draw()}
-  const vp=document.getElementById('chartViewport');
-  vp.addEventListener('contextmenu',e=>e.preventDefault());
+  // Institutional Right-Click Order Placement Context Menu (pre-filled LTP, SL & Target suggestions)
+  let _chartCtxMenu = document.getElementById('chartContextMenu');
+  if(!_chartCtxMenu){
+    _chartCtxMenu = document.createElement('div');
+    _chartCtxMenu.id = 'chartContextMenu';
+    _chartCtxMenu.className = 'chart-context-menu';
+    _chartCtxMenu.style.cssText = 'position:fixed;z-index:999999;background:var(--surface,#12161f);border:1px solid rgba(0,210,255,0.4);border-radius:8px;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,0.7);display:none;font-family:var(--font-body,sans-serif);font-size:12px;min-width:230px;backdrop-filter:blur(10px);color:var(--text,#e7eaf0);';
+    document.body.appendChild(_chartCtxMenu);
+    document.addEventListener('click', (ev) => {
+      if(_chartCtxMenu && !_chartCtxMenu.contains(ev.target)) _chartCtxMenu.style.display = 'none';
+    });
+  }
+
+  vp.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const r = vp.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    const view = getView();
+    if(!view || !view.data || !view.data.length) return;
+    const clickedPrice = Math.round(priceFromY(y, view) * 100) / 100;
+    const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || state.symbol || 'BANKNIFTY';
+    const activeReco = window.__caCurrentChartReco || window.__caRecommendation || {};
+
+    // Calculate formula & recommendation model suggestions
+    const riskPts = (activeReco.entry && activeReco.stop_loss)
+      ? Math.abs(activeReco.entry - activeReco.stop_loss)
+      : Math.max(1, Math.round(clickedPrice * 0.008 * 100) / 100);
+    const rewardPts = (activeReco.entry && activeReco.target)
+      ? Math.abs(activeReco.target - activeReco.entry)
+      : Math.round(riskPts * 2.0 * 100) / 100;
+
+    const buySl = Math.round((clickedPrice - riskPts) * 100) / 100;
+    const buyTgt = Math.round((clickedPrice + rewardPts) * 100) / 100;
+    const sellSl = Math.round((clickedPrice + riskPts) * 100) / 100;
+    const sellTgt = Math.round((clickedPrice - rewardPts) * 100) / 100;
+
+    _chartCtxMenu.innerHTML = `
+      <div style="font-size:10.5px;color:var(--text-dim,#8a93a6);padding:4px 8px 6px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+        <b>${sym}</b><span style="font-family:var(--font-mono);">@ ₹${clickedPrice.toFixed(2)}</span>
+      </div>
+      <div id="ctxBtnBuy" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:5px;cursor:pointer;background:rgba(38,217,166,0.12);color:#26D9A6;font-weight:700;margin-bottom:4px;gap:6px;">
+        <span>🟢 Buy / Long</span>
+        <span style="font-size:9.5px;font-family:var(--font-mono);color:rgba(231,234,240,0.8);">SL ${buySl} · TGT ${buyTgt}</span>
+      </div>
+      <div id="ctxBtnSell" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:5px;cursor:pointer;background:rgba(255,92,114,0.12);color:#FF5C72;font-weight:700;gap:6px;">
+        <span>🔴 Sell / Short</span>
+        <span style="font-size:9.5px;font-family:var(--font-mono);color:rgba(231,234,240,0.8);">SL ${sellSl} · TGT ${sellTgt}</span>
+      </div>
+    `;
+
+    const posX = Math.min(window.innerWidth - 250, e.clientX);
+    const posY = Math.min(window.innerHeight - 130, e.clientY);
+    _chartCtxMenu.style.left = `${posX}px`;
+    _chartCtxMenu.style.top = `${posY}px`;
+    _chartCtxMenu.style.display = 'block';
+
+    document.getElementById('ctxBtnBuy')?.addEventListener('click', () => {
+      _chartCtxMenu.style.display = 'none';
+      if(typeof window.openQuickOrderModal === 'function'){
+        window.openQuickOrderModal({
+          symbol: sym,
+          signal: 'BUY',
+          price: clickedPrice,
+          entry: clickedPrice,
+          stop_loss: buySl,
+          target: buyTgt
+        });
+      } else if(typeof window.openOrder === 'function'){
+        window.openOrder('BUY', null, 1, sym, clickedPrice);
+      }
+    });
+
+    document.getElementById('ctxBtnSell')?.addEventListener('click', () => {
+      _chartCtxMenu.style.display = 'none';
+      if(typeof window.openQuickOrderModal === 'function'){
+        window.openQuickOrderModal({
+          symbol: sym,
+          signal: 'SELL',
+          price: clickedPrice,
+          entry: clickedPrice,
+          stop_loss: sellSl,
+          target: sellTgt
+        });
+      } else if(typeof window.openOrder === 'function'){
+        window.openOrder('SELL', null, 1, sym, clickedPrice);
+      }
+    });
+  });
   vp.addEventListener('selectstart',e=>e.preventDefault());
   vp.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'||e.pointerType==='pen')e.preventDefault()},{passive:false});
   function setChartInteractionMode(mode){
