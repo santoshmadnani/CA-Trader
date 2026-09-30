@@ -5583,18 +5583,19 @@ def apply_backtest_blindspots(
             adj_entry = round(min(vwap - 0.3 * atr, adj_entry + 0.35 * atr), 2)
             applied.append("VWAP Extension Filter: Entry raised toward VWAP equilibrium (preventing chased breakdown)")
 
-    # 4. 15-Minute Opening Range (ORB) Barrier
-    orb_candles = candles[:3] if len(candles) >= 3 else candles
-    if orb_candles:
-        orb_high = max(float(c.get("high") or last_price) for c in orb_candles)
-        orb_low = min(float(c.get("low") or last_price) for c in orb_candles)
-        if orb_low < last_price < orb_high:
-            if side == "BUY" and adj_target > orb_high:
-                adj_target = round(min(adj_target, orb_high), 2)
-                applied.append("15m ORB Barrier: Target aligned with Opening Range High resistance until confirmed breakout")
-            elif side == "SELL" and adj_target < orb_low:
-                adj_target = round(max(adj_target, orb_low), 2)
-                applied.append("15m ORB Barrier: Target aligned with Opening Range Low support until confirmed breakdown")
+    # 4. 15-Minute Opening Range (ORB) Barrier (Equity only, never applied to options)
+    if not is_option:
+        orb_candles = candles[:3] if len(candles) >= 3 else candles
+        if orb_candles:
+            orb_high = max(float(c.get("high") or last_price) for c in orb_candles)
+            orb_low = min(float(c.get("low") or last_price) for c in orb_candles)
+            if orb_low < last_price < orb_high:
+                if side == "BUY" and adj_target > orb_high:
+                    adj_target = round(min(adj_target, orb_high), 2)
+                    applied.append("15m ORB Barrier: Target aligned with Opening Range High resistance until confirmed breakout")
+                elif side == "SELL" and adj_target < orb_low:
+                    adj_target = round(max(adj_target, orb_low), 2)
+                    applied.append("15m ORB Barrier: Target aligned with Opening Range Low support until confirmed breakdown")
 
     # 5. Bid-Ask Spread & Liquidity Slippage
     slippage = max(0.05, round(adj_entry * 0.0005, 2))
@@ -6843,7 +6844,7 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             vwap=float(ta.get("vwap") or last_price),
             candles=candles,
             atr=atr,
-            side="BUY" if (instrument.get("option_type") or "CE") == "CE" else "SELL",
+            side="BUY",
             entry=entry,
             target=tgt,
             stop_loss=sl,
@@ -7109,22 +7110,33 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
     sl_lvl = float(levels.get("stop_loss") or 0.0)
     tgt_lvl = float(levels.get("target") or 0.0)
 
-    # Check for live Stop Loss or Target Hit
-    cmp_to_check = float(instrument.get("entry") or last_price or entry_lvl)
-    if reco_action in ("BUY", "BUY CALL", "CE"):
-        if sl_lvl > 0 and cmp_to_check <= sl_lvl:
+    # Check for live Stop Loss or Target Hit (Option vs Equity Separation)
+    is_opt_trade = bool(instrument.get("kind") == "OPTION" or opt_type_detected or "CE" in reco_symbol or "PE" in reco_symbol)
+    if is_opt_trade:
+        # Long option contract: profit on premium increase, stop loss on premium decrease
+        opt_curr_price = float(instrument.get("cmp") or instrument.get("entry") or (opt_perf.get("ltp") if opt_perf else 0.0) or entry_lvl)
+        if sl_lvl > 0 and opt_curr_price > 0 and opt_curr_price <= sl_lvl:
             trade_status = "STOP_LOSS_HIT"
             status_label = f"STOP LOSS HIT 🛑 Exit at ₹{sl_lvl:,.2f}"
-        elif tgt_lvl > 0 and cmp_to_check >= tgt_lvl:
+        elif tgt_lvl > 0 and opt_curr_price > 0 and opt_curr_price >= tgt_lvl:
             trade_status = "TARGET_1_HIT"
             status_label = f"TARGET 1 HIT 🎯 Achieved ₹{tgt_lvl:,.2f}"
-    elif reco_action in ("SELL", "BUY PUT", "PE"):
-        if sl_lvl > 0 and cmp_to_check >= sl_lvl:
-            trade_status = "STOP_LOSS_HIT"
-            status_label = f"STOP LOSS HIT 🛑 Exit at ₹{sl_lvl:,.2f}"
-        elif tgt_lvl > 0 and cmp_to_check <= tgt_lvl:
-            trade_status = "TARGET_1_HIT"
-            status_label = f"TARGET 1 HIT 🎯 Achieved ₹{tgt_lvl:,.2f}"
+    else:
+        # Equity stock: BUY vs SELL direction
+        if reco_action == "BUY":
+            if sl_lvl > 0 and last_price <= sl_lvl:
+                trade_status = "STOP_LOSS_HIT"
+                status_label = f"STOP LOSS HIT 🛑 Exit at ₹{sl_lvl:,.2f}"
+            elif tgt_lvl > 0 and last_price >= tgt_lvl:
+                trade_status = "TARGET_1_HIT"
+                status_label = f"TARGET 1 HIT 🎯 Achieved ₹{tgt_lvl:,.2f}"
+        elif reco_action == "SELL":
+            if sl_lvl > 0 and last_price >= sl_lvl:
+                trade_status = "STOP_LOSS_HIT"
+                status_label = f"STOP LOSS HIT 🛑 Exit at ₹{sl_lvl:,.2f}"
+            elif tgt_lvl > 0 and last_price <= tgt_lvl:
+                trade_status = "TARGET_1_HIT"
+                status_label = f"TARGET 1 HIT 🎯 Achieved ₹{tgt_lvl:,.2f}"
 
     if sm_setup:
         sm_chan = sm_setup.get("channel", "@stockmantraindex")
