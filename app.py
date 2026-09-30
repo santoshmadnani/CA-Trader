@@ -379,10 +379,22 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int):
         LIVE_STOCKMANTRA_MSGS.insert(0, {"id": msg_id, "text": text, "date": date_str, "time": time_str, "raw_date": dt_str})
         LIVE_STOCKMANTRA_MSGS = LIVE_STOCKMANTRA_MSGS[:100]
 
-        contract_re = re.search(r'\b(NIFTY|BANKNIFTY|BANK\s*NIFTY|FINNIFTY|FIN\s*NIFTY|RELIANCE|TCS|CRUDEOIL|INFY)\s*(\d{4,6})\s*(CE|PE|CALL|PUT)\b', text, re.IGNORECASE)
+        # Check for price pulse updates (e.g. "313", "316", "320🔥")
+        pulse_m = re.match(r'^\s*(\d{2,5}(?:\.\d+)?)\s*(?:\+{1,3}|🔥|🚀|👍|💥|🎯|blast|high|made)?\s*$', text.strip(), re.IGNORECASE)
+        if pulse_m and LIVE_STOCKMANTRA_SETUPS:
+            pulse_val = float(pulse_m.group(1))
+            # Update latest active setup's CMP
+            last_k = list(LIVE_STOCKMANTRA_SETUPS.keys())[-1]
+            active_s = LIVE_STOCKMANTRA_SETUPS[last_k]
+            active_s["cmp"] = pulse_val
+            if pulse_val >= active_s["target_1"]:
+                active_s["status"] = f"Target 1 Hit 🎯 Scalp Profit Booked (₹{pulse_val})"
+            log.info("Stock Mantra price pulse received: %s -> %s = ₹%s", last_k, active_s['symbol'], pulse_val)
+
+        contract_re = re.search(r'\b(NIFTY|BANKNIFTY|BANK\s*NIFTY|FINNIFTY|FIN\s*NIFTY|SENSEX|BSESENSEX|MIDCPNIFTY|RELIANCE|TCS|CRUDEOIL|INFY)\s*(\d{4,6})\s*(CE|PE|CALL|PUT)\b', text, re.IGNORECASE)
         if contract_re:
             und_raw = contract_re.group(1).upper().replace(" ", "")
-            und = "BANKNIFTY" if "BANK" in und_raw else ("FINNIFTY" if "FIN" in und_raw else und_raw)
+            und = "BANKNIFTY" if "BANK" in und_raw else ("FINNIFTY" if "FIN" in und_raw else ("SENSEX" if "SENSEX" in und_raw else und_raw))
             strike = int(contract_re.group(2))
             opt_raw = contract_re.group(3).upper()
             opt_type = "CE" if opt_raw in ("CE", "CALL") else "PE"
@@ -464,7 +476,7 @@ async def _stockmantra_live_telethon_loop():
             entity = await client.get_entity(channel_name)
             # Sync recent messages on startup
             cutoff = datetime.now(timezone.utc) - timedelta(hours=12)
-            async for m in client.iter_messages(entity, limit=30):
+            async for m in client.iter_messages(entity, limit=250):
                 if m.date < cutoff:
                     break
                 if m.text:
@@ -16251,7 +16263,7 @@ async def ai_dashboard(symbol: str = Query("NIFTY"), force: int = Query(0), user
         "win_rate": 86.4,
         "net_profit": 38450,
         "trade_stats": {"wins": 45, "total": 52},
-        "setups": setups,
+        "setups": combined_setups,
         "timestamp": now_iso()
     }
     CACHE.set(cache_key, result, 180)
@@ -17816,14 +17828,19 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
     except Exception as exc:
         log.debug("Disk scan error: %s", exc)
 
+    # Prepend real-time parsed stream setups to the response list
+    live_list = list(LIVE_STOCKMANTRA_SETUPS.values())
+    combined_setups = live_list + [s for s in setups if not any(l['underlying'] == s['underlying'] for l in live_list)]
+
     return {
         "ok": True,
         "source": "Stock Mantra Live Telegram Stream & Quantitative Reconciliation",
         "weightage": "50% Multiplier in Overall Consensus",
         "synced_at": time_str,
-        "count": len(setups),
+        "count": len(combined_setups),
         "server_telethon_sessions": session_files,
         "live_stream_active": len(LIVE_STOCKMANTRA_SETUPS) > 0,
+        "live_stream_setups_count": len(LIVE_STOCKMANTRA_SETUPS),
         "live_stream_recent_messages": LIVE_STOCKMANTRA_MSGS[:5],
         "server_stockmantra_files": detected_files,
         "server_db_tables": [t for t in db_tables if any(k in t.lower() for k in ("tele", "reco", "mantra", "msg", "calib"))],
