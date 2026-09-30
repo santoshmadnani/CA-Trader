@@ -2340,15 +2340,113 @@ button.btn.small,
   background: rgba(255, 255, 255, 0.03) !important;
 }
 
-/* Sticky Symbol Header Bar: Clean Kite Top Instrument Bar */
+/* Compact Symmetrical Symbol Buttons (Zerodha Kite Style) */
+.compact-sym-btn {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono, monospace) !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+  flex: none !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
+}
+.compact-sym-btn.buy {
+  background: rgba(38, 217, 166, 0.16) !important;
+  border: 1px solid rgba(38, 217, 166, 0.45) !important;
+  color: #26d9a6 !important;
+}
+.compact-sym-btn.sell {
+  background: rgba(255, 92, 114, 0.16) !important;
+  border: 1px solid rgba(255, 92, 114, 0.45) !important;
+  color: #ff5c72 !important;
+}
+.compact-sym-btn.ghost {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: var(--text-dim) !important;
+}
+.compact-sym-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Zerodha Kite Flat Tabs & Single Horizontal Line Separator Architecture */
+.navtabs,
+.wl-filters,
+.reco-timeframes,
+#recoTimeframeButtonGroup,
+.mover-tabs {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.chip-filter,
+.btn-tf,
+.reco-tf-btn {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: #8892b0 !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  transition: all 0.15s ease !important;
+}
+
+.chip-filter.active,
+.btn-tf.active,
+.reco-tf-btn.active {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid #387ed1 !important;
+  color: #387ed1 !important;
+  font-weight: 700 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Remove card boxes everywhere, use single horizontal lines */
+.card,
+.reco-master-card,
+.jarvis-copilot-card,
+.signal-card,
+.trade-sentinel-bar,
+.panel .card,
+#dashExcelWorksheetCard {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Sticky Symbol Header Bar: 1 Single Horizontal Line, Flush Under Top Bar */
 .sticky-symbol-bar {
   position: sticky;
-  top: 80px;
+  top: 78px;
   z-index: 995;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 14px !important;
   background: #0d1017 !important;
   border: none !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
@@ -2357,14 +2455,59 @@ button.btn.small,
   margin: 0 !important;
   width: 100% !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
 }
-.sticky-symbol-left { display: flex; align-items: center; gap: 10px; }
-.sticky-symbol-badge { font-weight: 800; font-family: var(--font-display); font-size: 20px; color: #ffffff; letter-spacing: 0.5px; }
-.sticky-symbol-price { font-weight: 800; font-family: var(--font-mono); font-size: 19px; color: #ffffff; margin-left: 4px; }
-.sticky-symbol-chg { font-family: var(--font-mono); font-size: 14px; font-weight: 700; margin-left: 4px; }
-.sticky-symbol-chg.up { color: var(--buy); }
-.sticky-symbol-chg.down { color: var(--sell); }
-.sticky-status-pill { font-size: 10px; color: var(--buy); background: rgba(38,217,166,0.12); border: 1px solid rgba(38,217,166,0.3); padding: 2px 7px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+.sticky-symbol-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+.sticky-symbol-badge {
+  font-weight: 700 !important;
+  font-family: var(--font-display) !important;
+  font-size: 15px !important;
+  color: #ffffff !important;
+  letter-spacing: 0.3px !important;
+  white-space: nowrap !important;
+}
+.sticky-symbol-price {
+  font-weight: 700 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 14px !important;
+  color: #ffffff !important;
+  margin-left: 2px !important;
+  white-space: nowrap !important;
+}
+.sticky-symbol-chg {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  margin-left: 2px !important;
+  white-space: nowrap !important;
+}
+.sticky-symbol-chg.up { color: var(--buy) !important; }
+.sticky-symbol-chg.down { color: var(--sell) !important; }
+.sticky-status-pill {
+  font-size: 9px !important;
+  color: var(--buy) !important;
+  background: rgba(38,217,166,0.12) !important;
+  border: 1px solid rgba(38,217,166,0.3) !important;
+  padding: 1px 5px !important;
+  border-radius: 3px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+.sticky-symbol-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex: 0 0 auto !important;
+}
 
 /* Mobile sliding bar below instead of above (Zerodha Kite Bottom Dock) */
 @media (max-width: 768px) {
@@ -2437,38 +2580,40 @@ button.btn.small,
     padding-top: 0px !important;
   }
   .sticky-symbol-bar {
-    top: 48px !important;
-    padding: 8px 12px !important;
-    flex-wrap: wrap;
-    gap: 6px;
+    top: 42px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 8px !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
   }
   .sticky-symbol-left {
-    width: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
+    gap: 4px !important;
   }
   .sticky-symbol-badge {
-    font-size: 17px !important;
-  }
-  .sticky-symbol-price {
-    font-size: 17px !important;
-  }
-  .sticky-symbol-chg {
     font-size: 13px !important;
   }
-  .sticky-symbol-right {
-    width: 100% !important;
-    display: flex !important;
-    gap: 8px !important;
-    justify-content: flex-end !important;
+  .sticky-symbol-price {
+    font-size: 12.5px !important;
   }
-  .sticky-symbol-right .btn {
-    flex: 1 !important;
-    height: 30px !important;
-    font-size: 12px !important;
-    padding: 0 10px !important;
-    border-radius: 4px !important;
+  .sticky-symbol-chg {
+    font-size: 10.5px !important;
+  }
+  .sticky-status-pill {
+    padding: 0 3px !important;
+    font-size: 8px !important;
+  }
+  .sticky-symbol-right {
+    gap: 4px !important;
+  }
+  .compact-sym-btn {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    font-size: 10.5px !important;
+  }
+  #dashJarvisTopCard {
+    margin-top: 6px !important;
   }
 }
 
@@ -3901,12 +4046,12 @@ select#watchlistSelect, select.watchlist-select {
         <span class="sticky-symbol-badge" id="stickySymbolTitle">BANKNIFTY</span>
         <span class="sticky-symbol-price" id="stickySymbolLtp">₹55,580.40</span>
         <span class="sticky-symbol-chg up" id="stickySymbolChange">+206.65 (+0.37%)</span>
-        <span class="sticky-status-pill" id="stickyMarketStatusPill">● LIVE IST</span>
+        <span class="sticky-status-pill" id="stickyMarketStatusPill" title="Live Market IST">●</span>
       </div>
       <div class="sticky-symbol-right">
-        <button class="btn buy small" onclick="openOrder('BUY')" style="padding:3px 12px;font-weight:700;">Buy</button>
-        <button class="btn sell small" onclick="openOrder('SELL')" style="padding:3px 12px;font-weight:700;">Sell</button>
-        <button class="btn ghost small" onclick="window.scrollTo({top:0, behavior:'smooth'})" title="Scroll to top" style="font-size:10.5px;padding:3px 8px;">Top ↑</button>
+        <button class="compact-sym-btn buy" onclick="openOrder('BUY')" title="Buy (B)" aria-label="Buy">B</button>
+        <button class="compact-sym-btn sell" onclick="openOrder('SELL')" title="Sell (S)" aria-label="Sell">S</button>
+        <button class="compact-sym-btn ghost" onclick="window.scrollTo({top:0, behavior:'smooth'})" title="Scroll to Top" aria-label="Top">↑</button>
       </div>
     </div>
 
@@ -4003,7 +4148,7 @@ select#watchlistSelect, select.watchlist-select {
                 <option value="">Current Expiry</option>
               </select>
             </div>
-            <button type="button" class="btn ghost small" onclick="loadDashboard(true); toast('Scanning all option chains for new setups...');" style="padding:3px 8px;font-size:11px;">Refresh recommendations</button>
+            <button type="button" class="btn ghost small" onclick="loadDashboard(true); toast('Scanning all option chains for new setups...');" style="padding:3px 8px;font-size:11px;">↻ Refresh</button>
           </div>
         </div>
 

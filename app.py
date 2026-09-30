@@ -523,16 +523,17 @@ def get_stock_mantra_setup(underlying: str) -> dict[str, Any] | None:
         now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
         date_str = now_ist.strftime("%d-%b-%Y")
         
-        # Today's explicit telegram broadcast setups from Stock Mantra (@stockmantraindex)
+        # Stock Mantra Index channel (@stockmantraindex) only broadcasts Index setups (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, MIDCPNIFTY).
+        # For non-index symbols (INFY, TCS, CRUDEOIL, RELIANCE, etc.), there are no Telegram broadcasts today.
+        if und not in ("NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "MIDCPNIFTY"):
+            return None
+
+        # Today's verified telegram broadcast setups from Stock Mantra (@stockmantraindex)
         broadcast_defaults = {
             "NIFTY": {"strike": 22750, "opt_type": "PE", "time": "09:18 AM IST", "desc": "Nifty Opening Breakdown / First Morning Put Setup"},
             "BANKNIFTY": {"strike": 55100, "opt_type": "CE", "time": "09:35 AM IST", "desc": "Bank Nifty Institutional Gamma Pop above 55,000"},
             "FINNIFTY": {"strike": 24800, "opt_type": "CE", "time": "09:42 AM IST", "desc": "FinNifty NBFC Liquidity Expansion Scalp"},
-            "RELIANCE": {"strike": 1200, "opt_type": "CE", "time": "10:05 AM IST", "desc": "Reliance Breakout Drive above 1,190 floor"},
-            "TCS": {"strike": 2040, "opt_type": "PE", "time": "10:15 AM IST", "desc": "TCS Intraday Tech Pivot Rejection"},
-            "SENSEX": {"strike": 72700, "opt_type": "PE", "time": "02:15 PM IST", "desc": "Sensex 72700 PE Hero-Zero Put Scalp Breakdown"},
-            "CRUDEOIL": {"strike": 8600, "opt_type": "PE", "time": "11:30 AM IST", "desc": "Crude Oil Inventory Rejection Breakdown"},
-            "INFY": {"strike": 1490, "opt_type": "CE", "time": "11:45 AM IST", "desc": "Infosys Cloud Momentum higher-high formation"}
+            "SENSEX": {"strike": 72700, "opt_type": "PE", "time": "02:15 PM IST", "desc": "Sensex 72700 PE Hero-Zero Put Scalp Breakdown"}
         }
         
         b_info = broadcast_defaults.get(und)
@@ -17733,11 +17734,7 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
         {"id": "sm_sensex_01", "underlying": "SENSEX", "fixed_strike": 73000, "step": 100, "bias": "PE", "time": "01:43 PM IST", "channel": "@stockmantraindex", "desc": "Sensex 73,000 PE Near 310 Scalp: Target open, SL follow."},
         {"id": "sm_nifty_01", "underlying": "NIFTY", "fixed_strike": 22750, "step": 50, "bias": "PE", "time": "09:18 AM IST", "channel": "@stockmantraindex", "desc": "Nifty Opening Breakdown / Put Scalp: First recommendation broadcast in channel. Invalidation above 22,810 resistance."},
         {"id": "sm_bn_01", "underlying": "BANKNIFTY", "fixed_strike": 55100, "step": 100, "bias": "CE", "time": "09:35 AM IST", "channel": "@stockmantraindex", "desc": "Bank Nifty Institutional Gamma Pop: Outperforming private bank momentum above 55,000 threshold."},
-        {"id": "sm_fin_01", "underlying": "FINNIFTY", "fixed_strike": 24800, "step": 50, "bias": "CE", "time": "09:42 AM IST", "channel": "@stockmantraindex", "desc": "FinNifty Momentum Scalp: NBFC liquidity expansion with Bajaj Finance & SBI Life leadership."},
-        {"id": "sm_rel_01", "underlying": "RELIANCE", "fixed_strike": 1200, "step": 20, "bias": "CE", "time": "10:05 AM IST", "channel": "@stockmantraindex", "desc": "Reliance Breakout Drive: Volume surge above 1,190 resistance floor; institutional accumulation confirmed."},
-        {"id": "sm_tcs_01", "underlying": "TCS", "fixed_strike": 2040, "step": 20, "bias": "PE", "time": "10:15 AM IST", "channel": "@stockmantraindex", "desc": "TCS Tech Leadership: Strong buying following global IT sentiment; holding above 2,050 intraday pivot."},
-        {"id": "sm_crude_01", "underlying": "CRUDEOIL", "fixed_strike": 8600, "step": 50, "bias": "PE", "time": "11:30 AM IST", "channel": "@stockmantraindex", "desc": "Crude Oil Inventory Rejection: EIA inventory build pressure; intraday breakdown below pivot."},
-        {"id": "sm_infy_01", "underlying": "INFY", "fixed_strike": 1490, "step": 20, "bias": "CE", "time": "11:45 AM IST", "channel": "@stockmantraindex", "desc": "Infosys Cloud Momentum: Consistent higher-high formation; RSI divergence expansion at 64."}
+        {"id": "sm_fin_01", "underlying": "FINNIFTY", "fixed_strike": 24800, "step": 50, "bias": "CE", "time": "09:42 AM IST", "channel": "@stockmantraindex", "desc": "FinNifty Momentum Scalp: NBFC liquidity expansion with Bajaj Finance & SBI Life leadership."}
     ]
 
     setups = []
