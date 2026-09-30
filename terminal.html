@@ -1126,7 +1126,7 @@ select option, .select-box select option {
   display: none;
   position: fixed;
   left: 0;
-  top: 130px;
+  top: calc(var(--top-header-height, 144px) + 12px) !important;
   z-index: 10005;
   width: 22px;
   height: 44px;
@@ -2436,23 +2436,26 @@ button.btn.small,
   -webkit-backdrop-filter: none !important;
 }
 
-/* Sticky Symbol Header Bar: 1 Single Horizontal Line, Flush Under Top Bar */
+/* Sticky Symbol Header Bar: 1 Single Horizontal Line, 0.5cm below section selection slider, directly above CA Jarvis, locked while scrolling */
 .sticky-symbol-bar {
-  position: sticky;
-  top: 78px;
-  z-index: 995;
+  margin-top: 0.5cm !important;
+  margin-bottom: 12px !important;
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: calc(var(--top-header-height, 84px) + 0.5cm) !important;
+  z-index: 2400 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  height: 40px !important;
-  min-height: 40px !important;
-  padding: 0 14px !important;
-  background: #0d1017 !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 16px !important;
+  background: #0c0f17 !important;
   border: none !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  margin: 0 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
   width: 100% !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
@@ -2603,12 +2606,17 @@ button.btn.small,
     padding-top: 0px !important;
   }
   .sticky-symbol-bar {
-    top: 42px !important;
-    height: 36px !important;
-    min-height: 36px !important;
-    padding: 0 8px !important;
+    margin-top: 0.5cm !important;
+    margin-bottom: 8px !important;
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: calc(var(--top-header-height, 82px) + 0.5cm) !important;
+    z-index: 2400 !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0 10px !important;
     flex-wrap: nowrap !important;
-    gap: 4px !important;
+    gap: 6px !important;
   }
   .sticky-symbol-left {
     gap: 4px !important;
@@ -3620,7 +3628,7 @@ select#watchlistSelect, select.watchlist-select {
 
 /* CA Trader Unified Static Header (Top Bar + Navtabs stay fixed on scroll) */
 :root {
-  --top-header-height: 86px;
+  --top-header-height: 84px;
 }
 .app-header-static {
   position: fixed !important;
@@ -3631,6 +3639,7 @@ select#watchlistSelect, select.watchlist-select {
   z-index: 2500 !important;
   background: var(--bg) !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+  display: block !important;
 }
 .app-header-static .topbar {
   position: relative !important;
@@ -3646,21 +3655,24 @@ select#watchlistSelect, select.watchlist-select {
   background: var(--bg) !important;
 }
 .layout {
-  padding-top: var(--top-header-height, 86px) !important;
+  padding-top: var(--top-header-height, 84px) !important;
+}
+.main {
+  overflow: visible !important;
 }
 @media (min-width: 761px) {
   .sidebar {
     position: sticky !important;
-    top: var(--top-header-height, 86px) !important;
-    height: calc(100vh - var(--top-header-height, 86px)) !important;
+    top: var(--top-header-height, 84px) !important;
+    height: calc(100vh - var(--top-header-height, 84px)) !important;
   }
 }
 @media (max-width: 760px) {
   :root {
-    --top-header-height: 84px;
+    --top-header-height: 82px;
   }
   .layout {
-    padding-top: var(--top-header-height, 84px) !important;
+    padding-top: var(--top-header-height, 82px) !important;
   }
   .topbar {
     padding: 0 6px !important;
@@ -4070,12 +4082,13 @@ select#watchlistSelect, select.watchlist-select {
   </button>
 <!-- MAIN -->
   <div class="main">
-    <!-- ============ FROZEN STICKY SYMBOL HEADER BAR (Always visible when scrolling) ============ -->
+
+    <!-- ============ FROZEN STICKY SYMBOL BAR (Directly above CA Jarvis, locked while scrolling) ============ -->
     <div id="globalStickySymbolBar" class="sticky-symbol-bar">
       <div class="sticky-symbol-left">
         <span class="sticky-symbol-badge" id="stickySymbolTitle">BANKNIFTY</span>
-        <span class="sticky-symbol-price" id="stickySymbolLtp">₹55,580.40</span>
-        <span class="sticky-symbol-chg up" id="stickySymbolChange">+206.65 (+0.37%)</span>
+        <span class="sticky-symbol-price" id="stickySymbolLtp">₹54,633.05</span>
+        <span class="sticky-symbol-chg up" id="stickySymbolChange">+457.15 (+0.84%)</span>
         <span class="sticky-status-pill" id="stickyMarketStatusPill" title="Live Market IST">●</span>
       </div>
       <div class="sticky-symbol-right">
