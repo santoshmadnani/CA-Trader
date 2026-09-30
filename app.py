@@ -5551,40 +5551,41 @@ def apply_backtest_blindspots(
     c_close = float(last_candle.get("close") or last_price)
     c_range = max(0.5, c_high - c_low)
 
-    # 1. Opening Volatility & Wick Buffer (9:15 - 9:20 AM IST)
-    if side == "BUY" and (c_high - last_price) < 0.15 * c_range:
-        pullback_buf = min(atr * 0.25, c_range * 0.30)
-        adj_entry = round(max(adj_sl + 1.0, adj_entry - pullback_buf), 2)
-        applied.append("Opening Wick Buffer: Pullback entry adjusted to avoid buying candle high wick")
-    elif side == "SELL" and (last_price - c_low) < 0.15 * c_range:
-        pullback_buf = min(atr * 0.25, c_range * 0.30)
-        adj_entry = round(adj_entry + pullback_buf, 2)
-        applied.append("Opening Wick Buffer: Pullback entry adjusted to avoid selling candle low wick")
-
-    # 2. Gap Exhaustion vs Continuation Check
-    if len(candles) >= 2:
-        prev_close = float(candles[-2].get("close") or last_price)
-        gap_pct = (c_open - prev_close) / max(1.0, prev_close)
-        if abs(gap_pct) > 0.006:
-            if gap_pct > 0 and c_close < c_open and side == "BUY":
-                adj_target = round(adj_entry + min(abs(adj_target - adj_entry), max(2.0, c_high - adj_entry)), 2)
-                applied.append("Gap Exhaustion Guard: Target capped at opening gap high due to bearish rejection wick")
-            elif gap_pct < 0 and c_close > c_open and side == "SELL":
-                adj_target = round(adj_entry - min(abs(adj_entry - adj_target), max(2.0, adj_entry - c_low)), 2)
-                applied.append("Gap Exhaustion Guard: Target capped at opening gap low due to bullish rejection wick")
-
-    # 3. VWAP Extension Barrier
-    if vwap and vwap > 0:
-        vwap_dist = last_price - vwap
-        if side == "BUY" and vwap_dist > 1.2 * atr:
-            adj_entry = round(max(vwap + 0.3 * atr, adj_entry - 0.35 * atr), 2)
-            applied.append("VWAP Extension Filter: Entry lowered toward VWAP equilibrium (preventing chased breakout)")
-        elif side == "SELL" and vwap_dist < -1.2 * atr:
-            adj_entry = round(min(vwap - 0.3 * atr, adj_entry + 0.35 * atr), 2)
-            applied.append("VWAP Extension Filter: Entry raised toward VWAP equilibrium (preventing chased breakdown)")
-
-    # 4. 15-Minute Opening Range (ORB) Barrier (Equity only, never applied to options)
+    # Rules 1-4 apply strictly to underlying equities/spots (never to option premiums)
     if not is_option:
+        # 1. Opening Volatility & Wick Buffer (9:15 - 9:20 AM IST)
+        if side == "BUY" and (c_high - last_price) < 0.15 * c_range:
+            pullback_buf = min(atr * 0.25, c_range * 0.30)
+            adj_entry = round(max(adj_sl + 1.0, adj_entry - pullback_buf), 2)
+            applied.append("Opening Wick Buffer: Pullback entry adjusted to avoid buying candle high wick")
+        elif side == "SELL" and (last_price - c_low) < 0.15 * c_range:
+            pullback_buf = min(atr * 0.25, c_range * 0.30)
+            adj_entry = round(adj_entry + pullback_buf, 2)
+            applied.append("Opening Wick Buffer: Pullback entry adjusted to avoid selling candle low wick")
+
+        # 2. Gap Exhaustion vs Continuation Check
+        if len(candles) >= 2:
+            prev_close = float(candles[-2].get("close") or last_price)
+            gap_pct = (c_open - prev_close) / max(1.0, prev_close)
+            if abs(gap_pct) > 0.006:
+                if gap_pct > 0 and c_close < c_open and side == "BUY":
+                    adj_target = round(adj_entry + min(abs(adj_target - adj_entry), max(2.0, c_high - adj_entry)), 2)
+                    applied.append("Gap Exhaustion Guard: Target capped at opening gap high due to bearish rejection wick")
+                elif gap_pct < 0 and c_close > c_open and side == "SELL":
+                    adj_target = round(adj_entry - min(abs(adj_entry - adj_target), max(2.0, adj_entry - c_low)), 2)
+                    applied.append("Gap Exhaustion Guard: Target capped at opening gap low due to bullish rejection wick")
+
+        # 3. VWAP Extension Barrier
+        if vwap and vwap > 0:
+            vwap_dist = last_price - vwap
+            if side == "BUY" and vwap_dist > 1.2 * atr:
+                adj_entry = round(max(vwap + 0.3 * atr, adj_entry - 0.35 * atr), 2)
+                applied.append("VWAP Extension Filter: Entry lowered toward VWAP equilibrium (preventing chased breakout)")
+            elif side == "SELL" and vwap_dist < -1.2 * atr:
+                adj_entry = round(min(vwap - 0.3 * atr, adj_entry + 0.35 * atr), 2)
+                applied.append("VWAP Extension Filter: Entry raised toward VWAP equilibrium (preventing chased breakdown)")
+
+        # 4. 15-Minute Opening Range (ORB) Barrier
         orb_candles = candles[:3] if len(candles) >= 3 else candles
         if orb_candles:
             orb_high = max(float(c.get("high") or last_price) for c in orb_candles)
