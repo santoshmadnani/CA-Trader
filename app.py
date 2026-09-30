@@ -467,6 +467,7 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int):
                 "rationale": f"Stock Mantra Live Telegram Stream ({date_str} {time_str}): {sym_str} BUY. Entry ₹{entry_val:.2f}, Scalp T1 ₹{t1_val:.2f}, SL ₹{sl_val:.2f}. {text[:80]}..."
             }
             LIVE_STOCKMANTRA_SETUPS[und] = setup_obj
+            LIVE_STOCKMANTRA_SETUPS[sym_str] = setup_obj
             log.info("Live Stock Mantra setup parsed for %s: %s", und, sym_str)
     except Exception as exc:
         log.debug("Error processing live stockmantra message: %s", exc)
@@ -529,6 +530,7 @@ def get_stock_mantra_setup(underlying: str) -> dict[str, Any] | None:
             "FINNIFTY": {"strike": 24800, "opt_type": "CE", "time": "09:42 AM IST", "desc": "FinNifty NBFC Liquidity Expansion Scalp"},
             "RELIANCE": {"strike": 1200, "opt_type": "CE", "time": "10:05 AM IST", "desc": "Reliance Breakout Drive above 1,190 floor"},
             "TCS": {"strike": 2040, "opt_type": "PE", "time": "10:15 AM IST", "desc": "TCS Intraday Tech Pivot Rejection"},
+            "SENSEX": {"strike": 72700, "opt_type": "PE", "time": "02:15 PM IST", "desc": "Sensex 72700 PE Hero-Zero Put Scalp Breakdown"},
             "CRUDEOIL": {"strike": 8600, "opt_type": "PE", "time": "11:30 AM IST", "desc": "Crude Oil Inventory Rejection Breakdown"},
             "INFY": {"strike": 1490, "opt_type": "CE", "time": "11:45 AM IST", "desc": "Infosys Cloud Momentum higher-high formation"}
         }
@@ -17724,7 +17726,11 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
     if "CRUDEOIL" not in spots: spots["CRUDEOIL"] = {"ltp": 7520.0, "net_change": -45.0, "change_pct": -0.60}
     if "INFY" not in spots: spots["INFY"] = {"ltp": 1490.0, "net_change": 14.0, "change_pct": 0.95}
 
+    if "SENSEX" not in spots: spots["SENSEX"] = {"ltp": 72850.0, "net_change": -320.0, "change_pct": -0.44}
+
     configs = [
+        {"id": "sm_sensex_02", "underlying": "SENSEX", "fixed_strike": 72700, "step": 100, "bias": "PE", "time": "02:15 PM IST", "channel": "@stockmantraindex", "desc": "Sensex 72,700 PE Hero-Zero Put Scalp: Invalidation above swing resistance, target open."},
+        {"id": "sm_sensex_01", "underlying": "SENSEX", "fixed_strike": 73000, "step": 100, "bias": "PE", "time": "01:43 PM IST", "channel": "@stockmantraindex", "desc": "Sensex 73,000 PE Near 310 Scalp: Target open, SL follow."},
         {"id": "sm_nifty_01", "underlying": "NIFTY", "fixed_strike": 22750, "step": 50, "bias": "PE", "time": "09:18 AM IST", "channel": "@stockmantraindex", "desc": "Nifty Opening Breakdown / Put Scalp: First recommendation broadcast in channel. Invalidation above 22,810 resistance."},
         {"id": "sm_bn_01", "underlying": "BANKNIFTY", "fixed_strike": 55100, "step": 100, "bias": "CE", "time": "09:35 AM IST", "channel": "@stockmantraindex", "desc": "Bank Nifty Institutional Gamma Pop: Outperforming private bank momentum above 55,000 threshold."},
         {"id": "sm_fin_01", "underlying": "FINNIFTY", "fixed_strike": 24800, "step": 50, "bias": "CE", "time": "09:42 AM IST", "channel": "@stockmantraindex", "desc": "FinNifty Momentum Scalp: NBFC liquidity expansion with Bajaj Finance & SBI Life leadership."},
@@ -17849,7 +17855,7 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
 
     # Prepend real-time parsed stream setups to the response list
     live_list = list(LIVE_STOCKMANTRA_SETUPS.values())
-    combined_setups = live_list + [s for s in setups if not any(l['underlying'] == s['underlying'] for l in live_list)]
+    combined_setups = live_list + [s for s in setups if not any(l.get('symbol') == s.get('symbol') for l in live_list)]
 
     return {
         "ok": True,
@@ -17860,12 +17866,12 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
         "server_telethon_sessions": session_files,
         "live_stream_active": len(LIVE_STOCKMANTRA_SETUPS) > 0,
         "live_stream_setups_count": len(LIVE_STOCKMANTRA_SETUPS),
-        "live_stream_recent_messages": LIVE_STOCKMANTRA_MSGS[:5],
+        "live_stream_recent_messages": LIVE_STOCKMANTRA_MSGS[:15],
         "server_stockmantra_files": detected_files,
         "server_db_tables": [t for t in db_tables if any(k in t.lower() for k in ("tele", "reco", "mantra", "msg", "calib"))],
         "fetch_script_snippet": (Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").read_text(encoding="utf-8", errors="ignore")[:1000] if Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").exists() else ""),
         "latest_json_msgs": (json.loads(Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").read_text(encoding="utf-8", errors="ignore"))[-3:] if Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").exists() else []),
-        "setups": setups
+        "setups": combined_setups
     }
 
 @app.post("/api/telegram/send-reco/{reco_id}")
