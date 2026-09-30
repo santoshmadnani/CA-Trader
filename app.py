@@ -17583,7 +17583,7 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
         sp_ltp = sp_data["ltp"]
         step = c["step"]
         opt_type = c["bias"]
-        atm_strike = int(round(sp_ltp / step) * step)
+        atm_strike = int(c.get("fixed_strike") or round(sp_ltp / step) * step)
         sym_str = f"{und} {atm_strike} {opt_type}"
         
         opt_ltp = 0.0
