@@ -17672,12 +17672,32 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
     except Exception as e:
         log.debug("Telegram inbound stream parse error: %s", e)
 
+    # Scan server disk & database for Telegram user API files / 1008 messages dataset
+    detected_files = []
+    session_files = []
+    db_tables = []
+    try:
+        search_dirs = [Path("."), Path("data"), Path("/home/ubuntu"), Path("/home/ubuntu/CA-Trader"), Path("/home/ubuntu/CA-Trader/data")]
+        for d in search_dirs:
+            if d.exists():
+                for f in d.glob("*stockmantra*"):
+                    detected_files.append(str(f))
+                for f in d.glob("*.session"):
+                    session_files.append(str(f))
+        tbl_rows = db_exec("SELECT name FROM sqlite_master WHERE type='table'", [], "all")
+        db_tables = [r.get("name") for r in tbl_rows] if tbl_rows else []
+    except Exception as exc:
+        log.debug("Disk scan error: %s", exc)
+
     return {
         "ok": True,
         "source": "Stock Mantra Live Telegram Stream & Quantitative Reconciliation",
         "weightage": "50% Multiplier in Overall Consensus",
         "synced_at": time_str,
         "count": len(setups),
+        "server_telethon_sessions": session_files,
+        "server_stockmantra_files": detected_files,
+        "server_db_tables": [t for t in db_tables if any(k in t.lower() for k in ("tele", "reco", "mantra", "msg", "calib"))],
         "setups": setups
     }
 
