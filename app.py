@@ -17698,6 +17698,8 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
         "server_telethon_sessions": session_files,
         "server_stockmantra_files": detected_files,
         "server_db_tables": [t for t in db_tables if any(k in t.lower() for k in ("tele", "reco", "mantra", "msg", "calib"))],
+        "fetch_script_snippet": (Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").read_text(encoding="utf-8", errors="ignore")[:1000] if Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").exists() else ""),
+        "latest_json_msgs": (json.loads(Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").read_text(encoding="utf-8", errors="ignore"))[-3:] if Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").exists() else []),
         "setups": setups
     }
 
