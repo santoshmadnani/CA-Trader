@@ -18384,6 +18384,91 @@ Please produce a comprehensive, empathetic, and mathematically rigorous Markdown
 # 🎨 Visual UI Customization & Persistence (Item 14)
 # ===========================================================================
 
+def update_terminal_html_customizations(data: dict[str, Any]) -> bool:
+    try:
+        terminal_file = BASE_DIR / "terminal.html"
+        if not terminal_file.exists():
+            return False
+        content = terminal_file.read_text(encoding="utf-8")
+        
+        css_rules = []
+        for sel, cfg in data.items():
+            if not isinstance(cfg, dict):
+                continue
+            rules = []
+            if cfg.get("hidden") is True:
+                rules.append("display: none !important;")
+            if cfg.get("fontSize"):
+                rules.append(f"font-size: {cfg['fontSize']} !important;")
+            if cfg.get("fontFamily"):
+                rules.append(f"font-family: {cfg['fontFamily']} !important;")
+            if cfg.get("width"):
+                rules.append(f"width: {cfg['width']} !important;")
+            if cfg.get("padding"):
+                rules.append(f"padding: {cfg['padding']} !important;")
+            if cfg.get("top"):
+                rules.append(f"position: relative !important; top: {cfg['top']} !important;")
+            if cfg.get("left"):
+                rules.append(f"position: relative !important; left: {cfg['left']} !important;")
+            if rules:
+                css_rules.append(f"{sel} {{ {' '.join(rules)} }}")
+                
+        custom_css = "\n".join(css_rules)
+        style_block = f'<style id="caPreloadedUiCustomStyles">\n{custom_css}\n</style>'
+        script_block = f'<script id="caPreloadedUiCustomOverrides">\nwindow.__caUiCustomOverrides = {json.dumps(data)};\n</script>'
+        
+        if '<style id="caPreloadedUiCustomStyles">' in content:
+            content = re.sub(r'<style id="caPreloadedUiCustomStyles">.*?</style>', style_block, content, flags=re.DOTALL)
+        else:
+            content = content.replace('</head>', f'{style_block}\n</head>', 1)
+            
+        if '<script id="caPreloadedUiCustomOverrides">' in content:
+            content = re.sub(r'<script id="caPreloadedUiCustomOverrides">.*?</script>', script_block, content, flags=re.DOTALL)
+        else:
+            content = content.replace('</body>', f'{script_block}\n</body>', 1)
+            
+        terminal_file.write_text(content, encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to update terminal.html customizations: {e}")
+        return False
+
+
+async def git_sync_customizations():
+    try:
+        import shutil
+        git_bin = shutil.which("git")
+        if not git_bin:
+            return
+        add_p = await asyncio.create_subprocess_exec(
+            git_bin, "add", "data/ui_customization.json", "terminal.html",
+            cwd=str(BASE_DIR), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        await add_p.communicate()
+        
+        com_p = await asyncio.create_subprocess_exec(
+            git_bin, "commit", "-m", "chore(ui): persist Edit UI layout and placement customizations",
+            cwd=str(BASE_DIR), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        await com_p.communicate()
+        
+        push_p = await asyncio.create_subprocess_exec(
+            git_bin, "push", "origin", "CA-Trader-Bifurcated",
+            cwd=str(BASE_DIR), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        try:
+            await asyncio.wait_for(push_p.communicate(), timeout=15.0)
+            logger.info("Git push for UI customizations completed")
+        except asyncio.TimeoutError:
+            try:
+                push_p.kill()
+            except Exception:
+                pass
+            logger.warning("Git push for UI customizations timed out")
+    except Exception as e:
+        logger.warning(f"Git sync customizations notice: {e}")
+
+
 @app.get("/api/ui/customize")
 async def get_ui_customization() -> dict[str, Any]:
     cfg_file = BASE_DIR / "data" / "ui_customization.json"
@@ -18401,7 +18486,14 @@ async def save_ui_customization(request: Request) -> dict[str, Any]:
     cfg_file = BASE_DIR / "data" / "ui_customization.json"
     cfg_file.parent.mkdir(parents=True, exist_ok=True)
     cfg_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return {"ok": True, "customization": data}
+    
+    # Bake overrides directly into terminal.html in code
+    updated_html = update_terminal_html_customizations(data)
+    
+    # Background commit and push to git
+    asyncio.create_task(git_sync_customizations())
+    
+    return {"ok": True, "customization": data, "html_updated": updated_html, "git_sync": "triggered"}
 
 
 @app.get("/api/mcp/openapi.json")

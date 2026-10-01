@@ -1349,6 +1349,25 @@ input:focus,textarea:focus,select:focus{outline:none!important;box-shadow:none!i
 .ca-edit-bar{position:fixed;top:0;left:0;right:0;z-index:5000;background:var(--gold);color:#0B2A1E;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;box-shadow:0 2px 12px rgba(0,0,0,.3);transform:translateY(-100%);transition:transform .2s;}
 .ca-edit-bar.active{transform:translateY(0);}
 
+/* Universal Drag & Drop Repositioning in Edit UI Mode */
+.ca-edit-mode .ca-draggable-active {
+  cursor: grab !important;
+}
+.ca-edit-mode .ca-draggable-active:active,
+.ca-edit-mode .ca-elem-dragging {
+  cursor: grabbing !important;
+  opacity: 0.45 !important;
+  outline: 2px dashed #00f0ff !important;
+}
+.ca-drop-before {
+  outline: 2px solid var(--gold) !important;
+  box-shadow: -4px 0 0 0 var(--gold), 0 -4px 0 0 var(--gold) !important;
+}
+.ca-drop-after {
+  outline: 2px solid var(--gold) !important;
+  box-shadow: 4px 0 0 0 var(--gold), 0 4px 0 0 var(--gold) !important;
+}
+
 /* Edit UI Mode Enhanced Context Menu & Visual Highlights */
 .ca-edit-mode button:hover,
 .ca-edit-mode .btn:hover,
@@ -1356,7 +1375,7 @@ input:focus,textarea:focus,select:focus{outline:none!important;box-shadow:none!i
 .ca-edit-mode .chip-filter:hover,
 .ca-edit-mode .opt-bs-btn:hover {
   outline: 2px dashed var(--gold) !important;
-  cursor: context-menu !important;
+  cursor: grab !important;
 }
 .ca-edit-mode h1:hover, .ca-edit-mode h2:hover, .ca-edit-mode h3:hover,
 .ca-edit-mode h4:hover, .ca-edit-mode p:hover, .ca-edit-mode span:hover {
@@ -7460,6 +7479,29 @@ window.applyCustomUiOverrides = function() {
           if (cfg.fontFamily !== undefined) el.style.fontFamily = cfg.fontFamily;
           if (cfg.width !== undefined) el.style.width = cfg.width;
           if (cfg.padding !== undefined) el.style.padding = cfg.padding;
+          if (cfg.top !== undefined) {
+            el.style.position = 'relative';
+            el.style.top = cfg.top;
+          }
+          if (cfg.left !== undefined) {
+            el.style.position = 'relative';
+            el.style.left = cfg.left;
+          }
+          if (cfg.moveBefore) {
+            try {
+              const ref = document.querySelector(cfg.moveBefore);
+              if (ref && ref.parentNode === el.parentNode && ref !== el) {
+                el.parentNode.insertBefore(el, ref);
+              }
+            } catch(_) {}
+          } else if (cfg.moveAfter) {
+            try {
+              const ref = document.querySelector(cfg.moveAfter);
+              if (ref && ref.parentNode === el.parentNode && ref !== el) {
+                el.parentNode.insertBefore(el, ref.nextElementSibling);
+              }
+            } catch(_) {}
+          }
         });
       } catch(_) {}
     });
@@ -7485,15 +7527,26 @@ window.caEditUndo = function() {
       const els = document.querySelectorAll(action.selector);
       els.forEach(el => { el.style[action.prop] = action.prevVal || ''; });
       setCaElementOverride(action.selector, action.prop, action.prevVal || '');
+    } else if (action.type === 'nudge') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => {
+        el.style.top = action.prevTop || '';
+        el.style.left = action.prevLeft || '';
+        el.style.position = action.prevPos || '';
+      });
+      setCaElementOverride(action.selector, 'top', action.prevTop || undefined);
+      setCaElementOverride(action.selector, 'left', action.prevLeft || undefined);
+      setCaElementOverride(action.selector, 'position', action.prevPos || undefined);
     } else if (action.type === 'reorder') {
-      const card = document.getElementById(action.cardId);
-      if (card && card.parentNode) {
+      const targetId = action.targetId || action.cardId;
+      const el = (targetId && targetId.startsWith('#')) ? document.querySelector(targetId) : (document.getElementById(targetId) || document.querySelector(targetId));
+      if (el && el.parentNode) {
         if (action.prevNextSiblingId) {
-          const nextEl = document.getElementById(action.prevNextSiblingId);
-          if (nextEl) card.parentNode.insertBefore(card, nextEl);
-          else card.parentNode.appendChild(card);
+          const nextEl = (action.prevNextSiblingId.startsWith('#')) ? document.querySelector(action.prevNextSiblingId) : (document.getElementById(action.prevNextSiblingId) || document.querySelector(action.prevNextSiblingId));
+          if (nextEl) el.parentNode.insertBefore(el, nextEl);
+          else el.parentNode.appendChild(el);
         } else {
-          card.parentNode.appendChild(card);
+          el.parentNode.appendChild(el);
         }
         saveCardLayouts();
       }
@@ -7508,6 +7561,9 @@ window.caEditUndo = function() {
           el.style.display = action.prevStyles.display || '';
           el.style.fontSize = action.prevStyles.fontSize || '';
           el.style.fontFamily = action.prevStyles.fontFamily || '';
+          el.style.top = action.prevStyles.top || '';
+          el.style.left = action.prevStyles.left || '';
+          el.style.position = action.prevStyles.position || '';
           if (action.card) {
             action.card.style.width = action.prevStyles.width || '';
             action.card.style.padding = action.prevStyles.padding || '';
@@ -7544,15 +7600,26 @@ window.caEditRedo = function() {
       const els = document.querySelectorAll(action.selector);
       els.forEach(el => { el.style[action.prop] = action.newVal || ''; });
       setCaElementOverride(action.selector, action.prop, action.newVal || '');
+    } else if (action.type === 'nudge') {
+      const els = document.querySelectorAll(action.selector);
+      els.forEach(el => {
+        el.style.top = action.newTop || '';
+        el.style.left = action.newLeft || '';
+        el.style.position = action.newPos || '';
+      });
+      setCaElementOverride(action.selector, 'top', action.newTop || undefined);
+      setCaElementOverride(action.selector, 'left', action.newLeft || undefined);
+      setCaElementOverride(action.selector, 'position', action.newPos || undefined);
     } else if (action.type === 'reorder') {
-      const card = document.getElementById(action.cardId);
-      if (card && card.parentNode) {
+      const targetId = action.targetId || action.cardId;
+      const el = (targetId && targetId.startsWith('#')) ? document.querySelector(targetId) : (document.getElementById(targetId) || document.querySelector(targetId));
+      if (el && el.parentNode) {
         if (action.newNextSiblingId) {
-          const nextEl = document.getElementById(action.newNextSiblingId);
-          if (nextEl) card.parentNode.insertBefore(card, nextEl);
-          else card.parentNode.appendChild(card);
+          const nextEl = (action.newNextSiblingId.startsWith('#')) ? document.querySelector(action.newNextSiblingId) : (document.getElementById(action.newNextSiblingId) || document.querySelector(action.newNextSiblingId));
+          if (nextEl) el.parentNode.insertBefore(el, nextEl);
+          else el.parentNode.appendChild(el);
         } else {
-          card.parentNode.appendChild(card);
+          el.parentNode.appendChild(el);
         }
         saveCardLayouts();
       }
@@ -7564,6 +7631,9 @@ window.caEditRedo = function() {
         el.style.display = '';
         el.style.fontSize = '';
         el.style.fontFamily = '';
+        el.style.top = '';
+        el.style.left = '';
+        el.style.position = '';
         if (action.card) {
           action.card.style.width = '';
           action.card.style.padding = '';
@@ -7590,7 +7660,7 @@ window.saveUiCustomizationToServer = async function() {
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d?.detail?.message || d?.detail || d?.message || `HTTP ${res.status}`);
-    toast('UI customizations saved permanently to application code!');
+    toast('UI saved permanently in server code & synced with Git!');
   } catch(err) {
     toast(`Failed to save to code: ${err.message}`, 'error');
   }
@@ -7749,6 +7819,25 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
       </div>
     </div>
 
+    <div class="ca-ctx-section">
+      <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;">Position &amp; Placement (Up / Down / Left / Right)</div>
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px;flex-wrap:wrap;">
+        <span style="font-size:10px;color:var(--text-dim);width:45px;">Reorder:</span>
+        <button type="button" class="ca-ctx-btn" id="caCtxMoveLeft" title="Swap with previous sibling (Left)">⬅ Left</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxMoveRight" title="Swap with next sibling (Right)">➡ Right</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxMoveUp" title="Move before previous element (Up)">⬆ Up</button>
+        <button type="button" class="ca-ctx-btn" id="caCtxMoveDown" title="Move after next element (Down)">⬇ Down</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+        <span style="font-size:10px;color:var(--text-dim);width:45px;">Nudge:</span>
+        <button type="button" class="ca-ctx-btn" data-ca-nudge="up" title="Nudge Up 5px">▲ -5px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-nudge="down" title="Nudge Down 5px">▼ +5px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-nudge="left" title="Nudge Left 5px">◀ -5px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-nudge="right" title="Nudge Right 5px">▶ +5px</button>
+        <button type="button" class="ca-ctx-btn" data-ca-nudge="reset" title="Reset Nudge Offset">↺ Pos</button>
+      </div>
+    </div>
+
     ${card ? `
     <div class="ca-ctx-section">
       <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;">Box Size &amp; Padding</div>
@@ -7764,11 +7853,6 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
         <button type="button" class="ca-ctx-btn" data-ca-pad="4px 8px">Tight</button>
         <button type="button" class="ca-ctx-btn" data-ca-pad="12px 14px">Normal</button>
         <button type="button" class="ca-ctx-btn" data-ca-pad="18px 20px">Spacious</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
-        <span style="font-size:10px;color:var(--text-dim);width:38px;">Order:</span>
-        <button type="button" class="ca-ctx-btn" id="caCtxMoveUp">⬆ Move Before</button>
-        <button type="button" class="ca-ctx-btn" id="caCtxMoveDown">⬇ Move After</button>
       </div>
     </div>
     ` : ''}
@@ -8000,43 +8084,96 @@ function renderCaEditContextMenu(clientX, clientY, target, card, btn, selText) {
         toast(`Box padding updated (Undo available)`);
       };
     });
-
-    document.getElementById('caCtxMoveUp')?.addEventListener('click', () => {
-      if (card.previousElementSibling && card.parentNode) {
-        const parent = card.parentNode;
-        const prevNext = card.nextElementSibling;
-        recordEditAction({
-          type: 'reorder',
-          cardId: card.id,
-          prevNextSiblingId: prevNext ? prevNext.id : null,
-          newNextSiblingId: card.previousElementSibling.id,
-          desc: 'Move card up'
-        });
-        parent.insertBefore(card, card.previousElementSibling);
-        saveCardLayouts();
-        toast('Card moved up (Undo available)');
-        caEditContextMenu.style.display = 'none';
-      }
-    });
-
-    document.getElementById('caCtxMoveDown')?.addEventListener('click', () => {
-      if (card.nextElementSibling && card.parentNode) {
-        const parent = card.parentNode;
-        const prevNext = card.nextElementSibling;
-        recordEditAction({
-          type: 'reorder',
-          cardId: card.id,
-          prevNextSiblingId: prevNext ? prevNext.id : null,
-          newNextSiblingId: prevNext.nextElementSibling ? prevNext.nextElementSibling.id : null,
-          desc: 'Move card down'
-        });
-        parent.insertBefore(card.nextElementSibling, card);
-        saveCardLayouts();
-        toast('Card moved down (Undo available)');
-        caEditContextMenu.style.display = 'none';
-      }
-    });
   }
+
+  // Wire Placement & Position (Reorder Left, Right, Up, Down) for any element
+  const wireMove = (btnId, isPrevious, desc) => {
+    const elBtn = document.getElementById(btnId);
+    if (!elBtn) return;
+    elBtn.onclick = () => {
+      const parent = target.parentNode;
+      if (!parent) return;
+      const sibling = isPrevious ? target.previousElementSibling : target.nextElementSibling;
+      if (!sibling) {
+        toast(`Already at the edge (${desc})`, 'info');
+        return;
+      }
+      const prevNext = target.nextElementSibling;
+      const targetNext = isPrevious ? sibling : sibling.nextElementSibling;
+      const selTarget = getCaElementSelector(target);
+      const selSibling = getCaElementSelector(sibling);
+
+      recordEditAction({
+        type: 'reorder',
+        targetId: target.id || selTarget,
+        prevNextSiblingId: prevNext ? (prevNext.id || getCaElementSelector(prevNext)) : null,
+        newNextSiblingId: targetNext ? (targetNext.id || getCaElementSelector(targetNext)) : null,
+        desc: `Move ${desc}`
+      });
+
+      if (isPrevious) {
+        parent.insertBefore(target, sibling);
+        setCaElementOverride(target, 'moveBefore', selSibling);
+        setCaElementOverride(target, 'moveAfter', undefined);
+      } else {
+        parent.insertBefore(target, sibling.nextElementSibling);
+        setCaElementOverride(target, 'moveAfter', selSibling);
+        setCaElementOverride(target, 'moveBefore', undefined);
+      }
+      if (card) saveCardLayouts();
+      toast(`Moved ${desc} (Undo available)`);
+      caEditContextMenu.style.display = 'none';
+    };
+  };
+
+  wireMove('caCtxMoveLeft', true, 'left');
+  wireMove('caCtxMoveUp', true, 'up');
+  wireMove('caCtxMoveRight', false, 'right');
+  wireMove('caCtxMoveDown', false, 'down');
+
+  // Wire Nudge Buttons (▲, ▼, ◀, ▶)
+  caEditContextMenu.querySelectorAll('[data-ca-nudge]').forEach(btnNudge => {
+    btnNudge.onclick = () => {
+      const dir = btnNudge.dataset.caNudge;
+      const sel = getCaElementSelector(target);
+      let curTop = parseInt(target.style.top || '0', 10);
+      let curLeft = parseInt(target.style.left || '0', 10);
+      if (isNaN(curTop)) curTop = 0;
+      if (isNaN(curLeft)) curLeft = 0;
+      const prevTop = target.style.top;
+      const prevLeft = target.style.left;
+      const prevPos = target.style.position;
+
+      if (dir === 'up') curTop -= 5;
+      else if (dir === 'down') curTop += 5;
+      else if (dir === 'left') curLeft -= 5;
+      else if (dir === 'right') curLeft += 5;
+      else if (dir === 'reset') { curTop = 0; curLeft = 0; }
+
+      const newTop = curTop ? `${curTop}px` : '';
+      const newLeft = curLeft ? `${curLeft}px` : '';
+      const newPos = (newTop || newLeft) ? 'relative' : '';
+
+      target.style.position = newPos;
+      target.style.top = newTop;
+      target.style.left = newLeft;
+
+      recordEditAction({
+        type: 'nudge',
+        selector: sel,
+        prevTop, prevLeft, prevPos,
+        newTop, newLeft, newPos,
+        desc: `Nudge ${dir}`
+      });
+
+      setCaElementOverride(target, 'top', newTop);
+      setCaElementOverride(target, 'left', newLeft);
+      if (newPos) setCaElementOverride(target, 'position', newPos);
+      else setCaElementOverride(target, 'position', undefined);
+
+      toast(`Nudged ${dir} (${curLeft}px, ${curTop}px)`);
+    };
+  });
 
   // Wire Reset Element
   document.getElementById('caCtxResetElem')?.addEventListener('click', () => {
