@@ -1531,24 +1531,14 @@
     }
 
     .panel {
-      display: block !important;
-      visibility: visible !important;
+      display: none !important;
       margin-bottom: 20px;
       scroll-margin-top: 132px;
     }
 
-    .panel[style*="display:none"],
-    .panel[style*="display: none"],
-    #panel-quiz,
-    #panel-tutorial,
-    #panel-alerts,
-    #panel-api-passbook,
-    #panel-console {
-      display: none !important;
-    }
-
     .panel.active {
-      display: block;
+      display: block !important;
+      visibility: visible !important;
       animation: panelIn .38s cubic-bezier(.16, 1, .3, 1);
     }
 
@@ -6302,9 +6292,9 @@
       -webkit-backdrop-filter: none !important;
     }
 
-    /* Tighten whole window layout: shift recommendation section and watchlist to 10px from top sliding section bar */
+    /* Tighten whole window layout: align recommendation section and watchlist baseline */
     .main {
-      padding: 10px 18px 50px !important;
+      padding: var(--top-header-height, 86px) 18px 50px !important;
       margin-top: 0 !important;
     }
 
@@ -6600,7 +6590,6 @@
       -webkit-backdrop-filter: blur(16px) !important;
     }
 
-    /* Zero Lag Transparent UI — Hardware accelerated, no per-card heavy blur (Item 1, 3, 8) */
     .card,
     .stat-card,
     .chart-card,
@@ -6618,10 +6607,54 @@
     .wl-item,
     div[id*="Card"],
     div[id*="card"] {
-      background: rgba(13, 18, 28, 0.42) !important;
-      border: 1px solid rgba(255, 255, 255, 0.08) !important;
-      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22) !important;
+      background: var(--surface, rgba(13, 18, 28, 0.72));
+      border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
       transform: translateZ(0);
+    }
+
+    [data-theme="light"] .card,
+    [data-theme="light"] .stat-card,
+    [data-theme="light"] .chart-card,
+    [data-theme="light"] .tool-card,
+    [data-theme="light"] .consensus,
+    [data-theme="light"] .basis-item,
+    [data-theme="light"] .pattern-card,
+    [data-theme="light"] .panel .card,
+    [data-theme="light"] #dashDualRecoCard,
+    [data-theme="light"] .jarvis-copilot-card,
+    [data-theme="light"] .tool-modal-card,
+    [data-theme="light"] .sidebar,
+    [data-theme="light"] .news-reel,
+    [data-theme="light"] .finder-card,
+    [data-theme="light"] .wl-item,
+    [data-theme="light"] div[id*="Card"],
+    [data-theme="light"] div[id*="card"],
+    [data-theme="ivory"] .card,
+    [data-theme="ivory"] .stat-card,
+    [data-theme="ivory"] .chart-card,
+    [data-theme="ivory"] .sidebar,
+    [data-theme="ivory"] #dashDualRecoCard,
+    [data-theme="ivory"] div[id*="Card"],
+    [data-theme="ivory"] div[id*="card"],
+    [data-theme="mint"] .card,
+    [data-theme="mint"] .stat-card,
+    [data-theme="mint"] .chart-card,
+    [data-theme="mint"] .sidebar,
+    [data-theme="mint"] #dashDualRecoCard,
+    [data-theme="mint"] div[id*="Card"],
+    [data-theme="mint"] div[id*="card"],
+    [data-theme="cream"] .card,
+    [data-theme="cream"] #dashDualRecoCard,
+    [data-theme="powder"] .card,
+    [data-theme="powder"] #dashDualRecoCard,
+    [data-theme="peach"] .card,
+    [data-theme="peach"] #dashDualRecoCard {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      border: 1px solid var(--border, #e2e8f0) !important;
+      color: var(--text, #1e293b) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
     }
 
     /* Removed CA Jarvis Section */
@@ -8280,7 +8313,7 @@
     }
 
     .layout {
-      padding-top: var(--top-header-height, 86px) !important;
+      padding-top: 0 !important;
     }
 
     .main {
@@ -8288,7 +8321,8 @@
     }
 
     @media (min-width: 761px) {
-      .sidebar {
+      .sidebar,
+      #mainSidebar {
         position: sticky !important;
         top: var(--top-header-height, 86px) !important;
         height: calc(100vh - var(--top-header-height, 86px)) !important;
@@ -13130,14 +13164,16 @@
       }
       const targetPanel = document.getElementById('panel-' + panelName) || document.getElementById(panelName);
       if (targetPanel) {
-        if (targetPanel.style.display === 'none') {
-          targetPanel.style.display = 'block';
-        }
-        targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        targetPanel.style.removeProperty('display');
+        targetPanel.removeAttribute('aria-hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
       document.querySelectorAll('.panel').forEach(p => {
         const isActive = (p.id === 'panel-' + panelName || p.id === panelName);
         p.classList.toggle('active', isActive);
+        if (!isActive) {
+          p.style.removeProperty('display');
+        }
       });
       try {
         if (name === 'reco') {
