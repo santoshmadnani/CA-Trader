@@ -6302,14 +6302,18 @@
       -webkit-backdrop-filter: none !important;
     }
 
-    /* Tighten whole window layout: shift watchlist and main content directly up to sliding section bar */
+    /* Tighten whole window layout: shift recommendation section and sidebar to 10px from top sliding section bar */
     .main {
-      padding: 0 18px 50px !important;
+      padding: 10px 18px 50px !important;
       margin-top: 0 !important;
     }
 
     .sidebar-head {
-      padding: 4px 10px 4px !important;
+      padding: 10px 10px 4px !important;
+      margin-top: 0 !important;
+    }
+
+    #dashDualRecoCard {
       margin-top: 0 !important;
     }
 
@@ -6328,118 +6332,17 @@
       box-sizing: border-box !important;
     }
 
-    /* Main Bar: Stock name, LTP, change, change %, buy & sell buttons as top section (Height 30px) */
-    .sticky-symbol-bar {
-      margin-top: 2px !important;
-      margin-bottom: 10px !important;
-      position: -webkit-sticky !important;
-      position: sticky !important;
-      top: var(--top-header-height, 84px) !important;
-      z-index: 950 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      height: 30px !important;
-      min-height: 30px !important;
-      max-height: 30px !important;
-      padding: 0 10px !important;
-      background: var(--surface, #121824) !important;
-      border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)) !important;
-      border-radius: 6px !important;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
-      overflow: hidden !important;
-    }
-
-    .sticky-symbol-left {
-      display: flex !important;
-      align-items: center !important;
-      gap: 8px !important;
-      min-width: 0 !important;
-      flex: 1 1 auto !important;
-      overflow: hidden !important;
-      white-space: nowrap !important;
-    }
-
-    .sticky-symbol-badge {
-      font-weight: 800 !important;
-      font-family: var(--font-display, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
-      font-size: 13.5px !important;
-      color: #ffffff !important;
-      letter-spacing: 0.3px !important;
-      white-space: nowrap !important;
-      background: transparent !important;
-      border: none !important;
+    /* Stock name, change, change %, buy & sell buttons section removed as requested */
+    .sticky-symbol-bar,
+    #globalStickySymbolBar {
+      display: none !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      max-height: 0 !important;
+      margin: 0 !important;
       padding: 0 !important;
-      line-height: 1 !important;
-    }
-
-    .sticky-symbol-price {
-      font-weight: 800 !important;
-      font-family: var(--font-mono, monospace) !important;
-      font-size: 12.5px !important;
-      color: #ffffff !important;
-      background: rgba(255, 255, 255, 0.06) !important;
-      border: 1px solid rgba(255, 255, 255, 0.14) !important;
-      border-radius: 4px !important;
-      padding: 1px 6px !important;
-      height: 20px !important;
-      box-sizing: border-box !important;
-      white-space: nowrap !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      line-height: 1 !important;
-    }
-
-    .sticky-symbol-chg {
-      font-family: var(--font-mono, monospace) !important;
-      font-size: 11px !important;
-      font-weight: 700 !important;
-      border-radius: 4px !important;
-      padding: 1px 6px !important;
-      height: 20px !important;
-      box-sizing: border-box !important;
-      white-space: nowrap !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      line-height: 1 !important;
-    }
-
-    .sticky-symbol-chg.up {
-      color: var(--buy, #26d9a6) !important;
-      background: rgba(38, 217, 166, 0.12) !important;
-      border: 1px solid rgba(38, 217, 166, 0.35) !important;
-    }
-
-    .sticky-symbol-chg.down {
-      color: var(--sell, #ff5c72) !important;
-      background: rgba(255, 92, 114, 0.12) !important;
-      border: 1px solid rgba(255, 92, 114, 0.35) !important;
-    }
-
-    .sticky-status-pill {
-      font-size: 8.5px !important;
-      color: var(--buy, #26d9a6) !important;
-      background: rgba(38, 217, 166, 0.12) !important;
-      border: 1px solid rgba(38, 217, 166, 0.3) !important;
-      padding: 1px 5px !important;
-      border-radius: 3px !important;
-      height: 16px !important;
-      box-sizing: border-box !important;
-      font-weight: 700 !important;
-      text-transform: uppercase !important;
-      white-space: nowrap !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      line-height: 1 !important;
-    }
-
-    .sticky-symbol-right {
-      display: flex !important;
-      align-items: center !important;
-      gap: 5px !important;
-      flex: 0 0 auto !important;
+      border: none !important;
+      overflow: hidden !important;
     }
 
     /* Mobile sliding bar below instead of above (Zerodha Kite Bottom Dock) */
@@ -9006,20 +8909,12 @@
     <!-- MAIN -->
     <div class="main">
 
-      <!-- ============ FROZEN STICKY SYMBOL BAR (Directly above CA Jarvis, locked while scrolling) ============ -->
-      <div id="globalStickySymbolBar" class="sticky-symbol-bar">
-        <div class="sticky-symbol-left">
-          <span class="sticky-symbol-badge" id="stickySymbolTitle">BANKNIFTY</span>
-          <span class="sticky-symbol-price" id="stickySymbolLtp">₹54,633.05</span>
-          <span class="sticky-symbol-chg up" id="stickySymbolChange">+457.15 (+0.84%)</span>
-          <span class="sticky-status-pill" id="stickyMarketStatusPill" title="Live Market IST">●</span>
-        </div>
-        <div class="sticky-symbol-right">
-          <button class="compact-sym-btn buy" onclick="openOrder('BUY')" title="Buy (B)" aria-label="Buy">BUY</button>
-          <button class="compact-sym-btn sell" onclick="openOrder('SELL')" title="Sell (S)" aria-label="Sell">SELL</button>
-          <button class="compact-sym-btn ghost" onclick="window.scrollTo({top:0, behavior:'smooth'})"
-            title="Scroll to Top" aria-label="Top">↑</button>
-        </div>
+      <!-- ============ FROZEN STICKY SYMBOL BAR (Removed as requested) ============ -->
+      <div id="globalStickySymbolBar" class="sticky-symbol-bar" style="display:none !important;height:0 !important;margin:0 !important;padding:0 !important;overflow:hidden;" aria-hidden="true">
+        <span id="stickySymbolTitle" style="display:none !important;"></span>
+        <span id="stickySymbolLtp" style="display:none !important;"></span>
+        <span id="stickySymbolChange" style="display:none !important;"></span>
+        <span id="stickyMarketStatusPill" style="display:none !important;"></span>
       </div>
 
 
