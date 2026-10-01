@@ -48,10 +48,8 @@ def check_status():
     print(f"  [3] Local Laptop Backend:          {'RUNNING' if local_ok else 'OFFLINE (Cloud is Primary)'}")
     print("=" * 62)
     
-    if local_ok and tunnel_proc and public_ok:
     if public_ok:
         print("  >>> ALL SYSTEMS ONLINE! <<<")
-        print("  Your server is active and accessible at:")
         print("  Your 24/7 server is active and accessible worldwide at:")
         print("  --> https://catrader.site")
     elif local_ok and not tunnel_proc:

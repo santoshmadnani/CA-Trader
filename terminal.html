@@ -2455,71 +2455,103 @@ button.btn.small,
   -webkit-backdrop-filter: none !important;
 }
 
-/* Sticky Symbol Header Bar: 1 Single Horizontal Line, 0.5cm below section selection slider, directly above CA Jarvis, locked while scrolling */
+/* Tighten whole window layout: shift watchlist and main content directly up to sliding section bar */
+.main {
+  padding: 0 18px 50px !important;
+  margin-top: 0 !important;
+}
+.sidebar-head {
+  padding: 6px 12px 6px !important;
+  margin-top: 0 !important;
+}
+.sidebar-title {
+  margin-bottom: 4px !important;
+}
+
+/* Sticky Symbol Header: Unboxed, separate normal text / badge boxes / buttons pinned cleanly above CA Jarvis */
 .sticky-symbol-bar {
-  margin-top: 0.5cm !important;
-  margin-bottom: 12px !important;
+  margin-top: 0 !important;
+  margin-bottom: 8px !important;
   position: -webkit-sticky !important;
   position: sticky !important;
-  top: calc(var(--top-header-height, 84px) + 0.5cm) !important;
-  z-index: 2400 !important;
+  top: var(--top-header-height, 82px) !important;
+  z-index: 950 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  height: 42px !important;
-  min-height: 42px !important;
-  padding: 0 16px !important;
-  background: #0c0f17 !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 4px 6px !important;
+  background: var(--bg, #0b0f19) !important;
   border: none !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 6px !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
   width: 100% !important;
   box-sizing: border-box !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 .sticky-symbol-left {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 10px !important;
   min-width: 0 !important;
   flex: 1 1 auto !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   white-space: nowrap !important;
+  flex-wrap: wrap !important;
 }
 .sticky-symbol-badge {
-  font-weight: 700 !important;
-  font-family: var(--font-display) !important;
-  font-size: 15px !important;
+  font-weight: 800 !important;
+  font-family: var(--font-display, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
+  font-size: 16px !important;
   color: #ffffff !important;
   letter-spacing: 0.3px !important;
   white-space: nowrap !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
 }
 .sticky-symbol-price {
-  font-weight: 700 !important;
-  font-family: var(--font-mono) !important;
-  font-size: 14px !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 15px !important;
   color: #ffffff !important;
-  margin-left: 2px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 5px !important;
+  padding: 2px 8px !important;
   white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
 .sticky-symbol-chg {
-  font-family: var(--font-mono) !important;
+  font-family: var(--font-mono, monospace) !important;
   font-size: 12px !important;
-  font-weight: 600 !important;
-  margin-left: 2px !important;
+  font-weight: 700 !important;
+  border-radius: 5px !important;
+  padding: 2px 8px !important;
   white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
-.sticky-symbol-chg.up { color: var(--buy) !important; }
-.sticky-symbol-chg.down { color: var(--sell) !important; }
+.sticky-symbol-chg.up {
+  color: var(--buy, #26d9a6) !important;
+  background: rgba(38, 217, 166, 0.12) !important;
+  border: 1px solid rgba(38, 217, 166, 0.35) !important;
+}
+.sticky-symbol-chg.down {
+  color: var(--sell, #ff5c72) !important;
+  background: rgba(255, 92, 114, 0.12) !important;
+  border: 1px solid rgba(255, 92, 114, 0.35) !important;
+}
 .sticky-status-pill {
   font-size: 9px !important;
-  color: var(--buy) !important;
+  color: var(--buy, #26d9a6) !important;
   background: rgba(38,217,166,0.12) !important;
   border: 1px solid rgba(38,217,166,0.3) !important;
-  padding: 1px 5px !important;
-  border-radius: 3px !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
   white-space: nowrap !important;
@@ -2625,23 +2657,27 @@ button.btn.small,
     padding-top: 0px !important;
   }
   .sticky-symbol-bar {
-    margin-top: 0.5cm !important;
-    margin-bottom: 8px !important;
+    margin-top: 2px !important;
+    margin-bottom: 6px !important;
     position: -webkit-sticky !important;
     position: sticky !important;
-    top: calc(var(--top-header-height, 82px) + 0.5cm) !important;
-    z-index: 2400 !important;
-    height: 38px !important;
-    min-height: 38px !important;
-    padding: 0 10px !important;
+    top: var(--top-header-height, 82px) !important;
+    z-index: 950 !important;
+    height: auto !important;
+    min-height: 32px !important;
+    padding: 2px 8px 4px 8px !important;
     flex-wrap: nowrap !important;
     gap: 6px !important;
+    background: var(--bg, #0c0f17) !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: none !important;
   }
   .sticky-symbol-left {
-    gap: 4px !important;
+    gap: 6px !important;
   }
   .sticky-symbol-badge {
-    font-size: 13px !important;
+    font-size: 13.5px !important;
   }
   .sticky-symbol-price {
     font-size: 12.5px !important;
@@ -3647,7 +3683,7 @@ select#watchlistSelect, select.watchlist-select {
 
 /* CA Trader Unified Static Header (Top Bar + Navtabs stay fixed on scroll) */
 :root {
-  --top-header-height: 84px;
+  --top-header-height: 82px;
 }
 .app-header-static {
   position: fixed !important;
@@ -3674,7 +3710,7 @@ select#watchlistSelect, select.watchlist-select {
   background: var(--bg) !important;
 }
 .layout {
-  padding-top: var(--top-header-height, 84px) !important;
+  padding-top: var(--top-header-height, 82px) !important;
 }
 .main {
   overflow: visible !important;
@@ -3682,8 +3718,8 @@ select#watchlistSelect, select.watchlist-select {
 @media (min-width: 761px) {
   .sidebar {
     position: sticky !important;
-    top: var(--top-header-height, 84px) !important;
-    height: calc(100vh - var(--top-header-height, 84px)) !important;
+    top: var(--top-header-height, 82px) !important;
+    height: calc(100vh - var(--top-header-height, 82px)) !important;
   }
 }
 @media (max-width: 760px) {
@@ -30579,27 +30615,39 @@ window.updateAllSectionHeaders = function(sym, ltp, chg, chgPct){
     if (tEl) {
       tEl.textContent = root;
       tEl.style.fontWeight = '800';
-      tEl.style.fontSize = p.title === 'stickySymbolTitle' ? '22px' : '20px';
+      tEl.style.fontSize = p.title === 'stickySymbolTitle' ? '16px' : '20px';
       tEl.style.color = '#ffffff';
     }
     if (lEl) {
       lEl.textContent = `₹${fmtLtp}`;
       lEl.style.fontFamily = 'var(--font-mono)';
-      lEl.style.fontSize = p.ltp === 'stickySymbolLtp' ? '21px' : '20px';
+      lEl.style.fontSize = p.ltp === 'stickySymbolLtp' ? '15px' : '20px';
       lEl.style.fontWeight = '800';
       lEl.style.color = '#ffffff';
       lEl.style.marginLeft = '8px';
       lEl.style.display = 'inline-block';
+      if (p.ltp === 'stickySymbolLtp') {
+        lEl.style.padding = '2px 8px';
+        lEl.style.borderRadius = '5px';
+        lEl.style.background = 'rgba(255, 255, 255, 0.06)';
+        lEl.style.border = '1px solid rgba(255, 255, 255, 0.14)';
+      }
     }
     if (cEl) {
       cEl.textContent = `${sign}${fmtChg} (${sign}${fmtChgPct}%)`;
       cEl.className = `chart-symbol-change ${colorClass}`;
       cEl.style.fontFamily = 'var(--font-mono)';
-      cEl.style.fontSize = p.chg === 'stickySymbolChange' ? '15px' : '14px';
+      cEl.style.fontSize = p.chg === 'stickySymbolChange' ? '12px' : '14px';
       cEl.style.fontWeight = '700';
       cEl.style.color = color;
       cEl.style.marginLeft = '6px';
       cEl.style.display = 'inline-block';
+      if (p.chg === 'stickySymbolChange') {
+        cEl.style.padding = '2px 8px';
+        cEl.style.borderRadius = '5px';
+        cEl.style.background = isPos ? 'rgba(38, 217, 166, 0.12)' : 'rgba(255, 92, 114, 0.12)';
+        cEl.style.border = isPos ? '1px solid rgba(38, 217, 166, 0.35)' : '1px solid rgba(255, 92, 114, 0.35)';
+      }
     }
   });
   
