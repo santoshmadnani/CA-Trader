@@ -1527,7 +1527,7 @@
     .main {
       flex: 1;
       min-width: 0;
-      padding: 0px 18px 50px;
+      padding: 0px 0.25cm 50px;
     }
 
     .panel {
@@ -3994,12 +3994,12 @@
       left: 0;
       top: calc(var(--top-header-height, 144px) + 12px) !important;
       z-index: 10005;
-      width: 22px;
-      height: 44px;
+      width: 14px;
+      height: 28px;
       background: #141822;
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-left: none;
-      border-radius: 0 6px 6px 0;
+      border-radius: 0 4px 4px 0;
       color: #387ed1;
       align-items: center;
       justify-content: center;
@@ -4012,7 +4012,7 @@
     .floating-watchlist-open-btn:hover {
       background: #1e2433;
       color: #60a5fa;
-      width: 26px;
+      width: 17px;
     }
 
     .sidebar.collapsed~.floating-watchlist-open-btn,
@@ -6294,7 +6294,7 @@
 
     /* Tighten whole window layout: align recommendation section and watchlist baseline */
     .main {
-      padding: var(--top-header-height, 86px) 18px 50px !important;
+      padding: var(--top-header-height, 86px) 0.25cm 50px !important;
       margin-top: 0 !important;
     }
 
@@ -8337,10 +8337,19 @@
       flex-direction: column;
       gap: 8px;
       margin-bottom: 12px;
-      padding-bottom: 10px;
+      padding-top: 10px;
+      padding-bottom: 8px;
+      padding-left: 6px;
+      padding-right: 6px;
       border-bottom: 1px solid var(--border-soft);
       width: 100%;
       box-sizing: border-box;
+    }
+
+    #dashDualRecoCard .universal-section-head {
+      padding-top: 0 !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
     }
 
     .universal-symbol-bar {
@@ -9093,7 +9102,7 @@
     <!-- Floating Right Arrow on left-most edge when Watchlist is toggled off (Zerodha style) -->
     <button id="floatingWatchlistOpenBtn" class="floating-watchlist-open-btn" onclick="toggleWatchlistCollapse(false)"
       title="Open Watchlist" aria-label="Open Watchlist">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5">
         <polyline points="9 18 15 12 9 6" />
       </svg>
     </button>
