@@ -442,6 +442,9 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int):
             if opt_ltp <= sl_val: status = "Stop Loss Hit 🛑 Cut Position"
             elif opt_ltp >= t1_val: status = "Target 1 Hit 🎯 Scalp Profit Booked"
 
+            now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+            is_today = bool(dt and dt.date() == now_ist.date())
+
             setup_obj = {
                 "id": f"sm_live_{msg_id}",
                 "symbol": sym_str,
@@ -466,9 +469,12 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int):
                 "is_live_stream": True,
                 "rationale": f"Stock Mantra Live Telegram Stream ({date_str} {time_str}): {sym_str} BUY. Entry ₹{entry_val:.2f}, Scalp T1 ₹{t1_val:.2f}, SL ₹{sl_val:.2f}. {text[:80]}..."
             }
-            LIVE_STOCKMANTRA_SETUPS[und] = setup_obj
-            LIVE_STOCKMANTRA_SETUPS[sym_str] = setup_obj
-            log.info("Live Stock Mantra setup parsed for %s: %s", und, sym_str)
+            if is_today:
+                LIVE_STOCKMANTRA_SETUPS[und] = setup_obj
+                LIVE_STOCKMANTRA_SETUPS[sym_str] = setup_obj
+                log.info("Live Stock Mantra setup parsed for today %s: %s", und, sym_str)
+            else:
+                log.debug("Skipping historical Stock Mantra message for date %s (only today's setups kept)", date_str)
     except Exception as exc:
         log.debug("Error processing live stockmantra message: %s", exc)
 
@@ -490,9 +496,9 @@ async def _stockmantra_live_telethon_loop():
                 continue
 
             entity = await client.get_entity(channel_name)
-            # Sync recent messages on startup
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=12)
-            async for m in client.iter_messages(entity, limit=250):
+            # Sync only today's messages on startup
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=14)
+            async for m in client.iter_messages(entity, limit=100):
                 if m.date < cutoff:
                     break
                 if m.text:
@@ -515,83 +521,17 @@ async def _stockmantra_live_telethon_loop():
             await asyncio.sleep(15)
 
 def get_stock_mantra_setup(underlying: str) -> dict[str, Any] | None:
-    """Synchronous helper to get live calibrated Stock Mantra setup with exact broadcast date, time, and contract details."""
+    """Helper to get live Stock Mantra setup strictly from today's live broadcast.
+    Returns None if no broadcast was sent today (prevents hardcoded fake recommendations)."""
     try:
         und = str(underlying).upper().strip()
         if und in LIVE_STOCKMANTRA_SETUPS:
-            return LIVE_STOCKMANTRA_SETUPS[und]
-        now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-        date_str = now_ist.strftime("%d-%b-%Y")
-        
-        # Stock Mantra Index channel (@stockmantraindex) only broadcasts Index setups (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, MIDCPNIFTY).
-        # For non-index symbols (INFY, TCS, CRUDEOIL, RELIANCE, etc.), there are no Telegram broadcasts today.
-        if und not in ("NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "MIDCPNIFTY"):
-            return None
-
-        # Today's verified telegram broadcast setups from Stock Mantra (@stockmantraindex)
-        broadcast_defaults = {
-            "NIFTY": {"strike": 22750, "opt_type": "PE", "time": "09:18 AM IST", "desc": "Nifty Opening Breakdown / First Morning Put Setup"},
-            "BANKNIFTY": {"strike": 55100, "opt_type": "CE", "time": "09:35 AM IST", "desc": "Bank Nifty Institutional Gamma Pop above 55,000"},
-            "FINNIFTY": {"strike": 24800, "opt_type": "CE", "time": "09:42 AM IST", "desc": "FinNifty NBFC Liquidity Expansion Scalp"},
-            "SENSEX": {"strike": 72700, "opt_type": "PE", "time": "02:15 PM IST", "desc": "Sensex 72700 PE Hero-Zero Put Scalp Breakdown"}
-        }
-        
-        b_info = broadcast_defaults.get(und)
-        step_map = {"NIFTY": 50, "BANKNIFTY": 100, "FINNIFTY": 50, "SENSEX": 100, "RELIANCE": 20, "TCS": 20, "CRUDEOIL": 50}
-        step = step_map.get(und, 50)
-        sp_data = get_live_fallback_quote(und) or {}
-        sp_ltp = float(sp_data.get("ltp") or 0.0)
-        if sp_ltp <= 0:
-            defaults = {"NIFTY": 22776.0, "BANKNIFTY": 55024.0, "FINNIFTY": 24810.0, "RELIANCE": 1192.0, "TCS": 2070.0, "CRUDEOIL": 7520.0}
-            sp_ltp = defaults.get(und, 1000.0)
-            
-        if b_info:
-            atm_strike = b_info["strike"]
-            opt_type = b_info["opt_type"]
-            b_time = b_info["time"]
-            b_desc = b_info.get("desc", "")
-        else:
-            atm_strike = int(c.get("fixed_strike") or round(sp_ltp / step) * step)
-            opt_type = "PE" if und == "CRUDEOIL" else "CE"
-            b_time = "09:18 AM IST"
-            b_desc = "Algorithmic momentum setup"
-            
-        sym_str = f"{und} {atm_strike} {opt_type}"
-        opt_ltp = round(float(bs_price(sp_ltp, atm_strike, opt_type=opt_type) or 120.0), 2)
-        if und == "CRUDEOIL" and (opt_ltp <= 2.0 or opt_ltp > 450.0):
-            opt_ltp = 208.60
-        elif opt_ltp <= 2.0:
-            opt_ltp = round(sp_ltp * 0.015, 2)
-        entry = round(opt_ltp * 0.94, 2)
-        sl = round(entry * 0.85, 2)
-        t1 = round(entry * 1.12, 2)
-        t2 = round(entry * 1.35, 2)
-        status = "ACTIVE"
-        if opt_ltp <= sl: status = "STOP_LOSS_HIT"
-        elif opt_ltp >= t2: status = "TARGET_2_HIT"
-        elif opt_ltp >= t1: status = "TARGET_1_HIT"
-        return {
-            "symbol": sym_str,
-            "underlying": und,
-            "strike": atm_strike,
-            "option_type": opt_type,
-            "signal": "BUY",
-            "spot_ltp": sp_ltp,
-            "cmp": opt_ltp,
-            "entry": entry,
-            "stop_loss": sl,
-            "target_1": t1,
-            "target_2": t2,
-            "status": status,
-            "accuracy": "94.2%",
-            "confluence_weight": 50,
-            "channel": "@stockmantraindex",
-            "date": date_str,
-            "time": b_time,
-            "published_at": f"{date_str} {b_time}",
-            "description": b_desc,
-            "rationale": f"Stock Mantra Broadcast ({date_str} {b_time}): {sym_str} BUY ({b_desc}). Entry: ₹{entry:.2f}, Scalp T1: ₹{t1:.2f}, Runner T2: ₹{t2:.2f}, SL: ₹{sl:.2f}."
-        }
+            setup = LIVE_STOCKMANTRA_SETUPS[und]
+            now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+            today_str = now_ist.strftime("%d-%b-%Y")
+            if setup.get("date") == today_str or setup.get("date") == now_ist.strftime("%Y-%m-%d"):
+                return setup
+        return None
     except Exception:
         return None
 
@@ -713,16 +653,14 @@ GNEWS_API_KEYS = [v for k, v in sorted(((k, v) for k, v in os.environ.items() if
 NEWSAPI_API_KEYS = [v for k, v in sorted(((k, v) for k, v in os.environ.items() if k == "NEWSAPI_API_KEY" or re.fullmatch(r"NEWSAPI_API_KEY_[2-9]|NEWSAPI_API_KEY_10", k)), key=lambda x: (0 if x[0] == "NEWSAPI_API_KEY" else int(x[0].rsplit("_", 1)[1]))) if v]
 UPSTOX_ACCESS_TOKENS = [v for k, v in sorted(((k, v) for k, v in os.environ.items() if k == "UPSTOX_ACCESS_TOKEN" or re.fullmatch(r"UPSTOX_ACCESS_TOKEN_[2-9]|UPSTOX_ACCESS_TOKEN_10", k)), key=lambda x: (0 if x[0] == "UPSTOX_ACCESS_TOKEN" else int(x[0].rsplit("_", 1)[1]))) if v]
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 AVAILABLE_AI_MODELS = list(dict.fromkeys([
-    "gemini-3.8-flash",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
+    "gemini-3-flash-preview",
     "gemini-flash-latest",
-    "gemini-3.7-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3.8-flash",
     "gemini-2.5-pro",
     "antigravity-deep-trader"
 ]))
@@ -1494,7 +1432,7 @@ def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] 
             continue
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{quote(model, safe='-_.')}:generateContent"
         try:
-            resp = requests.post(url, headers=headers, json=body, timeout=12.0)
+            resp = requests.post(url, headers=headers, json=body, timeout=4.5)
             if resp.status_code == 429 or resp.status_code >= 500:
                 continue
             if resp.status_code >= 400:
@@ -1504,8 +1442,6 @@ def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] 
             if candidates:
                 parts = candidates[0].get("content", {}).get("parts", [])
                 t = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
-                parts_out = candidates[0].get("content", {}).get("parts", [])
-                t = "".join(p.get("text", "") for p in parts_out if isinstance(p, dict))
                 if t:
                     provider_ok("gemini")
                     return {"available": True, "text": t, "model": model, "timestamp": now_iso()}
@@ -1996,29 +1932,101 @@ def provider_ok(provider: str) -> None:
 IST = timezone(timedelta(hours=5, minutes=30))
 # NSE cash/F&O trading holidays relevant to previous-market-day news filtering.
 # 2026 schedule is based on the exchange's published holiday calendar; callers
-# can extend/override via NEWS_MARKET_HOLIDAYS=YYYY-MM-DD,YYYY-MM-DD,... .
-_NSE_HOLIDAYS_BY_YEAR = {
-    2026: {
-        '2026-01-26','2026-03-03','2026-03-26','2026-03-31','2026-04-03',
-        '2026-04-14','2026-05-01','2026-05-28','2026-06-26','2026-09-14',
-        '2026-10-02','2026-10-20','2026-11-08','2026-11-10','2026-11-24','2026-12-25'
-    }
+# Comprehensive Indian Stock Market (NSE, BSE, MCX) Trading Holiday Calendar
+INDIAN_MARKET_HOLIDAYS_MAP = {
+    # 2024
+    '2024-01-22': 'Special Holiday (Ram Mandir Pran Pratishtha)',
+    '2024-01-26': 'Republic Day',
+    '2024-03-08': 'Mahashivratri',
+    '2024-03-25': 'Holi',
+    '2024-03-29': 'Good Friday',
+    '2024-04-11': 'Id-Ul-Fitr (Ramzan Id)',
+    '2024-04-17': 'Shri Ram Navami',
+    '2024-05-01': 'Maharashtra Day',
+    '2024-05-20': 'General Parliamentary Elections (Mumbai)',
+    '2024-06-17': 'Bakri Id / Eid-Ul-Adha',
+    '2024-07-17': 'Muharram',
+    '2024-08-15': 'Independence Day',
+    '2024-10-02': 'Mahatma Gandhi Jayanti',
+    '2024-11-01': 'Diwali Laxmi Pujan (Muhurat Trading)',
+    '2024-11-15': 'Gurunanak Jayanti',
+    '2024-11-20': 'Maharashtra Assembly Elections',
+    '2024-12-25': 'Christmas',
+    # 2025
+    '2025-01-26': 'Republic Day',
+    '2025-02-26': 'Mahashivratri',
+    '2025-03-14': 'Holi',
+    '2025-03-31': 'Id-Ul-Fitr (Ramzan Id)',
+    '2025-04-10': 'Mahavir Jayanti',
+    '2025-04-14': 'Dr. Baba Saheb Ambedkar Jayanti',
+    '2025-04-18': 'Good Friday',
+    '2025-05-01': 'Maharashtra Day',
+    '2025-06-07': 'Bakri Id',
+    '2025-08-15': 'Independence Day',
+    '2025-08-27': 'Ganesh Chaturthi',
+    '2025-10-02': 'Mahatma Gandhi Jayanti',
+    '2025-10-21': 'Diwali Laxmi Pujan (Muhurat Trading)',
+    '2025-10-22': 'Diwali Balipratipada',
+    '2025-11-05': 'Prakash Gurpurb Sri Guru Nanak Dev',
+    '2025-12-25': 'Christmas',
+    # 2026
+    '2026-01-26': 'Republic Day',
+    '2026-03-03': 'Holi',
+    '2026-03-20': 'Id-Ul-Fitr (Ramzan Id)',
+    '2026-03-26': 'Shri Ram Navami',
+    '2026-03-31': 'Mahavir Jayanti',
+    '2026-04-03': 'Good Friday',
+    '2026-04-14': 'Dr. Baba Saheb Ambedkar Jayanti',
+    '2026-05-01': 'Maharashtra Day',
+    '2026-05-28': 'Bakri Id / Eid-Ul-Adha',
+    '2026-06-26': 'Muharram',
+    '2026-09-14': 'Milad-un-Nabi',
+    '2026-10-02': 'Mahatma Gandhi Jayanti',
+    '2026-10-20': 'Dussehra',
+    '2026-11-08': 'Diwali Laxmi Pujan (Muhurat Trading)',
+    '2026-11-10': 'Diwali Balipratipada',
+    '2026-11-24': 'Guru Nanak Jayanti',
+    '2026-12-25': 'Christmas',
+    # 2027
+    '2027-01-26': 'Republic Day',
+    '2027-03-08': 'Mahashivratri',
+    '2027-03-22': 'Holi',
+    '2027-03-26': 'Good Friday',
+    '2027-04-14': 'Dr. Babasaheb Ambedkar Jayanti',
+    '2027-05-01': 'Maharashtra Day',
+    '2027-08-15': 'Independence Day',
+    '2027-10-02': 'Mahatma Gandhi Jayanti',
+    '2027-10-29': 'Diwali Laxmi Pujan',
+    '2027-12-25': 'Christmas'
 }
 
+def get_market_holiday_info(d: Any, segment: str = "NSE_EQ") -> tuple[bool, str]:
+    """Check if given date is an official Indian exchange trading holiday, returning (is_holiday, holiday_name)."""
+    if isinstance(d, datetime):
+        d = d.date()
+    iso = d.isoformat() if hasattr(d, "isoformat") else str(d)[:10]
+    if iso in INDIAN_MARKET_HOLIDAYS_MAP:
+        return True, INDIAN_MARKET_HOLIDAYS_MAP[iso]
+    extra = os.getenv('NEWS_MARKET_HOLIDAYS', '')
+    if extra and iso in [x.strip() for x in extra.split(',') if x.strip()]:
+        return True, "Trading Holiday"
+    return False, ""
+
 def _news_market_holidays():
-    out=set()
-    for y, vals in _NSE_HOLIDAYS_BY_YEAR.items(): out.update(vals)
-    extra=os.getenv('NEWS_MARKET_HOLIDAYS','')
+    out = set(INDIAN_MARKET_HOLIDAYS_MAP.keys())
+    extra = os.getenv('NEWS_MARKET_HOLIDAYS', '')
     if extra:
-        out.update(x.strip() for x in extra.split(',') if re.fullmatch(r'\d{4}-\d{2}-\d{2}',x.strip()))
+        out.update(x.strip() for x in extra.split(',') if re.fullmatch(r'\d{4}-\d{2}-\d{2}', x.strip()))
     return out
 
 def _is_market_day(d):
-    return d.weekday() < 5 and d.isoformat() not in _news_market_holidays()
+    is_hol, _ = get_market_holiday_info(d)
+    return d.weekday() < 5 and not is_hol
 
 def _previous_market_day(d):
-    cur=d-timedelta(days=1)
-    while not _is_market_day(cur): cur-=timedelta(days=1)
+    cur = d - timedelta(days=1)
+    while not _is_market_day(cur):
+        cur -= timedelta(days=1)
     return cur
 
 
@@ -2076,12 +2084,62 @@ def normalize_date_str(date_input: Any) -> str:
 
 def market_session(segment: str = "NSE_EQ", at: datetime | None = None) -> dict[str, Any]:
     at = at or datetime.now(IST)
+    is_mcx = segment.upper() in {"MCX", "COM", "COMMODITY"}
+    is_holiday, holiday_name = get_market_holiday_info(at.date(), segment)
+    if is_holiday:
+        next_sess = get_next_market_session(segment)
+        return {
+            "segment": segment,
+            "active": False,
+            "session": "closed",
+            "reason": f"holiday ({holiday_name})",
+            "holiday": holiday_name,
+            "is_holiday": True,
+            "next_session_date": next_sess.get("target_session_date"),
+            "next_session_label": next_sess.get("session_label"),
+            "markets": {
+                "NSE": {"open": False, "status": "Closed", "reason": f"Holiday: {holiday_name}"},
+                "BSE": {"open": False, "status": "Closed", "reason": f"Holiday: {holiday_name}"},
+                "MCX": {"open": False, "status": "Closed", "reason": f"Holiday: {holiday_name}"}
+            },
+            "timestamp": at.isoformat()
+        }
     if at.weekday() >= 5:
-        return {"segment": segment, "active": False, "session": "closed", "reason": "weekend", "timestamp": at.isoformat()}
+        next_sess = get_next_market_session(segment)
+        return {
+            "segment": segment,
+            "active": False,
+            "session": "closed",
+            "reason": "weekend",
+            "is_holiday": False,
+            "next_session_date": next_sess.get("target_session_date"),
+            "next_session_label": next_sess.get("session_label"),
+            "markets": {
+                "NSE": {"open": False, "status": "Closed", "reason": "Weekend"},
+                "BSE": {"open": False, "status": "Closed", "reason": "Weekend"},
+                "MCX": {"open": False, "status": "Closed", "reason": "Weekend"}
+            },
+            "timestamp": at.isoformat()
+        }
     t = at.time()
-    open_t, close_t = ("09:15", "23:00") if segment.upper() in {"MCX", "COM"} else ("09:15", "15:30")
+    open_t, close_t = ("09:00", "23:30") if is_mcx else ("09:15", "15:30")
     active = datetime.strptime(open_t, "%H:%M").time() <= t <= datetime.strptime(close_t, "%H:%M").time()
-    return {"segment": segment,"active": active,"session": "market" if active else "closed","open": open_t,"close": close_t,"timestamp": at.isoformat()}
+    nse_active = datetime.strptime("09:15", "%H:%M").time() <= t <= datetime.strptime("15:30", "%H:%M").time()
+    mcx_active = datetime.strptime("09:00", "%H:%M").time() <= t <= datetime.strptime("23:30", "%H:%M").time()
+    return {
+        "segment": segment,
+        "active": active,
+        "session": "market" if active else "closed",
+        "open": open_t,
+        "close": close_t,
+        "is_holiday": False,
+        "markets": {
+            "NSE": {"open": nse_active, "status": "Open" if nse_active else "Closed"},
+            "BSE": {"open": nse_active, "status": "Open" if nse_active else "Closed"},
+            "MCX": {"open": mcx_active, "status": "Open" if mcx_active else "Closed"}
+        },
+        "timestamp": at.isoformat()
+    }
 
 
 def get_next_market_session(segment: str = "NSE_EQ") -> dict[str, Any]:
@@ -16705,9 +16763,9 @@ User's message:
     updated_setup = None
     ai_resp = {}
     try:
-        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, system_prompt, 14000, image_data), timeout=15.0)
-    except Exception:
-        pass
+        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, system_prompt, 14000, image_data), timeout=25.0)
+    except Exception as e:
+        log.warning(f"[CA AI Chat] Gemini generation exception: {e}")
     text = ai_resp.get("text") if isinstance(ai_resp, dict) else None
     if not text:
         msg_low = message.lower()
