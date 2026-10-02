@@ -35,6 +35,13 @@ Before executing any tool call, file modification, or command:
 
 # Agent Workspace Rules (Fast & Lean Mode)
 
+0. **Strict Zero-Scratch & Git-Only Invariant**:
+   - **NEVER create temporary, inspection, test, or scratch files** on the laptop (no `scratch/`, `temp_*.js`, `patch_*.py`, or one-off test scripts).
+   - Make all changes directly to tracked repository files using `replace_file_content` or `multi_replace_file_content`.
+   - Maintain a strictly clean, organized repository structure (`app.py`, `terminal.html`, `backend/`, `static/`, `scripts/`, `tests/`).
+   - Remove dead code, redundant files, and zip/backup archives immediately.
+   - Strictly protect keys and secrets (`ca-trader-key.pem`, `oracle_key.key`, `oracle_key.pub`, `.env`) and never track or delete them.
+
 1. **Direct Execution First**:
    - For UI, CSS, HTML, and Python bug fixes or tweaks, apply the changes directly using `replace_file_content` without creating planning artifacts, markdown reports, or background test scripts unless explicitly requested by the user.
 
