@@ -9140,40 +9140,41 @@
               <button type="button" class="btn sell universal-btn-sell" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
             </div>
           </div>
-          <div class="dash-reco-controls" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-              <div id="recoTimeframeButtonGroup" class="reco-timeframes"
-                style="display:inline-flex;gap:3px;background:var(--surface-2);padding:3px;border-radius:6px;border:1px solid var(--border-soft);flex-wrap:wrap;">
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="1m"
-                  onclick="setRecoTimeframe('1m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1m</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="3m"
-                  onclick="setRecoTimeframe('3m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">3m</button>
-                <button type="button" class="btn small active reco-tf-btn" data-tf="5m"
-                  onclick="setRecoTimeframe('5m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;background:var(--gold);color:#000;cursor:pointer;">5m</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="10m"
-                  onclick="setRecoTimeframe('10m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">10m</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="15m"
-                  onclick="setRecoTimeframe('15m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">15m</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="20m"
-                  onclick="setRecoTimeframe('20m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">20m</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="30m"
-                  onclick="setRecoTimeframe('30m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">30m</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="45m"
-                  onclick="setRecoTimeframe('45m', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">45m</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="1h"
-                  onclick="setRecoTimeframe('1h', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1h</button>
-                <button type="button" class="btn small ghost reco-tf-btn" data-tf="1D"
-                  onclick="setRecoTimeframe('1D', this)"
-                  style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1D</button>
-              </div>
+          <div class="dash-reco-controls" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <div id="recoTimeframeButtonGroup" class="reco-timeframes"
+              style="display:inline-flex;gap:3px;background:var(--surface-2);padding:3px;border-radius:6px;border:1px solid var(--border-soft);flex-wrap:wrap;">
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="1m"
+                onclick="setRecoTimeframe('1m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1m</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="3m"
+                onclick="setRecoTimeframe('3m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">3m</button>
+              <button type="button" class="btn small active reco-tf-btn" data-tf="5m"
+                onclick="setRecoTimeframe('5m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;background:var(--gold);color:#000;cursor:pointer;">5m</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="10m"
+                onclick="setRecoTimeframe('10m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">10m</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="15m"
+                onclick="setRecoTimeframe('15m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">15m</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="20m"
+                onclick="setRecoTimeframe('20m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">20m</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="30m"
+                onclick="setRecoTimeframe('30m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">30m</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="45m"
+                onclick="setRecoTimeframe('45m', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">45m</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="1h"
+                onclick="setRecoTimeframe('1h', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1h</button>
+              <button type="button" class="btn small ghost reco-tf-btn" data-tf="1D"
+                onclick="setRecoTimeframe('1D', this)"
+                style="padding:2px 7px;font-size:11px;font-weight:700;height:24px;border-radius:4px;cursor:pointer;">1D</button>
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:8px;flex-shrink:0;">
               <div
                 style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);padding:2px 6px;border-radius:6px;border:1px solid var(--border-soft);">
                 <span
@@ -9186,7 +9187,7 @@
               </div>
               <button type="button" class="btn ghost small"
                 onclick="loadDashboard(true); toast('Scanning all option chains for new setups...');"
-                style="padding:3px 8px;font-size:11px;">↻ Refresh</button>
+                style="padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">↻ Refresh</button>
             </div>
           </div>
 
