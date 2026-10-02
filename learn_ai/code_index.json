@@ -1,0 +1,357 @@
+{
+  "project": "CA Trader",
+  "total_lines": 58814,
+  "app_py": {
+    "file": "app.py",
+    "total_lines": 19694,
+    "modules": [
+      {
+        "id": "app_news",
+        "title": "Module 1: Pre-Market Catalysts & Institutional News Feed",
+        "start_line": 1,
+        "end_line": 149,
+        "purpose": "Stores hard-coded high-impact institutional headlines (FII flows, RBI repo rates, OPEC crude disruptions) used to prime AI models before market opens.",
+        "layman": "Think of this as the morning newspaper headlines that the AI reads before deciding whether the market will go up or down today.",
+        "key_terms": ["FII", "VRR repo", "Sentiment", "Crude Oil", "Materiality"],
+        "ui_extract": "News & Catalyst Sentiment Feed in bottom panel of terminal"
+      },
+      {
+        "id": "app_bootstrap",
+        "title": "Module 2: Server Bootstrapping, FastAPI & Security Middleware",
+        "start_line": 150,
+        "end_line": 230,
+        "purpose": "Initializes the FastAPI application, configures Windows high-speed asyncio loops, sets up CORS headers and secure cookie session middleware.",
+        "layman": "The foundation and security guards of the app. It turns on the server, locks the doors so only logged-in users enter, and allows the browser to talk to Python.",
+        "key_terms": ["FastAPI", "Asyncio", "CORS", "SessionMiddleware", "Uvicorn"],
+        "ui_extract": "User Login status and Connection Dot in top navigation bar"
+      },
+      {
+        "id": "app_dual_feed",
+        "title": "Module 3: Resilient Dual-Feed Engine (Upstox + YFinance)",
+        "start_line": 231,
+        "end_line": 786,
+        "purpose": "Provides real-time market prices with automatic failover: queries Upstox API first; if market is closed or API limits trigger, smoothly falls back to Yahoo Finance.",
+        "layman": "Like having a backup generator. If the primary power (Upstox) cuts off, the secondary power (Yahoo Finance) kicks in instantly so your screen never goes blank.",
+        "key_terms": ["LTP", "Upstox", "yfinance", "Failover", "Black-Scholes"],
+        "ui_extract": "Live LTP numbers on top ticker and watchlist"
+      },
+      {
+        "id": "app_db",
+        "title": "Module 4: SQLite Database Engine & Data Tables",
+        "start_line": 787,
+        "end_line": 1420,
+        "purpose": "Creates SQLite tables (users, recommendations, orders, positions, watchlists, logs) and provides thread-safe db_exec() query executions.",
+        "layman": "The digital filing cabinet where every trade you make, every recommendation generated, and your account balance are permanently saved.",
+        "key_terms": ["SQLite", "db_exec", "Schema", "Foreign Key", "Transactions"],
+        "ui_extract": "Past trades table and wallet balance in header"
+      },
+      {
+        "id": "app_broker",
+        "title": "Module 5: Upstox Token Manager, OAuth & Webhooks",
+        "start_line": 1421,
+        "end_line": 2940,
+        "purpose": "Handles broker OAuth login flow, persists daily access tokens, downloads NSE/BSE contract master files, and handles incoming WebSocket ticks.",
+        "layman": "The handshake between you and your real stock broker. It keeps you securely logged into your trading account without having to re-enter your password every 5 minutes.",
+        "key_terms": ["OAuth", "Access Token", "WebSocket", "Contract Master", "Webhooks"],
+        "ui_extract": "Broker Connected badge in top right corner"
+      },
+      {
+        "id": "app_greeks",
+        "title": "Module 6: Quantitative Black-Scholes Pricing & Greeks Engine",
+        "start_line": 2941,
+        "end_line": 3820,
+        "purpose": "Calculates Black-Scholes option theoretical value (bs_price) and Greek sensitivities (Delta, Gamma, Theta, Vega, Rho, Implied Volatility).",
+        "layman": "The mathematical brain for options. It calculates how much an option price will move if the stock goes up 10 rupees (Delta), or how much value it loses each night while you sleep (Theta).",
+        "key_terms": ["Delta", "Gamma", "Theta", "Vega", "Implied Volatility (IV)", "Black-Scholes"],
+        "ui_extract": "Option Greeks cards (Delta, Gamma, Theta, Vega, IV) in the Option Chain tab"
+      },
+      {
+        "id": "app_ta",
+        "title": "Module 7: Core Technical Analysis & Indicator Formulas",
+        "start_line": 3821,
+        "end_line": 6304,
+        "purpose": "Takes raw candle series and calculates RSI (momentum), ATR (volatility range), EMA 20/50/200 (trend direction), Supertrend, and support/resistance levels.",
+        "layman": "The speedometer, compass, and fuel gauge of the market. It tells you whether price is speeding up (RSI), how choppy the road is (ATR), and which way the hill slopes (EMA).",
+        "key_terms": ["RSI", "ATR", "EMA", "VWAP", "Supertrend", "Support", "Resistance"],
+        "ui_extract": "Technical Confluence Meter (RSI 54.2, ATR 12.5) on chart"
+      },
+      {
+        "id": "app_reco",
+        "title": "Module 8: Autonomous Recommendation Engine (overall_recommendation)",
+        "start_line": 6305,
+        "end_line": 11365,
+        "purpose": "Combines multi-timeframe candle trends, option chain open interest, and news sentiment to output BUY CALL / BUY PUT signals, with precise Entry, Target, and Stop-Loss.",
+        "layman": "The AI trading coach. It looks at all charts and news simultaneously and says: 'Buy NIFTY 24500 CE at 120, take profit at 145, get out if it drops to 105'.",
+        "key_terms": ["Consensus", "Confidence Score", "Risk-Reward", "Target", "Stop Loss", "Scrap"],
+        "ui_extract": "CA AI Recommendation Card (BUY CALL, Entry, Target, SL, Conviction)"
+      },
+      {
+        "id": "app_backtest",
+        "title": "Module 9: Historical Replay, Backtesting & Calibration Engine",
+        "start_line": 11366,
+        "end_line": 12100,
+        "purpose": "Simulates historical sessions without future lookahead (simulate_5m_trade_series), evaluating whether trades hit target or stop-loss on point-in-time candles.",
+        "layman": "A time machine for traders. It lets you test trading strategies on random past dates (like September 2026) to see if you would have made or lost money.",
+        "key_terms": ["Backtest", "Lookahead Bias", "Resampling", "Win Rate", "Point-in-Time"],
+        "ui_extract": "100-Trade Backtest Report and Replay Canvas"
+      },
+      {
+        "id": "app_option_chain",
+        "title": "Module 10: Option Chain Matrix & Strike Scanner",
+        "start_line": 12101,
+        "end_line": 14000,
+        "purpose": "Builds tabular matrix of calls and puts across all strike prices with open interest, volume, Greeks, and ATM/ITM/OTM highlight classification.",
+        "layman": "The menu card of the options market. Shows every strike price available to buy or sell, with prices and buyer/seller activity.",
+        "key_terms": ["Strike Price", "ATM", "ITM", "OTM", "Open Interest (OI)", "PCR"],
+        "ui_extract": "Option Chain table tab with CE / PE columns"
+      },
+      {
+        "id": "app_orders",
+        "title": "Module 11: Paper Trading Simulator & P&L Calculator",
+        "start_line": 14001,
+        "end_line": 16000,
+        "purpose": "Accepts virtual and live orders, tracks live open positions, executes trailing stop-losses, and updates user net P&L and wallet margin.",
+        "layman": "Your practice trading account. You can place trades with virtual money to test your ideas without risking a single rupee of real capital.",
+        "key_terms": ["Paper Trading", "Margin", "Unrealized P&L", "Trailing Stop", "Lot Size"],
+        "ui_extract": "Open Positions tab, P&L badge, and Net Gain/Loss counter"
+      },
+      {
+        "id": "app_services",
+        "title": "Module 12: Telegram Alerts, News Feed & MCP AI Endpoints",
+        "start_line": 16001,
+        "end_line": 19694,
+        "purpose": "Dispatches high-priority signals to Telegram channels, serves news feeds, and exposes Model Context Protocol (MCP) endpoints for ChatGPT and external AI agents.",
+        "layman": "The loudspeaker and external AI bridge. Sends instant alerts to your phone via Telegram and lets ChatGPT ask our server for trading data.",
+        "key_terms": ["Telegram Bot", "MCP Manifest", "OpenAPI", "Webhook", "Health Check"],
+        "ui_extract": "Telegram Notification toggle in settings & /api/mcp/manifest"
+      }
+    ]
+  },
+  "terminal_html": {
+    "file": "terminal.html",
+    "total_lines": 39120,
+    "modules": [
+      {
+        "id": "term_head",
+        "title": "Section 1: HTML Head, Meta Tags & Resiliency Shield",
+        "start_line": 1,
+        "end_line": 30,
+        "purpose": "Initializes HTML5 document, sets up CDN preconnects, defines PWA manifest, and injects a fallback markdown parser shield to prevent script crashes.",
+        "layman": "The loading dock. Sets up connections to external resources so fonts and scripts load fast, and puts safety nets in place so the page never freezes.",
+        "key_terms": ["DOCTYPE", "preconnect", "PWA", "Cache-Control", "marked.min.js"],
+        "ui_extract": "Browser tab title and page head loading"
+      },
+      {
+        "id": "term_css",
+        "title": "Section 2: CSS Stylesheet & Theme Design System",
+        "start_line": 31,
+        "end_line": 1100,
+        "purpose": "Defines CSS custom properties (:root), dark mode color palette, glowing badge styles, glassmorphism cards, and hardware-accelerated animations.",
+        "layman": "The paint, furniture, and lighting of the app. Dictates how dark the background is, how buttons glow neon green or red, and makes everything look sleek.",
+        "key_terms": [":root", "Glassmorphism", "content-visibility", "Flexbox", "CSS Grid"],
+        "ui_extract": "Dark theme styling, card borders, neon buttons, fonts"
+      },
+      {
+        "id": "term_header_nav",
+        "title": "Section 3: Top Navigation Bar & Account Status",
+        "start_line": 1101,
+        "end_line": 1250,
+        "purpose": "HTML markup for the main app header: CA Trader branding, Live/Sim mode toggle, market status clock, wallet balance, and user profile avatar.",
+        "layman": "The dashboard header. Shows whether the market is currently open, your available cash balance, and switches between Live and Practice mode.",
+        "key_terms": ["Navbar", "Wallet Balance", "Market Hours", "Live Toggle"],
+        "ui_extract": "Top horizontal navigation bar on the screen"
+      },
+      {
+        "id": "term_marquee",
+        "title": "Section 4: Live Rolling Ticker Rail (Marquee)",
+        "start_line": 1251,
+        "end_line": 1450,
+        "purpose": "Continuous horizontal ticker marquee showing real-time prices and percentage changes for NIFTY, BANKNIFTY, SENSEX, CRUDEOIL, and RELIANCE.",
+        "layman": "The stock ticker tape running across the screen, just like on CNBC or Bloomberg TV, showing price movements in real time.",
+        "key_terms": ["Marquee", "Ticker Track", "Price Flash", "Percentage Change"],
+        "ui_extract": "Top rolling ticker tape right under the header"
+      },
+      {
+        "id": "term_watchlist",
+        "title": "Section 5: Watchlist Sidebar & Search Input",
+        "start_line": 1451,
+        "end_line": 2400,
+        "purpose": "Left sidebar layout containing category tabs (Indices, Equity, F&O, Commodities), instant search filter, and list of tracked instruments.",
+        "layman": "Your personal stock catalog. Lets you pick which index or stock you want to focus on (e.g., clicking BANKNIFTY switches the whole screen).",
+        "key_terms": ["Watchlist", "Search Filter", "Underlying", "Active Selection"],
+        "ui_extract": "Left vertical column with stock items"
+      },
+      {
+        "id": "term_chart",
+        "title": "Section 6: Interactive Charting Canvas & Timeframes",
+        "start_line": 2401,
+        "end_line": 12170,
+        "purpose": "Center stage container with timeframe selector (1m, 3m, 5m, 15m, 1D), technical indicator toggles (EMA, RSI, ATR), and interactive candlestick drawing canvas.",
+        "layman": "The main candlestick chart where you see price candles forming, green for up and red for down, with moving averages floating on top.",
+        "key_terms": ["Candlestick", "HTML5 Canvas", "Timeframe", "EMA Overlay", "Crosshair"],
+        "ui_extract": "Big central chart area"
+      },
+      {
+        "id": "term_bt_card",
+        "title": "Section 7: Historical Backtest & Replay UI (btRecoCard)",
+        "start_line": 12171,
+        "end_line": 14500,
+        "purpose": "Dedicated replay interface showing point-in-time recommendation verdict, entry price, stop-loss, target, and indicator confluence per candle.",
+        "layman": "The simulation cockpit. Displays what the AI thought on that exact candle in history, showing entry price, stop loss, and target.",
+        "key_terms": ["btVerdictBadge", "Conviction", "Point-in-Time", "Replay Bar"],
+        "ui_extract": "Replay Recommendation card (BUY CALL, Entry, SL, Target)"
+      },
+      {
+        "id": "term_reco_pad",
+        "title": "Section 8: Recommendation Signal & Order Execution Pad",
+        "start_line": 14501,
+        "end_line": 18000,
+        "purpose": "Right-hand panel displaying current live AI signal, rationale breakdown, and one-click 'BUY CALL' or 'BUY PUT' execution buttons.",
+        "layman": "The action pad. Where the AI shows its top trade recommendation of the moment, and with one click of the BUY button you enter the trade.",
+        "key_terms": ["Order Pad", "Lots", "Limit Order", "Market Order", "One-Click Execution"],
+        "ui_extract": "Right column with BUY CALL / BUY PUT buttons"
+      },
+      {
+        "id": "term_opt_chain_table",
+        "title": "Section 9: Interactive Option Chain Matrix",
+        "start_line": 18001,
+        "end_line": 22249,
+        "purpose": "Full-width table comparing Call options on left and Put options on right, with strike prices in center, highlighting ATM strike and Greeks.",
+        "layman": "The complete spreadsheet of options for the current week or month, color-coded so you instantly see which options are profitable.",
+        "key_terms": ["Option Chain", "Strike", "Calls", "Puts", "ATM Highlight", "PCR"],
+        "ui_extract": "Option Chain tab table"
+      },
+      {
+        "id": "term_greek_modal",
+        "title": "Section 10: Greek Learning & Simulation Modal",
+        "start_line": 22250,
+        "end_line": 25000,
+        "purpose": "Interactive popup modal triggered when clicking any Greek stat card ('Learn') allowing users to simulate price changes against Delta and Theta.",
+        "layman": "An interactive popup calculator where you slide stock price up or down to see exactly how much money your option will make.",
+        "key_terms": ["Modal", "Greek Simulator", "Delta Sensitivity", "Theta Decay"],
+        "ui_extract": "The Greek Simulation popup modal"
+      },
+      {
+        "id": "term_js_state",
+        "title": "Section 11: JavaScript Global State & Polling Engine",
+        "start_line": 25001,
+        "end_line": 30000,
+        "purpose": "Initializes state object, manages API fetch cycles every 2-3 seconds, handles error recovery, and synchronizes tabs.",
+        "layman": "The heartbeat of the frontend. Every 2 seconds it calls the backend server to get the latest prices and keeps the screen fresh without reloading the page.",
+        "key_terms": ["state", "setInterval", "fetch()", "Async/Await", "Error Boundary"],
+        "ui_extract": "Continuous automatic screen refresh without full page reload"
+      },
+      {
+        "id": "term_js_renderers",
+        "title": "Section 12: DOM Renderers & Signal Decoders",
+        "start_line": 30001,
+        "end_line": 35000,
+        "purpose": "Functions like selectDashboardRecoOption(), renderWatchlist(), updateTicker() that convert backend JSON data into HTML elements.",
+        "layman": "The construction crew. When the backend sends fresh data, these functions build the HTML tags and inject the numbers into the right boxes.",
+        "key_terms": ["innerHTML", "textContent", "DOM Injection", "Formatting", "Color Coding"],
+        "ui_extract": "Dynamic updates to badges, numbers, and tables"
+      },
+      {
+        "id": "term_js_events",
+        "title": "Section 13: Keyboard Shortcuts, Audio Alerts & Theme Toggles",
+        "start_line": 35001,
+        "end_line": 39120,
+        "purpose": "Event listeners for keyboard navigation (B for Buy, S for Sell), audio chimes when a target is hit, toast notifications, and dark/light mode toggle.",
+        "layman": "The sound effects and shortcuts. Plays a celebratory bell sound when your trade hits target, and allows power traders to trade using keyboard keys.",
+        "key_terms": ["addEventListener", "Web Audio API", "Toast Notifications", "Keyboard Shortcuts"],
+        "ui_extract": "Target hit chime, toast popups in bottom right"
+      }
+    ]
+  },
+  "interactive_presets": [
+    {
+      "id": "preset_buy_button",
+      "title": "Lesson 1: The 'BUY CALL / BUY PUT' Action Buttons",
+      "file": "terminal.html",
+      "line_range": "Lines 12180-12183 & 22259-22264",
+      "description": "How the terminal decides whether to show a green 'BUY CALL' badge or red 'BUY PUT' badge, and how you can style it or change the text.",
+      "layman": "In trading, if you think the market is going UP, you buy a CALL (green). If you think it's going DOWN, you buy a PUT (red). Here is the exact code that controls that button.",
+      "code_snippet": "<span class=\"verdict-badge buy\" id=\"btVerdictBadge\" style=\"font-size:12px;\">BUY CALL</span>\n\n/* Styling from CSS */\n.verdict-badge.buy {\n  background: rgba(38, 217, 166, 0.15);\n  color: #26d9a6;\n  border: 1px solid rgba(38, 217, 166, 0.4);\n  padding: 4px 10px;\n  border-radius: 4px;\n  font-weight: 700;\n  letter-spacing: 0.5px;\n}",
+      "editable_fields": [
+        {"key": "badge_text", "label": "Button Text", "type": "text", "default": "BUY CALL"},
+        {"key": "badge_bg", "label": "Background Color", "type": "color", "default": "#14382c"},
+        {"key": "badge_color", "label": "Text Color", "type": "color", "default": "#26d9a6"},
+        {"key": "border_radius", "label": "Border Radius (px)", "type": "number", "default": 6},
+        {"key": "font_size", "label": "Font Size (px)", "type": "number", "default": 13}
+      ]
+    },
+    {
+      "id": "preset_target_sl",
+      "title": "Lesson 2: Recommendation Entry, Target & Stop-Loss Cards",
+      "file": "app.py & terminal.html",
+      "line_range": "app.py: 11945-11960 | terminal.html: 12187-12206",
+      "description": "How the backend calculates Target and Stop-Loss using ATR (Average True Range), and how the frontend displays them in glowing cards.",
+      "layman": "A trade without a target and stop-loss is like driving without brakes. If Entry is 100, Target might be 125 (profit), and Stop-Loss 85 (maximum safety limit).",
+      "code_snippet": "# app.py (Lines 11998-12000)\ntarget_gain = round(max(atr * target_mult, entry * 0.0004), 2)\nsl_dist = round(max(atr * sl_mult, entry * 0.0015), 2)\ntarget = round(entry + target_gain, 2)\nstop_loss = round(entry - sl_dist, 2)",
+      "editable_fields": [
+        {"key": "entry_price", "label": "Entry Price (INR)", "type": "number", "default": 250.0},
+        {"key": "atr_val", "label": "Market Volatility (ATR)", "type": "number", "default": 14.5},
+        {"key": "target_mult", "label": "Target Multiplier", "type": "number", "default": 1.5},
+        {"key": "sl_mult", "label": "Stop-Loss Multiplier", "type": "number", "default": 1.0}
+      ]
+    },
+    {
+      "id": "preset_greeks",
+      "title": "Lesson 3: Option Greeks Stat Cards (Delta & Theta)",
+      "file": "app.py & terminal.html",
+      "line_range": "app.py: 2941-2990 | terminal.html: 20140-20165",
+      "description": "How Black-Scholes computes Delta (how much option moves per 1 rupee index move) and displays it in interactive cards with the Learn button.",
+      "layman": "Delta is your speed multiplier: Delta 0.50 means if NIFTY moves 100, your option moves 50. Theta is time decay: how much rent your option pays every day.",
+      "code_snippet": "<div class=\"stat-card greek-clickable\">\n  <div class=\"label\">\n    <span>Call Delta</span>\n    <span style=\"font-size:9.5px;color:#f5a623;\">Learn</span>\n  </div>\n  <div class=\"value\">+0.54</div>\n</div>",
+      "editable_fields": [
+        {"key": "delta_val", "label": "Call Delta (+0.0 to +1.0)", "type": "number", "default": 0.54},
+        {"key": "theta_val", "label": "Theta Decay (INR/day)", "type": "number", "default": -8.45},
+        {"key": "card_bg", "label": "Card Background", "type": "color", "default": "#131a24"},
+        {"key": "accent_color", "label": "Accent Color", "type": "color", "default": "#f5a623"}
+      ]
+    },
+    {
+      "id": "preset_watchlist_row",
+      "title": "Lesson 4: Watchlist Active Item Card",
+      "file": "terminal.html",
+      "line_range": "Lines 1480-1550 & 21000-21150",
+      "description": "How each stock/index is displayed in the sidebar with live price, net points change, and green/red percentage pill.",
+      "layman": "Your watchlist item is a live identity badge for each stock. When price goes up, it flashes green; when price drops, it flashes red.",
+      "code_snippet": "<div class=\"wl-item active\">\n  <div class=\"wl-sym-block\">\n    <span class=\"wl-name\">BANKNIFTY</span>\n    <span class=\"wl-sub\">NSE INDEX</span>\n  </div>\n  <div class=\"wl-price-block\">\n    <span class=\"wl-ltp\">INR 53,420.50</span>\n    <span class=\"wl-pct up\">+1.24%</span>\n  </div>\n</div>",
+      "editable_fields": [
+        {"key": "symbol_name", "label": "Symbol Name", "type": "text", "default": "BANKNIFTY"},
+        {"key": "ltp_price", "label": "Current Price (INR)", "type": "number", "default": 53420.50},
+        {"key": "pct_change", "label": "% Change", "type": "number", "default": 1.24},
+        {"key": "is_up", "label": "Is Market Bullish (Up)?", "type": "boolean", "default": true}
+      ]
+    },
+    {
+      "id": "preset_ticker_marquee",
+      "title": "Lesson 5: Rolling Ticker Marquee",
+      "file": "terminal.html",
+      "line_range": "Lines 1251-1350 & CSS Lines 420-470",
+      "description": "The continuously sliding marquee tape at the top of the screen that tracks all major benchmark indices.",
+      "layman": "Like a sports ticker showing scores across different games, this ticker loops smoothly across your screen using CSS animations.",
+      "code_snippet": "@keyframes tickerTrack {\n  0% { transform: translate3d(0, 0, 0); }\n  100% { transform: translate3d(-50%, 0, 0); }\n}\n.ticker-track {\n  display: flex;\n  gap: 24px;\n  animation: tickerTrack 25s linear infinite;\n}",
+      "editable_fields": [
+        {"key": "anim_speed", "label": "Scroll Speed (seconds)", "type": "number", "default": 25},
+        {"key": "gap_px", "label": "Spacing Between Tickers (px)", "type": "number", "default": 24},
+        {"key": "pill_border", "label": "Border Style", "type": "text", "default": "1px solid rgba(255,255,255,0.08)"}
+      ]
+    },
+    {
+      "id": "preset_technical_meter",
+      "title": "Lesson 6: Technical Confluence Meter (RSI & EMA)",
+      "file": "app.py & terminal.html",
+      "line_range": "app.py: 11801-11825 | terminal.html: 12215-12235",
+      "description": "How the system decides if an asset is oversold (RSI < 30), bullish (RSI > 50), or overbought (RSI > 70) and paints the confluence meter.",
+      "layman": "Think of RSI as a thermometer: Below 30 is freezing (oversold, ready to bounce). Above 70 is boiling (overbought, ready to cool down). Around 50 is comfortably warm.",
+      "code_snippet": "# app.py (Lines 11811-11816)\nif trend == 'BUY' or (rsi >= 48):\n    signal = 'BUY'\n    confidence = round(min(94.0, 65.0 + max(0, rsi - 48) * 1.2), 1)\nelse:\n    signal = 'SELL'\n    confidence = round(min(92.0, 62.0 + max(0, 52 - rsi) * 1.2), 1)",
+      "editable_fields": [
+        {"key": "rsi_value", "label": "RSI Value (0 - 100)", "type": "number", "default": 58.4},
+        {"key": "ema_20", "label": "20 EMA (INR)", "type": "number", "default": 24850.0},
+        {"key": "current_ltp", "label": "Current LTP (INR)", "type": "number", "default": 24920.0}
+      ]
+    }
+  ]
+}

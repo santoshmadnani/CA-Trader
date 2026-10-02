@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CA Trader — Learn AI & Code Sandbox</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070b12;
+      --surface: #0e1524;
+      --surface-2: #141f33;
+      --surface-3: #1c2b45;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(0, 229, 255, 0.3);
+      --text: #f0f4fc;
+      --text-dim: #94a3b8;
+      --text-muted: #64748b;
+      --cyan: #00e5ff;
+      --green: #00e676;
+      --red: #ff3b30;
+      --gold: #f5a623;
+      --purple: #b388ff;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Bar */
+    header {
+      background: rgba(14, 21, 36, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, var(--cyan), #3b82f6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #000;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-tag {
+      font-size: 10px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--cyan);
+      border-radius: 4px;
+      font-weight: 700;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-dim);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .nav-btn.active {
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--cyan);
+      border-color: rgba(0, 229, 255, 0.35);
+    }
+
+    .term-link-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 12.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    .term-link-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    /* Section Subhead */
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* =========================================================================
+       TAB 1: PLAYGROUND & SIDE-BY-SIDE SANDBOX
+       ========================================================================= */
+    .playground-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      flex: 1;
+      min-height: 650px;
+    }
+
+    @media (max-width: 1100px) {
+      .playground-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Preset selector */
+    .preset-selector-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface-2);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .preset-select {
+      flex: 1;
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .code-meta-badge {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--cyan);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 229, 255, 0.25);
+    }
+
+    .layman-box {
+      background: rgba(245, 166, 35, 0.08);
+      border: 1px solid rgba(245, 166, 35, 0.25);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #ffd180;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .layman-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    /* Quick controls */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      background: var(--surface-2);
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .control-input {
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-family: var(--font-mono);
+      outline: none;
+    }
+
+    .control-input:focus {
+      border-color: var(--cyan);
+    }
+
+    /* Code editor area */
+    .code-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      background: #05080f;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #090e1a;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .code-textarea {
+      width: 100%;
+      height: 220px;
+      background: transparent;
+      color: #e2e8f0;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.5;
+      padding: 12px;
+      border: none;
+      resize: vertical;
+      outline: none;
+      white-space: pre;
+    }
+
+    .btn-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--cyan);
+      color: #000;
+      font-weight: 700;
+    }
+
+    .btn-primary:hover {
+      background: #33ecff;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text-dim);
+    }
+
+    .btn-ghost:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    /* Live Preview Pane */
+    .preview-canvas-box {
+      flex: 1;
+      background: #060911;
+      border-radius: 10px;
+      border: 2px dashed rgba(0, 229, 255, 0.25);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 280px;
+      position: relative;
+    }
+
+    .live-badge-indicator {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--green);
+      background: rgba(0, 230, 118, 0.15);
+      border: 1px solid rgba(0, 230, 118, 0.3);
+      padding: 2px 8px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    /* The Bridge Connection Card */
+    .bridge-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bridge-flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      overflow-x: auto;
+      padding: 4px 0;
+    }
+
+    .flow-node {
+      background: var(--surface-3);
+      padding: 4px 10px;
+      border-radius: 4px;
+      color: var(--cyan);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+    }
+
+    /* =========================================================================
+       TAB 2: FULL CODE DIRECTORY (40,000+ LINES EXPLORER)
+       ========================================================================= */
+    .directory-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+      flex: 1;
+      min-height: 700px;
+    }
+
+    @media (max-width: 1024px) {
+      .directory-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .toc-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .toc-search {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    .toc-input {
+      flex: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      outline: none;
+    }
+
+    .toc-list {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 650px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toc-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .toc-item:hover {
+      background: var(--surface-2);
+    }
+
+    .toc-item.active {
+      background: rgba(0, 229, 255, 0.1);
+      border-left: 3px solid var(--cyan);
+    }
+
+    .toc-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .toc-item-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .code-viewer-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .code-viewer-header {
+      background: var(--surface-2);
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .code-lines-scroll {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 650px;
+      background: #05080f;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .code-line-row {
+      display: flex;
+      padding: 2px 8px;
+      transition: background 0.1s;
+    }
+
+    .code-line-row:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .line-number {
+      width: 50px;
+      color: #475569;
+      text-align: right;
+      padding-right: 14px;
+      user-select: none;
+    }
+
+    .line-content {
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      flex: 1;
+    }
+
+    /* =========================================================================
+       TAB 3: AI GLOSSARY & GEMINI MENTOR
+       ========================================================================= */
+    .glossary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .glossary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .glossary-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--cyan);
+    }
+
+    .glossary-term {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .glossary-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--surface-2);
+      color: var(--text-dim);
+    }
+
+    .glossary-summary {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .glossary-analogy {
+      background: rgba(245, 166, 35, 0.08);
+      border-left: 3px solid var(--gold);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #ffcc80;
+      border-radius: 0 4px 4px 0;
+    }
+
+    /* =========================================================================
+       CUSTOM RIGHT-CLICK CONTEXT MENU & AI MODAL
+       ========================================================================= */
+    #customContextMenu {
+      position: fixed;
+      display: none;
+      z-index: 1000;
+      background: #0f172a;
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      padding: 6px;
+      min-width: 230px;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    .menu-item {
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background 0.15s;
+    }
+
+    .menu-item:hover {
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--cyan);
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--cyan);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 650px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+      animation: modalSlide 0.25s ease-out;
+    }
+
+    @keyframes modalSlide {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      background: var(--surface-2);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+
+    .mentor-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(179, 136, 255, 0.15);
+      border: 1px solid rgba(179, 136, 255, 0.35);
+      color: var(--purple);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .explain-section {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .explain-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .explain-text {
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .explain-analogy-box {
+      background: rgba(245, 166, 35, 0.1);
+      border-left: 3px solid var(--gold);
+      padding: 12px;
+      border-radius: 0 6px 6px 0;
+      color: #ffecb3;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      border: 1px solid var(--cyan);
+      color: var(--text);
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">CA</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="brand-title">CA Trader — Learn AI</span>
+          <span class="brand-tag">v4.6 Mentor</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);">Interactive Code Sandbox & Technical Explainer</div>
+      </div>
+    </div>
+
+    <nav>
+      <button class="nav-btn active" id="tabBtnPlayground" onclick="switchMainTab('playground')">
+        🎮 Interactive Playground
+      </button>
+      <button class="nav-btn" id="tabBtnDirectory" onclick="switchMainTab('directory')">
+        📚 Full Code Directory
+      </button>
+      <button class="nav-btn" id="tabBtnGlossary" onclick="switchMainTab('glossary')">
+        💡 AI Glossary
+      </button>
+      <a href="/terminal" class="term-link-btn" target="_blank">
+        ⚡ Open Live Terminal
+      </a>
+    </nav>
+  </header>
+
+  <!-- Main Views Container -->
+  <main>
+
+    <!-- =======================================================================
+         TAB 1: INTERACTIVE PLAYGROUND ("PRACTICE WHAT CHANGES WHAT")
+         ======================================================================= -->
+    <div class="tab-content active" id="viewPlayground">
+      <div class="section-head">
+        <div>
+          <h1 class="section-title">
+            <span>🎮 Practice What Changes What</span>
+            <span class="code-meta-badge" id="activeLessonBadge">Lesson 1: BUY CALL Button</span>
+          </h1>
+          <p class="section-subtitle">Tweak the code on the left. Watch the live UI component update on the right instantly.</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="resetActivePreset()">↺ Reset to Original</button>
+          <button class="btn btn-primary" onclick="applyPlaygroundCode()">⚡ Apply Changes</button>
+        </div>
+      </div>
+
+      <!-- Preset Selector -->
+      <div class="preset-selector-bar">
+        <span style="font-size:12.5px;font-weight:700;color:var(--text-dim);white-space:nowrap;">Select Lesson / Component:</span>
+        <select class="preset-select" id="presetSelectDropdown" onchange="onPresetChange(this.value)">
+          <option value="preset_buy_button">Lesson 1: BUY CALL / BUY PUT Action Buttons (terminal.html)</option>
+          <option value="preset_target_sl">Lesson 2: Target & Stop-Loss Calculation Cards (app.py & terminal.html)</option>
+          <option value="preset_greeks">Lesson 3: Option Greeks Stat Cards - Delta & Theta (app.py & terminal.html)</option>
+          <option value="preset_watchlist_row">Lesson 4: Watchlist Active Item Card (terminal.html)</option>
+          <option value="preset_ticker_marquee">Lesson 5: Rolling Ticker Marquee Bar (terminal.html CSS)</option>
+          <option value="preset_technical_meter">Lesson 6: Technical Confluence Meter - RSI & EMA (app.py)</option>
+        </select>
+      </div>
+
+      <!-- Side-by-Side Grid -->
+      <div class="playground-grid">
+
+        <!-- Left: Code & Controls -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">
+              <span>📝 Code Source & Parameters</span>
+            </span>
+            <span class="code-meta-badge" id="sourceRefBadge">terminal.html [Line 12181]</span>
+          </div>
+
+          <!-- Plain Layman Explanation Box -->
+          <div class="layman-box" id="laymanBox">
+            <span class="layman-icon">💡</span>
+            <div>
+              <b style="color:#fff;">Plain English Explanation:</b>
+              <div id="laymanText" style="margin-top:4px;">
+                In trading, if you think the market is going UP, you buy a CALL (green). If you think it's going DOWN, you buy a PUT (red). Here is the exact code that controls that button.
+              </div>
+            </div>
+          </div>
+
+          <!-- Beginner Tweak Controls -->
+          <div class="controls-grid" id="quickControlsGrid">
+            <!-- Populated dynamically per preset -->
+          </div>
+
+          <!-- Live Code Editor -->
+          <div class="code-container">
+            <div class="code-header">
+              <span>LIVE CODE EDITOR (Type any changes here)</span>
+              <span style="color:var(--text-muted);">Right-click any word to ask Gemini</span>
+            </div>
+            <textarea class="code-textarea" id="playgroundCodeText" spellcheck="false"></textarea>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="applyPlaygroundCode()">⚡ Render Live UI</button>
+            <button class="btn btn-ghost" onclick="askGeminiForCurrentSnippet()">❓ Ask Gemini to Explain This Block</button>
+          </div>
+        </div>
+
+        <!-- Right: Live UI Extract Preview -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">
+              <span>👁️ Live UI Extract (Screen Output)</span>
+            </span>
+            <span class="code-meta-badge" style="color:var(--green);border-color:rgba(0,230,118,0.3);background:rgba(0,230,118,0.1);">
+              Interactive Sandbox
+            </span>
+          </div>
+
+          <!-- The Live Sandbox Container -->
+          <div class="preview-canvas-box" id="previewSandbox">
+            <div class="live-badge-indicator">
+              <span class="live-dot"></span>
+              <span>LIVE RENDER</span>
+            </div>
+            <!-- The actual component renders here -->
+            <div id="componentMountPoint" style="width:100%;display:flex;align-items:center;justify-content:center;"></div>
+          </div>
+
+          <!-- The Connection Bridge Explanation -->
+          <div class="bridge-card">
+            <div style="font-size:12px;font-weight:700;color:var(--cyan);text-transform:uppercase;">
+              🔗 How This Code Connects Frontend & Backend:
+            </div>
+            <div class="bridge-flow" id="bridgeFlow">
+              <span class="flow-node">app.py (Decision)</span>
+              <span class="flow-arrow">➔</span>
+              <span class="flow-node">JSON API (/api/reco)</span>
+              <span class="flow-arrow">➔</span>
+              <span class="flow-node">terminal.html (#btVerdictBadge)</span>
+              <span class="flow-arrow">➔</span>
+              <span class="flow-node">Screen UI</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.4;" id="bridgeDesc">
+              When the AI in <code>app.py</code> issues a signal, it emits a string like "BUY CALL". The JavaScript in <code>terminal.html</code> receives that JSON payload, updates the text of this badge, and applies the green neon styling class.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         TAB 2: FULL CODE DIRECTORY (40,000+ LINES EXPLORER)
+         ======================================================================= -->
+    <div class="tab-content" id="viewDirectory">
+      <div class="section-head">
+        <div>
+          <h1 class="section-title">
+            <span>📚 Complete Codebase Directory & Inspector</span>
+          </h1>
+          <p class="section-subtitle">Inspect both app.py (~19,700 lines) and terminal.html (~39,120 lines) section by section with plain-English breakdowns.</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost active" id="btnBrowseTerminal" onclick="switchDirectoryFile('terminal.html')">terminal.html (39,120 lines)</button>
+          <button class="btn btn-ghost" id="btnBrowseApp" onclick="switchDirectoryFile('app.py')">app.py (19,694 lines)</button>
+        </div>
+      </div>
+
+      <div class="directory-layout">
+
+        <!-- Table of Contents -->
+        <div class="toc-card">
+          <div class="toc-search">
+            <input type="text" class="toc-input" id="tocSearchInput" placeholder="Search sections, lines, or keywords..." oninput="filterTocItems(this.value)">
+          </div>
+          <div class="toc-list" id="tocContainer">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Code Viewer -->
+        <div class="code-viewer-card">
+          <div class="code-viewer-header">
+            <div>
+              <span style="font-weight:700;font-size:14px;color:var(--cyan);" id="activeModuleHeader">Section 1: HTML Head & Setup</span>
+              <div style="font-size:11.5px;color:var(--text-dim);" id="activeModuleSub">Lines 1 - 30</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-ghost" onclick="loadPrevSlice()">◀ Previous</button>
+              <button class="btn btn-ghost" onclick="loadNextSlice()">Next ▶</button>
+              <button class="btn btn-primary" onclick="explainActiveModule()">💡 Explain Section with Gemini</button>
+            </div>
+          </div>
+
+          <!-- Code Lines Container -->
+          <div class="code-lines-scroll" id="codeLinesContainer">
+            <!-- Populated dynamically via /api/learn-ai/code-slice -->
+            <div style="padding:24px;text-align:center;color:var(--text-dim);">Loading code slice...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         TAB 3: AI GLOSSARY & GEMINI MENTOR
+         ======================================================================= -->
+    <div class="tab-content" id="viewGlossary">
+      <div class="section-head">
+        <div>
+          <h1 class="section-title">
+            <span>💡 Technical & Trading Glossary</span>
+          </h1>
+          <p class="section-subtitle">Every technical term explained in simple layman language with everyday real-life examples.</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <input type="text" class="toc-input" id="glossarySearchInput" style="width:260px;" placeholder="Search term (e.g. Delta, ATR, RSI)..." oninput="filterGlossaryCards(this.value)">
+          <button class="btn btn-primary" onclick="askCustomTerm()">Ask Gemini Anything</button>
+        </div>
+      </div>
+
+      <div class="glossary-grid" id="glossaryGrid">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- =========================================================================
+       CUSTOM RIGHT-CLICK CONTEXT MENU
+       ========================================================================= -->
+  <div id="customContextMenu">
+    <div class="menu-item" onclick="triggerRightClickExplain()">
+      <span style="font-size:16px;">❓</span>
+      <span><b>What does this mean?</b> (Ask Gemini)</span>
+    </div>
+    <div class="menu-item" onclick="jumpToPlaygroundWithSelected()">
+      <span style="font-size:16px;">🎮</span>
+      <span>Practice in Sandbox</span>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       GEMINI AI EXPLANATION MODAL
+       ========================================================================= -->
+  <div class="modal-backdrop" id="explainModalBackdrop">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🧠 Gemini AI Layman Explanation</span>
+        </div>
+        <button class="modal-close" onclick="closeExplainModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="explainModalBody">
+        <div style="text-align:center;padding:24px;color:var(--cyan);">
+          Consulting Gemini AI mentor...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toastBox">
+    <span id="toastIcon">⚡</span>
+    <span id="toastMsg">Changes applied to live preview!</span>
+  </div>
+
+  <!-- Client-side Logic -->
+  <script>
+    /* =========================================================================
+       GLOBAL STATE & PRESETS
+       ========================================================================= */
+    let currentDirectoryFile = 'terminal.html';
+    let currentSliceStart = 1;
+    let currentSliceEnd = 50;
+    let selectedWord = '';
+    let selectedContext = '';
+    let codeIndexData = null;
+    let currentPreset = null;
+
+    // Presets database (built-in fallback guarantees immediate operation)
+    const PRESETS = {
+      preset_buy_button: {
+        id: 'preset_buy_button',
+        title: "Lesson 1: The 'BUY CALL / BUY PUT' Action Buttons",
+        file: 'terminal.html',
+        line_range: 'Lines 12180-12183 & 22259-22264',
+        layman: "In trading, if you think the market is going UP, you buy a CALL (green). If you think it's going DOWN, you buy a PUT (red). Here is the exact code that controls that button.",
+        source_badge: 'terminal.html [Line 12181]',
+        code: `<span class="verdict-badge buy" id="btVerdictBadge" style="background:#14382c;color:#26d9a6;border:1px solid rgba(38,217,166,0.5);padding:8px 16px;border-radius:6px;font-size:14px;font-weight:700;letter-spacing:0.5px;cursor:pointer;display:inline-block;box-shadow:0 0 14px rgba(38,217,166,0.3);">BUY CALL</span>`,
+        controls: [
+          { key: 'text', label: 'Button Text', type: 'text', val: 'BUY CALL' },
+          { key: 'bg', label: 'Background Color', type: 'color', val: '#14382c' },
+          { key: 'color', label: 'Text Color', type: 'color', val: '#26d9a6' },
+          { key: 'radius', label: 'Border Radius (px)', type: 'number', val: 6 },
+          { key: 'fontSize', label: 'Font Size (px)', type: 'number', val: 14 }
+        ],
+        bridge: {
+          flow: ['app.py (signal)', 'JSON (/api/reco)', 'terminal.html (#btVerdictBadge)', 'Screen UI'],
+          desc: 'When app.py detects an upward trend (RSI > 48), it sends "BUY CALL". JavaScript in terminal.html injects this text into #btVerdictBadge and paints it green.'
+        },
+        render: (params) => {
+          return `<button style="background:${params.bg};color:${params.color};border:1px solid ${params.color};padding:8px 18px;border-radius:${params.radius}px;font-size:${params.fontSize}px;font-weight:700;letter-spacing:0.5px;cursor:pointer;box-shadow:0 0 16px ${params.color}40;transition:all 0.2s;" onclick="alert('Simulated Order Placed: ' + this.innerText)">${params.text}</button>`;
+        }
+      },
+
+      preset_target_sl: {
+        id: 'preset_target_sl',
+        title: 'Lesson 2: Target & Stop-Loss Calculation Cards',
+        file: 'app.py & terminal.html',
+        line_range: 'app.py: 11998-12000 | terminal.html: 12187-12206',
+        layman: "A trade without a target and stop-loss is like driving without brakes. If Entry is ₹250, Target is ₹271 (take profit), and Stop-Loss is ₹235 (safety stop).",
+        source_badge: 'app.py [11998] & terminal.html [12187]',
+        code: `# app.py (Lines 11998-12000)\nentry = 250.0\natr = 14.5\ntarget_mult = 1.5\nsl_mult = 1.0\n\ntarget = round(entry + (atr * target_mult), 2)    # ₹271.75\nstop_loss = round(entry - (atr * sl_mult), 2)    # ₹235.50`,
+        controls: [
+          { key: 'entry', label: 'Entry Price (₹)', type: 'number', val: 250.0 },
+          { key: 'atr', label: 'Volatility (ATR ₹)', type: 'number', val: 14.5 },
+          { key: 'tgt_m', label: 'Target Multiplier', type: 'number', val: 1.5 },
+          { key: 'sl_m', label: 'Stop-Loss Multiplier', type: 'number', val: 1.0 }
+        ],
+        bridge: {
+          flow: ['app.py: entry + atr*mult', 'JSON: {entry, target, sl}', 'terminal.html: #btOptTarget', '3-Column Display'],
+          desc: 'The backend computes math based on volatility (ATR). The browser receives the numbers and injects them into the three cards: Entry, Stop Loss, and Target.'
+        },
+        render: (params) => {
+          const e = Number(params.entry) || 250;
+          const a = Number(params.atr) || 14;
+          const tm = Number(params.tgt_m) || 1.5;
+          const sm = Number(params.sl_m) || 1.0;
+          const tgt = (e + (a * tm)).toFixed(2);
+          const sl = (e - (a * sm)).toFixed(2);
+          const rr = ((e + (a * tm) - e) / Math.max(0.1, (e - (e - (a * sm))))).toFixed(2);
+
+          return `
+            <div style="width:100%;max-width:380px;background:#0d1522;padding:16px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);">
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:12px;">
+                <span style="font-weight:700;color:#00e5ff;">NIFTY 24800 CE</span>
+                <span style="color:#f5a623;font-weight:700;">R:R 1:${rr}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;">
+                <div style="background:#141f33;padding:8px;border-radius:6px;text-align:center;">
+                  <div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;">Entry</div>
+                  <div style="font-family:monospace;font-size:15px;font-weight:700;color:#f0f4fc;">₹${e.toFixed(2)}</div>
+                </div>
+                <div style="background:#141f33;padding:8px;border-radius:6px;text-align:center;">
+                  <div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;">Stop Loss</div>
+                  <div style="font-family:monospace;font-size:15px;font-weight:700;color:#ff3b30;">₹${sl}</div>
+                </div>
+                <div style="background:#141f33;padding:8px;border-radius:6px;text-align:center;">
+                  <div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;">Target</div>
+                  <div style="font-family:monospace;font-size:15px;font-weight:700;color:#00e676;">₹${tgt}</div>
+                </div>
+              </div>
+            </div>`;
+        }
+      },
+
+      preset_greeks: {
+        id: 'preset_greeks',
+        title: 'Lesson 3: Option Greeks Stat Cards (Delta & Theta)',
+        file: 'app.py & terminal.html',
+        line_range: 'app.py: 2941-2990 | terminal.html: 20140-20165',
+        layman: "Delta is your speed multiplier: Delta 0.54 means if NIFTY moves ₹100, your option moves ₹54. Theta is daily rent: your option loses ₹8.45 every day just from the clock ticking.",
+        source_badge: 'terminal.html [Line 20145]',
+        code: `<!-- terminal.html (Line 20145) -->\n<div class="stat-card greek-clickable" style="background:#131a24;border:1px solid rgba(255,255,255,0.1);padding:12px;border-radius:8px;">\n  <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;">\n    <span>Call Delta</span>\n    <span style="color:#f5a623;font-size:10px;">ⓘ Learn</span>\n  </div>\n  <div style="font-size:18px;font-weight:700;color:#f0f4fc;margin-top:4px;">+0.54</div>\n</div>`,
+        controls: [
+          { key: 'delta', label: 'Call Delta (+0.0 to +1.0)', type: 'number', val: 0.54 },
+          { key: 'theta', label: 'Theta Decay (₹/day)', type: 'number', val: -8.45 },
+          { key: 'cardBg', label: 'Card Background', type: 'color', val: '#131a24' }
+        ],
+        bridge: {
+          flow: ['app.py: bs_greeks()', 'JSON: {delta, theta, gamma}', 'terminal.html: renderGreeks()', 'Stat Cards with "ⓘ Learn"'],
+          desc: 'Black-Scholes calculates the theoretical sensitivities in Python. The browser renders them into clickable stat cards with an educational "ⓘ Learn" tag.'
+        },
+        render: (params) => {
+          return `
+            <div style="display:flex;gap:12px;width:100%;max-width:360px;">
+              <div style="flex:1;background:${params.cardBg};border:1px solid rgba(255,255,255,0.1);padding:12px;border-radius:8px;cursor:pointer;" onclick="openExplainTerm('Delta')">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;">
+                  <span>Call Delta</span>
+                  <span style="color:#f5a623;font-size:10px;">ⓘ Learn</span>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#00e5ff;margin-top:4px;">+${Number(params.delta).toFixed(2)}</div>
+              </div>
+              <div style="flex:1;background:${params.cardBg};border:1px solid rgba(255,255,255,0.1);padding:12px;border-radius:8px;cursor:pointer;" onclick="openExplainTerm('Theta')">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;">
+                  <span>Call Theta</span>
+                  <span style="color:#f5a623;font-size:10px;">ⓘ Learn</span>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#ff3b30;margin-top:4px;">${Number(params.theta).toFixed(2)}</div>
+              </div>
+            </div>`;
+        }
+      },
+
+      preset_watchlist_row: {
+        id: 'preset_watchlist_row',
+        title: 'Lesson 4: Watchlist Active Item Card',
+        file: 'terminal.html',
+        line_range: 'Lines 1480-1550 & 21000-21150',
+        layman: "Your watchlist item is a live identity badge for each stock. When price goes up, it flashes green; when price drops, it flashes red.",
+        source_badge: 'terminal.html [Line 1492]',
+        code: `<!-- terminal.html (Line 1492) -->\n<div class="wl-item active" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#141f33;border-left:3px solid #00e5ff;border-radius:6px;">\n  <div>\n    <div style="font-weight:700;font-size:14px;color:#f0f4fc;">BANKNIFTY</div>\n    <div style="font-size:10px;color:#94a3b8;">NSE INDEX</div>\n  </div>\n  <div style="text-align:right;">\n    <div style="font-family:monospace;font-weight:700;font-size:14px;color:#f0f4fc;">₹53,420.50</div>\n    <span style="font-size:11px;font-weight:700;color:#00e676;">+1.24%</span>\n  </div>\n</div>`,
+        controls: [
+          { key: 'sym', label: 'Symbol Name', type: 'text', val: 'BANKNIFTY' },
+          { key: 'ltp', label: 'Price (₹)', type: 'number', val: 53420.50 },
+          { key: 'pct', label: '% Change', type: 'number', val: 1.24 },
+          { key: 'isUp', label: 'Bullish (Green)?', type: 'boolean', val: true }
+        ],
+        bridge: {
+          flow: ['Upstox / YFinance quote', 'GET /api/quote', 'terminal.html: renderWatchlist()', 'Sidebar Row'],
+          desc: 'Quotes arrive via polling or WebSocket. The JavaScript formats the LTP in Indian Rupee comma notation and attaches the green or red change pill.'
+        },
+        render: (params) => {
+          const isUp = params.isUp !== false && Number(params.pct) >= 0;
+          const col = isUp ? '#00e676' : '#ff3b30';
+          const sign = isUp ? '+' : '';
+          return `
+            <div style="width:100%;max-width:320px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#141f33;border-left:3px solid #00e5ff;border-radius:6px;border:1px solid rgba(255,255,255,0.06);cursor:pointer;">
+              <div>
+                <div style="font-weight:700;font-size:14px;color:#f0f4fc;">${params.sym}</div>
+                <div style="font-size:10px;color:#94a3b8;">NSE INDEX</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-family:monospace;font-weight:700;font-size:14px;color:#f0f4fc;">₹${Number(params.ltp).toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
+                <span style="font-size:11px;font-weight:700;color:${col};background:${col}1a;padding:2px 6px;border-radius:4px;">${sign}${params.pct}%</span>
+              </div>
+            </div>`;
+        }
+      },
+
+      preset_ticker_marquee: {
+        id: 'preset_ticker_marquee',
+        title: 'Lesson 5: Rolling Ticker Marquee',
+        file: 'terminal.html',
+        line_range: 'Lines 1251-1350 & CSS Lines 420-470',
+        layman: "Like a sports ticker tape showing live scores across different games, this ticker loops smoothly across your screen using CSS keyframe animations.",
+        source_badge: 'terminal.html [CSS Line 425]',
+        code: `/* terminal.html (Line 425) */\n@keyframes tickerTrack {\n  0% { transform: translate3d(0, 0, 0); }\n  100% { transform: translate3d(-50%, 0, 0); }\n}\n.ticker-track {\n  display: flex;\n  gap: 20px;\n  animation: tickerTrack 15s linear infinite;\n}`,
+        controls: [
+          { key: 'speed', label: 'Scroll Speed (sec)', type: 'number', val: 12 },
+          { key: 'gap', label: 'Gap Between Tickers (px)', type: 'number', val: 24 }
+        ],
+        bridge: {
+          flow: ['Global quotes list', 'terminal.html: updateTicker()', 'CSS keyframe loop', 'Top Marquee Rail'],
+          desc: 'Updates every 2 seconds. The CSS keyframes translate the track continuously across the screen using GPU acceleration.'
+        },
+        render: (params) => {
+          return `
+            <div style="width:100%;overflow:hidden;background:#090e1a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 0;">
+              <div style="display:flex;gap:${params.gap}px;white-space:nowrap;animation:tickerAnim ${params.speed}s linear infinite;width:max-content;">
+                <span style="font-size:12px;font-weight:700;color:#f0f4fc;">NIFTY <b style="color:#00e676;">24,850 (+0.4%)</b></span>
+                <span style="font-size:12px;font-weight:700;color:#f0f4fc;">BANKNIFTY <b style="color:#00e676;">53,420 (+1.2%)</b></span>
+                <span style="font-size:12px;font-weight:700;color:#f0f4fc;">CRUDEOIL <b style="color:#ff3b30;">6,180 (-0.8%)</b></span>
+                <span style="font-size:12px;font-weight:700;color:#f0f4fc;">RELIANCE <b style="color:#00e676;">1,310 (+0.6%)</b></span>
+                <span style="font-size:12px;font-weight:700;color:#f0f4fc;">NIFTY <b style="color:#00e676;">24,850 (+0.4%)</b></span>
+                <span style="font-size:12px;font-weight:700;color:#f0f4fc;">BANKNIFTY <b style="color:#00e676;">53,420 (+1.2%)</b></span>
+              </div>
+              <style>
+                @keyframes tickerAnim { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+              </style>
+            </div>`;
+        }
+      },
+
+      preset_technical_meter: {
+        id: 'preset_technical_meter',
+        title: 'Lesson 6: Technical Confluence Meter (RSI & EMA)',
+        file: 'app.py & terminal.html',
+        line_range: 'app.py: 11801-11825 | terminal.html: 12215-12235',
+        layman: "Think of RSI as a thermometer: Below 30 is freezing (oversold, ready to bounce). Above 70 is boiling (overbought, ready to cool down). Around 50 is comfortably warm.",
+        source_badge: 'app.py [Line 11811]',
+        code: `# app.py (Lines 11811-11816)\nif trend == "BUY" or (rsi >= 48):\n    signal = "BUY"\n    confidence = round(min(94.0, 65.0 + max(0, rsi - 48) * 1.2), 1)\nelse:\n    signal = "SELL"\n    confidence = round(min(92.0, 62.0 + max(0, 52 - rsi) * 1.2), 1)`,
+        controls: [
+          { key: 'rsi', label: 'RSI Value (0 - 100)', type: 'number', val: 58.4 },
+          { key: 'ema', label: '20 EMA (₹)', type: 'number', val: 24850.0 },
+          { key: 'ltp', label: 'Current Price (₹)', type: 'number', val: 24920.0 }
+        ],
+        bridge: {
+          flow: ['app.py: technical_analysis()', 'overall_recommendation()', 'terminal.html: #btEma20, #btRsi', 'Technical Meter'],
+          desc: 'RSI and moving averages are computed in Python from historical candle arrays. The browser formats them into the technical confluence scorecard.'
+        },
+        render: (params) => {
+          const rsi = Number(params.rsi) || 50;
+          const status = rsi > 60 ? 'Bullish Momentum' : rsi < 40 ? 'Bearish Momentum' : 'Neutral / Range';
+          const statusCol = rsi > 60 ? '#00e676' : rsi < 40 ? '#ff3b30' : '#f5a623';
+          return `
+            <div style="width:100%;max-width:360px;background:#0d1522;padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:12px;">
+                <span style="color:#94a3b8;font-weight:700;">RSI CONFLUENCE</span>
+                <span style="color:${statusCol};font-weight:700;">${status}</span>
+              </div>
+              <div style="width:100%;height:8px;background:#1e293b;border-radius:4px;overflow:hidden;margin-bottom:12px;">
+                <div style="width:${rsi}%;height:100%;background:${statusCol};border-radius:4px;transition:width 0.3s;"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">
+                <div style="background:#141f33;padding:8px;border-radius:6px;text-align:center;">
+                  <div style="font-size:10px;color:#94a3b8;">RSI (14)</div>
+                  <div style="font-size:15px;font-weight:700;color:#f0f4fc;">${rsi.toFixed(1)}</div>
+                </div>
+                <div style="background:#141f33;padding:8px;border-radius:6px;text-align:center;">
+                  <div style="font-size:10px;color:#94a3b8;">20 EMA</div>
+                  <div style="font-size:15px;font-weight:700;color:#00e5ff;">₹${params.ema}</div>
+                </div>
+              </div>
+            </div>`;
+        }
+      }
+    };
+
+    /* =========================================================================
+       INITIALIZATION
+       ========================================================================= */
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Load preset 1 initially
+      onPresetChange('preset_buy_button');
+
+      // Load Code Directory Index
+      await loadDirectoryData();
+
+      // Setup right-click listener
+      setupRightClickListener();
+
+      // Render Glossary
+      renderGlossaryCards();
+    });
+
+    /* =========================================================================
+       PLAYGROUND LOGIC
+       ========================================================================= */
+    function onPresetChange(presetKey) {
+      currentPreset = PRESETS[presetKey];
+      if (!currentPreset) return;
+
+      document.getElementById('activeLessonBadge').textContent = currentPreset.title;
+      document.getElementById('sourceRefBadge').textContent = currentPreset.source_badge;
+      document.getElementById('laymanText').textContent = currentPreset.layman;
+      document.getElementById('playgroundCodeText').value = currentPreset.code;
+
+      // Render controls
+      const ctrlGrid = document.getElementById('quickControlsGrid');
+      ctrlGrid.innerHTML = '';
+      currentPreset.controls.forEach(ctrl => {
+        const item = document.createElement('div');
+        item.className = 'control-item';
+        item.innerHTML = `
+          <label class="control-label">${ctrl.label}</label>
+          <input type="${ctrl.type === 'color' ? 'color' : ctrl.type === 'number' ? 'number' : ctrl.type === 'boolean' ? 'checkbox' : 'text'}" 
+                 class="control-input" 
+                 id="ctrl_${ctrl.key}" 
+                 value="${ctrl.val}" 
+                 ${ctrl.type === 'boolean' && ctrl.val ? 'checked' : ''}
+                 onchange="onControlParamChanged('${ctrl.key}', this.value, this.checked, '${ctrl.type}')"
+                 oninput="onControlParamChanged('${ctrl.key}', this.value, this.checked, '${ctrl.type}')">
+        `;
+        ctrlGrid.appendChild(item);
+      });
+
+      // Update Bridge description
+      if (currentPreset.bridge) {
+        document.getElementById('bridgeFlow').innerHTML = currentPreset.bridge.flow.map(f => `<span class="flow-node">${f}</span>`).join('<span class="flow-arrow">➔</span>');
+        document.getElementById('bridgeDesc').innerHTML = currentPreset.bridge.desc;
+      }
+
+      // Render Live UI
+      applyPlaygroundControls();
+    }
+
+    function onControlParamChanged(key, val, isChecked, type) {
+      if (!currentPreset) return;
+      const ctrl = currentPreset.controls.find(c => c.key === key);
+      if (ctrl) {
+        ctrl.val = type === 'boolean' ? isChecked : val;
+      }
+      applyPlaygroundControls();
+    }
+
+    function applyPlaygroundControls() {
+      if (!currentPreset) return;
+      const params = {};
+      currentPreset.controls.forEach(c => params[c.key] = c.val);
+      const renderedHtml = currentPreset.render(params);
+      document.getElementById('componentMountPoint').innerHTML = renderedHtml;
+      showToast('Live preview updated!');
+    }
+
+    function applyPlaygroundCode() {
+      // If user typed custom HTML/CSS into the textarea, mount it directly
+      const customCode = document.getElementById('playgroundCodeText').value;
+      if (customCode.includes('<') && customCode.includes('>')) {
+        document.getElementById('componentMountPoint').innerHTML = customCode;
+        showToast('Rendered custom code snippet!');
+      } else {
+        applyPlaygroundControls();
+      }
+    }
+
+    function resetActivePreset() {
+      const pKey = document.getElementById('presetSelectDropdown').value;
+      onPresetChange(pKey);
+      showToast('Reset to original code and values!');
+    }
+
+    /* =========================================================================
+       DIRECTORY TAB & CODE SLICER
+       ========================================================================= */
+    async function loadDirectoryData() {
+      try {
+        const res = await fetch('/api/learn-ai/directory');
+        if (res.ok) {
+          codeIndexData = await res.json();
+          renderTocList();
+          loadCodeSlice(currentDirectoryFile, currentSliceStart, currentSliceEnd);
+        }
+      } catch (e) {
+        console.warn('Using local fallback index for directory');
+      }
+    }
+
+    function switchDirectoryFile(filename) {
+      currentDirectoryFile = filename;
+      document.getElementById('btnBrowseTerminal').className = 'btn btn-ghost ' + (filename === 'terminal.html' ? 'active' : '');
+      document.getElementById('btnBrowseApp').className = 'btn btn-ghost ' + (filename === 'app.py' ? 'active' : '');
+      currentSliceStart = 1;
+      currentSliceEnd = 50;
+      renderTocList();
+      loadCodeSlice(currentDirectoryFile, currentSliceStart, currentSliceEnd);
+    }
+
+    function renderTocList() {
+      const toc = document.getElementById('tocContainer');
+      if (!codeIndexData) return;
+
+      const fileData = currentDirectoryFile === 'terminal.html' ? codeIndexData.terminal_html : codeIndexData.app_py;
+      if (!fileData || !fileData.modules) return;
+
+      toc.innerHTML = '';
+      fileData.modules.forEach((mod, idx) => {
+        const item = document.createElement('div');
+        item.className = 'toc-item ' + (idx === 0 ? 'active' : '');
+        item.onclick = () => {
+          document.querySelectorAll('.toc-item').forEach(x => x.classList.remove('active'));
+          item.classList.add('active');
+          document.getElementById('activeModuleHeader').textContent = mod.title;
+          document.getElementById('activeModuleSub').textContent = `Lines ${mod.start_line} - ${mod.end_line} • ${mod.layman}`;
+          loadCodeSlice(currentDirectoryFile, mod.start_line, mod.start_line + 45);
+        };
+        item.innerHTML = `
+          <div class="toc-item-title">${mod.title}</div>
+          <div class="toc-item-meta">
+            <span>Lines ${mod.start_line} - ${mod.end_line}</span>
+            <span style="color:var(--cyan);font-size:10px;">${mod.id}</span>
+          </div>
+        `;
+        toc.appendChild(item);
+      });
+    }
+
+    async function loadCodeSlice(file, start, end) {
+      currentSliceStart = start;
+      currentSliceEnd = end;
+      const container = document.getElementById('codeLinesContainer');
+      container.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-dim);">Loading lines ${start} to ${end} of ${file}...</div>`;
+
+      try {
+        const res = await fetch(`/api/learn-ai/code-slice?file=${encodeURIComponent(file)}&start=${start}&end=${end}`);
+        const data = await res.json();
+        if (data.ok && data.lines) {
+          container.innerHTML = data.lines.map(l => `
+            <div class="code-line-row">
+              <span class="line-number">${l.line_num}</span>
+              <span class="line-content">${escapeHtml(l.content)}</span>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = `<div style="padding:24px;color:var(--red);">Failed loading slice: ${data.error || 'Unknown error'}</div>`;
+        }
+      } catch (err) {
+        container.innerHTML = `<div style="padding:24px;color:var(--gold);">Preview unavailable offline. Line range: ${start} - ${end}</div>`;
+      }
+    }
+
+    function loadNextSlice() {
+      loadCodeSlice(currentDirectoryFile, currentSliceEnd + 1, currentSliceEnd + 50);
+    }
+
+    function loadPrevSlice() {
+      const newStart = Math.max(1, currentSliceStart - 50);
+      loadCodeSlice(currentDirectoryFile, newStart, newStart + 49);
+    }
+
+    function filterTocItems(query) {
+      const q = (query || '').toLowerCase().trim();
+      document.querySelectorAll('.toc-item').forEach(el => {
+        const txt = el.textContent.toLowerCase();
+        el.style.display = txt.includes(q) ? 'block' : 'none';
+      });
+    }
+
+    /* =========================================================================
+       TAB SWITCHING
+       ========================================================================= */
+    function switchMainTab(tabId) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+      if (tabId === 'playground') {
+        document.getElementById('tabBtnPlayground').classList.add('active');
+        document.getElementById('viewPlayground').classList.add('active');
+      } else if (tabId === 'directory') {
+        document.getElementById('tabBtnDirectory').classList.add('active');
+        document.getElementById('viewDirectory').classList.add('active');
+      } else if (tabId === 'glossary') {
+        document.getElementById('tabBtnGlossary').classList.add('active');
+        document.getElementById('viewGlossary').classList.add('active');
+      }
+    }
+
+    /* =========================================================================
+       RIGHT-CLICK CONTEXT MENU & GEMINI AI MENTOR
+       ========================================================================= */
+    function setupRightClickListener() {
+      const menu = document.getElementById('customContextMenu');
+
+      document.addEventListener('contextmenu', (e) => {
+        // Get selected text or target word
+        let text = window.getSelection().toString().trim();
+        if (!text && e.target) {
+          text = (e.target.innerText || e.target.textContent || '').trim().split(/\s+/)[0] || '';
+        }
+
+        if (text && text.length < 50) {
+          e.preventDefault();
+          selectedWord = text;
+          selectedContext = e.target ? (e.target.innerText || '').substring(0, 150) : '';
+
+          menu.style.display = 'block';
+          menu.style.left = `${Math.min(window.innerWidth - 250, e.clientX)}px`;
+          menu.style.top = `${Math.min(window.innerHeight - 120, e.clientY)}px`;
+        } else {
+          menu.style.display = 'none';
+        }
+      });
+
+      document.addEventListener('click', () => {
+        menu.style.display = 'none';
+      });
+    }
+
+    async function triggerRightClickExplain() {
+      document.getElementById('customContextMenu').style.display = 'none';
+      openExplainTerm(selectedWord, selectedContext);
+    }
+
+    function jumpToPlaygroundWithSelected() {
+      document.getElementById('customContextMenu').style.display = 'none';
+      switchMainTab('playground');
+      showToast(`Selected word: "${selectedWord}" ready in playground.`);
+    }
+
+    async function openExplainTerm(term, context = '') {
+      const modal = document.getElementById('explainModalBackdrop');
+      const body = document.getElementById('explainModalBody');
+      modal.classList.add('open');
+
+      body.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <div style="font-size:24px;margin-bottom:10px;">🧠</div>
+          <div style="font-weight:700;font-size:16px;color:var(--cyan);margin-bottom:6px;">Consulting Gemini AI Mentor for "${escapeHtml(term)}"</div>
+          <div style="font-size:12px;color:var(--text-dim);">Analyzing trading context, generating plain-English summary & relatable real-world example...</div>
+        </div>
+      `;
+
+      try {
+        const res = await fetch('/api/learn-ai/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ term, context, code: '' })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          body.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <h2 style="font-size:20px;font-weight:700;color:var(--text);">${escapeHtml(data.term || term)}</h2>
+              <span class="mentor-pill">⚡ ${escapeHtml(data.source || 'gemini-3.8-flash')}</span>
+            </div>
+
+            <div class="explain-section">
+              <span class="explain-label">🧒 Explained Like I'm 10 Years Old:</span>
+              <p class="explain-text">${escapeHtml(data.plain_summary || 'Key market indicator or code element.')}</p>
+            </div>
+
+            <div class="explain-analogy-box">
+              <b style="color:#f5a623;">🚗 Real-Life Relatable Analogy:</b>
+              <div style="margin-top:4px;">${escapeHtml(data.real_life_analogy || 'Like a gauge on a car dashboard.')}</div>
+            </div>
+
+            <div class="explain-section">
+              <span class="explain-label">📍 Where It Lives in CA Trader:</span>
+              <p class="explain-text" style="font-family:var(--font-mono);font-size:12px;">${escapeHtml(data.in_ca_trader || 'Used across app.py and terminal.html.')}</p>
+            </div>
+
+            <div class="explain-section">
+              <span class="explain-label">⚠️ What Happens If You Change It:</span>
+              <p class="explain-text">${escapeHtml(data.what_if_changed || 'Directly adjusts calculation behavior or screen display.')}</p>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+              <button class="btn btn-ghost" onclick="closeExplainModal()">Close</button>
+              <button class="btn btn-primary" onclick="closeExplainModal(); switchMainTab('playground');">🎮 Try In Sandbox</button>
+            </div>
+          `;
+        } else {
+          body.innerHTML = `<div style="padding:20px;color:var(--red);">Error: ${data.error || 'Failed to explain term'}</div>`;
+        }
+      } catch (err) {
+        body.innerHTML = `<div style="padding:20px;color:var(--gold);">Network error contacting Gemini. Using offline dictionary.</div>`;
+      }
+    }
+
+    function closeExplainModal() {
+      document.getElementById('explainModalBackdrop').classList.remove('open');
+    }
+
+    function askCustomTerm() {
+      const term = prompt('Enter any trading, technical, or code word to explain (e.g. Gamma, ATR, WebSocket, Stop Loss):');
+      if (term && term.trim()) {
+        openExplainTerm(term.trim());
+      }
+    }
+
+    function askGeminiForCurrentSnippet() {
+      const code = document.getElementById('playgroundCodeText').value;
+      const lessonTitle = currentPreset ? currentPreset.title : 'Current Code Block';
+      openExplainTerm(lessonTitle, 'Code snippet: ' + code.substring(0, 150));
+    }
+
+    function explainActiveModule() {
+      const title = document.getElementById('activeModuleHeader').textContent;
+      const sub = document.getElementById('activeModuleSub').textContent;
+      openExplainTerm(title, sub);
+    }
+
+    /* =========================================================================
+       GLOSSARY CARDS
+       ========================================================================= */
+    const GLOSSARY_ITEMS = [
+      {
+        term: 'Delta (Δ)',
+        category: 'Options Greek',
+        summary: "Measures how much an option's price moves when the underlying stock moves by ₹1.",
+        analogy: "Like a car's gas pedal: how fast the car accelerates when you tap the pedal."
+      },
+      {
+        term: 'Theta (Θ)',
+        category: 'Options Greek',
+        summary: "Time decay: the daily loss in an option's value just because time has passed.",
+        analogy: "Like an ice cream cone melting on a hot summer afternoon while you hold it."
+      },
+      {
+        term: 'Gamma (Γ)',
+        category: 'Options Greek',
+        summary: "Measures the acceleration of Delta: how fast Delta changes as the stock moves.",
+        analogy: "If Delta is your driving speed, Gamma is how fast your car accelerates from 0 to 100."
+      },
+      {
+        term: 'Vega (ν)',
+        category: 'Options Greek',
+        summary: "Measures sensitivity to changes in overall market fear and excitement (Implied Volatility).",
+        analogy: "Like umbrella prices during a rainstorm: when rain is falling, umbrellas cost twice as much."
+      },
+      {
+        term: 'RSI (Relative Strength Index)',
+        category: 'Technical Indicator',
+        summary: "A speed thermometer graded 0 to 100 telling you if an asset is overbought or oversold.",
+        analogy: "Like a marathon runner: above 70 they are exhausted; below 30 they are rested and ready to sprint."
+      },
+      {
+        term: 'ATR (Average True Range)',
+        category: 'Volatility',
+        summary: "The normal rupee swing of a stock over a 5-minute or daily candle.",
+        analogy: "Like the height of ocean waves: calm water (low ATR) vs storm waves (high ATR)."
+      },
+      {
+        term: 'Stop Loss (SL)',
+        category: 'Risk Management',
+        summary: "An automatic safety exit that caps your maximum loss if a trade goes wrong.",
+        analogy: "Like an emergency circuit breaker in your home electrical box preventing a fire."
+      },
+      {
+        term: 'Target (Take Profit)',
+        category: 'Risk Management',
+        summary: "The predetermined price where you exit and lock in your profits.",
+        analogy: "Like crossing the finish line in a race: you collect your medal and stop running."
+      },
+      {
+        term: 'WebSocket',
+        category: 'Technology',
+        summary: "A continuous live two-way connection between your browser and the server.",
+        analogy: "Like talking on a live phone call instead of sending letters in the mail."
+      },
+      {
+        term: 'FastAPI',
+        category: 'Backend Framework',
+        summary: "A modern, high-speed Python web framework that powers the CA Trader backend.",
+        analogy: "The high-speed kitchen engine that takes orders from the browser and serves data."
+      },
+      {
+        term: 'Black-Scholes Model',
+        category: 'Quantitative Math',
+        summary: "A Nobel-prize winning mathematical formula that calculates the fair price of stock options.",
+        analogy: "Like an actuary formula calculating fair car insurance premiums based on risk and time."
+      },
+      {
+        term: 'Open Interest (OI)',
+        category: 'Options Data',
+        summary: "The total number of open option contracts currently held by buyers and sellers.",
+        analogy: "Like counting total hotel rooms booked: high bookings mean heavy crowd commitment."
+      }
+    ];
+
+    function renderGlossaryCards() {
+      const grid = document.getElementById('glossaryGrid');
+      grid.innerHTML = GLOSSARY_ITEMS.map(item => `
+        <div class="glossary-card">
+          <div class="glossary-term">
+            <span>${escapeHtml(item.term)}</span>
+            <span class="glossary-badge">${escapeHtml(item.category)}</span>
+          </div>
+          <p class="glossary-summary">${escapeHtml(item.summary)}</p>
+          <div class="glossary-analogy">
+            <b>Analogy:</b> ${escapeHtml(item.analogy)}
+          </div>
+          <button class="btn btn-ghost" style="margin-top:auto;" onclick="openExplainTerm('${escapeHtml(item.term)}')">
+            🧠 Deep Dive with Gemini
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function filterGlossaryCards(query) {
+      const q = (query || '').toLowerCase().trim();
+      document.querySelectorAll('.glossary-card').forEach(c => {
+        const text = c.textContent.toLowerCase();
+        c.style.display = text.includes(q) ? 'flex' : 'none';
+      });
+    }
+
+    /* =========================================================================
+       UTILITIES
+       ========================================================================= */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastBox');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.style.display = 'flex';
+      setTimeout(() => { toast.style.display = 'none'; }, 2400);
+    }
+  </script>
+</body>
+</html>
