@@ -9197,45 +9197,9 @@
               <button type="button" class="btn ghost small"
                 onclick="loadDashboard(true); toast('Scanning all option chains for new setups...');"
                 style="padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">↻ Refresh</button>
-              <div style="position:relative;display:inline-block;">
-                <button type="button" class="btn ghost small" id="recoSettingsBtn" title="Recommendation Risk & Capital Settings"
-                  style="padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;"
-                  onclick="window.toggleRecoSettings(event)">⚙ Settings</button>
-                <div id="recoSettingsPopover"
-                  style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:280px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;z-index:99999;box-shadow:0 12px 32px rgba(0,0,0,0.7);">
-                  <div
-                    style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:10px;border-bottom:1px solid var(--border-soft);padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-                    <span style="display:inline-flex;align-items:center;gap:5px;"><span>⚙</span> Capital & Risk Settings</span>
-                    <span style="cursor:pointer;font-size:13px;color:var(--text-dim);" onclick="window.toggleRecoSettings(event)">✕</span>
-                  </div>
-                  <div style="margin-bottom:8px;">
-                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Capital Per Trade (₹)</label>
-                    <input id="recoCapital" type="number" placeholder="50000"
-                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
-                      oninput="localStorage.setItem('ca_capital',this.value)">
-                  </div>
-                  <div style="margin-bottom:8px;">
-                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Max Loss Per Trade (₹)</label>
-                    <input id="recoMaxLoss" type="number" placeholder="2000"
-                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
-                      oninput="localStorage.setItem('ca_max_loss',this.value);if(window.onRecoRiskChange)window.onRecoRiskChange();">
-                  </div>
-                  <div style="margin-bottom:8px;">
-                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Desired Profit Per Trade (₹)</label>
-                    <input id="recoMaxProfit" type="number" placeholder="5000"
-                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
-                      oninput="localStorage.setItem('ca_desired_profit',this.value);if(window.onRecoRiskChange)window.onRecoRiskChange();">
-                  </div>
-                  <div style="margin-bottom:12px;">
-                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Minimum Lot / Qty Per Trade</label>
-                    <input id="recoMinLots" type="number" placeholder="1" min="1"
-                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
-                      oninput="localStorage.setItem('ca_min_lots',this.value);if(window.onRecoRiskChange)window.onRecoRiskChange();">
-                  </div>
-                  <button type="button" class="btn gold small" style="width:100%;justify-content:center;height:28px;font-weight:700;"
-                    onclick="window.saveRecoSettings()">Save & Refresh</button>
-                </div>
-              </div>
+              <button type="button" class="btn ghost small" id="recoSettingsBtn" title="Recommendation Risk & Capital Settings"
+                style="padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;"
+                onclick="window.openRecoSettingsModal(event)">⚙ Settings</button>
             </div>
           </div>
 
@@ -29011,27 +28975,86 @@
       }
     })();
 
-    // Close recoSettingsPopover on outside click
-    document.addEventListener('click', (e) => {
-      const pop = document.getElementById('recoSettingsPopover');
-      if (pop && pop.style.display !== 'none') {
-        if (!e.target.closest('#recoSettingsBtn') && !e.target.closest('#recoSettingsPopover')) {
-          pop.style.display = 'none';
-        }
-      }
-    });
-    // Restore saved settings
+    // Restore saved settings on initial load
     (function restoreRecoSettings() {
-      const cap = localStorage.getItem('ca_capital');
-      const loss = localStorage.getItem('ca_max_loss');
-      const profit = localStorage.getItem('ca_desired_profit');
-      const lots = localStorage.getItem('ca_min_lots');
-      if (cap && document.getElementById('recoCapital')) document.getElementById('recoCapital').value = cap;
-      if (loss && document.getElementById('recoMaxLoss')) document.getElementById('recoMaxLoss').value = loss;
-      if (profit && document.getElementById('recoMaxProfit')) document.getElementById('recoMaxProfit').value = profit;
-      if (lots && document.getElementById('recoMinLots')) document.getElementById('recoMinLots').value = lots;
+      const cap = localStorage.getItem('ca_capital') || '50000';
+      const loss = localStorage.getItem('ca_max_loss') || '2000';
+      const profit = localStorage.getItem('ca_desired_profit') || '5000';
+      const lots = localStorage.getItem('ca_min_lots') || '1';
+      if (document.getElementById('recoCapital')) document.getElementById('recoCapital').value = cap;
+      if (document.getElementById('recoMaxLoss')) document.getElementById('recoMaxLoss').value = loss;
+      if (document.getElementById('recoMaxProfit')) document.getElementById('recoMaxProfit').value = profit;
+      if (document.getElementById('recoMinLots')) document.getElementById('recoMinLots').value = lots;
     })();
   </script>
+
+  <!-- Recommendation Risk & Capital Settings Modal (Mobile Responsive & Centered) -->
+  <div id="recoSettingsModal"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:100005;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;"
+    onclick="if(event.target===this)window.closeRecoSettingsModal()">
+    <div
+      style="background:var(--surface,#1a1d24);border:1px solid var(--border,#2e3542);border-radius:12px;width:100%;max-width:440px;box-shadow:0 24px 60px rgba(0,0,0,0.6);padding:20px;box-sizing:border-box;position:relative;">
+      
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-soft,rgba(255,255,255,0.08));padding-bottom:12px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:rgba(24,144,255,0.15);color:var(--primary,#1890ff);font-size:15px;font-weight:700;">⚙</span>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text,#fff);">Recommendation &amp; Risk Settings</div>
+            <div style="font-size:11px;color:var(--text-dim,#8890a0);">Tailors lot size &amp; affordable strikes to your capital</div>
+          </div>
+        </div>
+        <button type="button" class="btn ghost small" onclick="window.closeRecoSettingsModal()"
+          style="font-size:18px;line-height:1;border:none;background:transparent;color:var(--text-dim,#8890a0);padding:6px;cursor:pointer;min-width:32px;min-height:32px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+
+      <!-- Settings Fields -->
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--text-faint,#8890a0);text-transform:uppercase;margin-bottom:5px;">
+            Total Capital Allocated (₹)
+          </label>
+          <input type="number" id="recoCapital" min="5000" step="5000" placeholder="50000"
+            style="width:100%;box-sizing:border-box;background:var(--surface-2,#121418);color:var(--text,#fff);border:1px solid var(--border,#2e3542);border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600;font-family:var(--font-mono,monospace);outline:none;">
+          <div style="font-size:10px;color:var(--text-dim,#717d96);margin-top:3px;">Filters out option strikes requiring higher premium per lot</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--text-faint,#8890a0);text-transform:uppercase;margin-bottom:5px;">
+              Max Loss / Trade (₹)
+            </label>
+            <input type="number" id="recoMaxLoss" min="500" step="500" placeholder="2000"
+              style="width:100%;box-sizing:border-box;background:var(--surface-2,#121418);color:var(--text,#fff);border:1px solid var(--border,#2e3542);border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600;font-family:var(--font-mono,monospace);outline:none;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--text-faint,#8890a0);text-transform:uppercase;margin-bottom:5px;">
+              Desired Profit (₹)
+            </label>
+            <input type="number" id="recoMaxProfit" min="1000" step="500" placeholder="5000"
+              style="width:100%;box-sizing:border-box;background:var(--surface-2,#121418);color:var(--text,#fff);border:1px solid var(--border,#2e3542);border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600;font-family:var(--font-mono,monospace);outline:none;">
+          </div>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--text-faint,#8890a0);text-transform:uppercase;margin-bottom:5px;">
+            Default Minimum Lots Per Trade
+          </label>
+          <input type="number" id="recoMinLots" min="1" max="50" step="1" placeholder="1"
+            style="width:100%;box-sizing:border-box;background:var(--surface-2,#121418);color:var(--text,#fff);border:1px solid var(--border,#2e3542);border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600;font-family:var(--font-mono,monospace);outline:none;">
+          <div style="font-size:10px;color:var(--text-dim,#717d96);margin-top:3px;">Base sizing (multiplied by symbol lot size e.g. 75 for NIFTY, 100 for CRUDEOIL)</div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid var(--border-soft,rgba(255,255,255,0.08));">
+        <button type="button" class="btn ghost small" onclick="window.closeRecoSettingsModal()"
+          style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:6px;cursor:pointer;">Cancel</button>
+        <button type="button" class="btn primary small" onclick="window.saveRecoSettings()"
+          style="padding:9px 20px;font-size:13px;font-weight:700;border-radius:6px;background:var(--primary,#1890ff);color:#fff;border:none;cursor:pointer;">Save &amp; Apply</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Historical Recommendation Rationale Snapshot Modal (Item 8) -->
   <div id="historicalRationaleModal"
@@ -32229,23 +32252,42 @@
     window.__caReplayPositions = [];
     window.__caReplayClosedTrades = [];
 
-    window.toggleRecoSettings = function (e) {
-      if (e) e.stopPropagation();
-      const pop = document.getElementById('recoSettingsPopover');
-      if (!pop) return;
-      const isShown = pop.style.display !== 'none';
-      pop.style.display = isShown ? 'none' : 'block';
-      if (!isShown) {
-        const cap = document.getElementById('recoCapital');
-        const ml = document.getElementById('recoMaxLoss');
-        const mp = document.getElementById('recoMaxProfit');
-        const lots = document.getElementById('recoMinLots');
-        if (cap) cap.value = localStorage.getItem('ca_capital') || '50000';
-        if (ml) ml.value = localStorage.getItem('ca_max_loss') || '2000';
-        if (mp) mp.value = localStorage.getItem('ca_desired_profit') || '5000';
-        if (lots) lots.value = localStorage.getItem('ca_min_lots') || '1';
+    window.openRecoSettingsModal = function (e) {
+      if (e) {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      }
+      const cap = document.getElementById('recoCapital');
+      const ml = document.getElementById('recoMaxLoss');
+      const mp = document.getElementById('recoMaxProfit');
+      const lots = document.getElementById('recoMinLots');
+      if (cap) cap.value = localStorage.getItem('ca_capital') || '50000';
+      if (ml) ml.value = localStorage.getItem('ca_max_loss') || '2000';
+      if (mp) mp.value = localStorage.getItem('ca_desired_profit') || '5000';
+      if (lots) lots.value = localStorage.getItem('ca_min_lots') || '1';
+
+      const modal = document.getElementById('recoSettingsModal');
+      if (modal) {
+        modal.style.display = 'flex';
       }
     };
+
+    window.closeRecoSettingsModal = function () {
+      const modal = document.getElementById('recoSettingsModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    };
+
+    window.toggleRecoSettings = function (e) {
+      const modal = document.getElementById('recoSettingsModal');
+      if (modal && modal.style.display === 'flex') {
+        window.closeRecoSettingsModal();
+      } else {
+        window.openRecoSettingsModal(e);
+      }
+    };
+
     window.saveRecoSettings = function () {
       const cap = document.getElementById('recoCapital')?.value || '50000';
       const ml = document.getElementById('recoMaxLoss')?.value || '2000';
@@ -32255,11 +32297,15 @@
       localStorage.setItem('ca_max_loss', ml);
       localStorage.setItem('ca_desired_profit', mp);
       localStorage.setItem('ca_min_lots', lots);
-      const pop = document.getElementById('recoSettingsPopover');
-      if (pop) pop.style.display = 'none';
+      window.closeRecoSettingsModal();
       if (typeof window.onRecoRiskChange === 'function') window.onRecoRiskChange();
       if (typeof loadDashboard === 'function') void loadDashboard(true);
-      _toastMsg('⚙ Settings saved: Capital ₹' + cap + ', Max Loss ₹' + ml + ', Desired Profit ₹' + mp + ', Min Lots: ' + lots);
+      const msg = '⚙ Settings saved: Capital ₹' + cap + ', Max Loss ₹' + ml + ', Desired Profit ₹' + mp + ', Min Lots: ' + lots;
+      if (typeof _toastMsg === 'function') {
+        _toastMsg(msg);
+      } else if (typeof toast === 'function') {
+        toast(msg);
+      }
     };
 
     window.toggleReplayOrderSettings = function (e) {
