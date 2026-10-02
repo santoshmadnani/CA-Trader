@@ -7821,6 +7821,12 @@ except Exception as _st_err:
 try:
     from backend.routers.ai_connector import router as ai_connector_router
     app.include_router(ai_connector_router)
+try:
+    from backend.routers.backcovers_router import router as backcovers_router
+    app.include_router(backcovers_router)
+except Exception as _bc_err:
+    log.warning("Could not mount backcovers router: %s", _bc_err)
+
 except Exception as _ai_err:
     log.warning("Could not mount AI/MCP connector router: %s", _ai_err)
 
@@ -8028,6 +8034,8 @@ async def index(request: Request) -> Response:
         return await login_page(request)
     if (fitness_allowlisted(user) or is_admin(user)) and not selected_terminal(request):
         return RedirectResponse("/post-login", status_code=302)
+    if selected_terminal(request) == "backcovers":
+        return RedirectResponse("/backcovers", status_code=302)
     if selected_terminal(request) == "fitness":
         return await fitness_page(request)
     return await terminal_page(request)
@@ -8061,6 +8069,7 @@ async def post_login_page(request: Request) -> Response:
     user=current_user(request)
     if AUTH_ENABLED and not user: return RedirectResponse("/login", status_code=302)
     if not (fitness_allowlisted(user) or is_admin(user)): return RedirectResponse("/terminal", status_code=302)
+    if selected_terminal(request)=="backcovers": return RedirectResponse("/backcovers", status_code=302)
     if selected_terminal(request)=="fitness": return RedirectResponse("/fitness", status_code=302)
     if selected_terminal(request)=="trading": return RedirectResponse("/terminal", status_code=302)
     if not TERMINAL_SELECTOR_HTML_PATH.exists(): return RedirectResponse("/terminal", status_code=302)
@@ -8069,7 +8078,7 @@ async def post_login_page(request: Request) -> Response:
 @app.post("/api/auth/select-terminal")
 async def auth_select_terminal(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     body=await request.json(); terminal=str(body.get("terminal") or "").strip().lower()
-    if terminal not in {"trading","fitness"}: raise HTTPException(422,"Unsupported terminal")
+    if terminal not in {"trading","fitness","backcovers"}: raise HTTPException(422,"Unsupported terminal")
     if terminal=="fitness" and not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
     request.session["selected_terminal"]=terminal
     return {"ok":True,"terminal":terminal}

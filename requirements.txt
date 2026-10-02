@@ -13,3 +13,5 @@ upstox-python-sdk>=2.23,<3
 huggingface_hub
 openpyxl
 yfinance>=0.2.38
+Pillow>=10.0.0
+google-genai

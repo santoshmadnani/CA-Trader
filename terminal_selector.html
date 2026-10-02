@@ -140,6 +140,18 @@
         </div>
         <button class="btn primary" onclick="choose('fitness')">Open</button>
       </div>
+      <!-- 3. backcovers.ai -->
+      <div class="card">
+        <div style="display:flex;gap:14px;align-items:center">
+          <div class="icon">🎨</div>
+          <div>
+            <div class="title">backcovers.ai</div>
+            <div class="desc">AI-powered phone back cover designer & customizer studio.</div>
+          </div>
+        </div>
+        <button class="btn primary" onclick="choose('backcovers')">Open</button>
+      </div>
+
     </div>
 
     <div class="foot">
@@ -163,6 +175,8 @@
       }
       if (t === 'fitness') {
         location.href = '/fitness';
+      } else if (t === 'backcovers') {
+        location.href = '/backcovers';
       } else {
         location.href = '/terminal';
       }
