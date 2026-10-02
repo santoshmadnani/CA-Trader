@@ -13179,7 +13179,7 @@
           let opts = '<option value="">Current Expiry (' + expiries[0] + ')</option>';
           expiries.forEach((e, idx) => {
             const isSel = (curr === e) ? 'selected' : '';
-            opts += `<option value="${e}" ${isSel}>${e}${idx === 0 ? ' (Near)' : ''}</option>`;
+            opts += `<option value="${e}" ${isSel}>${e}${idx === 0 ? (root.includes('BANK') ? ' (Monthly)' : ' (Near)') : ''}</option>`;
           });
           sel.innerHTML = opts;
         }
@@ -30391,17 +30391,31 @@
         const base = baseDateStr ? new Date(baseDateStr) : new Date();
         const d = isNaN(base.getTime()) ? new Date() : base;
         const rU = String(root || '').toUpperCase();
-        let targetDay = 2; // Real NIFTY weekly options expire on Tuesday (e.g. 22-Sep, 29-Sep)
-        if (rU.includes('BANKNIFTY')) targetDay = 3; // Wednesday
-        else if (rU.includes('FINNIFTY')) targetDay = 2; // Tuesday
-        else if (rU.includes('MIDCPNIFTY')) targetDay = 1; // Monday
-        else if (!rU.includes('NIFTY')) targetDay = 4; // Stock options monthly Thursday
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+        // BankNifty has MONTHLY ONLY expiry (Last Tuesday of the month under SEBI Single Weekly Index Rule)
+        // Stocks also have monthly expiry (Last Thursday of the month)
+        if (rU.includes('BANKNIFTY') || rU.includes('FINNIFTY') || (!rU.includes('NIFTY') && !rU.includes('CRUDE'))) {
+          const targetWeekday = (rU.includes('BANKNIFTY') || rU.includes('FINNIFTY')) ? 2 : 4; // 2=Tuesday, 4=Thursday
+          let yr = d.getFullYear();
+          let mo = d.getMonth();
+          let lastDay = new Date(yr, mo + 1, 0);
+          let offset = (lastDay.getDay() - targetWeekday + 7) % 7;
+          let candExp = new Date(lastDay.getTime() - offset * 86400000);
+          if (d.getTime() > candExp.getTime() + 15.5 * 3600000) {
+            lastDay = new Date(yr, mo + 2, 0);
+            offset = (lastDay.getDay() - targetWeekday + 7) % 7;
+            candExp = new Date(lastDay.getTime() - offset * 86400000);
+          }
+          const dd = String(candExp.getDate()).padStart(2, '0');
+          return `${dd}-${months[candExp.getMonth()]}-${candExp.getFullYear()}`;
+        }
+
+        // NIFTY 50: Weekly Thursday (targetDay = 4 in JS: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu)
+        let targetDay = 4;
         let diff = (targetDay - d.getDay() + 7) % 7;
-        // If today is expiry day and past market close (15:30), roll to next week
         if (diff === 0 && (d.getHours() > 15 || (d.getHours() === 15 && d.getMinutes() >= 30))) diff = 7;
         const expD = new Date(d.getTime() + diff * 86400000);
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const dd = String(expD.getDate()).padStart(2, '0');
         return `${dd}-${months[expD.getMonth()]}-${expD.getFullYear()}`;
       }
@@ -30417,8 +30431,8 @@
       if (!cleanCeSym.toUpperCase().startsWith(root)) {
         cleanCeSym = `${root} ${cleanExpCe} ${strike} CE`;
       }
-      const defaultCeLtp = root.includes('BANK') ? 420.0 : (root.includes('CRUDE') ? 85.0 : 185.0);
-      const defaultPeLtp = root.includes('BANK') ? 380.0 : (root.includes('CRUDE') ? 78.0 : 165.0);
+      const defaultCeLtp = root.includes('BANK') ? 980.0 : (root.includes('CRUDE') ? 85.0 : 185.0);
+      const defaultPeLtp = root.includes('BANK') ? 810.0 : (root.includes('CRUDE') ? 78.0 : 165.0);
       const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, root) : null;
       const ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || defaultCeLtp);
       const activeTf = window.__caRecoTimeframe || '5m';
@@ -30623,7 +30637,7 @@
         const intrinsic = side === 'CE' ? Math.max(0, curLtp - newStrike) : Math.max(0, newStrike - curLtp);
         const distFromAtm = Math.abs(curLtp - newStrike);
         const decayFactor = Math.max(0.2, 1 - (distFromAtm / (step * 8)));
-        const baseAtmPrem = root.includes('BANK') ? 420.0 : (root.includes('CRUDE') ? 85.0 : 185.0);
+        const baseAtmPrem = root.includes('BANK') ? 980.0 : (root.includes('CRUDE') ? 85.0 : 185.0);
         const timeVal = Math.max(15, baseAtmPrem * decayFactor);
         newLtp = Math.round((intrinsic + timeVal) * 100) / 100;
       }

@@ -10013,7 +10013,7 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         "SILVER": {"spot": 88200.0, "step": 500.0, "lot": 30, "iv": 22.0, "default_exp": get_sebi_compliant_expiry("SILVER")},
         "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": get_sebi_compliant_expiry("COPPER")},
         "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": get_sebi_compliant_expiry("ZINC")},
-        "BANKNIFTY": {"spot": 55500.0, "step": 100.0, "lot": 15, "iv": 15.0, "default_exp": get_sebi_compliant_expiry("BANKNIFTY")},
+        "BANKNIFTY": {"spot": 54450.0, "step": 100.0, "lot": 15, "iv": 15.8, "default_exp": get_sebi_compliant_expiry("BANKNIFTY")},
         "NIFTY": {"spot": 24500.0, "step": 50.0, "lot": 75, "iv": 13.0, "default_exp": get_sebi_compliant_expiry("NIFTY")},
     }
     
@@ -10076,12 +10076,28 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
 
     atm_strike = round(spot / step) * step
     exp_str = expiry or default_exp
-    t_years = 12.0 / 365.0
+    days_to_exp = 25.0 if "BANK" in root else 12.0
+    try:
+        now_d = datetime.now(IST).date()
+        clean_exp = exp_str.replace("-", " ").strip()
+        parsed_d = None
+        for fmt in ("%d %b %Y", "%d %B %Y", "%Y %m %d", "%d %m %Y"):
+            try:
+                parsed_d = datetime.strptime(clean_exp, fmt).date()
+                break
+            except Exception:
+                pass
+        if parsed_d:
+            days_diff = (parsed_d - now_d).days
+            days_to_exp = max(0.5, float(days_diff))
+    except Exception:
+        pass
+    t_years = days_to_exp / 365.0
     sigma = iv / 100.0
 
     strikes_list = []
     is_mcx = root in {"CRUDEOIL","GOLD","SILVER","NATURALGAS","COPPER","ZINC","LEAD","ALUMINIUM"}
-    for i in range(-12, 13):
+    for i in range(-25, 26):
         stk = round(atm_strike + i * step, 2)
         call_p = bs_price(spot, stk, t_years=t_years, sigma=sigma, opt_type="CE")
         put_p = bs_price(spot, stk, t_years=t_years, sigma=sigma, opt_type="PE")
@@ -10255,14 +10271,18 @@ async def option_expiries(underlying: str, user: dict[str, Any] = Depends(requir
             valid_exp = set()
             for x in rows:
                 if isinstance(x, dict) and x.get("expiry"):
-                    exp_str = str(x["expiry"]).strip().upper()
-                    try:
-                        ed = datetime.strptime(exp_str, "%d %b %Y").date()
-                        if ed >= today_d:
-                            valid_exp.add(exp_str)
-                    except Exception:
-                        valid_exp.add(exp_str)
-            expiries = sorted(valid_exp)
+                    raw_exp = str(x["expiry"]).strip()
+                    parsed_d = None
+                    for fmt in ("%Y-%m-%d", "%d %b %Y", "%d %B %Y", "%d-%m-%Y"):
+                        try:
+                            parsed_d = datetime.strptime(raw_exp, fmt).date()
+                            break
+                        except Exception:
+                            pass
+                    if parsed_d and parsed_d >= today_d:
+                        valid_exp.add((parsed_d, parsed_d.strftime("%d %b %Y").upper()))
+            if valid_exp:
+                expiries = [item[1] for item in sorted(list(valid_exp), key=lambda it: it[0])]
         except Exception:
             expiries = []
 
