@@ -2395,40 +2395,19 @@ class UpstoxAdapter:
         responses/feeds can omit it or return 0 while a live move is present.
         Cache this recovery value so it never becomes a per-tick request.
         """
-        cache_key=f"prev-close:{key}"
-        cached=CACHE.get(cache_key)
-        if cached is not None:
-            return float(cached) if cached is not None else None
-            return float(cached) if isinstance(cached, (int, float)) and cached > 0 else None
         cache_key = f"prev-close:{key}"
         cached = CACHE.get(cache_key)
         if cached is not None and isinstance(cached, (int, float)) and cached > 0:
             return float(cached)
-        # F&O derivative contracts do not have daily historical candle series in Upstox
-        if "FO|" in key or "FO%7C" in key or "%7C" in key and ("_FO" in key):
-            CACHE.set(cache_key, 0.0, 1800.0)
-        if "FO|" in key or "FO%7C" in key or ("%7C" in key and "_FO" in key):
-            return None
+        # For F&O instruments (options/futures), attempt to fetch the last session close
+        # from the Upstox historical candle endpoint. If that fails, return None.
+        # NOTE: Do NOT fall back to Black-Scholes for the prev-close — use None so the
+        # quote() method can decide on the best synthetic fallback.
+        is_fo = "FO|" in key or "FO%7C" in key or ("%7C" in key and "_FO" in key)
         try:
-            now=datetime.now(IST)
-            end=(now.date()-timedelta(days=1))
-            start=end-timedelta(days=7)
-            path=f"/historical-candle/{quote(key,safe='')}/day/{end.isoformat()}/{start.isoformat()}"
-            payload=self._get(path,{},ttl=1800.0,cache_key=cache_key)
-            rows=(payload.get('data') or {}).get('candles') or []
-            vals=[]
-            for row in rows:
-                try:
-                    vals.append((str(row[0]),float(row[4])))
-                except Exception:
-                    continue
-            if vals:
-                close=sorted(vals)[-1][1]
-                CACHE.set(cache_key,close,300.0)
-                CACHE.set(cache_key,close,1800.0)
-                return close
             now = datetime.now(IST)
             to_d = now.date()
+            # Adjust for weekends so we always target a trading day
             if to_d.weekday() == 5:
                 to_d -= timedelta(days=1)
             elif to_d.weekday() == 6:
@@ -2437,14 +2416,18 @@ class UpstoxAdapter:
             path = f"/historical-candle/{quote(key, safe='')}/day/{to_d.isoformat()}/{from_d.isoformat()}"
             payload = self._get(path, {}, ttl=1800.0, cache_key=cache_key)
             rows = (payload.get('data') or {}).get('candles') or []
-            if len(rows) >= 2:
-                prev_c = float(rows[1][4])
-                CACHE.set(cache_key, prev_c, 1800.0)
-                return prev_c
-            elif len(rows) == 1:
-                prev_c = float(rows[0][4])
-                CACHE.set(cache_key, prev_c, 1800.0)
-                return prev_c
+            vals = []
+            for row in rows:
+                try:
+                    vals.append((str(row[0]), float(row[4])))
+                except Exception:
+                    continue
+            if vals:
+                close = sorted(vals)[-1][1]
+                CACHE.set(cache_key, close, 1800.0)
+                return close
+            if is_fo:
+                CACHE.set(cache_key, 0.0, 1800.0)
             CACHE.set(cache_key, 0.0, 1800.0)
         except Exception as exc:
             CACHE.set(cache_key, 0.0, 1800.0)
@@ -3702,7 +3685,19 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
                             live_ltp = float(q["ltp"])
                     except Exception:
                         pass
-                
+
+                # If the instrument key is synthetic (not a real Upstox numeric token),
+                # resolve the real key from the trading symbol and try again
+                if live_ltp <= 0 and opt_sym:
+                    try:
+                        real_opt_key, _ = UPSTOX.resolve_instrument(opt_sym)
+                        q = UPSTOX.quote(real_opt_key)
+                        if q and q.get("ltp"):
+                            live_ltp = float(q["ltp"])
+                            opt_key = real_opt_key  # update to the real key
+                    except Exception:
+                        pass
+
                 if live_ltp <= 0:
                     live_ltp = bs_price(spot, float(best_row["strike"]), opt_type=bias_tag)
 
@@ -6465,11 +6460,26 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         disp_raw = re.sub(r'\s+FUT(?:\s+EXP)?\s+', ' ', disp_raw).strip()
         disp_raw = re.sub(r'(\d+)(CE|PE)$', r'\1 \2', disp_raw)
         c_disp = disp_raw if any(x in disp_raw.upper() for x in (" CE", " PE", "CE", "PE")) else c_sym
+        # Determine if this is a synthetic key (no numeric token) — synthetic keys fail Upstox API
+        _is_synthetic_key = c_key and "|" in c_key and not any(ch.isdigit() for ch in c_key.split("|")[-1].replace("_", "")[:6])
+        opt_entry = 0.0
+        _resolved_key = None
         try:
             q = UPSTOX.quote(c_key or c_sym)
             opt_entry = float(q.get("ltp") or q.get("last_price") or 0.0)
         except Exception:
             opt_entry = 0.0
+        # If quote with synthetic/unresolved key returned 0, resolve the real Upstox instrument
+        if opt_entry <= 0 and c_sym:
+            try:
+                real_key, _ = UPSTOX.resolve_instrument(c_sym)
+                _resolved_key = real_key
+                q2 = UPSTOX.quote(real_key)
+                opt_entry = float(q2.get("ltp") or q2.get("last_price") or 0.0)
+                if opt_entry > 0:
+                    c_key = real_key  # use the real key going forward
+            except Exception:
+                pass
         if opt_entry <= 0:
             opt_entry = float(c_node.get("entry") or 0.0)
         opt_parsed = parse_option_contract(c_sym)

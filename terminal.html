@@ -15900,7 +15900,11 @@
           ['recoSymbol', 'recoLtp', 'recoChange', null],
           ['newsSymbol', 'newsLtp', 'newsChange', null],
           ['fundSymbol', 'fundLtp', 'fundChange', null],
-          ['autoSymbolTitle', 'autoLtp', 'autoChange', null]
+          ['autoSymbolTitle', 'autoLtp', 'autoChange', null],
+          ['otherFactorsSymbol', 'otherFactorsLtp', 'otherFactorsChange', null],
+          ['moversSymbol', 'moversLtp', 'moversChange', null],
+          ['stickySymbolTitle', 'stickySymbolLtp', 'stickySymbolChange', null],
+          ['askAiSymbol', 'askAiLtp', 'askAiChange', null]
         ];
         panels.forEach(([tId, lId, cId, nId]) => {
           const t = document.getElementById(tId); if (t) t.textContent = sym;
@@ -15908,9 +15912,17 @@
           const elC = document.getElementById(cId); if (elC) { elC.textContent = chText; elC.className = chClass; }
           if (nId) { const elN = document.getElementById(nId); if (elN) elN.textContent = compName; }
         });
+        // Also sync all universal-sym-* spans across every panel
+        document.querySelectorAll('.universal-sym-title').forEach(el => { el.textContent = sym; });
+        document.querySelectorAll('.universal-sym-ltp').forEach(el => { el.textContent = ltpText; });
+        document.querySelectorAll('.universal-sym-change').forEach(el => { el.textContent = chText; el.className = `universal-sym-change chart-symbol-change ${ch > 0 ? 'up' : ch < 0 ? 'down' : ''}`; el.style.color = ch > 0 ? 'var(--buy)' : ch < 0 ? 'var(--sell)' : 'var(--text-dim)'; });
 
         const dsl = document.getElementById('dashboardSelectedLtp'); if (dsl) { dsl.textContent = ltpText; dsl.style.fontWeight = '700'; }
         const dsc = document.getElementById('dashboardSelectedChange'); if (dsc) { dsc.textContent = chText; dsc.style.fontWeight = '700'; dsc.style.color = ch > 0 ? 'var(--buy)' : ch < 0 ? 'var(--sell)' : 'var(--text-dim)'; }
+        // Propagate to updateAllSectionHeaders so non-covered panels (sticky, other-factors, movers) stay in sync
+        if (typeof window.updateAllSectionHeaders === 'function') {
+          window.updateAllSectionHeaders(sym, l, ch, pct);
+        }
       }
       function updateOptionHeader(q) { updateHeader(q); }
 
@@ -30073,9 +30085,20 @@
 
     // Global Safe Scope Helpers
     const _getSym = () => (typeof window.selectedSymbol === 'function' && window.selectedSymbol()) ? window.selectedSymbol() : (window.CATraderSymbol || (typeof S !== 'undefined' && S ? S : 'NIFTY'));
-    const _getLtp = () => {
-      const p = Number((typeof state !== 'undefined' && state?.latestLive) || (typeof APP_CACHE !== 'undefined' && APP_CACHE?.quote?.ltp) || 0);
-      return p > 0 ? p : 23340;
+    const _getLtp = (targetSym) => {
+      const sym = targetSym || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+      const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
+      if (window.__CA_WL_QUOTES) {
+        const q = window.__CA_WL_QUOTES[root] || window.__CA_WL_QUOTES[sym] || window.__CA_WL_QUOTES[root.toUpperCase()];
+        if (q && q.ltp && Number(q.ltp) > 0) return Number(q.ltp);
+      }
+      if (typeof state !== 'undefined' && state?.latestLive && Number(state.latestLive) > 0) {
+        return Number(state.latestLive);
+      }
+      if (typeof APP_CACHE !== 'undefined' && APP_CACHE?.quote?.ltp && Number(APP_CACHE.quote.ltp) > 0) {
+        return Number(APP_CACHE.quote.ltp);
+      }
+      return 0;
     };
     const _getQuote = () => ((typeof APP_CACHE !== 'undefined' && APP_CACHE?.quote) ? APP_CACHE.quote : {});
     const _fmtNum = (v) => (typeof fmt === 'function' ? fmt(v) : (v != null && !isNaN(v) ? Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'));
@@ -30235,31 +30258,96 @@
       if (tag) tag.textContent = `TF: ${tf}`;
       if (typeof loadDashboard === 'function') loadDashboard(true);
     };
+    window.setRecoCardsLoadingState = function (baseSym) {
+      const sym = baseSym || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+      const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
+      const dash = '₹—';
+      if (document.getElementById('ceContractName')) document.getElementById('ceContractName').textContent = `${root} CALL (CE)`;
+      if (document.getElementById('ceExpiryDate')) document.getElementById('ceExpiryDate').textContent = 'Evaluating...';
+      if (document.getElementById('ceCmp')) document.getElementById('ceCmp').textContent = dash;
+      if (document.getElementById('ceEntry')) document.getElementById('ceEntry').textContent = dash;
+      if (document.getElementById('ceSl')) document.getElementById('ceSl').textContent = dash;
+      if (document.getElementById('ceTarget')) document.getElementById('ceTarget').textContent = dash;
+      if (document.getElementById('ceTgt1')) document.getElementById('ceTgt1').textContent = dash;
+      if (document.getElementById('ceTgt2')) document.getElementById('ceTgt2').textContent = dash;
+      if (document.getElementById('ceTgt3')) document.getElementById('ceTgt3').textContent = dash;
+      if (document.getElementById('ceTrailingSl')) document.getElementById('ceTrailingSl').textContent = '—';
+      if (document.getElementById('ceRr')) document.getElementById('ceRr').textContent = '—';
+      if (document.getElementById('ceConsensusBadge')) {
+        document.getElementById('ceConsensusBadge').textContent = 'Evaluating...';
+        document.getElementById('ceConsensusBadge').className = 'tag neutral';
+      }
+      if (document.getElementById('ceRationaleShort')) document.getElementById('ceRationaleShort').textContent = 'Scanning live order book & algorithmic confluence...';
+      if (document.getElementById('ceCautionBadge')) document.getElementById('ceCautionBadge').style.display = 'none';
+
+      if (document.getElementById('peContractName')) document.getElementById('peContractName').textContent = `${root} PUT (PE)`;
+      if (document.getElementById('peExpiryDate')) document.getElementById('peExpiryDate').textContent = 'Evaluating...';
+      if (document.getElementById('peCmp')) document.getElementById('peCmp').textContent = dash;
+      if (document.getElementById('peEntry')) document.getElementById('peEntry').textContent = dash;
+      if (document.getElementById('peSl')) document.getElementById('peSl').textContent = dash;
+      if (document.getElementById('peTarget')) document.getElementById('peTarget').textContent = dash;
+      if (document.getElementById('peTgt1')) document.getElementById('peTgt1').textContent = dash;
+      if (document.getElementById('peTgt2')) document.getElementById('peTgt2').textContent = dash;
+      if (document.getElementById('peTgt3')) document.getElementById('peTgt3').textContent = dash;
+      if (document.getElementById('peTrailingSl')) document.getElementById('peTrailingSl').textContent = '—';
+      if (document.getElementById('peRr')) document.getElementById('peRr').textContent = '—';
+      if (document.getElementById('peConsensusBadge')) {
+        document.getElementById('peConsensusBadge').textContent = 'Evaluating...';
+        document.getElementById('peConsensusBadge').className = 'tag neutral';
+      }
+      if (document.getElementById('peRationaleShort')) document.getElementById('peRationaleShort').textContent = 'Scanning live order book & algorithmic confluence...';
+      if (document.getElementById('peCautionBadge')) document.getElementById('peCautionBadge').style.display = 'none';
+
+      const undSymEl = document.getElementById('undSymbol') || document.getElementById('undSymbolName');
+      if (undSymEl) undSymEl.textContent = root;
+      if (document.getElementById('undCmp')) document.getElementById('undCmp').textContent = dash;
+      if (document.getElementById('undEntry')) document.getElementById('undEntry').textContent = dash;
+      if (document.getElementById('undSl')) document.getElementById('undSl').textContent = dash;
+      if (document.getElementById('undTarget')) document.getElementById('undTarget').textContent = dash;
+      if (document.getElementById('undTgt1')) document.getElementById('undTgt1').textContent = dash;
+      if (document.getElementById('undTgt2')) document.getElementById('undTgt2').textContent = dash;
+      if (document.getElementById('undTgt3')) document.getElementById('undTgt3').textContent = dash;
+      if (document.getElementById('undTrailingSl')) document.getElementById('undTrailingSl').textContent = '—';
+      if (document.getElementById('undRr')) document.getElementById('undRr').textContent = '—';
+      if (document.getElementById('undSignalBadge')) {
+        document.getElementById('undSignalBadge').textContent = 'SCANNING';
+        document.getElementById('undSignalBadge').className = 'tag neutral';
+      }
+      if (document.getElementById('undConsensusBadge')) {
+        document.getElementById('undConsensusBadge').textContent = 'Analyzing Multi-Factor Matrix...';
+        document.getElementById('undConsensusBadge').className = 'tag neutral';
+      }
+      if (document.getElementById('undRationaleShort')) {
+        document.getElementById('undRationaleShort').textContent = 'Evaluating dynamic confluence across 40 factors...';
+      }
+    };
+
     window.switchRecoTimeframe = function (mode, btn) {
       const map = { scalp: '5m', intraday: '15m', swing: '1D' };
       window.setRecoTimeframe(map[mode] || mode);
     };
 
     window.renderDualRecoCards = function (data) {
-      if (!data) data = {};
-      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'NIFTY';
+      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || (typeof _getSym === 'function' ? _getSym() : 'NIFTY');
       const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
+      const curLtpRaw = Number((data && (data.cmp || data.ltp)) || (typeof _getLtp === 'function' ? _getLtp(sym) : 0));
 
-      const curLtpRaw = Number(data.cmp || (typeof _getLtp === 'function' ? _getLtp(sym) : 0));
-      const fallbackLtp = root.includes('BANK') ? 55580 : (root.includes('CRUDE') ? 6200 : (root.includes('SENSEX') ? 81500 : 25200));
-      let curLtp = fallbackLtp;
-      if (curLtpRaw > 10) {
-        if (root.includes('BANK') && curLtpRaw >= 35000 && curLtpRaw <= 90000) curLtp = curLtpRaw;
-        else if (root.includes('CRUDE') && curLtpRaw >= 2000 && curLtpRaw <= 15000) curLtp = curLtpRaw;
-        else if (root.includes('SENSEX') && curLtpRaw >= 60000) curLtp = curLtpRaw;
-        else if ((root === 'NIFTY' || root.includes('NIFTY 50')) && curLtpRaw >= 15000 && curLtpRaw <= 35000) curLtp = curLtpRaw;
-        else if (!root.includes('BANK') && !root.includes('CRUDE') && !root.includes('SENSEX') && curLtpRaw > 10) curLtp = curLtpRaw;
+      if (!data || (!data.recommendation && !data.action && !data.signal && !data.cmp && !data.call_option && !data.put_option)) {
+        if (typeof window.setRecoCardsLoadingState === 'function') {
+          window.setRecoCardsLoadingState(root);
+        }
+        if (typeof window.updateAllSectionHeaders === 'function') {
+          window.updateAllSectionHeaders(root, curLtpRaw > 0 ? curLtpRaw : 0);
+        }
+        return;
       }
+
+      let curLtp = curLtpRaw > 0 ? curLtpRaw : 0;
       if (typeof window.updateAllSectionHeaders === 'function') {
         window.updateAllSectionHeaders(root, curLtp);
       }
       const step = root.includes('BANK') ? 100 : (root.includes('CRUDE') ? 50 : 50);
-      const strike = Math.round(curLtp / step) * step;
+      const strike = curLtp > 0 ? Math.round(curLtp / step) * step : (root.includes('BANK') ? 54400 : 25000);
 
       // Validate data belongs to the current symbol; discard old symbol's contracts
       const dataSym = String(data.symbol || data.underlying || '').toUpperCase();
@@ -30468,14 +30556,16 @@
       if (!cleanCeSym.toUpperCase().startsWith(root)) {
         cleanCeSym = `${root} ${cleanExpCe} ${strike} CE`;
       }
-      const defaultCeLtp = root.includes('BANK') ? 980.0 : (root.includes('CRUDE') ? 85.0 : 185.0);
-      const defaultPeLtp = root.includes('BANK') ? 810.0 : (root.includes('CRUDE') ? 78.0 : 165.0);
       const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, root) : null;
-      const ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || defaultCeLtp);
+      const ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || rawCe?.ltp || 0);
       const activeTf = window.__caRecoTimeframe || '5m';
-      const ceSpec = window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, activeTf);
+      const ceSpec = ltpCe > 0
+        ? window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, activeTf)
+        : { entry: 0, sl: 0, tgt: 0, rrDisplay: '—', risk: 0, actualRr: 2.0 };
       // Compare with 15m alternative for timeframe commentary
-      const ceSpec15m = window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, '15m');
+      const ceSpec15m = ltpCe > 0
+        ? window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, '15m')
+        : { actualRr: 2.0 };
       ceSpec.symbol = cleanCeSym;
 
       // --- PUT OPTION (PE) PRICING DERIVATION (ca_trader_formula_dashboard_spec.md) ---
@@ -30484,9 +30574,13 @@
         cleanPeSym = `${root} ${cleanExpPe} ${strike} PE`;
       }
       const liveQPe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanPeSym, root) : null;
-      const ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || defaultPeLtp);
-      const peSpec = window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, activeTf);
-      const peSpec15m = window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, '15m');
+      const ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || rawPe?.ltp || 0);
+      const peSpec = ltpPe > 0
+        ? window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, activeTf)
+        : { entry: 0, sl: 0, tgt: 0, rrDisplay: '—', risk: 0, actualRr: 2.0 };
+      const peSpec15m = ltpPe > 0
+        ? window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, '15m')
+        : { actualRr: 2.0 };
       peSpec.symbol = cleanPeSym;
 
       const entryCe = ceSpec.entry;
@@ -30512,13 +30606,13 @@
       // Render CALL (CE) Card - Only Buy Recommendations
       if (document.getElementById('ceContractName')) document.getElementById('ceContractName').textContent = cleanCeSym;
       if (document.getElementById('ceExpiryDate')) document.getElementById('ceExpiryDate').textContent = `Exp: ${cleanExpCe}`;
-      if (document.getElementById('ceCmp')) document.getElementById('ceCmp').textContent = `₹${_fmtNum(ltpCe)}`;
-      if (document.getElementById('ceEntry')) document.getElementById('ceEntry').textContent = `₹${_fmtNum(entryCe)}`;
-      if (document.getElementById('ceSl')) document.getElementById('ceSl').textContent = `₹${_fmtNum(slCe)}`;
-      if (document.getElementById('ceTarget')) document.getElementById('ceTarget').textContent = `₹${_fmtNum(tgtCe)}`;
-      if (document.getElementById('ceTgt1')) document.getElementById('ceTgt1').textContent = `₹${_fmtNum(ceSpec.target1 || tgtCe)}`;
-      if (document.getElementById('ceTgt2')) document.getElementById('ceTgt2').textContent = `₹${_fmtNum(ceSpec.target2 || _roundV(entryCe + 3.5 * ceSpec.risk))}`;
-      if (document.getElementById('ceTgt3')) document.getElementById('ceTgt3').textContent = `₹${_fmtNum(ceSpec.target3 || _roundV(entryCe + 5.5 * ceSpec.risk))}`;
+      if (document.getElementById('ceCmp')) document.getElementById('ceCmp').textContent = ltpCe > 0 ? `₹${_fmtNum(ltpCe)}` : '₹—';
+      if (document.getElementById('ceEntry')) document.getElementById('ceEntry').textContent = entryCe > 0 ? `₹${_fmtNum(entryCe)}` : '₹—';
+      if (document.getElementById('ceSl')) document.getElementById('ceSl').textContent = slCe > 0 ? `₹${_fmtNum(slCe)}` : '₹—';
+      if (document.getElementById('ceTarget')) document.getElementById('ceTarget').textContent = tgtCe > 0 ? `₹${_fmtNum(tgtCe)}` : '₹—';
+      if (document.getElementById('ceTgt1')) document.getElementById('ceTgt1').textContent = tgtCe > 0 ? `₹${_fmtNum(ceSpec.target1 || tgtCe)}` : '₹—';
+      if (document.getElementById('ceTgt2')) document.getElementById('ceTgt2').textContent = tgtCe > 0 ? `₹${_fmtNum(ceSpec.target2 || _roundV(entryCe + 3.5 * ceSpec.risk))}` : '₹—';
+      if (document.getElementById('ceTgt3')) document.getElementById('ceTgt3').textContent = tgtCe > 0 ? `₹${_fmtNum(ceSpec.target3 || _roundV(entryCe + 5.5 * ceSpec.risk))}` : '₹—';
       if (document.getElementById('ceTrailingSl')) document.getElementById('ceTrailingSl').textContent = ceSpec.trailingSl || `Cost at T1; Lock T1 at T2`;
       if (document.getElementById('ceRr')) document.getElementById('ceRr').textContent = rrCe;
       if (document.getElementById('ceConsensusBadge')) {
@@ -30527,23 +30621,23 @@
       }
       const tfTipCe = isBacktest
         ? `Backtest Replay (${btDateStr} ${btTimeStr}): Buy CE setup on ${strike} strike.`
-        : (activeTf === '5m'
+        : (ltpCe > 0 && entryCe > 0 ? (activeTf === '5m'
           ? `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. 15m TF R:R (1:${ceSpec15m.actualRr.toFixed(2)} vs 1:${ceSpec.actualRr.toFixed(2)}).`
           : (activeTf === '10m'
             ? `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. Risk: ₹${ceSpec.risk.toFixed(1)}.`
-            : `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. Support: ₹${ceSpec.sl.toFixed(1)}.`));
+            : `Pullback entry: -₹${_fmtNum(ltpCe - entryCe)} below CMP. Support: ₹${ceSpec.sl.toFixed(1)}.`)) : 'Evaluating dynamic market entry...');
       if (document.getElementById('ceRationaleShort')) document.getElementById('ceRationaleShort').innerHTML = tfTipCe;
 
       // Render PUT (PE) Card - Only Buy Recommendations (Active when underlying signal is SELL)
       if (document.getElementById('peContractName')) document.getElementById('peContractName').textContent = cleanPeSym;
       if (document.getElementById('peExpiryDate')) document.getElementById('peExpiryDate').textContent = `Exp: ${cleanExpPe}`;
-      if (document.getElementById('peCmp')) document.getElementById('peCmp').textContent = `₹${_fmtNum(ltpPe)}`;
-      if (document.getElementById('peEntry')) document.getElementById('peEntry').textContent = `₹${_fmtNum(entryPe)}`;
-      if (document.getElementById('peSl')) document.getElementById('peSl').textContent = `₹${_fmtNum(slPe)}`;
-      if (document.getElementById('peTarget')) document.getElementById('peTarget').textContent = `₹${_fmtNum(tgtPe)}`;
-      if (document.getElementById('peTgt1')) document.getElementById('peTgt1').textContent = `₹${_fmtNum(peSpec.target1 || tgtPe)}`;
-      if (document.getElementById('peTgt2')) document.getElementById('peTgt2').textContent = `₹${_fmtNum(peSpec.target2 || _roundV(entryPe + 3.5 * peSpec.risk))}`;
-      if (document.getElementById('peTgt3')) document.getElementById('peTgt3').textContent = `₹${_fmtNum(peSpec.target3 || _roundV(entryPe + 5.5 * peSpec.risk))}`;
+      if (document.getElementById('peCmp')) document.getElementById('peCmp').textContent = ltpPe > 0 ? `₹${_fmtNum(ltpPe)}` : '₹—';
+      if (document.getElementById('peEntry')) document.getElementById('peEntry').textContent = entryPe > 0 ? `₹${_fmtNum(entryPe)}` : '₹—';
+      if (document.getElementById('peSl')) document.getElementById('peSl').textContent = slPe > 0 ? `₹${_fmtNum(slPe)}` : '₹—';
+      if (document.getElementById('peTarget')) document.getElementById('peTarget').textContent = tgtPe > 0 ? `₹${_fmtNum(tgtPe)}` : '₹—';
+      if (document.getElementById('peTgt1')) document.getElementById('peTgt1').textContent = tgtPe > 0 ? `₹${_fmtNum(peSpec.target1 || tgtPe)}` : '₹—';
+      if (document.getElementById('peTgt2')) document.getElementById('peTgt2').textContent = tgtPe > 0 ? `₹${_fmtNum(peSpec.target2 || _roundV(entryPe + 3.5 * peSpec.risk))}` : '₹—';
+      if (document.getElementById('peTgt3')) document.getElementById('peTgt3').textContent = tgtPe > 0 ? `₹${_fmtNum(peSpec.target3 || _roundV(entryPe + 5.5 * peSpec.risk))}` : '₹—';
       if (document.getElementById('peTrailingSl')) document.getElementById('peTrailingSl').textContent = peSpec.trailingSl || `Cost at T1; Lock T1 at T2`;
       if (document.getElementById('peRr')) document.getElementById('peRr').textContent = rrPe;
       if (document.getElementById('peConsensusBadge')) {
@@ -30552,11 +30646,11 @@
       }
       const tfTipPe = isBacktest
         ? `Backtest Replay (${btDateStr} ${btTimeStr}): Buy PE setup on ${strike} strike.`
-        : (activeTf === '5m'
+        : (ltpPe > 0 && entryPe > 0 ? (activeTf === '5m'
           ? `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. 15m TF R:R (1:${peSpec15m.actualRr.toFixed(2)} vs 1:${peSpec.actualRr.toFixed(2)}).`
           : (activeTf === '10m'
             ? `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. Risk: ₹${peSpec.risk.toFixed(1)}.`
-            : `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. Support: ₹${peSpec.sl.toFixed(1)}.`));
+            : `Pullback entry: -₹${_fmtNum(ltpPe - entryPe)} below CMP. Support: ₹${peSpec.sl.toFixed(1)}.`)) : 'Evaluating dynamic market entry...');
       if (document.getElementById('peRationaleShort')) document.getElementById('peRationaleShort').innerHTML = tfTipPe;
 
       // Bull Run / Severe Fall Sentinel Alert Banner
@@ -35983,22 +36077,22 @@
 
       const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || (typeof _getSym === 'function' ? _getSym() : 'NIFTY');
       const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
-      const curLtp = Number((data && (data.cmp || data.ltp)) || (typeof _getLtp === 'function' ? _getLtp() : 23400));
+      const curLtp = Number((data && (data.cmp || data.ltp)) || (typeof _getLtp === 'function' ? _getLtp() : 0));
       const step = root.includes('BANK') ? 100 : (root.includes('CRUDE') ? 50 : 50);
-      const atmStrike = Math.round(curLtp / step) * step;
+      const atmStrike = curLtp > 0 ? Math.round(curLtp / step) * step : 0;
       const lotSize = root.includes('BANK') ? 30 : (root.includes('CRUDE') ? 100 : (root.includes('FIN') ? 25 : (root.includes('MID') ? 50 : 25)));
 
       // Retrieve user capital per trade budget
       const userCapital = Number(localStorage.getItem('ca_capital') || document.getElementById('recoCapital')?.value || 9000);
 
       // CE Entry & Capital Check
-      const ceEntryText = document.getElementById('ceEntry')?.textContent || '527.66';
-      const entryCe = parseFloat(ceEntryText.replace(/[^0-9.]/g, '')) || 527.66;
+      const ceEntryText = document.getElementById('ceEntry')?.textContent || '';
+      const entryCe = ceEntryText.includes('—') ? 0 : (parseFloat(ceEntryText.replace(/[^0-9.]/g, '')) || 0);
       const reqCeCapital = Math.round(entryCe * lotSize * 100) / 100;
       // Top Right Caution Popovers for Budget Warning (Items 2 & 7)
       const ceBadge = document.getElementById('ceCautionBadge');
       const cePopText = document.getElementById('ceCautionPopoverText');
-      if (reqCeCapital > userCapital) {
+      if (entryCe > 0 && reqCeCapital > userCapital && atmStrike > 0) {
         const maxAffordableCePrem = Math.floor((userCapital / lotSize) * 10) / 10;
         const diffStrikes = Math.ceil((entryCe - maxAffordableCePrem) / (step * 0.45));
         const affordableStrikeCe = atmStrike + (diffStrikes * step);
@@ -36013,13 +36107,13 @@
       }
 
       // PE Entry & Capital Check
-      const peEntryText = document.getElementById('peEntry')?.textContent || '170.30';
-      const entryPe = parseFloat(peEntryText.replace(/[^0-9.]/g, '')) || 170.30;
+      const peEntryText = document.getElementById('peEntry')?.textContent || '';
+      const entryPe = peEntryText.includes('—') ? 0 : (parseFloat(peEntryText.replace(/[^0-9.]/g, '')) || 0);
       const reqPeCapital = Math.round(entryPe * lotSize * 100) / 100;
       const peBadge = document.getElementById('peCautionBadge');
       const pePopText = document.getElementById('peCautionPopoverText');
 
-      if (reqPeCapital > userCapital) {
+      if (entryPe > 0 && reqPeCapital > userCapital && atmStrike > 0) {
         const maxAffordablePePrem = Math.floor((userCapital / lotSize) * 10) / 10;
         const diffStrikes = Math.ceil((entryPe - maxAffordablePePrem) / (step * 0.45));
         const affordableStrikePe = atmStrike - (diffStrikes * step);
@@ -37370,14 +37464,20 @@
       const activeSym = sym || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
       const root = String(activeSym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
 
-      // Resolve LTP
+      // Resolve LTP — never use hardcoded fallbacks; show ₹— when no real data
       let curLtp = Number(ltp);
       if (!curLtp || isNaN(curLtp) || curLtp <= 0) {
         if (typeof _getLtp === 'function') curLtp = _getLtp(root);
-        else curLtp = root.includes('BANK') ? 55580.40 : (root.includes('CRUDE') ? 6210.0 : 25215.30);
+        // Try cached watchlist quote as secondary source
+        if ((!curLtp || curLtp <= 0) && window.__CA_WL_QUOTES) {
+          const wq = window.__CA_WL_QUOTES[root] || window.__CA_WL_QUOTES[root.toUpperCase()];
+          if (wq && wq.ltp) curLtp = Number(wq.ltp);
+        }
+        // If still no data — use 0 so the display shows ₹— instead of fake values
+        if (!curLtp || isNaN(curLtp) || curLtp <= 0) curLtp = 0;
       }
 
-      // Resolve Change & Change Pct
+      // Resolve Change & Change Pct — read from watchlist DOM; never invent values
       let curChg = Number(chg);
       let curChgPct = Number(chgPct);
       if ((!curChg && curChg !== 0) || isNaN(curChg)) {
@@ -37386,12 +37486,41 @@
           const txt = wlRow.textContent.trim();
           const m = txt.match(/([+-]?\d+(?:\.\d+)?)/);
           if (m) curChg = parseFloat(m[1]);
+        } else if (window.__CA_WL_QUOTES) {
+          const wq = window.__CA_WL_QUOTES[root] || window.__CA_WL_QUOTES[root.toUpperCase()];
+          if (wq && wq.net_change != null) curChg = Number(wq.net_change);
+          else curChg = 0;
         } else {
-          curChg = root.includes('BANK') ? 320.15 : (root.includes('CRUDE') ? -42.0 : 78.40);
+          curChg = 0;
         }
       }
       if ((!curChgPct && curChgPct !== 0) || isNaN(curChgPct)) {
-        curChgPct = Math.round((curChg / (curLtp - curChg || 1)) * 10000) / 100;
+        curChgPct = (curLtp > 0 && curChg !== 0) ? Math.round((curChg / ((curLtp - curChg) || 1)) * 10000) / 100 : 0;
+      }
+
+      // If LTP is still 0, show placeholder dash so no fake data is displayed
+      if (curLtp <= 0) {
+        const dash = '—';
+        const dashPairs = [
+          { title: 'stickySymbolTitle', ltp: 'stickySymbolLtp', chg: 'stickySymbolChange' },
+          { title: 'dashSymbolTitle', ltp: 'dashSymbolLtp', chg: 'dashSymbolChange' },
+          { title: 'chartSymbolTitle', ltp: 'chartSymbolLtp', chg: 'chartSymbolChange' },
+          { title: 'optionsSymbol', ltp: 'optionsLtp', chg: 'optionsChange' },
+          { title: 'askAiSymbol', ltp: 'askAiLtp', chg: 'askAiChange' },
+          { title: 'newsSymbol', ltp: 'newsLtp', chg: 'newsChange' },
+          { title: 'fundSymbol', ltp: 'fundLtp', chg: 'fundChange' },
+          { title: 'otherFactorsSymbol', ltp: 'otherFactorsLtp', chg: 'otherFactorsChange' },
+          { title: 'moversSymbol', ltp: 'moversLtp', chg: 'moversChange' }
+        ];
+        dashPairs.forEach(p => {
+          const tEl = document.getElementById(p.title); if (tEl) tEl.textContent = root;
+          const lEl = document.getElementById(p.ltp); if (lEl) lEl.textContent = '₹—';
+          const cEl = document.getElementById(p.chg); if (cEl) { cEl.textContent = dash; cEl.style.color = 'var(--text-dim)'; }
+        });
+        document.querySelectorAll('.universal-sym-title').forEach(el => { el.textContent = root; });
+        document.querySelectorAll('.universal-sym-ltp').forEach(el => { el.textContent = '₹—'; });
+        document.querySelectorAll('.universal-sym-change').forEach(el => { el.textContent = dash; el.style.color = 'var(--text-dim)'; });
+        return;
       }
 
       const isPos = curChg >= 0;
@@ -37399,7 +37528,7 @@
       const color = isPos ? 'var(--buy)' : 'var(--sell)';
       const colorClass = isPos ? 'up' : 'down';
       const fmtLtp = typeof _fmtNum === 'function' ? _fmtNum(curLtp) : curLtp.toFixed(2);
-      const fmtChg = typeof _fmtNum === 'function' ? _fmtNum(curChg) : curChg.toFixed(2);
+      const fmtChg = typeof _fmtNum === 'function' ? _fmtNum(Math.abs(curChg)) : Math.abs(curChg).toFixed(2);
       const fmtChgPct = Math.abs(curChgPct).toFixed(2);
 
       const sectionPairs = [
