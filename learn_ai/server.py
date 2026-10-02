@@ -12,7 +12,7 @@ import urllib.parse
 from pathlib import Path
 import requests
 
-PORT = 5050
+PORT = 5150
 BASE_DIR = Path(__file__).resolve().parent
 REPO_DIR = BASE_DIR.parent
 
@@ -148,9 +148,25 @@ class LearnAIHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(str(BASE_DIR))
+    socketserver.TCPServer.allow_reuse_address = True
+    active_port = PORT
+    httpd = None
+    for p in range(PORT, PORT + 20):
+        try:
+            httpd = socketserver.TCPServer(("", p), LearnAIHandler)
+            active_port = p
+            break
+        except OSError:
+            continue
+
+    if not httpd:
+        print(f"Could not bind to any port between {PORT} and {PORT + 20}")
+        exit(1)
+
     print(f"==================================================")
     print(f"  CA TRADER — LEARN AI DEDICATED APP SERVER")
-    print(f"  Open in your browser: http://localhost:{PORT}")
+    print(f"  Open in your browser: http://localhost:{active_port}")
     print(f"==================================================")
-    with socketserver.TCPServer(("", PORT), LearnAIHandler) as httpd:
+    with httpd:
         httpd.serve_forever()
+
