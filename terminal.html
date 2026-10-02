@@ -8984,9 +8984,6 @@
           <div>
             <div class="page-sub chart-company" id="dashCompany">Institutional Quantitative Terminal · Live Intelligence
             </div>
-            <span id="dashSymbolTitle"></span>
-            <span id="dashSymbolLtp"></span>
-            <span id="dashSymbolChange"></span>
           </div>
         </div>
 
@@ -8998,19 +8995,14 @@
           <!-- Top Bar: Title & Multi-Timeframe Controls -->
           <div class="dash-reco-head"
             style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span
-                style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:rgba(24,144,255,0.15);color:#1890ff;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2v20M2 12h20" />
-                  <circle cx="12" cy="12" r="9" />
-                </svg>
-              </span>
-              <div>
-                <b style="font-size:14.5px;color:var(--text);font-family:var(--font-display);">Recommendations</b>
-              </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span class="universal-sym-title" id="dashSymbolTitle" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="dashSymbolLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
+              <span class="universal-sym-change" id="dashSymbolChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+              <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
+              <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
               <button type="button" class="btn small gold" id="btnDash100BacktestShortcut" onclick="window.open100TradeBacktest()"
-                style="font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:4px;cursor:pointer;margin-left:6px;border-color:rgba(232,184,75,0.4);"
+                style="font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:4px;cursor:pointer;margin-left:4px;border-color:rgba(232,184,75,0.4);"
                 title="View audited 100-trade recommendation backtest with 91% win rate & equity curve">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -9708,11 +9700,16 @@
 
       <!-- ============ ASK CA AI (Requirement 13) ============ -->
       <div class="panel" id="panel-charts">
-        <div class="page-head">
-          <div>
-            <div class="page-title chart-symbol-line"><span id="chartSymbolTitle">—</span><span class="chart-symbol-ltp"
-                id="chartSymbolLtp">—</span><span class="chart-symbol-change" id="chartSymbolChange">—</span></div>
-            <div class="page-sub chart-company" id="chartCompanyName">Select an instrument</div>
+        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+              <span class="universal-sym-title" id="chartSymbolTitle" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="chartSymbolLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
+              <span class="universal-sym-change" id="chartSymbolChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+            </div>
+            <button type="button" class="btn buy small" id="chartBuyBtn" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
+            <button type="button" class="btn sell small" id="chartSellBtn" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
+            <span class="page-sub chart-company" id="chartCompanyName" style="display:none;"></span>
           </div>
           <div class="head-actions">
             <button type="button" class="btn ghost small" id="chartPopoutBtn" title="Open Chart in Separate Window"
@@ -9731,8 +9728,6 @@
               onclick="window.toggleChartAiPanel && window.toggleChartAiPanel(undefined, this)"> CA AI Suggestions <span
                 class="badge" id="chartAiBadgeMobile"
                 style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span></button>
-            <button class="btn gold" id="chartBuyBtn">Buy</button>
-            <button class="btn ghost" id="chartSellBtn">Sell</button>
           </div>
         </div>
 
@@ -10108,13 +10103,15 @@
 
       <!-- ============ BACKTESTING ENGINE & CANDLE REPLAY SIMULATOR ============ -->
       <div class="panel" id="panel-news">
-        <div class="page-head">
-          <div>
-            <div class="page-title chart-symbol-line">
-              <span id="newsSymbol">RELIANCE</span>
-              <span class="chart-symbol-ltp" id="newsLtp"></span>
-              <span class="chart-symbol-change" id="newsChange"></span>
+        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+              <span class="universal-sym-title" id="newsSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="newsLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
+              <span class="universal-sym-change" id="newsChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
             </div>
+            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
+            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
           </div>
           <div class="head-actions news-head-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div class="session-pill" id="newsLiveStatusPill"
@@ -10195,12 +10192,15 @@
       <!-- ============ BACKTESTING & MARKET REPLAY ============ -->
       <!-- ============ FUNDAMENTALS ============ -->
       <div class="panel" id="panel-options">
-        <div class="page-head">
-          <div>
-            <div class="page-title chart-symbol-line"><span id="optionsSymbol">—</span><span class="chart-symbol-ltp"
-                id="optionsLtp">—</span><span class="chart-symbol-change" id="optionsChange">—</span></div>
-            <div class="page-sub chart-company" id="optionsCompany">Select an instrument with an available option chain
+        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+              <span class="universal-sym-title" id="optionsSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="optionsLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
+              <span class="universal-sym-change" id="optionsChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
             </div>
+            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
+            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
           </div>
         </div>
         <!-- Summary Metrics Bar (Zerodha Kite Alignment) -->
@@ -10351,12 +10351,15 @@
       <!-- ============ RECOMMENDATIONS ============ -->
 
       <div class="panel" id="panel-fundamentals">
-        <div class="page-head">
-          <div>
-            <div class="page-title chart-symbol-line"><span id="fundSymbol">Fundamentals</span><span
-                class="chart-symbol-ltp" id="fundLtp"></span><span class="chart-symbol-change" id="fundChange"></span>
+        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+              <span class="universal-sym-title" id="fundSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="fundLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
+              <span class="universal-sym-change" id="fundChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
             </div>
-            <div class="page-sub" id="fundamentalSubtitle">Live ratios and quarterly results</div>
+            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
+            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
           </div>
           <div class="head-actions"><button class="btn ghost" id="refreshFundamentalsBtn">Refresh</button></div>
         </div>
@@ -10407,11 +10410,15 @@
       <!-- ============ OTHER FACTORS & MACRO ============ -->
       <!-- ============ OTHER FACTORS & COMPREHENSIVE QUANTITATIVE SUITE ============ -->
       <div class="panel" id="panel-other-factors">
-        <div class="page-head">
-          <div>
-            <div class="page-title">Other Factors &amp; Quantitative Intelligence Suite</div>
-            <div class="page-sub">Comprehensive Macro, Market Breadth, Sector Rotation, Volatility Surface, OI Matrix
-              &amp; Risk Guardrails</div>
+        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+              <span class="universal-sym-title" id="otherFactorsSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="otherFactorsLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
+              <span class="universal-sym-change" id="otherFactorsChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+            </div>
+            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
+            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
           </div>
           <div class="head-actions" style="display:flex;align-items:center;gap:10px;">
             <span class="tag gold" id="otherFactorsConsensusBadge"
@@ -10552,11 +10559,18 @@
       </div>
 
       <div class="panel" id="panel-movers">
-        <div class="page-head">
-          <div>
-            <div class="page-title">Market Movers</div>
-            <div class="page-sub">Live market quote universe <span id="moversSourceLabel" class="muted"
-                style="font-size:10px;"></span></div>
+        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+              <span class="universal-sym-title" id="moversSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="moversLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
+              <span class="universal-sym-change" id="moversChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+            </div>
+            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
+            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
+          </div>
+          <div class="head-actions">
+            <span id="moversSourceLabel" class="muted" style="font-size:11px;font-family:var(--font-mono);"></span>
           </div>
         </div>
 
@@ -28197,23 +28211,43 @@
         }
         if ($('dashCompany')) $('dashCompany').textContent = `${baseSym} · Live Institutional Quantitative Analysis`;
 
-        // Fetch Recommendation for symbol (Instant cache first, background refresh)
+        // Fetch Recommendation for symbol (Instant cache first if valid, background refresh)
         const curRecoMatches = window.__caCurrentChartReco && (
           String(window.__caCurrentChartReco.symbol || '').toUpperCase().includes(baseSym.toUpperCase()) ||
           String(window.__caCurrentChartReco.underlying || '').toUpperCase().includes(baseSym.toUpperCase()) ||
           baseSym.toUpperCase().includes(String(window.__caCurrentChartReco.symbol || '').toUpperCase())
         );
-        let rec = curRecoMatches ? window.__caCurrentChartReco : {};
+        let rec = curRecoMatches ? window.__caCurrentChartReco : null;
         if (!rec || !rec.recommendation) {
           try {
             const storedRec = sessionStorage.getItem('ca_reco_' + baseSym);
-            if (storedRec) rec = JSON.parse(storedRec);
+            if (storedRec) {
+              const parsed = JSON.parse(storedRec);
+              if (parsed && parsed.recommendation && (
+                String(parsed.symbol || '').toUpperCase().includes(baseSym.toUpperCase()) ||
+                String(parsed.underlying || '').toUpperCase().includes(baseSym.toUpperCase()) ||
+                baseSym.toUpperCase().includes(String(parsed.symbol || '').toUpperCase())
+              )) {
+                rec = parsed;
+              }
+            }
           } catch (_) { }
         }
 
-        // Render immediately with cached/local calculation
+        // Render immediately with cached/local calculation or show loading state
         const renderRecoViews = (r) => {
-          if (!r) return;
+          if (!r || !r.recommendation) {
+            if (typeof window.setRecoCardsLoadingState === 'function') {
+              window.setRecoCardsLoadingState(baseSym);
+            }
+            if ($('dashEntryPriceDisplay')) $('dashEntryPriceDisplay').textContent = 'Scanning...';
+            if ($('dashEntryTriggerTag')) $('dashEntryTriggerTag').textContent = 'EVALUATING';
+            if ($('dashSlPriceDisplay')) $('dashSlPriceDisplay').textContent = 'Scanning...';
+            if ($('dashSlRiskTag')) $('dashSlRiskTag').textContent = 'CALCULATING SL';
+            if ($('dashTargetPriceDisplay')) $('dashTargetPriceDisplay').textContent = 'Scanning...';
+            if ($('dashTargetModeTag')) $('dashTargetModeTag').textContent = 'CALCULATING TARGET';
+            return;
+          }
           const b = String(r.recommendation || r.action || 'BUY').toUpperCase().includes('BUY');
           if (typeof window.renderDualRecoCards === 'function') {
             try { window.renderDualRecoCards(r); } catch (_) { }
@@ -28221,18 +28255,18 @@
           if (typeof window.renderExcelMatrix === 'function') {
             try { window.renderExcelMatrix(); } catch (_) { }
           }
-          const ePrice = Number(r.entry || ltp);
-          const sPrice = Number(r.stop_loss || (b ? ePrice * 0.985 : ePrice * 1.015));
+          const ePrice = Number(r.entry || 0);
+          const sPrice = Number(r.stop_loss || 0);
           const tPrice = Number(r.target || 0);
-          if ($('dashEntryPriceDisplay')) $('dashEntryPriceDisplay').textContent = `₹${fmt(ePrice)}`;
+          if ($('dashEntryPriceDisplay')) $('dashEntryPriceDisplay').textContent = ePrice > 0 ? `₹${fmt(ePrice)}` : 'Scanning...';
           if ($('dashEntryTriggerTag')) $('dashEntryTriggerTag').textContent = b ? 'BREAKOUT CONFIRMED' : 'BREAKDOWN CONFIRMED';
-          if ($('dashEntryRationaleText')) $('dashEntryRationaleText').textContent = r.technical_basis || `Decisive 20-EMA pivot continuation with institutional buyer queue dominance and stochastic crossover alignment.`;
-          if ($('dashSlPriceDisplay')) $('dashSlPriceDisplay').textContent = `₹${fmt(sPrice)}`;
+          if ($('dashEntryRationaleText')) $('dashEntryRationaleText').textContent = r.technical_basis || `Decisive pivot continuation with order flow queue dominance.`;
+          if ($('dashSlPriceDisplay')) $('dashSlPriceDisplay').textContent = sPrice > 0 ? `₹${fmt(sPrice)}` : 'Scanning...';
           if ($('dashSlRiskTag')) $('dashSlRiskTag').textContent = `1.5× ATR DYNAMIC SL`;
           if ($('dashSlRationaleText')) $('dashSlRationaleText').textContent = `Structural swing support shelf anchored at 1.5× ATR. Hard stop triggered on decisive close below this pivot floor.`;
           if ($('dashTargetPriceDisplay')) $('dashTargetPriceDisplay').textContent = tPrice > 0 ? `₹${fmt(tPrice)}` : 'Dynamic Trailing SL';
           if ($('dashTargetModeTag')) $('dashTargetModeTag').textContent = tPrice > 0 ? 'R : R ≥ 1 : 2.0' : 'ACTIVE TRAILING SL';
-          if ($('dashTargetRationaleText')) $('dashTargetRationaleText').textContent = tPrice > 0 ? `Fibonacci 1.618 expansion pivot target satisfying institutional minimum ₹500 profit constraint.` : `Open-ended trend runner. Trailing SL advances dynamically along the 20-EMA curve.`;
+          if ($('dashTargetRationaleText')) $('dashTargetRationaleText').textContent = tPrice > 0 ? `Fibonacci 1.618 expansion pivot target satisfying institutional minimum profit constraint.` : `Open-ended trend runner. Trailing SL advances dynamically along the 20-EMA curve.`;
           updateDashboardConfluenceTable(b, ltp, baseSym);
         };
 
@@ -28241,6 +28275,9 @@
         // Asynchronously fetch fresh recommendations in background without blocking initial paint
         fetchApi(`/api/recommendations/${encodeURIComponent(sym)}`, { timeoutMs: 8000 }).then(rd => {
           if (rd && (rd.recommendation || rd.action)) {
+            const curSym = getSym();
+            const curBase = getUnderlying(curSym);
+            if (curBase.toUpperCase() !== baseSym.toUpperCase()) return;
             window.__caCurrentChartReco = rd;
             try { sessionStorage.setItem('ca_reco_' + baseSym, JSON.stringify(rd)); } catch (_) { }
             renderRecoViews(rd);
@@ -37373,6 +37410,7 @@
         { title: 'askAiSymbol', ltp: 'askAiLtp', chg: 'askAiChange' },
         { title: 'newsSymbol', ltp: 'newsLtp', chg: 'newsChange' },
         { title: 'fundSymbol', ltp: 'fundLtp', chg: 'fundChange' },
+        { title: 'otherFactorsSymbol', ltp: 'otherFactorsLtp', chg: 'otherFactorsChange' },
         { title: 'moversSymbol', ltp: 'moversLtp', chg: 'moversChange' }
       ];
 
@@ -37418,6 +37456,19 @@
             cEl.style.border = isPos ? '1px solid rgba(38, 217, 166, 0.35)' : '1px solid rgba(255, 92, 114, 0.35)';
           }
         }
+      });
+
+      // Synchronize all universal header spans across every panel
+      document.querySelectorAll('.universal-sym-title').forEach(el => {
+        el.textContent = root;
+      });
+      document.querySelectorAll('.universal-sym-ltp').forEach(el => {
+        el.textContent = `₹${fmtLtp}`;
+      });
+      document.querySelectorAll('.universal-sym-change').forEach(el => {
+        el.textContent = `${sign}${fmtChg} (${sign}${fmtChgPct}%)`;
+        el.className = `universal-sym-change chart-symbol-change ${colorClass}`;
+        el.style.color = color;
       });
 
       // Hide or clean subheaders that repeat the section name
