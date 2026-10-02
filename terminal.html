@@ -4,13 +4,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="manifest" href="/static/manifest.json">
   <link rel="stylesheet" href="/static/css/terminal.css">
   <title>CA Trader — Terminal</title>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
   <script>
     /* CA TRADER DEFENSIVE RESILIENCY SHIELD (Guarantees zero blank data & working buttons) */
     (function () {
@@ -517,6 +519,19 @@
 
     [data-theme="slate"] .chart-area svg line {
       stroke: #2A415E;
+    }
+
+    /* High Performance UI & Render Accelerators */
+    .panel:not(.active) {
+      content-visibility: hidden;
+      contain-intrinsic-size: 0 450px;
+    }
+    .card, .stat-card, .wl-item {
+      contain: content;
+    }
+    .ticker-wrap, .wl-strip-track, .chart-canvas-container {
+      will-change: transform;
+      transform: translateZ(0);
     }
 
     * {

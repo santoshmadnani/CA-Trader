@@ -6302,7 +6302,7 @@ def normalize_signal(side: str, levels: dict[str, Any]) -> bool:
     return True
 
 
-def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | None = None, bearable_loss: float | None = None, risk_preferences: dict[str, Any] | None = None, option_preferences: dict[str, Any] | None = None, max_profit_mode: bool = False, user_id: int | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
+def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | None = None, bearable_loss: float | None = None, risk_preferences: dict[str, Any] | None = None, option_preferences: dict[str, Any] | None = None, max_profit_mode: bool = False, user_id: int | None = None, expiry_scalp: bool = False, candles_override: list[dict[str, Any]] | None = None, live_quote_override: dict[str, Any] | None = None) -> dict[str, Any]:
     risk_preferences = risk_preferences or {}; option_preferences = option_preferences or {}
     user_capital = None; user_max_loss = None; user_desired_profit = None
     if user_id:
@@ -6315,10 +6315,14 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
     if bearable_loss is None and user_max_loss: bearable_loss = user_max_loss
     if desired_profit is None and user_desired_profit: desired_profit = user_desired_profit
     cache_key = f"overall:{symbol.upper()}:{timeframe}:{max_profit_mode}:{user_id}:{desired_profit}:{expiry_scalp}:{json.dumps(risk_preferences or {},sort_keys=True)}:{json.dumps(option_preferences or {},sort_keys=True)}"
-    cached = CACHE.get(cache_key)
-    if cached is not None: return cached
+    if not candles_override:
+        cached = CACHE.get(cache_key)
+        if cached is not None: return cached
     opt_info = parse_option_contract(symbol)
-    if opt_info:
+    if candles_override:
+        candles = [dict(c) for c in candles_override]
+        news = recommendation_news_evidence(opt_info["underlying"] if opt_info else symbol)
+    elif opt_info:
         underlying = opt_info["underlying"]
         news = recommendation_news_evidence(underlying)
         try:
@@ -6342,15 +6346,35 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     # Fetch live quote for symbol/underlying to guarantee fresh current session price & momentum
     q_live = None
-    try:
-        q_live = UPSTOX.quote(symbol)
-    except Exception:
-        pass
+    if live_quote_override:
+        q_live = dict(live_quote_override)
+    elif not candles_override:
+        try:
+            q_live = UPSTOX.quote(symbol)
+        except Exception:
+            pass
+    elif candles:
+        last_c = candles[-1]
+        prev_c = candles[-2] if len(candles) > 1 else last_c
+        ltp_val = float(last_c.get("close") or last_c.get("ltp") or 0.0)
+        prev_c_val = float(prev_c.get("close") or ltp_val)
+        chg_val = ltp_val - prev_c_val
+        q_live = {
+            "ltp": ltp_val,
+            "last_price": ltp_val,
+            "open": float(last_c.get("open") or ltp_val),
+            "high": float(last_c.get("high") or ltp_val),
+            "low": float(last_c.get("low") or ltp_val),
+            "close": ltp_val,
+            "volume": float(last_c.get("volume") or 0.0),
+            "net_change": chg_val,
+            "change_pct": (chg_val / prev_c_val * 100.0) if prev_c_val else 0.0
+        }
     live_ltp = float(q_live.get("ltp") or q_live.get("last_price") or 0.0) if q_live else 0.0
     net_chg = float(q_live.get("net_change") or q_live.get("session_change") or 0.0) if q_live else 0.0
     chg_pct = float(q_live.get("change_pct") or q_live.get("session_change_pct") or 0.0) if q_live else 0.0
 
-    if live_ltp > 0 and candles:
+    if live_ltp > 0 and candles and not candles_override:
         now_dt = datetime.now(timezone.utc)
         open_p = float(q_live.get("open") or candles[-1].get("open") or live_ltp)
         high_p = max(float(q_live.get("high") or live_ltp), live_ltp)
@@ -8066,6 +8090,24 @@ async def guide_page(request: Request) -> Response:
         return error_json("GUIDE_UI_NOT_FOUND", "ca_trader_guide.html is missing", 500)
     return HTMLResponse(GUIDE_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
 
+_cached_terminal_mtime: float = 0.0
+_cached_terminal_html: str = ""
+
+def get_cached_terminal_html() -> str:
+    global _cached_terminal_mtime, _cached_terminal_html
+    try:
+        mtime = HTML_PATH.stat().st_mtime
+        if mtime != _cached_terminal_mtime or not _cached_terminal_html:
+            raw = HTML_PATH.read_text(encoding="utf-8")
+            marker = "</body>"
+            if marker in raw:
+                raw = raw.replace(marker, INTEGRATION_BRIDGE + marker, 1)
+            _cached_terminal_html = raw
+            _cached_terminal_mtime = mtime
+        return _cached_terminal_html
+    except Exception:
+        return HTML_PATH.read_text(encoding="utf-8")
+
 @app.get("/terminal", response_class=HTMLResponse)
 async def terminal_page(request: Request) -> Response:
     user=current_user(request)
@@ -8077,10 +8119,7 @@ async def terminal_page(request: Request) -> Response:
         return RedirectResponse("/fitness", status_code=302)
     if not HTML_PATH.exists():
         return error_json("UI_NOT_FOUND", f"HTML file not found: {HTML_PATH}", 500)
-    html = HTML_PATH.read_text(encoding="utf-8")
-    marker = "</body>"
-    if marker in html:
-        html = html.replace(marker, INTEGRATION_BRIDGE + marker, 1)
+    html = get_cached_terminal_html()
     return HTMLResponse(html, headers=HTML_PAGE_HEADERS)
 @app.post("/api/news/external/search")
 async def external_news_search(request: Request, user: dict[str,Any] = Depends(require_user)) -> dict[str,Any]:
