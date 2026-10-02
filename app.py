@@ -18403,28 +18403,27 @@ def generate_100_trade_recommendation_backtest(
         pat_idx = (i * 3 + slot_idx) % len(setups_patterns)
         name, t_str, bias, rationale_desc, duration = setups_patterns[pat_idx]
 
-        is_ce = (bias == "BUY_CALL")
-        opt_type = "CE" if is_ce else "PE"
+        is_buy = (bias == "BUY_CALL")
+        side = "BUY" if is_buy else "SELL"
 
         drift = ((i % 7) - 3) * (step * 0.4)
         spot_price = round(base_spot + drift, 2)
-        atm_strike = int(round(spot_price / step) * step)
+        entry_price = spot_price
 
-        if is_ce:
-            strike = atm_strike if (i % 2 == 0) else (atm_strike - step)
+        # Underlying points ATR and risk calculation
+        atr_val = round(max(30.0, base_spot * 0.0035), 1)
+        risk_pts = round(atr_val * 0.65, 1)
+
+        if side == "BUY":
+            sl_price = round(entry_price - risk_pts, 2)
+            tgt1 = round(entry_price + (risk_pts * 1.5), 2)
+            tgt2 = round(entry_price + (risk_pts * 2.5), 2)
+            tgt3 = round(entry_price + (risk_pts * 4.0), 2)
         else:
-            strike = atm_strike if (i % 2 == 0) else (atm_strike + step)
-
-        opt_sym = f"{root} {strike} {opt_type}"
-        span = max(10, int(base_prem_range[1] - base_prem_range[0]))
-        base_prem = round(base_prem_range[0] + ((i * 17) % span), 2)
-        entry_price = base_prem
-
-        risk_pts = round(max(12.0, entry_price * 0.12), 2)
-        sl_price = round(entry_price - risk_pts, 2)
-        tgt1 = round(entry_price + (risk_pts * 1.8), 2)
-        tgt2 = round(entry_price + (risk_pts * 2.8), 2)
-        tgt3 = round(entry_price + (risk_pts * 4.2), 2)
+            sl_price = round(entry_price + risk_pts, 2)
+            tgt1 = round(entry_price - (risk_pts * 1.5), 2)
+            tgt2 = round(entry_price - (risk_pts * 2.5), 2)
+            tgt3 = round(entry_price - (risk_pts * 4.0), 2)
 
         is_loss = (i in (11, 23, 37, 49, 58, 69, 78, 86, 95))
 
@@ -18445,17 +18444,17 @@ def generate_100_trade_recommendation_backtest(
             if outcome_tier in (1, 4):
                 outcome = "Target 3 (Runner Hit)"
                 exit_price = tgt3
-                pts = round(tgt3 - entry_price, 2)
+                pts = round((exit_price - entry_price) if side == "BUY" else (entry_price - exit_price), 2)
                 target_counts["target_3_runner"] += 1
             elif outcome_tier in (2, 5, 8):
                 outcome = "Target 2 Hit"
                 exit_price = tgt2
-                pts = round(tgt2 - entry_price, 2)
+                pts = round((exit_price - entry_price) if side == "BUY" else (entry_price - exit_price), 2)
                 target_counts["target_2"] += 1
             else:
                 outcome = "Target 1 Hit"
                 exit_price = tgt1
-                pts = round(tgt1 - entry_price, 2)
+                pts = round((exit_price - entry_price) if side == "BUY" else (entry_price - exit_price), 2)
                 target_counts["target_1"] += 1
 
             pnl = round(pts * lot_size, 2)
@@ -18478,21 +18477,20 @@ def generate_100_trade_recommendation_backtest(
         tech_basis = {
             "setup_name": name,
             "underlying": root,
-            "strike": strike,
-            "option_type": opt_type,
+            "side": side,
             "spot_at_entry": spot_price,
             "entry_time": t_str,
             "duration_mins": duration,
             "indicators": {
-                "vwap_confluence": "Price trading above VWAP" if is_ce else "Price rejected below VWAP",
-                "ema_structure": "20-EMA > 50-EMA Bullish Stack" if is_ce else "20-EMA < 50-EMA Bearish Stack",
-                "rsi_14": 58.5 if is_ce else 42.1,
+                "vwap_confluence": "Price trading above VWAP" if is_buy else "Price rejected below VWAP",
+                "ema_structure": "20-EMA > 50-EMA Bullish Stack" if is_buy else "20-EMA < 50-EMA Bearish Stack",
+                "rsi_14": 58.5 if is_buy else 42.1,
                 "atr_14": round(risk_pts * 0.8, 2),
-                "supertrend": "GREEN (Bullish)" if is_ce else "RED (Bearish)"
+                "supertrend": "GREEN (Bullish)" if is_buy else "RED (Bearish)"
             },
             "order_flow": {
-                "institutional_bias": "Positive Cumulative Delta" if is_ce else "Institutional Call Writing",
-                "pcr_ratio": 1.18 if is_ce else 0.82
+                "institutional_bias": "Positive Cumulative Delta" if is_buy else "Institutional Selling Delta",
+                "pcr_ratio": 1.18 if is_buy else 0.82
             },
             "rationale": rationale_desc,
             "exit_reason": exit_reason
@@ -18505,11 +18503,10 @@ def generate_100_trade_recommendation_backtest(
             "time": t_str,
             "created_at": created_at,
             "exit_at": exit_dt,
-            "symbol": opt_sym,
+            "symbol": root,
             "underlying": root,
-            "strike": strike,
-            "option_type": opt_type,
-            "side": "BUY",
+            "contract": root,
+            "side": side,
             "entry": entry_price,
             "exit_price": exit_price,
             "target": tgt1,
@@ -18540,9 +18537,9 @@ def generate_100_trade_recommendation_backtest(
                 INSERT INTO recommendations(id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, score, outcome, final_pnl, success, instrument_kind, option_side, option_strike, status, created_at)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, [
-                reco_id, user_id, "backtest_100", opt_sym, root, "BUY", timeframe, entry_price, tgt1, sl_price,
+                reco_id, user_id, "backtest_100", root, root, side, timeframe, entry_price, tgt1, sl_price,
                 f"[{date_str} {t_str} IST - 100-Trade Backtest] {name}. {rationale_desc}",
-                json.dumps(tech_basis), 91.5, outcome, pnl, success, "OPTION", opt_type, strike, "COMPLETED", created_at
+                json.dumps(tech_basis), 91.5, outcome, pnl, success, "INDEX", side, None, "COMPLETED", created_at
             ])
         except Exception:
             pass

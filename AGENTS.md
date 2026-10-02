@@ -47,4 +47,11 @@ Before executing any tool call, file modification, or command:
    - Do not re-read entire multi-megabyte files when targeting specific sections.
    - Avoid launching headless browser automation or heavy multi-step verification scripts for simple CSS/HTML tweaks.
 
+4. **Automated Commit & Push to Oracle Pipeline**:
+   - After completing and validating changes in `terminal.html`, `app.py`, or any project files:
+     - Run `git add` for the modified workspace files.
+     - Commit with a clear, concise conventional commit message (e.g., `fix(ui): ...`, `feat(api): ...`).
+     - Push immediately to `origin CA-Trader-Bifurcated`.
+   - This automatically triggers `.github/workflows/deploy_to_oracle.yml` to deploy live changes to the Oracle Cloud VM without manual user intervention.
+
 

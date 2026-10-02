@@ -6688,21 +6688,23 @@
       overflow-y: auto !important;
     }
 
-    /* Hide Redundant Stock Name, LTP, Change in other sections (Item 7) */
+    /* Ensure Stock Name, LTP, Change are prominently visible on top across sections */
     #panel-news .chart-symbol-line,
     #panel-options .chart-symbol-line,
     #panel-fundamentals .chart-symbol-line,
     #panel-charts .page-head .chart-symbol-line,
     #panel-movers .chart-symbol-line {
-      display: none !important;
+      display: inline-flex !important;
+      align-items: center;
+      gap: 8px;
     }
 
     #panel-news .page-head,
     #panel-options .page-head,
     #panel-fundamentals .page-head,
     #panel-charts .page-head {
-      margin-bottom: 4px !important;
-      padding-top: 0px !important;
+      margin-bottom: 10px !important;
+      padding-top: 4px !important;
     }
 
     /* Scroll Reveal Animations */
@@ -8329,13 +8331,147 @@
       }
     }
 
-    @media (max-width: 760px) {
+    /* Universal Section Header styling across all panels */
+    .universal-section-head {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-soft);
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .universal-symbol-bar {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .universal-symbol-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .universal-sym-title {
+      font-size: 19px !important;
+      font-weight: 800 !important;
+      color: #ffffff !important;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .universal-sym-ltp {
+      font-size: 19px !important;
+      font-weight: 800 !important;
+      font-family: var(--font-mono) !important;
+      color: #ffffff !important;
+      white-space: nowrap;
+    }
+
+    .universal-sym-change {
+      font-size: 13.5px !important;
+      font-weight: 700 !important;
+      font-family: var(--font-mono) !important;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .universal-buy-sell-grid {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 10px !important;
+      width: 100% !important;
+      max-width: 480px;
+    }
+
+    .universal-btn-buy {
+      height: 38px !important;
+      font-size: 14px !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.6px !important;
+      border-radius: 6px !important;
+      background: #00b074 !important;
+      color: #ffffff !important;
+      border: none !important;
+      cursor: pointer !important;
+      transition: transform 0.15s ease, filter 0.15s ease !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    .universal-btn-sell {
+      height: 38px !important;
+      font-size: 14px !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.6px !important;
+      border-radius: 6px !important;
+      background: #df514c !important;
+      color: #ffffff !important;
+      border: none !important;
+      cursor: pointer !important;
+      transition: transform 0.15s ease, filter 0.15s ease !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    /* Applied indicators: use fx box only - hide outer cluttering badges */
+    #indicatorAppliedPane {
+      display: none !important;
+    }
+
+    @media (max-width: 768px) {
       :root {
-        --top-header-height: 82px;
+        --top-header-height: 44px;
       }
 
       .layout {
-        padding-top: var(--top-header-height, 82px) !important;
+        padding-top: 44px !important;
+      }
+
+      .main {
+        padding-top: 4px !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+      }
+
+      .universal-sym-title {
+        font-size: 17px !important;
+      }
+
+      .universal-sym-ltp {
+        font-size: 17px !important;
+      }
+
+      .universal-sym-change {
+        font-size: 12px !important;
+      }
+
+      .universal-buy-sell-grid {
+        max-width: 100% !important;
+        gap: 8px !important;
+      }
+
+      .universal-btn-buy,
+      .universal-btn-sell {
+        height: 36px !important;
+        font-size: 13.5px !important;
+      }
+
+      /* Hide backtest section & toolbar tools from mobile */
+      #dockBtnBacktest,
+      #panel-backtesting,
+      #toggleBacktestToolsCheckbox,
+      label:has(#toggleBacktestToolsCheckbox) {
+        display: none !important;
       }
 
       .topbar {
@@ -8992,25 +9128,19 @@
         <!-- ============ DUAL RECOMMENDATION ENGINE (BEST CE & BEST PE) ============ -->
         <div class="card" id="dashDualRecoCard"
           style="margin-bottom:14px;padding:14px 18px;background:rgba(12,18,28,0.22);border:1px solid rgba(24,144,255,0.3);border-radius:10px;backdrop-filter:blur(16px);box-shadow:0 6px 20px rgba(0,0,0,0.2);">
-          <!-- Top Bar: Title & Multi-Timeframe Controls -->
-          <div class="dash-reco-head"
-            style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border-soft);padding-bottom:12px;">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span class="universal-sym-title" id="dashSymbolTitle" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
-              <span class="universal-sym-ltp" id="dashSymbolLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
-              <span class="universal-sym-change" id="dashSymbolChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
-              <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
-              <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
-              <button type="button" class="btn small gold" id="btnDash100BacktestShortcut" onclick="window.open100TradeBacktest()"
-                style="font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:4px;cursor:pointer;margin-left:4px;border-color:rgba(232,184,75,0.4);"
-                title="View audited 100-trade recommendation backtest with 91% win rate & equity curve">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                <span>100-Trade Backtest (91%)</span>
-              </button>
+          <!-- Top Bar: Universal Stock Header & 2x1 Buy/Sell Buttons -->
+          <div class="universal-section-head">
+            <div class="universal-symbol-bar">
+              <span class="universal-sym-title" id="dashSymbolTitle">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="dashSymbolLtp">₹—</span>
+              <span class="universal-sym-change" id="dashSymbolChange">—</span>
             </div>
-            <div class="dash-reco-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div class="universal-buy-sell-grid">
+              <button type="button" class="btn buy universal-btn-buy" onclick="window.openOrderForUnderlying('BUY')">BUY</button>
+              <button type="button" class="btn sell universal-btn-sell" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
+            </div>
+          </div>
+          <div class="dash-reco-controls" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
               <div id="recoTimeframeButtonGroup" class="reco-timeframes"
                 style="display:inline-flex;gap:3px;background:var(--surface-2);padding:3px;border-radius:6px;border:1px solid var(--border-soft);flex-wrap:wrap;">
                 <button type="button" class="btn small ghost reco-tf-btn" data-tf="1m"
@@ -9700,35 +9830,31 @@
 
       <!-- ============ ASK CA AI (Requirement 13) ============ -->
       <div class="panel" id="panel-charts">
-        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
-              <span class="universal-sym-title" id="chartSymbolTitle" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
-              <span class="universal-sym-ltp" id="chartSymbolLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
-              <span class="universal-sym-change" id="chartSymbolChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+        <div class="universal-section-head">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;width:100%;">
+            <div class="universal-symbol-bar">
+              <span class="universal-sym-title" id="chartSymbolTitle">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="chartSymbolLtp">₹—</span>
+              <span class="universal-sym-change" id="chartSymbolChange">—</span>
             </div>
-            <button type="button" class="btn buy small" id="chartBuyBtn" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
-            <button type="button" class="btn sell small" id="chartSellBtn" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
-            <span class="page-sub chart-company" id="chartCompanyName" style="display:none;"></span>
+            <div class="head-actions" style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+              <button type="button" class="btn ghost small" id="chartPopoutBtn" title="Open Chart in Separate Window"
+                onclick="openChartPopout()"
+                style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                <span>Pop-out</span>
+              </button>
+            </div>
           </div>
-          <div class="head-actions">
-            <button type="button" class="btn ghost small" id="chartPopoutBtn" title="Open Chart in Separate Window"
-              onclick="openChartPopout()"
-              style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 8px;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-              <span>Pop-out</span>
-            </button>
-            <button class="btn gold" id="chartAiSuggestBtnMobile"
-              style="display:none;font-weight:700;padding:4px 8px;font-size:11px;align-items:center;gap:4px;"
-              title="CA AI Indicator & Trendline Suggestions"
-              onclick="window.toggleChartAiPanel && window.toggleChartAiPanel(undefined, this)"> CA AI Suggestions <span
-                class="badge" id="chartAiBadgeMobile"
-                style="position:static;width:auto;height:15px;padding:0 4px;border-radius:6px;font-size:8.5px;background:var(--buy);color:#0B2A1E;border:none;margin-left:2px;font-weight:700;">AI</span></button>
+          <div class="universal-buy-sell-grid">
+            <button type="button" class="btn buy universal-btn-buy" id="chartBuyBtn" onclick="window.openOrderForUnderlying('BUY')">BUY</button>
+            <button type="button" class="btn sell universal-btn-sell" id="chartSellBtn" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
           </div>
+          <span class="page-sub chart-company" id="chartCompanyName" style="display:none;"></span>
         </div>
 
         <!-- CA AI Master Executive Summary & Institutional Synthesis Card (Release 38) -->
@@ -10103,27 +10229,29 @@
 
       <!-- ============ BACKTESTING ENGINE & CANDLE REPLAY SIMULATOR ============ -->
       <div class="panel" id="panel-news">
-        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
-              <span class="universal-sym-title" id="newsSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
-              <span class="universal-sym-ltp" id="newsLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
-              <span class="universal-sym-change" id="newsChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+        <div class="universal-section-head">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;width:100%;">
+            <div class="universal-symbol-bar">
+              <span class="universal-sym-title" id="newsSymbol">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="newsLtp">₹—</span>
+              <span class="universal-sym-change" id="newsChange">—</span>
             </div>
-            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
-            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
+            <div class="head-actions news-head-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <div class="session-pill" id="newsLiveStatusPill"
+                style="background:var(--surface-2);border:1px solid var(--border-soft);padding:4px 10px;border-radius:7px;font-family:var(--font-mono);font-size:11px;color:var(--buy);display:flex;align-items:center;gap:6px;">
+                <span
+                  style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--buy);box-shadow:0 0 6px var(--buy);"></span>
+                <span>Live Feed</span> · <b id="newsTimerCountdown">60s</b>
+              </div>
+              <div class="chip-filter active" data-ca-news-mode="all">All Impact News</div>
+              <div class="chip-filter" data-ca-news-mode="stock" id="newsStockTab">Stock Impact</div>
+              <div class="chip-filter" data-ca-news-mode="global">Global Macro</div>
+              <button class="btn ghost small" id="newsRefreshNowBtn" title="Fetch latest CA AI newsfeed">Refresh</button>
+            </div>
           </div>
-          <div class="head-actions news-head-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <div class="session-pill" id="newsLiveStatusPill"
-              style="background:var(--surface-2);border:1px solid var(--border-soft);padding:4px 10px;border-radius:7px;font-family:var(--font-mono);font-size:11px;color:var(--buy);display:flex;align-items:center;gap:6px;">
-              <span
-                style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--buy);box-shadow:0 0 6px var(--buy);"></span>
-              <span>Live Feed</span> · <b id="newsTimerCountdown">60s</b>
-            </div>
-            <div class="chip-filter active" data-ca-news-mode="all">All Impact News</div>
-            <div class="chip-filter" data-ca-news-mode="stock" id="newsStockTab">Stock Impact</div>
-            <div class="chip-filter" data-ca-news-mode="global">Global Macro</div>
-            <button class="btn ghost small" id="newsRefreshNowBtn" title="Fetch latest CA AI newsfeed">Refresh</button>
+          <div class="universal-buy-sell-grid">
+            <button type="button" class="btn buy universal-btn-buy" onclick="window.openOrderForUnderlying('BUY')">BUY</button>
+            <button type="button" class="btn sell universal-btn-sell" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
           </div>
         </div>
 
@@ -10192,15 +10320,15 @@
       <!-- ============ BACKTESTING & MARKET REPLAY ============ -->
       <!-- ============ FUNDAMENTALS ============ -->
       <div class="panel" id="panel-options">
-        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
-              <span class="universal-sym-title" id="optionsSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
-              <span class="universal-sym-ltp" id="optionsLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
-              <span class="universal-sym-change" id="optionsChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
-            </div>
-            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
-            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
+        <div class="universal-section-head">
+          <div class="universal-symbol-bar">
+            <span class="universal-sym-title" id="optionsSymbol">BANKNIFTY</span>
+            <span class="universal-sym-ltp" id="optionsLtp">₹—</span>
+            <span class="universal-sym-change" id="optionsChange">—</span>
+          </div>
+          <div class="universal-buy-sell-grid">
+            <button type="button" class="btn buy universal-btn-buy" onclick="window.openOrderForUnderlying('BUY')">BUY</button>
+            <button type="button" class="btn sell universal-btn-sell" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
           </div>
         </div>
         <!-- Summary Metrics Bar (Zerodha Kite Alignment) -->
@@ -10351,17 +10479,19 @@
       <!-- ============ RECOMMENDATIONS ============ -->
 
       <div class="panel" id="panel-fundamentals">
-        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
-              <span class="universal-sym-title" id="fundSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
-              <span class="universal-sym-ltp" id="fundLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
-              <span class="universal-sym-change" id="fundChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+        <div class="universal-section-head">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;width:100%;">
+            <div class="universal-symbol-bar">
+              <span class="universal-sym-title" id="fundSymbol">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="fundLtp">₹—</span>
+              <span class="universal-sym-change" id="fundChange">—</span>
             </div>
-            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
-            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
+            <div class="head-actions"><button class="btn ghost small" id="refreshFundamentalsBtn">Refresh</button></div>
           </div>
-          <div class="head-actions"><button class="btn ghost" id="refreshFundamentalsBtn">Refresh</button></div>
+          <div class="universal-buy-sell-grid">
+            <button type="button" class="btn buy universal-btn-buy" onclick="window.openOrderForUnderlying('BUY')">BUY</button>
+            <button type="button" class="btn sell universal-btn-sell" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
+          </div>
         </div>
         <div id="fundamentalSignal" class="card" style="margin-bottom:14px">
           <div class="data-empty">Loading fundamentals…</div>
@@ -10410,24 +10540,26 @@
       <!-- ============ OTHER FACTORS & MACRO ============ -->
       <!-- ============ OTHER FACTORS & COMPREHENSIVE QUANTITATIVE SUITE ============ -->
       <div class="panel" id="panel-other-factors">
-        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
-              <span class="universal-sym-title" id="otherFactorsSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
-              <span class="universal-sym-ltp" id="otherFactorsLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
-              <span class="universal-sym-change" id="otherFactorsChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+        <div class="universal-section-head">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;width:100%;">
+            <div class="universal-symbol-bar">
+              <span class="universal-sym-title" id="otherFactorsSymbol">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="otherFactorsLtp">₹—</span>
+              <span class="universal-sym-change" id="otherFactorsChange">—</span>
             </div>
-            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
-            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
+            <div class="head-actions" style="display:flex;align-items:center;gap:10px;">
+              <span class="tag gold" id="otherFactorsConsensusBadge"
+                style="font-family:var(--font-mono);font-weight:700;">Consensus: 78.5% Bullish</span>
+              <span class="muted" id="ofCountdownBadge"
+                style="font-size:11px;font-family:var(--font-mono);display:inline-flex;align-items:center;gap:4px;">⏱
+                Auto-updating in <b id="ofNextRefreshSecs" style="color:var(--buy);">30s</b></span>
+              <button class="btn gold small" id="refreshOtherFactorsBtn" onclick="loadOtherFactorsSuite(true)"
+                style="font-size:11px;padding:3px 10px;font-weight:700;cursor:pointer;">Refresh (30s)</button>
+            </div>
           </div>
-          <div class="head-actions" style="display:flex;align-items:center;gap:10px;">
-            <span class="tag gold" id="otherFactorsConsensusBadge"
-              style="font-family:var(--font-mono);font-weight:700;">Consensus: 78.5% Bullish</span>
-            <span class="muted" id="ofCountdownBadge"
-              style="font-size:11px;font-family:var(--font-mono);display:inline-flex;align-items:center;gap:4px;">⏱
-              Auto-updating in <b id="ofNextRefreshSecs" style="color:var(--buy);">30s</b></span>
-            <button class="btn gold small" id="refreshOtherFactorsBtn" onclick="loadOtherFactorsSuite(true)"
-              style="font-size:11px;padding:3px 10px;font-weight:700;cursor:pointer;">Refresh (30s)</button>
+          <div class="universal-buy-sell-grid">
+            <button type="button" class="btn buy universal-btn-buy" onclick="window.openOrderForUnderlying('BUY')">BUY</button>
+            <button type="button" class="btn sell universal-btn-sell" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
           </div>
         </div>
 
@@ -10559,18 +10691,20 @@
       </div>
 
       <div class="panel" id="panel-movers">
-        <div class="page-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div class="page-title chart-symbol-line" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
-              <span class="universal-sym-title" id="moversSymbol" style="font-size:18px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">BANKNIFTY</span>
-              <span class="universal-sym-ltp" id="moversLtp" style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:#ffffff;">₹—</span>
-              <span class="universal-sym-change" id="moversChange" style="font-size:13px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;">—</span>
+        <div class="universal-section-head">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;width:100%;">
+            <div class="universal-symbol-bar">
+              <span class="universal-sym-title" id="moversSymbol">BANKNIFTY</span>
+              <span class="universal-sym-ltp" id="moversLtp">₹—</span>
+              <span class="universal-sym-change" id="moversChange">—</span>
             </div>
-            <button type="button" class="btn buy small" onclick="window.openOrderForUnderlying('BUY')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">BUY</button>
-            <button type="button" class="btn sell small" onclick="window.openOrderForUnderlying('SELL')" style="font-weight:700;padding:3px 12px;height:26px;font-size:11px;">SELL</button>
+            <div class="head-actions">
+              <span id="moversSourceLabel" class="muted" style="font-size:11px;font-family:var(--font-mono);"></span>
+            </div>
           </div>
-          <div class="head-actions">
-            <span id="moversSourceLabel" class="muted" style="font-size:11px;font-family:var(--font-mono);"></span>
+          <div class="universal-buy-sell-grid">
+            <button type="button" class="btn buy universal-btn-buy" onclick="window.openOrderForUnderlying('BUY')">BUY</button>
+            <button type="button" class="btn sell universal-btn-sell" onclick="window.openOrderForUnderlying('SELL')">SELL</button>
           </div>
         </div>
 
@@ -13378,6 +13512,9 @@
           p.style.removeProperty('display');
         }
       });
+      try {
+        if (typeof window.updateAllSectionHeaders === 'function') window.updateAllSectionHeaders();
+      } catch (_) { }
       try {
         if (name === 'reco') {
           if (typeof loadRecommendations === 'function') loadRecommendations(false);
@@ -30710,14 +30847,13 @@
       } catch (_) { }
     })();
 
-    window.openOrderForUnderlying = function () {
-
-      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'NIFTY';
-      const sig = document.getElementById('undSignalBadge')?.textContent || 'BUY';
+    window.openOrderForUnderlying = function (side = 'BUY') {
+      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'BANKNIFTY';
+      const cleanSide = String(side || 'BUY').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
       if (typeof window.openOrder === 'function') {
-        window.openOrder(sig, sym);
+        window.openOrder(cleanSide, null, 1, sym);
       } else {
-        toast(`Opening order modal for ${sym} (${sig})`);
+        toast(`Opening order modal for ${sym} (${cleanSide})`);
       }
     };
 
@@ -30863,16 +30999,17 @@
       }
     };
 
-    window.openOrderForUnderlying = function () {
-      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'NIFTY';
+    window.openOrderForUnderlying = function (side = 'BUY') {
+      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || _getSym() || 'BANKNIFTY';
       const lotSize = (typeof getSymbolLotSize === 'function') ? getSymbolLotSize(sym) : 1;
+      const cleanSide = String(side || 'BUY').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
       const entry = parseFloat((document.getElementById('undEntry')?.textContent || '').replace(/[^0-9.]/g, '')) || null;
       const sl = parseFloat((document.getElementById('undSl')?.textContent || '').replace(/[^0-9.]/g, '')) || null;
       const target = parseFloat((document.getElementById('undTarget')?.textContent || '').replace(/[^0-9.]/g, '')) || null;
       if (typeof window.openOrder === 'function') {
-        window.openOrder('BUY', sym, lotSize, sym, { entry, sl, target });
+        window.openOrder(cleanSide, sym, lotSize, sym, { entry, sl, target });
       } else if (typeof openOrder === 'function') {
-        openOrder('BUY', sym, lotSize, sym, { entry, sl, target });
+        openOrder(cleanSide, sym, lotSize, sym, { entry, sl, target });
       }
     };
 
@@ -38530,9 +38667,10 @@
       }
     };
 
-    window.openOrderForUnderlying = function () {
-      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || 'BANKNIFTY';
-      window.openOrder('BUY', null, 1, sym);
+    window.openOrderForUnderlying = function (side = 'BUY', customSym = null) {
+      const sym = customSym || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || (typeof _getSym === 'function' ? _getSym() : null) || 'BANKNIFTY';
+      const cleanSide = String(side || 'BUY').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
+      window.openOrder(cleanSide, null, 1, sym);
     };
 
     // Wire modal close and submit handlers
