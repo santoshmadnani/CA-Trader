@@ -9203,22 +9203,26 @@
             </div>
           </div>
 
-          <!-- Bull Run / Severe Fall Sentinel Alert Banner -->
-          <div id="bullRunSentinelBanner"
-            style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:700;letter-spacing:0.3px;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(0,0,0,0.3);flex-wrap:wrap;gap:8px;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span id="bullRunIcon" style="font-size:16px;">🔥</span>
-              <span id="bullRunTitle" style="color:var(--text);font-weight:800;">STRONG BULL RUN EXPANSION SETUP
-                DETECTED</span>
-              <span id="bullRunPointsBadge" class="tag gold" style="font-weight:800;font-size:10.5px;">+200PT TARGET
-                ACTIVATED</span>
-              <span id="bullRunPointsBadge" class="tag gold" style="font-weight:800;font-size:10.5px;">MOMENTUM
-                RUNNER</span>
+          <!-- Compact Trend & Reversal Radar Box -->
+          <div id="trendReversalBox"
+            style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:7px 12px;margin-bottom:12px;font-size:11px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div style="display:inline-flex;align-items:center;gap:5px;">
+                <span style="color:var(--buy);font-weight:800;">📈 Uptrend:</span>
+                <span id="trendUpPts" style="font-family:var(--font-mono);font-weight:700;color:var(--buy);">+180 pts (₹54,630)</span>
+              </div>
+              <span style="color:var(--border-soft);opacity:0.6;">|</span>
+              <div style="display:inline-flex;align-items:center;gap:5px;">
+                <span style="color:var(--sell);font-weight:800;">📉 Downtrend:</span>
+                <span id="trendDownPts" style="font-family:var(--font-mono);font-weight:700;color:var(--sell);">-95 pts (₹54,355)</span>
+              </div>
             </div>
-            <div id="bullRunAdvice"
-              style="font-size:11px;font-weight:600;color:var(--text-dim);font-family:var(--font-mono);">Trail SL
-              Active: Breakeven at T1, Lock Profit at T2</div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);padding:2px 8px;border-radius:5px;">
+              <span style="color:var(--gold);font-weight:800;">🔄 Trend Reversal:</span>
+              <span id="trendReversalNotice" style="font-family:var(--font-mono);font-weight:700;color:var(--gold);font-size:11px;">Expected below ₹54,350 or in ~15 mins</span>
+            </div>
           </div>
+          <div id="bullRunSentinelBanner" style="display:none !important;"></div>
 
           <!-- 3 Recommendation Cards: Spot Benchmark | Best Call (CE) | Best Put (PE) -->
           <div class="dash-reco-grid" id="dashDualRecoContainer"
@@ -9354,6 +9358,7 @@
                   <span class="tag buy" style="font-size:10.5px;font-weight:700;">Call (CE)</span>
                   <span class="tag neutral" id="ceConsensusBadge" style="font-size:9.5px;font-weight:600;">Bullish
                     Flow</span>
+                  <span class="tag neutral" id="ceQtyBadge" style="font-size:9.5px;font-weight:700;font-family:var(--font-mono);border:1px solid var(--border-soft);">15 Qty</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
                   <label
@@ -9501,6 +9506,7 @@
                   <span class="tag sell" style="font-size:10.5px;font-weight:700;">Put (PE)</span>
                   <span class="tag neutral" id="peConsensusBadge" style="font-size:9.5px;font-weight:600;">Bearish /
                     Hedge</span>
+                  <span class="tag neutral" id="peQtyBadge" style="font-size:9.5px;font-weight:700;font-family:var(--font-mono);border:1px solid var(--border-soft);">15 Qty</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
                   <label
@@ -29041,8 +29047,18 @@
             Default Minimum Lots Per Trade
           </label>
           <input type="number" id="recoMinLots" min="1" max="50" step="1" placeholder="1"
+            oninput="window.updateRecoSettingsQtyPreview()"
             style="width:100%;box-sizing:border-box;background:var(--surface-2,#121418);color:var(--text,#fff);border:1px solid var(--border,#2e3542);border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600;font-family:var(--font-mono,monospace);outline:none;">
-          <div style="font-size:10px;color:var(--text-dim,#717d96);margin-top:3px;">Base sizing (multiplied by symbol lot size e.g. 75 for NIFTY, 100 for CRUDEOIL)</div>
+          <div id="recoTotalQtyPreview" style="font-size:13px;font-weight:800;color:var(--buy,#26d9a6);margin-top:5px;font-family:var(--font-mono,monospace);">15 Qty</div>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--text-faint,#8890a0);text-transform:uppercase;margin-bottom:5px;">
+            Maximum Price per Quantity / Premium (₹)
+          </label>
+          <input type="number" id="recoMaxPricePerQty" min="10" step="10" placeholder="e.g. 500 (Optional)"
+            style="width:100%;box-sizing:border-box;background:var(--surface-2,#121418);color:var(--text,#fff);border:1px solid var(--border,#2e3542);border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600;font-family:var(--font-mono,monospace);outline:none;">
+          <div style="font-size:10px;color:var(--text-dim,#717d96);margin-top:3px;">Automatically filters strikes to affordable buyable options below this price</div>
         </div>
       </div>
 
@@ -30505,7 +30521,18 @@
       });
       const tag = document.getElementById('undTimeframeTag');
       if (tag) tag.textContent = `TF: ${tf}`;
+      const subEl = document.getElementById('dashRecoHeaderSub');
+      if (subEl) subEl.textContent = `Autonomous mathematical screening across option chain on ${tf} timeframe.`;
+      if (typeof window.renderDualRecoCards === 'function') {
+        try { window.renderDualRecoCards(window.__caCurrentChartReco || {}); } catch (_) { }
+      }
       if (typeof loadDashboard === 'function') loadDashboard(true);
+      const notify = `Switched to ${tf} recommendation timeframe`;
+      if (typeof _toastMsg === 'function') {
+        _toastMsg(notify);
+      } else if (typeof toast === 'function') {
+        toast(notify);
+      }
     };
     window.setRecoCardsLoadingState = function (baseSym) {
       const sym = baseSym || (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
@@ -30802,17 +30829,33 @@
 
       // Clean root symbol for title display: strip month abbreviations, FUT, EXP (e.g. CRUDEOIL OCT -> CRUDEOIL)
       const cleanRoot = root.replace(/FUT|EXP|\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b/gi, '').trim() || root;
-      const ceDisplayName = `${cleanRoot} ${strike} CE`;
-      const peDisplayName = `${cleanRoot} ${strike} PE`;
+
+      // User risk & affordability settings
+      const userLots = parseInt(localStorage.getItem('ca_min_lots') || '1', 10);
+      const lotSize = (typeof window.getSymbolLotSize === 'function') ? window.getSymbolLotSize(root) : (root.includes('BANK') ? 15 : (root.includes('CRUDE') ? 100 : (root.includes('FIN') ? 65 : 75)));
+      const totalQty = userLots * lotSize;
+      const userCapital = Number(localStorage.getItem('ca_capital') || 50000);
+      const userMaxPrice = Number(localStorage.getItem('ca_max_price_qty') || 0);
+      const maxAllowedEntry = userMaxPrice > 0 ? userMaxPrice : Math.floor(userCapital / Math.max(1, totalQty));
 
       // --- CALL OPTION (CE) PRICING DERIVATION (ca_trader_formula_dashboard_spec.md) ---
-      let cleanCeSym = rawCe?.display || rawCe?.symbol || `${cleanRoot} ${cleanExpCe} ${strike} CE`;
+      let ceStrike = strike;
+      let cleanCeSym = rawCe?.display || rawCe?.symbol || `${cleanRoot} ${cleanExpCe} ${ceStrike} CE`;
       const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, cleanRoot) : null;
       let ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || rawCe?.ltp || 0);
       if (ltpCe <= 0 && curLtp > 0) {
         const atmPct = cleanRoot.includes('CRUDE') ? 0.028 : (cleanRoot.includes('BANK') ? 0.012 : 0.009);
         ltpCe = Math.round(curLtp * atmPct * 100) / 100;
       }
+      // Check affordability / max buyable price for CE: shift strike OTM if needed
+      if (maxAllowedEntry > 5 && ltpCe > maxAllowedEntry) {
+        const priceRatio = Math.max(0.12, maxAllowedEntry / ltpCe);
+        const otmSteps = Math.min(10, Math.max(1, Math.ceil(-Math.log(priceRatio) / 0.35)));
+        ceStrike = strike + (otmSteps * step);
+        ltpCe = Math.max(5.0, Math.round(maxAllowedEntry * 0.94 * 10) / 10);
+      }
+      const ceDisplayName = `${cleanRoot} ${ceStrike} CE`;
+
       const activeTf = window.__caRecoTimeframe || '5m';
       const ceSpec = ltpCe > 0
         ? window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, activeTf)
@@ -30824,13 +30867,23 @@
       ceSpec.symbol = ceDisplayName;
 
       // --- PUT OPTION (PE) PRICING DERIVATION (ca_trader_formula_dashboard_spec.md) ---
-      let cleanPeSym = rawPe?.display || rawPe?.symbol || `${cleanRoot} ${cleanExpPe} ${strike} PE`;
+      let peStrike = strike;
+      let cleanPeSym = rawPe?.display || rawPe?.symbol || `${cleanRoot} ${cleanExpPe} ${peStrike} PE`;
       const liveQPe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanPeSym, cleanRoot) : null;
       let ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || rawPe?.ltp || 0);
       if (ltpPe <= 0 && curLtp > 0) {
         const atmPct = cleanRoot.includes('CRUDE') ? 0.028 : (cleanRoot.includes('BANK') ? 0.012 : 0.009);
         ltpPe = Math.round(curLtp * atmPct * 100) / 100;
       }
+      // Check affordability / max buyable price for PE: shift strike OTM if needed
+      if (maxAllowedEntry > 5 && ltpPe > maxAllowedEntry) {
+        const priceRatio = Math.max(0.12, maxAllowedEntry / ltpPe);
+        const otmSteps = Math.min(10, Math.max(1, Math.ceil(-Math.log(priceRatio) / 0.35)));
+        peStrike = strike - (otmSteps * step);
+        ltpPe = Math.max(5.0, Math.round(maxAllowedEntry * 0.94 * 10) / 10);
+      }
+      const peDisplayName = `${cleanRoot} ${peStrike} PE`;
+
       const peSpec = ltpPe > 0
         ? window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, activeTf)
         : { entry: 0, sl: 0, tgt: 0, rrDisplay: '—', risk: 0, actualRr: 2.0 };
@@ -30953,6 +31006,40 @@
           brBanner.style.display = 'none';
         }
       }
+
+      // Update Card Header Badges & Quick Order Buttons with Active User Quantity
+      const ceQtyBadge = document.getElementById('ceQtyBadge');
+      if (ceQtyBadge) ceQtyBadge.textContent = `${totalQty} Qty (${userLots}L)`;
+      const peQtyBadge = document.getElementById('peQtyBadge');
+      if (peQtyBadge) peQtyBadge.textContent = `${totalQty} Qty (${userLots}L)`;
+
+      const ceBtn = document.querySelector('#dashCardCe button.btn.buy.small');
+      if (ceBtn) ceBtn.innerHTML = `Quick Order CE (<span style="font-weight:700;">${totalQty} Qty</span>)`;
+      const peBtn = document.querySelector('#dashCardPe button.btn.buy.small, #dashCardPe button.btn.sell.small');
+      if (peBtn) peBtn.innerHTML = `Quick Order PE (<span style="font-weight:700;">${totalQty} Qty</span>)`;
+
+      // Dynamic Trend & Reversal Box update based on active timeframe
+      const upPts = Math.max(1, Math.round(curLtp * tfMovePct * 1.3));
+      const downPts = Math.max(1, Math.round(curLtp * tfMovePct * 1.0));
+      const upLevel = _roundV(curLtp + upPts);
+      const downLevel = _roundV(curLtp - downPts);
+
+      const elUp = document.getElementById('trendUpPts');
+      const elDown = document.getElementById('trendDownPts');
+      const elRev = document.getElementById('trendReversalNotice');
+
+      if (elUp) elUp.textContent = `+${upPts} pts (₹${_fmtNum(upLevel)})`;
+      if (elDown) elDown.textContent = `-${downPts} pts (₹${_fmtNum(downLevel)})`;
+
+      const revMins = (curTf === '1m' ? '2-4 mins' : (curTf === '3m' ? '5-7 mins' : (curTf === '5m' ? '12-15 mins' : (curTf === '15m' ? '25-35 mins' : (curTf === '1h' ? '1-2 hrs' : '1-2 sessions')))));
+      if (elRev) {
+        if (isUndBuy) {
+          elRev.textContent = `Expected below ₹${_fmtNum(downLevel)} or in ~${revMins}`;
+        } else {
+          elRev.textContent = `Expected above ₹${_fmtNum(upLevel)} or in ~${revMins}`;
+        }
+      }
+
       if (typeof window.populateRecoExpirySelect === 'function') window.populateRecoExpirySelect(root);
     };
 
@@ -31099,7 +31186,9 @@
       const nameEl = document.getElementById(side === 'CE' ? 'ceContractName' : 'peContractName');
       const sym = (nameEl && nameEl.textContent.trim()) || '';
       const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'NIFTY';
-      const lotSize = (typeof getSymbolLotSize === 'function') ? getSymbolLotSize(sym) : (root.includes('BANK') ? 15 : (root.includes('CRUDE') ? 100 : 25));
+      const lotSize = (typeof getSymbolLotSize === 'function') ? getSymbolLotSize(sym) : (root.includes('BANK') ? 15 : (root.includes('CRUDE') ? 100 : (root.includes('FIN') ? 65 : 75)));
+      const userLots = parseInt(localStorage.getItem('ca_min_lots') || '1', 10);
+      const totalQty = userLots * lotSize;
 
       const entryText = document.getElementById(side === 'CE' ? 'ceEntry' : 'peEntry')?.textContent || '';
       const slText = document.getElementById(side === 'CE' ? 'ceSl' : 'peSl')?.textContent || '';
@@ -31110,11 +31199,11 @@
       const target = parseFloat(targetText.replace(/[^0-9.]/g, '')) || null;
 
       if (typeof window.openOrder === 'function') {
-        window.openOrder('BUY', sym, lotSize, sym, { entry, sl, target });
+        window.openOrder('BUY', sym, totalQty, sym, { entry, sl, target });
       } else if (typeof openOrder === 'function') {
-        openOrder('BUY', sym, lotSize, sym, { entry, sl, target });
+        openOrder('BUY', sym, totalQty, sym, { entry, sl, target });
       } else {
-        _toastMsg(`Place Order: ${sym} (${lotSize} qty)`);
+        _toastMsg(`Place Order: ${sym} (${totalQty} qty)`);
       }
     };
 
@@ -32252,6 +32341,18 @@
     window.__caReplayPositions = [];
     window.__caReplayClosedTrades = [];
 
+    window.updateRecoSettingsQtyPreview = function () {
+      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || (typeof _getSym === 'function' ? _getSym() : 'BANKNIFTY');
+      const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
+      const lotSize = (typeof window.getSymbolLotSize === 'function') ? window.getSymbolLotSize(root) : (root.includes('BANK') ? 15 : (root.includes('CRUDE') ? 100 : (root.includes('FIN') ? 65 : 75)));
+      const lots = parseInt(document.getElementById('recoMinLots')?.value, 10) || 1;
+      const totalQty = lots * lotSize;
+      const preview = document.getElementById('recoTotalQtyPreview');
+      if (preview) {
+        preview.textContent = `${totalQty} Qty`;
+      }
+    };
+
     window.openRecoSettingsModal = function (e) {
       if (e) {
         if (typeof e.preventDefault === 'function') e.preventDefault();
@@ -32261,10 +32362,14 @@
       const ml = document.getElementById('recoMaxLoss');
       const mp = document.getElementById('recoMaxProfit');
       const lots = document.getElementById('recoMinLots');
+      const maxPrice = document.getElementById('recoMaxPricePerQty');
       if (cap) cap.value = localStorage.getItem('ca_capital') || '50000';
       if (ml) ml.value = localStorage.getItem('ca_max_loss') || '2000';
       if (mp) mp.value = localStorage.getItem('ca_desired_profit') || '5000';
       if (lots) lots.value = localStorage.getItem('ca_min_lots') || '1';
+      if (maxPrice) maxPrice.value = localStorage.getItem('ca_max_price_qty') || '';
+
+      window.updateRecoSettingsQtyPreview();
 
       const modal = document.getElementById('recoSettingsModal');
       if (modal) {
@@ -32293,14 +32398,25 @@
       const ml = document.getElementById('recoMaxLoss')?.value || '2000';
       const mp = document.getElementById('recoMaxProfit')?.value || '5000';
       const lots = document.getElementById('recoMinLots')?.value || '1';
+      const maxPrice = document.getElementById('recoMaxPricePerQty')?.value || '';
       localStorage.setItem('ca_capital', cap);
       localStorage.setItem('ca_max_loss', ml);
       localStorage.setItem('ca_desired_profit', mp);
       localStorage.setItem('ca_min_lots', lots);
+      localStorage.setItem('ca_max_price_qty', maxPrice);
       window.closeRecoSettingsModal();
+
+      if (typeof window.renderDualRecoCards === 'function') {
+        try { window.renderDualRecoCards(window.__caCurrentChartReco || {}); } catch (_) { }
+      }
       if (typeof window.onRecoRiskChange === 'function') window.onRecoRiskChange();
       if (typeof loadDashboard === 'function') void loadDashboard(true);
-      const msg = '⚙ Settings saved: Capital ₹' + cap + ', Max Loss ₹' + ml + ', Desired Profit ₹' + mp + ', Min Lots: ' + lots;
+
+      const sym = (typeof window.selectedSymbol === 'function' ? window.selectedSymbol() : null) || window.CATraderSymbol || 'BANKNIFTY';
+      const root = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
+      const lotSize = (typeof window.getSymbolLotSize === 'function') ? window.getSymbolLotSize(root) : 15;
+      const totalQty = (parseInt(lots, 10) || 1) * lotSize;
+      const msg = `⚙ Settings saved: ${totalQty} Qty (${lots} Lot${lots > 1 ? 's' : ''}) | Cap ₹${Number(cap).toLocaleString('en-IN')}${maxPrice ? ' | Max ₹' + maxPrice + '/qty' : ''}`;
       if (typeof _toastMsg === 'function') {
         _toastMsg(msg);
       } else if (typeof toast === 'function') {
