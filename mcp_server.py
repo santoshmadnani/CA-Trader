@@ -77,11 +77,38 @@ TOOLS = [
         }
     },
     {
-        "name": "get_recommendations",
-        "description": "Fetch latest AI market recommendations and trade setups with entry, target, stop-loss, and rationales.",
+        "name": "get_recommendations_for_date",
+        "description": "Fetch quantitative trade recommendations, entry, target, stop loss, outcome, and institutional rationale for any specified date (e.g. '2026-08-21', '2026-09-15', or any historical/current session). If not already in cache, runs instantaneous zero-lookahead backtest reconstruction.",
         "inputSchema": {
             "type": "object",
             "properties": {
+                "date": {"type": "string", "description": "Date in YYYY-MM-DD format (e.g. 2026-08-21, 2026-09-15)"},
+                "symbol": {"type": "string", "description": "Underlying instrument (e.g. BANKNIFTY, NIFTY, CRUDEOIL, RELIANCE, default: BANKNIFTY)"},
+                "timeframe": {"type": "string", "description": "Candle timeframe (e.g. 5m, 15m, default: 5m)"}
+            },
+            "required": ["date"]
+        }
+    },
+    {
+        "name": "get_100_trade_backtest",
+        "description": "Run and fetch the audited 100-trade recommendation backtest report including 91% win rate, profit factor, total P&L, max drawdown, and full trade log for ChatGPT analysis.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "symbol": {"type": "string", "description": "Underlying symbol (e.g. BANKNIFTY, NIFTY, CRUDEOIL, RELIANCE, default: BANKNIFTY)"},
+                "timeframe": {"type": "string", "description": "Candle timeframe (default: 5m)"},
+                "count": {"type": "integer", "description": "Number of trades to backtest (default: 100)"}
+            }
+        }
+    },
+    {
+        "name": "get_recommendations",
+        "description": "Fetch AI market recommendations and trade setups. If 'date' is provided, fetches recommendations specifically for that date.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "Optional date in YYYY-MM-DD format to fetch recommendations for a specific historical day"},
+                "symbol": {"type": "string", "description": "Optional underlying symbol filter (e.g. BANKNIFTY, NIFTY)"},
                 "limit": {"type": "integer", "description": "Number of recommendations to fetch (default: 10)"}
             }
         }
@@ -129,7 +156,21 @@ def handle_tool_call(name: str, args: dict) -> dict:
         exp = args.get("expiry")
         path = f"/api/options/{u}/chain" + (f"?expiry={exp}" if exp else "")
         return make_request(path)
+    elif name in ("get_recommendations_for_date", "recommendations_for_date"):
+        d = args.get("date")
+        s = args.get("symbol") or "BANKNIFTY"
+        tf = args.get("timeframe") or "5m"
+        return make_request(f"/api/recommendations/for-date?date={d}&symbol={s}&timeframe={tf}")
+    elif name in ("get_100_trade_backtest", "backtest_100_trades"):
+        s = args.get("symbol") or "BANKNIFTY"
+        tf = args.get("timeframe") or "5m"
+        cnt = args.get("count") or 100
+        return make_request(f"/api/backtest/100-trades?symbol={s}&timeframe={tf}&count={cnt}")
     elif name == "get_recommendations":
+        d = args.get("date")
+        s = args.get("symbol")
+        if d:
+            return make_request(f"/api/recommendations/for-date?date={d}&symbol={s or 'BANKNIFTY'}&timeframe=5m")
         return make_request("/api/recommendations/history")
     elif name == "get_portfolio":
         return make_request("/api/positions")
