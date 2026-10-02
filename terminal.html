@@ -9197,6 +9197,45 @@
               <button type="button" class="btn ghost small"
                 onclick="loadDashboard(true); toast('Scanning all option chains for new setups...');"
                 style="padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">↻ Refresh</button>
+              <div style="position:relative;display:inline-block;">
+                <button type="button" class="btn ghost small" id="recoSettingsBtn" title="Recommendation Risk & Capital Settings"
+                  style="padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;"
+                  onclick="window.toggleRecoSettings(event)">⚙ Settings</button>
+                <div id="recoSettingsPopover"
+                  style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:280px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;z-index:99999;box-shadow:0 12px 32px rgba(0,0,0,0.7);">
+                  <div
+                    style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:10px;border-bottom:1px solid var(--border-soft);padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="display:inline-flex;align-items:center;gap:5px;"><span>⚙</span> Capital & Risk Settings</span>
+                    <span style="cursor:pointer;font-size:13px;color:var(--text-dim);" onclick="window.toggleRecoSettings(event)">✕</span>
+                  </div>
+                  <div style="margin-bottom:8px;">
+                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Capital Per Trade (₹)</label>
+                    <input id="recoCapital" type="number" placeholder="50000"
+                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
+                      oninput="localStorage.setItem('ca_capital',this.value)">
+                  </div>
+                  <div style="margin-bottom:8px;">
+                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Max Loss Per Trade (₹)</label>
+                    <input id="recoMaxLoss" type="number" placeholder="2000"
+                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
+                      oninput="localStorage.setItem('ca_max_loss',this.value);if(window.onRecoRiskChange)window.onRecoRiskChange();">
+                  </div>
+                  <div style="margin-bottom:8px;">
+                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Desired Profit Per Trade (₹)</label>
+                    <input id="recoMaxProfit" type="number" placeholder="5000"
+                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
+                      oninput="localStorage.setItem('ca_desired_profit',this.value);if(window.onRecoRiskChange)window.onRecoRiskChange();">
+                  </div>
+                  <div style="margin-bottom:12px;">
+                    <label style="font-size:10.5px;color:var(--text-faint);display:block;margin-bottom:3px;font-weight:600;">Minimum Lot / Qty Per Trade</label>
+                    <input id="recoMinLots" type="number" placeholder="1" min="1"
+                      style="width:100%;height:28px;padding:3px 8px;font-size:11px;border-radius:4px;background:var(--surface-2);color:var(--text);border:1px solid var(--border-soft);box-sizing:border-box;"
+                      oninput="localStorage.setItem('ca_min_lots',this.value);if(window.onRecoRiskChange)window.onRecoRiskChange();">
+                  </div>
+                  <button type="button" class="btn gold small" style="width:100%;justify-content:center;height:28px;font-weight:700;"
+                    onclick="window.saveRecoSettings()">Save & Refresh</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -9367,7 +9406,7 @@
                   </div>
                   <!-- Search Box beside ITM & OTM buttons (Item 5) -->
                   <div class="top-search" style="position:relative;display:inline-block;">
-                    <input type="text" id="ceOptionSearchInput" placeholder=" CE strike…" autocomplete="off"
+                    <input type="text" id="ceOptionSearchInput" name="ce_strike_query_no_autofill" placeholder=" CE strike…" autocomplete="new-password" data-lpignore="true"
                       style="width:84px;height:20px;padding:1px 6px;font-size:10px;border-radius:4px;background:var(--surface);color:var(--text);border:1px solid var(--border-soft);">
                     <div class="top-search-suggestions" id="ceOptionSearchSuggestions"
                       style="position:absolute;right:0;top:calc(100% + 4px);min-width:210px;max-height:220px;overflow-y:auto;z-index:99999;">
@@ -9514,7 +9553,7 @@
                   </div>
                   <!-- Search Box beside ITM & OTM buttons (Item 5) -->
                   <div class="top-search" style="position:relative;display:inline-block;">
-                    <input type="text" id="peOptionSearchInput" placeholder=" PE strike…" autocomplete="off"
+                    <input type="text" id="peOptionSearchInput" name="pe_strike_query_no_autofill" placeholder=" PE strike…" autocomplete="new-password" data-lpignore="true"
                       style="width:84px;height:20px;padding:1px 6px;font-size:10px;border-radius:4px;background:var(--surface);color:var(--text);border:1px solid var(--border-soft);">
                     <div class="top-search-suggestions" id="peOptionSearchSuggestions"
                       style="position:absolute;right:0;top:calc(100% + 4px);min-width:210px;max-height:220px;overflow-y:auto;z-index:99999;">
@@ -28986,9 +29025,11 @@
       const cap = localStorage.getItem('ca_capital');
       const loss = localStorage.getItem('ca_max_loss');
       const profit = localStorage.getItem('ca_desired_profit');
+      const lots = localStorage.getItem('ca_min_lots');
       if (cap && document.getElementById('recoCapital')) document.getElementById('recoCapital').value = cap;
       if (loss && document.getElementById('recoMaxLoss')) document.getElementById('recoMaxLoss').value = loss;
       if (profit && document.getElementById('recoMaxProfit')) document.getElementById('recoMaxProfit').value = profit;
+      if (lots && document.getElementById('recoMinLots')) document.getElementById('recoMinLots').value = lots;
     })();
   </script>
 
@@ -30253,6 +30294,44 @@
     const _roundV = (v, d = 2) => (typeof roundVal === 'function' ? roundVal(v, d) : Math.round(Number(v || 0) * Math.pow(10, d)) / Math.pow(10, d));
     const _toastMsg = (msg) => { if (typeof toast === 'function') toast(msg); else if (typeof showToast === 'function') showToast(msg); else console.log(msg); };
 
+    // Standardized Minimum Lot Size Resolver across Indices, MCX Commodities & F&O Stocks
+    window.getSymbolLotSize = function (sym) {
+      if (!sym) return 1;
+      const s = String(sym).toUpperCase().trim();
+      if (s.includes('CRUDEOILM')) return 10;
+      if (s.includes('CRUDE')) return 100;
+      if (s.includes('NATGASMINI')) return 250;
+      if (s.includes('NATURALGAS')) return 1250;
+      if (s.includes('GOLDM')) return 10;
+      if (s.includes('GOLDGUINEA') || s.includes('GOLDPETAL')) return 1;
+      if (s.includes('GOLD')) return 100;
+      if (s.includes('SILVERMIC')) return 1;
+      if (s.includes('SILVERM')) return 5;
+      if (s.includes('SILVER')) return 30;
+      if (s.includes('COPPER')) return 2500;
+      if (s.includes('ZINC') || s.includes('LEAD') || s.includes('ALUMINIUM')) return 5000;
+      if (s.includes('BANKNIFTY') || s.includes('NIFTY BANK')) return 15;
+      if (s.includes('FINNIFTY')) return 65;
+      if (s.includes('MIDCPNIFTY')) return 120;
+      if (s.includes('NIFTY')) return 75;
+      if (s.includes('SENSEX')) return 10;
+      if (s.includes('BANKEX')) return 15;
+      const stockLots = {
+        'RELIANCE': 250, 'HDFCBANK': 550, 'ICICIBANK': 700, 'INFY': 400,
+        'TCS': 175, 'SBIN': 750, 'BHARTIARTL': 475, 'TATAMOTORS': 575,
+        'TATASTEEL': 5500, 'ITC': 1600, 'AXISBANK': 625, 'KOTAKBANK': 400,
+        'LT': 150, 'MARUTI': 50, 'BAJFINANCE': 125, 'BAJAJFINSV': 500,
+        'ASIANPAINT': 200, 'TITAN': 175, 'SUNPHARMA': 350, 'WIPRO': 1500,
+        'HCLTECH': 350, 'NTPC': 1500, 'ONGC': 3850, 'POWERGRID': 1800,
+        'COALINDIA': 2100, 'ADANIENT': 300, 'ADANIPORTS': 400, 'JSWSTEEL': 675,
+        'HINDALCO': 1400, 'VEDL': 1150
+      };
+      for (const [k, v] of Object.entries(stockLots)) {
+        if (s.startsWith(k) || s.includes(k)) return v;
+      }
+      return 1;
+    };
+
     // Update Dual CE & PE Cards with Clean Pullback Entry != LTP
     // ============================================================================
     // CA TRADER SPEC LEVELS CALCULATION ENGINE (ca_trader_formula_dashboard_spec.md)
@@ -30698,13 +30777,19 @@
       const cleanExpCe = deriveContractExpiry(rawExpCe, baseReplayDate);
       const cleanExpPe = deriveContractExpiry(rawExpPe, baseReplayDate);
 
+      // Clean root symbol for title display: strip month abbreviations, FUT, EXP (e.g. CRUDEOIL OCT -> CRUDEOIL)
+      const cleanRoot = root.replace(/FUT|EXP|\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b/gi, '').trim() || root;
+      const ceDisplayName = `${cleanRoot} ${strike} CE`;
+      const peDisplayName = `${cleanRoot} ${strike} PE`;
+
       // --- CALL OPTION (CE) PRICING DERIVATION (ca_trader_formula_dashboard_spec.md) ---
-      let cleanCeSym = rawCe?.display || rawCe?.symbol || `${root} ${cleanExpCe} ${strike} CE`;
-      if (!cleanCeSym.toUpperCase().startsWith(root)) {
-        cleanCeSym = `${root} ${cleanExpCe} ${strike} CE`;
+      let cleanCeSym = rawCe?.display || rawCe?.symbol || `${cleanRoot} ${cleanExpCe} ${strike} CE`;
+      const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, cleanRoot) : null;
+      let ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || rawCe?.ltp || 0);
+      if (ltpCe <= 0 && curLtp > 0) {
+        const atmPct = cleanRoot.includes('CRUDE') ? 0.028 : (cleanRoot.includes('BANK') ? 0.012 : 0.009);
+        ltpCe = Math.round(curLtp * atmPct * 100) / 100;
       }
-      const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, root) : null;
-      const ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || rawCe?.ltp || 0);
       const activeTf = window.__caRecoTimeframe || '5m';
       const ceSpec = ltpCe > 0
         ? window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, activeTf)
@@ -30713,22 +30798,23 @@
       const ceSpec15m = ltpCe > 0
         ? window.calculateSpecLevels('CE', curLtp, vwapVal, ltpCe, 0.52, 0.0014, -12.4, 14.8, 13.8, 58.4, 28.5, suppVal, resVal, sAtrVal, 18.73, 0.478, '15m')
         : { actualRr: 2.0 };
-      ceSpec.symbol = cleanCeSym;
+      ceSpec.symbol = ceDisplayName;
 
       // --- PUT OPTION (PE) PRICING DERIVATION (ca_trader_formula_dashboard_spec.md) ---
-      let cleanPeSym = rawPe?.display || rawPe?.symbol || `${root} ${cleanExpPe} ${strike} PE`;
-      if (!cleanPeSym.toUpperCase().startsWith(root)) {
-        cleanPeSym = `${root} ${cleanExpPe} ${strike} PE`;
+      let cleanPeSym = rawPe?.display || rawPe?.symbol || `${cleanRoot} ${cleanExpPe} ${strike} PE`;
+      const liveQPe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanPeSym, cleanRoot) : null;
+      let ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || rawPe?.ltp || 0);
+      if (ltpPe <= 0 && curLtp > 0) {
+        const atmPct = cleanRoot.includes('CRUDE') ? 0.028 : (cleanRoot.includes('BANK') ? 0.012 : 0.009);
+        ltpPe = Math.round(curLtp * atmPct * 100) / 100;
       }
-      const liveQPe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanPeSym, root) : null;
-      const ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || rawPe?.ltp || 0);
       const peSpec = ltpPe > 0
         ? window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, activeTf)
         : { entry: 0, sl: 0, tgt: 0, rrDisplay: '—', risk: 0, actualRr: 2.0 };
       const peSpec15m = ltpPe > 0
         ? window.calculateSpecLevels('PE', curLtp, vwapVal, ltpPe, -0.48, 0.0014, -11.8, 14.2, 14.5, 58.4, 28.5, suppVal, resVal, sAtrVal, 16.50, 0.478, '15m')
         : { actualRr: 2.0 };
-      peSpec.symbol = cleanPeSym;
+      peSpec.symbol = peDisplayName;
 
       const entryCe = ceSpec.entry;
       const slCe = ceSpec.sl;
@@ -30751,7 +30837,7 @@
       };
 
       // Render CALL (CE) Card - Only Buy Recommendations
-      if (document.getElementById('ceContractName')) document.getElementById('ceContractName').textContent = cleanCeSym;
+      if (document.getElementById('ceContractName')) document.getElementById('ceContractName').textContent = ceDisplayName;
       if (document.getElementById('ceExpiryDate')) document.getElementById('ceExpiryDate').textContent = `Exp: ${cleanExpCe}`;
       if (document.getElementById('ceCmp')) document.getElementById('ceCmp').textContent = ltpCe > 0 ? `₹${_fmtNum(ltpCe)}` : '₹—';
       if (document.getElementById('ceEntry')) document.getElementById('ceEntry').textContent = entryCe > 0 ? `₹${_fmtNum(entryCe)}` : '₹—';
@@ -30776,7 +30862,7 @@
       if (document.getElementById('ceRationaleShort')) document.getElementById('ceRationaleShort').innerHTML = tfTipCe;
 
       // Render PUT (PE) Card - Only Buy Recommendations (Active when underlying signal is SELL)
-      if (document.getElementById('peContractName')) document.getElementById('peContractName').textContent = cleanPeSym;
+      if (document.getElementById('peContractName')) document.getElementById('peContractName').textContent = peDisplayName;
       if (document.getElementById('peExpiryDate')) document.getElementById('peExpiryDate').textContent = `Exp: ${cleanExpPe}`;
       if (document.getElementById('peCmp')) document.getElementById('peCmp').textContent = ltpPe > 0 ? `₹${_fmtNum(ltpPe)}` : '₹—';
       if (document.getElementById('peEntry')) document.getElementById('peEntry').textContent = entryPe > 0 ? `₹${_fmtNum(entryPe)}` : '₹—';
@@ -32153,22 +32239,27 @@
         const cap = document.getElementById('recoCapital');
         const ml = document.getElementById('recoMaxLoss');
         const mp = document.getElementById('recoMaxProfit');
+        const lots = document.getElementById('recoMinLots');
         if (cap) cap.value = localStorage.getItem('ca_capital') || '50000';
         if (ml) ml.value = localStorage.getItem('ca_max_loss') || '2000';
         if (mp) mp.value = localStorage.getItem('ca_desired_profit') || '5000';
+        if (lots) lots.value = localStorage.getItem('ca_min_lots') || '1';
       }
     };
     window.saveRecoSettings = function () {
       const cap = document.getElementById('recoCapital')?.value || '50000';
       const ml = document.getElementById('recoMaxLoss')?.value || '2000';
       const mp = document.getElementById('recoMaxProfit')?.value || '5000';
+      const lots = document.getElementById('recoMinLots')?.value || '1';
       localStorage.setItem('ca_capital', cap);
       localStorage.setItem('ca_max_loss', ml);
       localStorage.setItem('ca_desired_profit', mp);
+      localStorage.setItem('ca_min_lots', lots);
       const pop = document.getElementById('recoSettingsPopover');
       if (pop) pop.style.display = 'none';
       if (typeof window.onRecoRiskChange === 'function') window.onRecoRiskChange();
-      _toastMsg(' Settings saved: Max Loss ₹' + ml + ', Desired Profit ₹' + mp);
+      if (typeof loadDashboard === 'function') void loadDashboard(true);
+      _toastMsg('⚙ Settings saved: Capital ₹' + cap + ', Max Loss ₹' + ml + ', Desired Profit ₹' + mp + ', Min Lots: ' + lots);
     };
 
     window.toggleReplayOrderSettings = function (e) {

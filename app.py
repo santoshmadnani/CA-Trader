@@ -254,7 +254,12 @@ def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
         yf_sym = yf_map.get(sym)
         opt_info = None
         if not yf_sym:
-            if sym.startswith("NSE_INDEX|"):
+            if "CRUDE" in sym: yf_sym = "CL=F"
+            elif "GOLD" in sym: yf_sym = "GC=F"
+            elif "SILVER" in sym: yf_sym = "SI=F"
+            elif "NATURALGAS" in sym: yf_sym = "NG=F"
+            elif "COPPER" in sym: yf_sym = "HG=F"
+            elif sym.startswith("NSE_INDEX|"):
                 clean = sym.split("|")[-1].replace(" ", "").upper()
                 if "NIFTY50" in clean or clean == "NIFTY": yf_sym = "^NSEI"
                 elif "BANK" in clean: yf_sym = "^NSEBANK"
@@ -267,25 +272,26 @@ def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
                 if opt_info:
                     und = opt_info["underlying"]
                     und_q = get_live_fallback_quote(und)
-                    if und_q and und_q.get("ltp"):
-                        und_ltp = float(und_q["ltp"])
-                        strike = float(opt_info["strike"])
-                        opt_type = opt_info["option_type"]
-                        opt_price = bs_price(und_ltp, strike, opt_type=opt_type)
-                        return {
-                            "instrument": sym,
-                            "ltp": round(float(opt_price), 2),
-                            "close": round(float(opt_price), 2),
-                            "cp": round(float(opt_price * 0.96), 2),
-                            "open": round(float(opt_price * 0.95), 2),
-                            "high": round(float(opt_price * 1.08), 2),
-                            "low": round(float(opt_price * 0.92), 2),
-                            "net_change": round(float(opt_price * 0.04), 2),
-                            "change_pct": 4.0,
-                            "fresh": True,
-                            "provider": "bs_live_engine"
-                        }
+                    und_ltp = float(und_q["ltp"]) if (und_q and und_q.get("ltp")) else (9000.0 if "CRUDE" in und else (25000.0 if "NIFTY" in und else 54000.0))
+                    strike = float(opt_info["strike"])
+                    opt_type = opt_info["option_type"]
+                    opt_price = bs_price(und_ltp, strike, opt_type=opt_type)
+                    return {
+                        "instrument": sym,
+                        "ltp": round(float(opt_price), 2),
+                        "close": round(float(opt_price), 2),
+                        "cp": round(float(opt_price * 0.96), 2),
+                        "open": round(float(opt_price * 0.95), 2),
+                        "high": round(float(opt_price * 1.08), 2),
+                        "low": round(float(opt_price * 0.92), 2),
+                        "net_change": round(float(opt_price * 0.04), 2),
+                        "change_pct": 4.0,
+                        "fresh": True,
+                        "provider": "bs_live_engine"
+                    }
                 else:
+                    if sym.startswith("MCX") or "CRUDE" in sym or "GOLD" in sym or "SILVER" in sym or "NATURALGAS" in sym or "COPPER" in sym:
+                        return None
                     clean_root = sym.split()[0].replace(".NS", "").replace(".BO", "")
                     yf_sym = f"{clean_root}.NS"
         
@@ -340,8 +346,23 @@ def get_live_fallback_candles(instrument: str, timeframe: str = "5", days: int =
             "SENSEX": "^BSESN",
             "CRUDEOIL": "CL=F",
             "GOLD": "GC=F",
+            "SILVER": "SI=F",
+            "NATURALGAS": "NG=F",
+            "COPPER": "HG=F",
         }
-        yf_sym = yf_map.get(sym) or (f"{sym.split()[0]}.NS" if not sym.endswith(".NS") else sym)
+        if "CRUDE" in sym: yf_sym = "CL=F"
+        elif "GOLD" in sym: yf_sym = "GC=F"
+        elif "SILVER" in sym: yf_sym = "SI=F"
+        elif "NATURALGAS" in sym: yf_sym = "NG=F"
+        elif "COPPER" in sym: yf_sym = "HG=F"
+        elif sym in yf_map: yf_sym = yf_map[sym]
+        elif sym.startswith("MCX_FO|") or sym.startswith("NSE_FO|") or "_CE" in sym or "_PE" in sym or sym.endswith("CE") or sym.endswith("PE"):
+            return []  # Options cannot be queried directly from yfinance via .NS
+        elif sym.startswith("MCX"):
+            return []
+        else:
+            clean_token = sym.split()[0].replace(".NS", "").replace(".BO", "")
+            yf_sym = f"{clean_token}.NS"
         interval = "5m"
         tf_str = str(timeframe).lower()
         if "15" in tf_str: interval = "15m"
@@ -3454,6 +3475,9 @@ def parse_option_contract(sym: str) -> dict[str, Any] | None:
     if not sym:
         return None
     s = str(sym).strip().upper()
+    # Normalize exchange prefixes and delimiters (e.g. MCX_FO|CRUDEOIL_9000_CE -> CRUDEOIL 9000 CE)
+    s = re.sub(r'^(MCX_FO|NSE_FO|NSE_INDEX|BSE_FO|MCX_COM|NSE_COM)\|', '', s)
+    s = s.replace('_', ' ').strip()
     if not re.search(r'\b(CE|PE)\b', s) and not (s.endswith('CE') or s.endswith('PE')):
         return None
     m1 = re.match(r'^([A-Z]+)\s+(\d+(?:\.\d+)?)\s+(CE|PE)(?:\s+(.*))?$', s)
@@ -3468,7 +3492,7 @@ def parse_option_contract(sym: str) -> dict[str, Any] | None:
     opt_type = "PE" if (" PE" in s or s.endswith("PE")) else ("CE" if (" CE" in s or s.endswith("CE")) else None)
     if not opt_type:
         return None
-    strike_match = re.search(r'\b(\d{4,6})\b', s)
+    strike_match = re.search(r'\b(\d{3,6})\b', s)
     underlying_match = re.match(r'^([A-Z]+)', s)
     if underlying_match and strike_match:
         return {"underlying": underlying_match.group(1), "strike": float(strike_match.group(1)), "option_type": opt_type, "expiry": "", "symbol": s}
@@ -3515,8 +3539,11 @@ def synthesize_option_candles(instrument: str, opt_info: dict[str, Any], underly
     return synth_candles
 
 def resolve_lot_size(sym: str, default: int = 1) -> int:
-    s = str(sym or "").upper()
+    s = str(sym or "").upper().strip()
+    # MCX Commodities
+    if "CRUDEOILM" in s: return 10
     if "CRUDE" in s: return 100
+    if "NATGASMINI" in s: return 250
     if "NATURALGAS" in s: return 1250
     if "GOLDM" in s: return 10
     if "GOLDGUINEA" in s: return 1
@@ -3527,10 +3554,31 @@ def resolve_lot_size(sym: str, default: int = 1) -> int:
     if "SILVER" in s: return 30
     if "COPPER" in s: return 2500
     if "ZINC" in s: return 5000
+    if "LEAD" in s: return 5000
+    if "ALUMINIUM" in s: return 5000
+
+    # Major Indices
     if "NIFTY BANK" in s or "BANKNIFTY" in s: return 15
     if "FINNIFTY" in s: return 65
     if "MIDCPNIFTY" in s: return 120
     if "NIFTY" in s: return 75
+    if "SENSEX" in s: return 10
+    if "BANKEX" in s: return 15
+
+    # Top F&O Stocks
+    stock_lots = {
+        "RELIANCE": 250, "HDFCBANK": 550, "ICICIBANK": 700, "INFY": 400,
+        "TCS": 175, "SBIN": 750, "BHARTIARTL": 475, "TATAMOTORS": 575,
+        "TATASTEEL": 5500, "ITC": 1600, "AXISBANK": 625, "KOTAKBANK": 400,
+        "LT": 150, "MARUTI": 50, "BAJFINANCE": 125, "BAJAJFINSV": 500,
+        "ASIANPAINT": 200, "TITAN": 175, "SUNPHARMA": 350, "WIPRO": 1500,
+        "HCLTECH": 350, "NTPC": 1500, "ONGC": 3850, "POWERGRID": 1800,
+        "COALINDIA": 2100, "ADANIENT": 300, "ADANIPORTS": 400, "JSWSTEEL": 675,
+        "HINDALCO": 1400, "VEDL": 1150
+    }
+    for k, v in stock_lots.items():
+        if s.startswith(k) or k in s:
+            return v
     return default
 
 
