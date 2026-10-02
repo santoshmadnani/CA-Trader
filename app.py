@@ -7821,14 +7821,15 @@ except Exception as _st_err:
 try:
     from backend.routers.ai_connector import router as ai_connector_router
     app.include_router(ai_connector_router)
+except Exception as _ai_err:
+    log.warning("Could not mount AI/MCP connector router: %s", _ai_err)
+
 try:
     from backend.routers.backcovers_router import router as backcovers_router
     app.include_router(backcovers_router)
 except Exception as _bc_err:
     log.warning("Could not mount backcovers router: %s", _bc_err)
 
-except Exception as _ai_err:
-    log.warning("Could not mount AI/MCP connector router: %s", _ai_err)
 
 
 @app.middleware("http")
