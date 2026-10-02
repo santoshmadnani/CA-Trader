@@ -157,21 +157,26 @@ def handle_tool_call(name: str, args: dict) -> dict:
         path = f"/api/options/{u}/chain" + (f"?expiry={exp}" if exp else "")
         return make_request(path)
     elif name in ("get_recommendations_for_date", "recommendations_for_date"):
-        d = args.get("date")
-        s = args.get("symbol") or "BANKNIFTY"
-        tf = args.get("timeframe") or "5m"
-        return make_request(f"/api/recommendations/for-date?date={d}&symbol={s}&timeframe={tf}")
+        d = urllib.parse.quote(str(args.get("date") or ""))
+        s = urllib.parse.quote(str(args.get("symbol") or "BANKNIFTY"))
+        tf = urllib.parse.quote(str(args.get("timeframe") or "5m"))
+        lim = int(args.get("limit") or 10)
+        return make_request(f"/api/recommendations/for-date?date={d}&symbol={s}&timeframe={tf}&limit={lim}")
     elif name in ("get_100_trade_backtest", "backtest_100_trades"):
-        s = args.get("symbol") or "BANKNIFTY"
-        tf = args.get("timeframe") or "5m"
-        cnt = args.get("count") or 100
+        s = urllib.parse.quote(str(args.get("symbol") or "BANKNIFTY"))
+        tf = urllib.parse.quote(str(args.get("timeframe") or "5m"))
+        cnt = int(args.get("count") or 100)
         return make_request(f"/api/backtest/100-trades?symbol={s}&timeframe={tf}&count={cnt}")
     elif name == "get_recommendations":
         d = args.get("date")
         s = args.get("symbol")
+        lim = int(args.get("limit") or 10)
         if d:
-            return make_request(f"/api/recommendations/for-date?date={d}&symbol={s or 'BANKNIFTY'}&timeframe=5m")
-        return make_request("/api/recommendations/history")
+            d_q = urllib.parse.quote(str(d))
+            s_q = urllib.parse.quote(str(s or "BANKNIFTY"))
+            return make_request(f"/api/recommendations/for-date?date={d_q}&symbol={s_q}&timeframe=5m&limit={lim}")
+        s_q = urllib.parse.quote(str(s or ""))
+        return make_request(f"/api/recommendations/history?symbol={s_q}&limit={lim}")
     elif name == "get_portfolio":
         return make_request("/api/positions")
     elif name == "get_funds":
