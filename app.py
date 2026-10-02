@@ -19700,3 +19700,232 @@ async def api_mcp_call_http(request: Request, user: dict[str, Any] = Depends(req
     return {"error": f"Unknown tool: {name}", "available_tools": ["get_recommendations_for_date", "get_100_trade_backtest", "get_recommendations", "get_market_quote", "get_system_health"]}
 
 
+# ===========================================================================
+# LEARN AI: Interactive Code Explorer, Practice Sandbox & Gemini Mentor
+# ===========================================================================
+
+LEARN_AI_CACHE: dict[str, dict[str, Any]] = {}
+
+FALLBACK_GLOSSARY: dict[str, dict[str, str]] = {
+    "delta": {
+        "term": "Delta (Δ)",
+        "plain_summary": "Delta measures how much an option's price moves when the underlying stock moves by ₹1.",
+        "real_life_analogy": "Like a car's gas pedal: pressing down (underlying moves) determines how fast the speedometer needle moves.",
+        "in_ca_trader": "Calculated via Black-Scholes in app.py (line 2941) and displayed in the Option Chain Greek cards in terminal.html (line 20145).",
+        "what_if_changed": "A higher Delta (0.80) means your option acts like a stock, moving fast; a low Delta (0.15) moves slowly."
+    },
+    "theta": {
+        "term": "Theta (Θ)",
+        "plain_summary": "Theta is time decay: how much money an option loses each passing day just by sitting in your account.",
+        "real_life_analogy": "Like an ice cream cone on a hot afternoon: every minute you hold it, a little bit melts away.",
+        "in_ca_trader": "Computed in app.py bs_greeks() and shown in terminal.html Greek simulation modal to warn buyers about weekend decay.",
+        "what_if_changed": "If Theta is -₹15/day, holding the option over the weekend without price movement will cost you ₹30 in value."
+    },
+    "gamma": {
+        "term": "Gamma (Γ)",
+        "plain_summary": "Gamma measures the acceleration of Delta: how quickly Delta changes as the stock moves.",
+        "real_life_analogy": "If Delta is speed, Gamma is acceleration. Pressing harder increases how rapidly you speed up.",
+        "in_ca_trader": "Used in app.py to detect explosive expiry-day zero-to-hero momentum spikes in Out-of-The-Money options.",
+        "what_if_changed": "High Gamma options can double or crash within minutes near market close on Thursday expiry."
+    },
+    "vega": {
+        "term": "Vega (ν)",
+        "plain_summary": "Vega measures how sensitive an option's price is to changes in overall market fear and excitement (Implied Volatility).",
+        "real_life_analogy": "Like umbrella prices during heavy rain: when a storm is coming (volatility rises), umbrellas cost more.",
+        "in_ca_trader": "Monitored before major RBI announcements or election budget sessions in app.py to avoid buying overpriced options.",
+        "what_if_changed": "If Vega is high, an option can lose value even if the stock doesn't move, just because market fear calmed down."
+    },
+    "rsi": {
+        "term": "Relative Strength Index (RSI)",
+        "plain_summary": "A momentum thermometer that grades price speed from 0 to 100.",
+        "real_life_analogy": "Like a runner sprinting uphill: above 70 they are exhausted and need to rest; below 30 they are rested and ready to sprint.",
+        "in_ca_trader": "Calculated in technical_analysis() (line 5176) in app.py. Values > 48 trigger bullish buy bias in overall_recommendation().",
+        "what_if_changed": "Lowering the RSI buy threshold from 48 to 40 generates more frequent signals with lower win probability."
+    },
+    "atr": {
+        "term": "Average True Range (ATR)",
+        "plain_summary": "Measures the normal daily or 5-minute price swing of an asset in rupees.",
+        "real_life_analogy": "Like the height of ocean waves: on calm days waves are 1 foot (low ATR), during storms waves are 15 feet (high ATR).",
+        "in_ca_trader": "Crucial formula in app.py (line 11998) used to set dynamic Target = entry + (ATR * 1.5) and Stop Loss = entry - (ATR * 1.0).",
+        "what_if_changed": "Without ATR, a fixed ₹5 target would be too small for BANKNIFTY (swings ₹300) and too big for a ₹50 penny stock."
+    },
+    "stop_loss": {
+        "term": "Stop Loss (SL)",
+        "plain_summary": "An automatic exit order that closes your trade if the market moves against you to limit your loss.",
+        "real_life_analogy": "Like an emergency circuit breaker in your house: if too much electricity flows, it flips off before a fire starts.",
+        "in_ca_trader": "Rendered in terminal.html #btOptSl (line 12198) and tracked live in app.py simulate_5m_trade_series().",
+        "what_if_changed": "Setting SL too tight causes random noise to stop you out; setting it too loose risks major capital loss."
+    },
+    "target": {
+        "term": "Target / Take Profit",
+        "plain_summary": "The exact price where you intend to close the trade and lock in your earned profits.",
+        "real_life_analogy": "Like reaching the finish line in a race: you collect your trophy and stop running before you trip.",
+        "in_ca_trader": "Displayed in terminal.html #btOptTarget (line 12204) and checked against forward candle high/low prices.",
+        "what_if_changed": "Increasing the target multiplier requires bigger market breakouts; if too ambitious, price reverses before hitting target."
+    },
+    "websocket": {
+        "term": "WebSocket",
+        "plain_summary": "A continuous two-way live phone call between your web browser and the server.",
+        "real_life_analogy": "Like talking on a live phone call instead of sending letters in the mail and waiting days for a reply.",
+        "in_ca_trader": "Connected in terminal.html to stream Upstox tick packets directly into the live chart without reloading the page.",
+        "what_if_changed": "If WebSocket disconnects, the app falls back to REST polling every 2 seconds to keep quotes alive."
+    }
+}
+
+
+@app.get("/learn")
+@app.get("/learn-ai")
+async def serve_learn_ai_page() -> HTMLResponse:
+    """Serves the interactive Learn AI Code Playground & Explainer."""
+    learn_path = Path(__file__).resolve().parent / "learn_ai" / "index.html"
+    if not learn_path.exists():
+        learn_path = Path(__file__).resolve().parent / "learn_ai.html"
+    if learn_path.exists():
+        with open(learn_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Learn AI App is loading...</h1>", status_code=200)
+
+
+@app.get("/api/learn-ai/directory")
+async def get_learn_ai_directory() -> dict[str, Any]:
+    """Returns the comprehensive code index mapping app.py and terminal.html."""
+    idx_path = Path(__file__).resolve().parent / "learn_ai" / "code_index.json"
+    if idx_path.exists():
+        try:
+            with open(idx_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            return {"error": f"Failed reading index: {e}"}
+    return {"error": "code_index.json not found"}
+
+
+@app.get("/api/learn-ai/code-slice")
+async def get_learn_ai_code_slice(file: str = "app.py", start: int = 1, end: int = 100) -> dict[str, Any]:
+    """Safely retrieves a line-numbered slice of app.py or terminal.html."""
+    safe_name = "app.py" if "app" in file.lower() else "terminal.html"
+    target_path = Path(__file__).resolve().parent / safe_name
+    if not target_path.exists():
+        return {"ok": False, "error": f"File {safe_name} not found"}
+
+    start_idx = max(1, start)
+    end_idx = max(start_idx, min(end, start_idx + 400))  # Max 400 lines per slice
+
+    lines_out = []
+    try:
+        with open(target_path, "r", encoding="utf-8", errors="replace") as f:
+            for i, line in enumerate(f, start=1):
+                if i >= start_idx and i <= end_idx:
+                    lines_out.append({"line_num": i, "content": line.rstrip("\r\n")})
+                elif i > end_idx:
+                    break
+        return {
+            "ok": True,
+            "file": safe_name,
+            "start": start_idx,
+            "end": end_idx,
+            "total_fetched": len(lines_out),
+            "lines": lines_out
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@app.post("/api/learn-ai/explain")
+async def post_learn_ai_explain(request: Request) -> dict[str, Any]:
+    """Analyzes any trading/technical word via Gemini API and returns layman explanations with real-world examples."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    term = str(body.get("term") or "").strip()
+    context = str(body.get("context") or "").strip()
+    code_snippet = str(body.get("code") or "").strip()
+
+    if not term:
+        return {"ok": False, "error": "Missing term to explain"}
+
+    cache_key = term.lower().strip()
+    if cache_key in LEARN_AI_CACHE:
+        return LEARN_AI_CACHE[cache_key]
+
+    # Check fallback dictionary for immediate match
+    clean_k = cache_key.replace(" ", "_").replace("-", "_")
+    fallback = None
+    for k, v in FALLBACK_GLOSSARY.items():
+        if k in clean_k or clean_k in k:
+            fallback = v
+            break
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if gemini_key:
+        prompt = (
+            f"You are a friendly, expert trading and software engineering mentor for beginners.\n"
+            f"Explain this term in simple layman words with a real-life relatable example:\n"
+            f"Term: '{term}'\n"
+            f"Context: '{context}'\n"
+            f"Code reference: '{code_snippet[:250]}'\n\n"
+            f"Respond STRICTLY in valid JSON with this exact structure:\n"
+            f"{{\n"
+            f'  "term": "{term}",\n'
+            f'  "plain_summary": "1-2 simple sentences explaining what this means to a complete beginner.",\n'
+            f'  "real_life_analogy": "A relatable real-life analogy (e.g. driving a car, cooking, shopping).",\n'
+            f'  "in_ca_trader": "Where and how this is used inside CA Trader (app.py or terminal.html).",\n'
+            f'  "what_if_changed": "What happens if this code or value is changed or breaks in the app."\n'
+            f"}}"
+        )
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={gemini_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.3}
+        }
+        try:
+            resp = requests.post(url, json=payload, timeout=8)
+            if resp.status_code == 200:
+                resp_json = resp.json()
+                text_out = resp_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                # Extract JSON from response
+                m = re.search(r"\{.*\}", text_out, re.DOTALL)
+                if m:
+                    parsed = json.loads(m.group(0))
+                    res = {
+                        "ok": True,
+                        "source": "gemini-3.8-flash",
+                        "term": parsed.get("term", term),
+                        "plain_summary": parsed.get("plain_summary", ""),
+                        "real_life_analogy": parsed.get("real_life_analogy", ""),
+                        "in_ca_trader": parsed.get("in_ca_trader", ""),
+                        "what_if_changed": parsed.get("what_if_changed", "")
+                    }
+                    LEARN_AI_CACHE[cache_key] = res
+                    return res
+        except Exception as e_gemini:
+            log.warning("Gemini explain call failed: %s; falling back to curated glossary", e_gemini)
+
+    # Use fallback or generate structured fallback
+    if fallback:
+        res = {
+            "ok": True,
+            "source": "curated_mentor_glossary",
+            "term": fallback["term"],
+            "plain_summary": fallback["plain_summary"],
+            "real_life_analogy": fallback["real_life_analogy"],
+            "in_ca_trader": fallback["in_ca_trader"],
+            "what_if_changed": fallback["what_if_changed"]
+        }
+    else:
+        res = {
+            "ok": True,
+            "source": "mentor_generator",
+            "term": term,
+            "plain_summary": f"'{term}' is a key concept used in trading calculations or UI layout.",
+            "real_life_analogy": f"Like a specialized tool in a mechanic's toolbox: each part has one specific job to make the whole engine run.",
+            "in_ca_trader": f"Located in the codebase to process data or format values on screen.",
+            "what_if_changed": f"Changing '{term}' directly adjusts how calculations behave or how elements appear on screen."
+        }
+    LEARN_AI_CACHE[cache_key] = res
+    return res
+
+
+
+
