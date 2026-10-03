@@ -30090,7 +30090,9 @@ async function loadDashboard(force = false) {
 
       // Item 18: Fix optionsProviderStatus upon loading option chain
       const origRenderOptionChain = window.renderOptionChain;
-      window.renderOptionChain = function (data) {
+      // Option Chain Table Renderer: Dynamically builds the interactive strike price ladder,
+// highlighting In-The-Money (ITM) and Out-Of-The-Money (OTM) calls/puts with Open Interest bars.
+window.renderOptionChain = function (data) {
         if (typeof origRenderOptionChain === 'function') origRenderOptionChain(data);
         const statusEl = document.getElementById('optionsProviderStatus');
         if (statusEl && data) {
@@ -30110,7 +30112,9 @@ async function loadDashboard(force = false) {
     // ============================================================================
 
     // 1. Universal Draggable Helper (PC Pointer + Mobile Touch)
-    function makeUniversalDraggable(targetEl, handleEl) {
+    // Draggable Modal Window Engine: Allows dragging order forms, chart setting popups, and journal windows
+// seamlessly across the screen on both desktop mice and mobile touch screens.
+function makeUniversalDraggable(targetEl, handleEl) {
       if (!targetEl || !handleEl) return;
       handleEl.classList.add('draggable-handle');
 
