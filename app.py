@@ -1,31 +1,28 @@
 from __future__ import annotations
+# To avoid syntax errors when using string without quotes.
 
 import uuid
-
-"""CA Trader integration server.
-
-The supplied terminal HTML is served byte-for-byte.  This module provides the
-headless JSON backend described in the accompanying specification and appends
-only a non-visual JavaScript bridge at response time so the existing controls
-can call those APIs.
-
-Run:
-    python app.py
-
-The server uses ASGI/FastAPI because the execution environment already
-contains FastAPI/Starlette/Uvicorn.  Environment names remain compatible with
-the supplied CA Trader .env file (FLASK_HOST/FLASK_PORT, etc.).
-"""
+# Generates and assigns unique ID to orders or sessions.
 
 import asyncio
+# Responsible for loading multiple live data, i.e., LTP, live candle in charts, option chain, etc. simultaneously.
+
 import sys
+# Checks whether machine has windows or linux.
+
 if sys.platform == "win32":
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     except Exception:
         pass
+# Uses WindowsSelectorEventLoop instead of ProactorEventLoop to handle connections and disconnections with websocket without crashing or errors.
+
 import base64
+# Encodes images into binary data for transfer of images across server, upstox and browser without corruption of data and without saving the image in disc and just displaying the image through server on browser.
+
 import contextlib
+# Automatically closes open doors (databases, connections) and quietly ignores expected small errors without crashing the app.
+
 import hashlib
 import hmac
 import json
