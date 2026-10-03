@@ -20488,7 +20488,9 @@ function attachResilientClickDelegation() {
       $('aiChatSend')?.addEventListener('click', sendAiChat); $('aiChatInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendAiChat() });
 
       // ---------------- Watchlist live LTP/change ----------------
-      async function refreshWatchlistQuotes() {
+      // Watchlist Stream Updater: Periodically polls live market prices for your pinned symbols,
+// recalculating percentage gains and color-coding positive (green) and negative (red) ticks.
+async function refreshWatchlistQuotes() {
         const rows = [...document.querySelectorAll('.wl-item')]; const symbols = rows.map(r => r.dataset.symbol || r.querySelector('.wl-sym')?.textContent?.trim()?.split(/\s+/)[0]).filter(Boolean); if (!symbols.length) return; if (!symbols.length) return;
         try { const d = await api('/api/market/quotes?instruments=' + encodeURIComponent(symbols.join(','))); (d.items || []).forEach(q => { const row = rows.find(r => (r.dataset.symbol || '') === q.symbol); if (!row) return; let right = row.querySelector('.wl-right'); if (!right) { right = document.createElement('div'); right.className = 'wl-right'; row.appendChild(right) } let l = right.querySelector('.wl-ltp'); if (!l) { l = document.createElement('div'); l.className = 'wl-ltp'; right.prepend(l) } l.textContent = fmt(q.ltp); let c = right.querySelector('.wl-chg'); if (!c) { c = document.createElement('div'); c.className = 'wl-chg'; right.appendChild(c) } const ch = q.session_change_pct != null ? Number(q.session_change_pct) : (q.change_pct != null ? Number(q.change_pct) : null); const net = q.session_change != null ? Number(q.session_change) : (q.net_change != null ? Number(q.net_change) : null); c.textContent = net != null ? `${net > 0 ? '+' : ''}${fmt(net)}${ch != null && Number.isFinite(ch) ? ` (${ch > 0 ? '+' : ''}${fmt(ch)}%)` : ''}` : '—'; c.className = 'wl-chg ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : ''); row.dataset.ltp = q.ltp ?? ''; }); } catch (e) { console.debug('[CA Trader watchlist quotes bulk error]', e); }
       }
@@ -22425,7 +22427,9 @@ function attachResilientClickDelegation() {
       window.selectDashboardRecoOption = selectDashboardRecoOption;
       window.updateDashboardRecoBanner = updateDashboardRecoBanner;
 
-      function renderChartRecoData(rec, sym) {
+      // Chart AI Overlay Renderer: Draws recommended buy/sell levels, target profit zones, and stop-loss lines
+// directly on the candlestick chart canvas so you can visualize the setup in context.
+function renderChartRecoData(rec, sym) {
         sym = sym || rec?.symbol || selectedSymbol() || 'NIFTY';
         const rawAction = String(rec?.recommendation || rec?.signal || rec?.action || 'NEUTRAL').toUpperCase();
         const qualifies = rec?.qualifies !== false && rawAction !== 'NO_TRADE' && rawAction !== 'NEUTRAL' && Number(rec?.entry) > 0;
@@ -24353,7 +24357,9 @@ function attachResilientClickDelegation() {
         const canvas = $('dashboardMiniChart'); if (!canvas) return; const data = Array.isArray(candles) ? candles.slice(-80) : []; const rect = canvas.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; canvas.width = Math.max(1, Math.floor(rect.width * dpr)); canvas.height = Math.max(1, Math.floor(rect.height * dpr)); const ctx = canvas.getContext('2d'); if (!ctx || data.length < 2) return; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); const w = rect.width, h = rect.height, p = 12; const closes = data.map(x => Number(x.close)).filter(Number.isFinite); const lo = Math.min(...closes), hi = Math.max(...closes), range = (hi - lo) || 1; const x = i => p + (i / (closes.length - 1)) * Math.max(1, w - 2 * p), y = v => h - p - ((v - lo) / range) * Math.max(1, h - 2 * p); ctx.clearRect(0, 0, w, h); ctx.beginPath(); closes.forEach((v, i) => { const xx = x(i), yy = y(v); if (i) ctx.lineTo(xx, yy); else ctx.moveTo(xx, yy) }); ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--buy') || '#4fd1aa'; ctx.lineWidth = 1.6; ctx.stroke(); if ($('dashboardChartStatus')) $('dashboardChartStatus').textContent = `${closes.length} candles · ${fmt(closes.at(-1))}`;
       }
 
-      async function loadDashboard(force = false) {
+      // Terminal Dashboard Assembler: Gathers index spot prices (NIFTY, BANKNIFTY, SENSEX, CRUDEOIL),
+// top market gainers/losers, active trade alerts, and portfolio P&L to paint the home dashboard view.
+async function loadDashboard(force = false) {
         if (window.loadDashboard && window.loadDashboard !== loadDashboard) { return window.loadDashboard(force); }
         const sym = selectedSymbol();
         applyDashboardLayout();
