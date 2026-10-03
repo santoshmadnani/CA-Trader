@@ -163,7 +163,9 @@
         }
       }
 
-      function attachResilientClickDelegation() {
+      // Event Delegation Shield: Ensures all tab clicks, modal triggers, and buttons remain responsive
+// even if heavy charting scripts are still initializing in the background.
+function attachResilientClickDelegation() {
         if (window.__CA_SHIELD_DELEGATION__) return;
         window.__CA_SHIELD_DELEGATION__ = true;
 
