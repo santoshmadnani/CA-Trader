@@ -535,6 +535,8 @@ if HTML_PATH is None:
 load_dotenv(BASE_DIR / ".env")
 load_dotenv(Path.cwd() / ".env")
 
+# --- SERVER NETWORK & SECURITY CONFIGURATION ---
+# Manages network hosting, ports, password authentication, and session encryption keys.
 HOST = os.getenv("FLASK_HOST", os.getenv("HOST", "127.0.0.1"))
 PORT = int(os.getenv("FLASK_PORT", os.getenv("PORT", "8000")))
 DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
@@ -554,6 +556,8 @@ LOG_FILE = BASE_DIR / os.getenv("LOG_FILE", "ca-trader.log")
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "1") == "1"
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "1200"))
 # Bound concurrent Upstox REST calls and enforce max 450 req/min token bucket (Upstox limit: 500/min)
+# Rate Limiter Shield: Upstox limits API calls to 500 requests/minute. This token bucket engine caps speed at 450 req/min,
+# preventing rate-limit bans (HTTP 429) and ensuring smooth data flow.
 class UpstoxRateLimiter:
     """Thread-safe Token Bucket Rate Limiter enforcing max 450 requests per 60 seconds
     (strictly under Upstox's hard ceiling of 500 req/min) to prevent 429 errors and freezes.
@@ -641,6 +645,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("ca-trader")
 
+# Security Sanitizer: Blacklists patterns matching access tokens, passwords, and API keys
+# so secrets are never accidentally leaked into logs, bug reports, or error messages.
 SECRET_PATTERNS = [
     re.compile(r"Bearer\s+[A-Za-z0-9._\-]+", re.I),
     re.compile(r"(?:api[_-]?key|client[_-]?secret|access[_-]?token|password)\s*[=:]\s*\S+", re.I),
@@ -664,6 +670,8 @@ def now_iso() -> str:
 _DB_LOCK = threading.RLock()
 
 
+# Local Database Notebook Connector: Connects to ca_trader.sqlite3 using WAL (Write-Ahead Logging) mode,
+# allowing blazing-fast instant reads without locking the database while new orders are being written.
 def db_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
@@ -725,6 +733,8 @@ def db_exec(sql: str, params: Iterable[Any] = (), fetch: str | None = None) -> A
             conn.close()
 
 
+# Master Database Initializer: Auto-generates essential trading tables upon startup
+# (users, orders, live positions, portfolio holdings, AI recommendations, watchlists, passbook, and risk audit logs).
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     schema = """
