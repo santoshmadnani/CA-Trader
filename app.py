@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-# Real-time institutional Crude Oil drivers (Release 48 - Item 12)
-
-NIFTY_REAL_NEWS_2026 = []
-BANKNIFTY_REAL_NEWS_2026 = []
-GOLD_REAL_NEWS_2026 = []
-CRUDE_REAL_NEWS_2026 = []
 
 
 
