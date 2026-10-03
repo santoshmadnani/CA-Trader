@@ -2889,6 +2889,8 @@ def norm_cdf(x: float) -> float:
 def norm_pdf(x: float) -> float:
     return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
 
+# Black-Scholes Options Pricing Engine: Calculates the fair mathematical value of Call (CE) and Put (PE) contracts
+# based on underlying stock/index spot price, strike price, time to expiry, interest rate, and market volatility.
 def bs_price(spot: float, strike: float, t_years: float = 15.0 / 365.0, r: float = 0.07, sigma: float = 0.18, opt_type: str = "CE") -> float:
     if spot <= 0 or strike <= 0 or t_years <= 0 or sigma <= 0:
         return max(0.05, round((spot - strike) if opt_type == "CE" else (strike - spot), 2))
@@ -2903,6 +2905,8 @@ def bs_price(spot: float, strike: float, t_years: float = 15.0 / 365.0, r: float
     except Exception:
         return max(0.05, round((spot - strike) if opt_type == "CE" else (strike - spot), 2))
 
+# Option Greeks Calculator: Measures how option premiums change with market movements
+# (Delta = price sensitivity, Gamma = acceleration, Theta = daily time decay, Vega = volatility impact).
 def bs_greeks(spot: float, strike: float, t_years: float = 15.0 / 365.0, r: float = 0.07, sigma: float = 0.18, opt_type: str = "CE") -> dict[str, float]:
     spot = max(0.01, float(spot))
     strike = max(0.01, float(strike))
@@ -3422,6 +3426,8 @@ def is_future_symbol(sym: str) -> bool:
         return True
     return False
 
+# Contract Parser: Translates tricky broker symbol strings (like NSE_FO|NIFTY24OCT25000CE or MCX_FO|CRUDEOIL_9000_PE)
+# into clean, readable trading information: underlying index, strike price, option type (CE/PE), and expiry.
 def parse_option_contract(sym: str) -> dict[str, Any] | None:
     if not sym:
         return None
@@ -6122,6 +6128,8 @@ def calculate_perfect_entry(
     }
 
 
+# Dynamic Target & Stop-Loss Calculator: Uses ATR (Average True Range) volatility, support/resistance pivots,
+# and user risk limits to calculate optimal exit targets and defensive stop-loss boundaries.
 def trade_levels(side: str, entry: float, atr_value: float | None, support: float | None, resistance: float | None, desired_profit: float | None, bearable_loss: float | None, symbol: str | None = None, expiry_scalp: bool = False) -> dict[str, Any]:
     calib = get_active_calibration(symbol or "DEFAULT")
     t_mult = float(calib.get("target_atr_multiplier", 1.8))
@@ -6181,6 +6189,8 @@ def normalize_signal(side: str, levels: dict[str, Any]) -> bool:
     return True
 
 
+# Core Multi-Factor Recommendation AI Brain: Analyzes trend direction, EMA momentum, RSI indicators, option chain open interest (PCR),
+# and news sentiment to generate actionable BUY/SELL signals with mathematically aligned targets and stop losses.
 def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | None = None, bearable_loss: float | None = None, risk_preferences: dict[str, Any] | None = None, option_preferences: dict[str, Any] | None = None, max_profit_mode: bool = False, user_id: int | None = None, expiry_scalp: bool = False, candles_override: list[dict[str, Any]] | None = None, live_quote_override: dict[str, Any] | None = None) -> dict[str, Any]:
     risk_preferences = risk_preferences or {}; option_preferences = option_preferences or {}
     user_capital = None; user_max_loss = None; user_desired_profit = None
@@ -10045,6 +10055,8 @@ async def analysis_overall(
 # Options APIs
 # ---------------------------------------------------------------------------
 
+# Real-Time Option Chain Matrix: Assembles full strike ladders with LTP, Open Interest (OI), Volume,
+# and live Black-Scholes Greeks (Delta, Theta, Gamma, IV) for NIFTY, BANKNIFTY, FINNIFTY, and SENSEX.
 def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> dict[str, Any]:
     parsed = parse_option_contract(underlying)
     if parsed:
@@ -14947,6 +14959,8 @@ def _position_mark_and_pnl(user_id: int) -> None:
     except Exception as exc:
         pass
 
+# Paper Trading Simulation Engine: Instantly executes virtual demo orders against real live market quotes
+# with zero financial risk, recording filled trades, entry prices, and portfolio P&L in your journal.
 def _paper_fill(user_id:int, order:dict[str,Any], recommendation_id:str|None=None) -> dict[str,Any]:
     """Paper fill engine with real local funds, long/short netting and reserved capital."""
     symbol=str(order.get("symbol") or "").upper(); key=order.get("instrument_key") or symbol
