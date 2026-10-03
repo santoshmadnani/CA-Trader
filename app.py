@@ -21,23 +21,52 @@ import base64
 # Encodes images into binary data for transfer of images across server, upstox and browser without corruption of data and without saving the image in disc and just displaying the image through server on browser.
 
 import contextlib
-# Automatically closes open doors (databases, connections) and quietly ignores expected small errors without crashing the app.
+# Automatically closes or open databases, connections, etc. after a data is received from upstox or server to browser, e.g., recommendations, LTP, candles, etc. to prevent any leakage of memory or data. Also, it quietly ignores expected small errors without crashing the app.
 
 import hashlib
+# Converts sensitive data like passwords and webhook tokens into a secure, irreversible digital fingerprint to prevent tampering and theft.
+
 import hmac
+# Creates a tamper-proof secret digital seal between Upstox and our server so nobody can alter order data or forge fake trade requests in transit.
+
 import json
+# Converts incoming market feeds, orders, and recommendations into organized readable text format so server and browser can exchange data effortlessly.
+
 import gzip
+# Compresses large market data and historical candle responses into small packets so they load rapidly over the internet without lagging.
+
 import logging
+# Acts as the system CCTV camera and black box recorder, keeping a timestamped record of every trade, error, and server event for audit.
+
 import math
+# Performs essential trading math calculations like rounding strike prices, percentage moves, and technical indicator values.
+
 import os
+# Interacts with the computer operating system to read environment secrets (.env), check file paths, and manage server memory.
+
 import re
+# Acts as a smart search magnifying glass to detect specific patterns like extracting strike prices, dates, or symbols from text strings.
+
 import html
+# Cleans and sanitizes raw text from user inputs or broker alerts to prevent malicious scripts from breaking the browser interface.
+
 import secrets
+# Generates unguessable, cryptographically secure tokens and session keys so your trading session cannot be hijacked.
+
 import sqlite3
+# The lightweight local database notebook that permanently saves your trades, order history, configuration, and trade logs on disk.
+
 import random
+# Generates jitter delays and random sample times for backtesting algorithms and avoiding simultaneous API request bursts.
+
 import statistics
+# Calculates statistical market metrics like average price, standard deviation, and variance for volatility and Bollinger Bands.
+
 import threading
+# Allows multiple background workers to run at the exact same time, so order execution doesn't freeze while fetching live market quotes.
+
 import time
+# Tracks exact timestamps, measures execution speeds, and manages delays or clock intervals between market ticks.
 from concurrent.futures import ThreadPoolExecutor, wait, as_completed, TimeoutError as FuturesTimeoutError
 import traceback
 import uuid
