@@ -68,46 +68,88 @@ import threading
 import time
 # Tracks exact timestamps, measures execution speeds, and manages delays or clock intervals between market ticks.
 from concurrent.futures import ThreadPoolExecutor, wait, as_completed, TimeoutError as FuturesTimeoutError
+# Coordinates multiple background worker threads simultaneously so market updates, analysis, and order tasks execute concurrently without freezing the server.
+
 import traceback
+# Prints detailed diagnostic traces if a crash happens, pinpointing the exact file, line number, and function for fast debugging.
+
 import uuid
+# Generates globally unique order IDs, tracking tokens, and transaction identifiers so trades never collide or get mixed up.
+
 from collections import defaultdict, deque
-import collections
+# High-performance collections: defaultdict auto-creates missing dictionary keys; deque maintains fast fixed-length rolling buffers for candle streams.
+
 from datetime import datetime, timedelta, timezone
+# Handles calendar dates, timestamps, market session open/close boundaries, and time offsets.
+
 from pathlib import Path
+# Manages cross-platform file paths cleanly on both Windows laptops and Linux cloud servers.
+
 from typing import Any, Iterable, Optional
-from urllib.parse import quote, urlencode
-import urllib.parse
+# Provides type hints so developers and code inspectors understand expected inputs and return types for functions.
+
 from urllib.parse import quote, quote_plus, urlencode
+# Safely formats web URLs and query parameters so symbols with special characters (like '|' or '&') don't break network requests.
+
 from zoneinfo import ZoneInfo
+# Handles precise market timezones (e.g. Asia/Kolkata), automatically taking care of daylight savings and clock offsets.
+
 from xml.etree import ElementTree as ET
+# Parses XML responses from data feeds and broker reports if received instead of JSON.
 
 import numpy as np
+# Blazing-fast numerical computation engine used for vector math, volatility arrays, and moving average series.
+
 import pandas as pd
+# Powers structured data analysis, converting historical OHLCV candle streams into organized time-series tables for indicator calculations.
+
 import requests
+# The reliable HTTP communication engine used to fetch quotes, submit orders, and speak with external market APIs over the web.
+
 from requests.adapters import HTTPAdapter
+# Configures advanced connection pooling and automated retry policies so transient network hiccups don't drop broker requests.
+
 try:
     import upstox_client  # optional official SDK; REST/WebSocket bridge falls back if unavailable
 except Exception:
     upstox_client = None
+# Official Upstox SDK bridge: provides official library bindings when installed, falling back gracefully to direct REST/WebSockets when omitted.
+
 try:
     import websocket as websocket_client
 except Exception:
     websocket_client = None
+# Client library for real-time streaming WebSocket connections from market data providers.
+
 try:
     from websockets.sync.client import connect as websocket_sync_connect
 except Exception:
     websocket_sync_connect = None
+# Synchronous WebSocket connection helper for streaming real-time ticks into background threads.
+
 from dotenv import load_dotenv
+# Automatically reads configuration secrets and credentials from the local .env file into the system environment.
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+# The core high-speed web server framework powering CA Trader's REST endpoints, API authentication, and real-time browser WebSockets.
+
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, FileResponse
+# Formats server responses into web pages (HTML), structured data (JSON), or downloadable files.
+
 from pydantic import BaseModel, Field
+# Validates incoming request payloads from the browser, ensuring strike prices, order types, and quantities are clean and properly typed.
+
 from starlette.middleware.cors import CORSMiddleware
+# Protects the server by configuring Cross-Origin Resource Sharing so only authorized web origins can access trading endpoints.
+
 from starlette.middleware.sessions import SessionMiddleware
+# Securely stores user login state and browser session cookies.
 
 try:
     import uvicorn
 except Exception as exc:  # pragma: no cover
     uvicorn = None
+# Lightning-fast ASGI production web server engine that runs FastAPI.
 
 from backend.services.telegram_service import (
     mask_token,
@@ -120,6 +162,7 @@ from backend.services.telegram_service import (
     save_user_telegram_config,
     dispatch_telegram_alert,
 )
+# Connects CA Trader directly to Telegram bots, instantly notifying your phone about AI trade alerts, risk warnings, and system status.
 # ---------------------------------------------------------------------------
 # RESILIENT MULTI-FEED ENGINE (Upstox + yfinance + Black-Scholes Greeks)
 # ---------------------------------------------------------------------------
@@ -129,6 +172,8 @@ except Exception:
     yf = None
 
 def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
+    # Backup quote engine: fetches spot quotes from Yahoo Finance and calculates options pricing when Upstox is down.
+
     """Bulletproof live quote provider using yfinance and Black-Scholes for options."""
     try:
         import yfinance as yf
@@ -226,6 +271,7 @@ def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
     return None
 
 def get_live_fallback_candles(instrument: str, timeframe: str = "5", days: int = 5) -> list[dict[str, Any]]:
+    # Backup multi-timeframe candles: downloads OHLCV historical candlestick data via Yahoo Finance when broker endpoints throttle.
     """Fetch multi-timeframe candles via yfinance when primary provider is rate-limited."""
     try:
         import yfinance as yf
@@ -296,6 +342,7 @@ LIVE_STOCKMANTRA_SETUPS: dict[str, Any] = {}
 LIVE_STOCKMANTRA_MSGS: list[dict[str, Any]] = []
 
 def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int):
+    # Telegram StockMantra advisory message processor: parses channel alerts for contracts, strikes, targets, and price pulses.
     global LIVE_STOCKMANTRA_SETUPS, LIVE_STOCKMANTRA_MSGS
     try:
         try:

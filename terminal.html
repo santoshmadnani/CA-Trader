@@ -14,7 +14,9 @@
   <meta http-equiv="Expires" content="0">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
   <script>
-    /* CA TRADER DEFENSIVE RESILIENCY SHIELD (Guarantees zero blank data & working buttons) */
+    /* CA TRADER DEFENSIVE RESILIENCY SHIELD
+       Layman Note: Browser safety net that monitors market clocks, watches for network failures,
+       and automatically auto-populates fallback data so no screen or button appears blank or frozen. */
     (function () {
       // Universal marked markdown parser fallback (prevents 'marked is not defined' error)
       if (typeof window.marked === 'undefined') {
@@ -79,6 +81,7 @@
 
       // 2. Health & Self-Healing Watchdog
       function runHealthAndRecoveryCheck() {
+        // Self-Healing Routine: Runs diagnostic checks on clock, watchlist items, option tables, and chart containers to ensure continuous operation.
         try {
           // Check A: Market Clock
           var clock = document.getElementById('marketClock');
