@@ -76,6 +76,7 @@ import traceback
 import uuid
 # Generates globally unique order IDs, tracking tokens, and transaction identifiers so trades never collide or get mixed up.
 
+import collections
 from collections import defaultdict, deque
 # High-performance collections: defaultdict auto-creates missing dictionary keys; deque maintains fast fixed-length rolling buffers for candle streams.
 
