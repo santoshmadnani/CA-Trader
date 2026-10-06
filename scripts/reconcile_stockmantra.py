@@ -32,8 +32,11 @@ def run_reconciliation():
     # 1. Locate dataset and database
     repo_dir = Path("/home/ubuntu/CA-Trader") if Path("/home/ubuntu/CA-Trader").exists() else Path.cwd()
     json_candidates = [
+        repo_dir / "data" / "stockmantra_3months.json",
         repo_dir / "stockmantra_3months.json",
+        Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json"),
         Path("/home/ubuntu/CA-Trader/stockmantra_3months.json"),
+        Path("data/stockmantra_3months.json"),
         Path("stockmantra_3months.json"),
         Path("../stockmantra_3months.json"),
     ]
@@ -43,9 +46,12 @@ def run_reconciliation():
         sys.exit(1)
 
     db_candidates = [
+        repo_dir / "data" / "ca_trader.sqlite3",
         repo_dir / "ca_trader.sqlite3",
         repo_dir / "app" / "ca_trader.sqlite3",
+        Path("/home/ubuntu/CA-Trader/data/ca_trader.sqlite3"),
         Path("/home/ubuntu/CA-Trader/ca_trader.sqlite3"),
+        Path("data/ca_trader.sqlite3"),
         Path("ca_trader.sqlite3"),
     ]
     db_path = next((p for p in db_candidates if p.exists()), None)

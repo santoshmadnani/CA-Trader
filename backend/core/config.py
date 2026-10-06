@@ -34,7 +34,18 @@ AUTH_ENABLED = os.getenv("CA_AUTH_ENABLED", "1") == "1"
 AUTH_IDLE_HOURS = float(os.getenv("CA_AUTH_IDLE_HOURS", "12"))
 AUTH_SECRET = os.getenv("CA_AUTH_SECRET") or secrets.token_hex(32)
 
-_configured_db_path = Path(os.getenv("CA_DATABASE_PATH", str(BASE_DIR / "ca_trader.sqlite3")))
+_configured_db_env = os.getenv("CA_DATABASE_PATH")
+if _configured_db_env:
+    _configured_db_path = Path(_configured_db_env)
+else:
+    _data_db = BASE_DIR / "data" / "ca_trader.sqlite3"
+    _root_db = BASE_DIR / "ca_trader.sqlite3"
+    if _data_db.exists() and _root_db.exists():
+        _configured_db_path = _data_db if _data_db.stat().st_mtime >= _root_db.stat().st_mtime else _root_db
+    elif _data_db.exists():
+        _configured_db_path = _data_db
+    else:
+        _configured_db_path = _root_db
 _legacy_db_path = _configured_db_path.with_name("ca_trader.db")
 DB_PATH = _legacy_db_path if _legacy_db_path.exists() and not _configured_db_path.exists() else _configured_db_path
 

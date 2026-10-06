@@ -177,7 +177,7 @@
     }
   },
   "laptop_server_hosting": {
-    "guide_file": "LAPTOP_SERVER_GUIDE.md",
+    "guide_file": "server_host/LAPTOP_SERVER_GUIDE.md",
     "host_config": "server_host/host_config.json",
     "launcher": "server_host/start_laptop_server.bat",
     "installer": "server_host/install_host_prerequisites.bat",

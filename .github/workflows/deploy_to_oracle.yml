@@ -25,25 +25,36 @@ jobs:
 
             # --- ARRANGE SERVER DIRECTORY IN CLEAN GITHUB-ALIGNED STRUCTURE ---
             echo "[*] Organizing server directory structure..."
-            mkdir -p data static scripts backups logs
-
-            # Organize stray data files into data/
-            if [ -f "stockmantra_3months.json" ]; then
-              cp -f stockmantra_3months.json data/ 2>/dev/null || true
-            fi
-            if [ -f "stockmantra_telegram_raw.json" ]; then
-              mv -f stockmantra_telegram_raw.json data/ 2>/dev/null || true
-            fi
+            mkdir -p data static scripts backups logs docs
 
             # Clean cache and temporary build artifacts
             find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
             find . -name "*.pyc" -delete 2>/dev/null || true
 
-            # Automated safety backup of SQLite database
+            # Organize stray data files into data/
+            if [ -f "stockmantra_3months.json" ]; then
+              cp -u stockmantra_3months.json data/ 2>/dev/null || true
+            fi
+            if [ -f "stockmantra_telegram_raw.json" ]; then
+              mv -f stockmantra_telegram_raw.json data/ 2>/dev/null || true
+            fi
+
+            # Automated safety backup and arrangement of SQLite database
             if [ -f "ca_trader.sqlite3" ]; then
               cp ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3"
-              # Keep only the last 7 safety backups to preserve disk space
+              cp -u ca_trader.sqlite3 data/ca_trader.sqlite3 2>/dev/null || true
               ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +8 | xargs -r rm -- 2>/dev/null || true
+            elif [ -f "data/ca_trader.sqlite3" ]; then
+              cp data/ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3"
+              ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +8 | xargs -r rm -- 2>/dev/null || true
+            fi
+
+            # Ensure root compatibility symlinks point to canonical data/ paths
+            if [ -f "data/ca_trader.sqlite3" ]; then
+              ln -sf data/ca_trader.sqlite3 ca_trader.sqlite3 2>/dev/null || true
+            fi
+            if [ -f "data/stockmantra_3months.json" ]; then
+              ln -sf data/stockmantra_3months.json stockmantra_3months.json 2>/dev/null || true
             fi
 
             /home/ubuntu/venv/bin/pip install -r requirements.txt --quiet
@@ -58,8 +69,6 @@ jobs:
               echo "=========================================================="
               /home/ubuntu/venv/bin/python3 scripts/reconcile_stockmantra.py
               echo "=========================================================="
-            else
-              echo "[WARN] stockmantra_3months.json not found in /home/ubuntu/CA-Trader"
             fi
 
             sudo systemctl restart catrader

@@ -541,8 +541,18 @@ PORT = int(os.getenv("FLASK_PORT", os.getenv("PORT", "8000")))
 DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
 AUTH_ENABLED = os.getenv("CA_AUTH_ENABLED", "1") == "1"
 AUTH_IDLE_HOURS = float(os.getenv("CA_AUTH_IDLE_HOURS", "12"))
-AUTH_SECRET = os.getenv("CA_AUTH_SECRET") or secrets.token_hex(32)
-_configured_db_path = Path(os.getenv("CA_DATABASE_PATH", str(BASE_DIR / "ca_trader.sqlite3")))
+_configured_db_env = os.getenv("CA_DATABASE_PATH")
+if _configured_db_env:
+    _configured_db_path = Path(_configured_db_env)
+else:
+    _data_db = BASE_DIR / "data" / "ca_trader.sqlite3"
+    _root_db = BASE_DIR / "ca_trader.sqlite3"
+    if _data_db.exists() and _root_db.exists():
+        _configured_db_path = _data_db if _data_db.stat().st_mtime >= _root_db.stat().st_mtime else _root_db
+    elif _data_db.exists():
+        _configured_db_path = _data_db
+    else:
+        _configured_db_path = _root_db
 # Preserve the production database used by older CA Trader deployments.  Some
 # deployment images set CA_DATABASE_PATH=/app/data/ca_trader.sqlite3 while the
 # persistent volume contains ca_trader.db.  Prefer the existing persistent DB
@@ -18056,7 +18066,15 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
         "server_stockmantra_files": detected_files,
         "server_db_tables": [t for t in db_tables if any(k in t.lower() for k in ("tele", "reco", "mantra", "msg", "calib"))],
         "fetch_script_snippet": (Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").read_text(encoding="utf-8", errors="ignore")[:1000] if Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").exists() else ""),
-        "latest_json_msgs": (json.loads(Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").read_text(encoding="utf-8", errors="ignore"))[-3:] if Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").exists() else []),
+        "latest_json_msgs": (
+            json.loads((Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json") if Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json").exists() else Path("/home/ubuntu/CA-Trader/stockmantra_3months.json")).read_text(encoding="utf-8", errors="ignore"))[-3:]
+            if (Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json").exists() or Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").exists())
+            else (
+                json.loads((BASE_DIR / "data" / "stockmantra_3months.json" if (BASE_DIR / "data" / "stockmantra_3months.json").exists() else BASE_DIR / "stockmantra_3months.json").read_text(encoding="utf-8", errors="ignore"))[-3:]
+                if ((BASE_DIR / "data" / "stockmantra_3months.json").exists() or (BASE_DIR / "stockmantra_3months.json").exists())
+                else []
+            )
+        ),
         "setups": combined_setups
     }
 
