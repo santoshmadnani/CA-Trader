@@ -526,6 +526,7 @@ LOGIN_HTML_PATH = next((p for p in LOGIN_HTML_CANDIDATES if p.exists()), None)
 FITNESS_HTML_PATH = BASE_DIR / "fitness.html"
 TERMINAL_SELECTOR_HTML_PATH = BASE_DIR / "terminal_selector.html"
 GUIDE_HTML_PATH = BASE_DIR / "ca_trader_guide.html"
+HARNESS_HTML_PATH = BASE_DIR / "multi_agent_harness.html"
 if HTML_PATH is None:
     # The exact uploaded filename is kept as a fallback reference for users
     # who place app.py elsewhere and keep the HTML beside it.
@@ -7997,6 +7998,14 @@ async def guide_page(request: Request) -> Response:
     if not GUIDE_HTML_PATH.exists():
         return error_json("GUIDE_UI_NOT_FOUND", "ca_trader_guide.html is missing", 500)
     return HTMLResponse(GUIDE_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+
+@app.get("/agents", response_class=HTMLResponse)
+@app.get("/harness", response_class=HTMLResponse)
+@app.get("/multi-agent", response_class=HTMLResponse)
+async def multi_agent_harness_page(request: Request) -> Response:
+    if not HARNESS_HTML_PATH.exists():
+        return error_json("HARNESS_UI_NOT_FOUND", "multi_agent_harness.html is missing", 500)
+    return HTMLResponse(HARNESS_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
 
 _cached_terminal_mtime: float = 0.0
 _cached_terminal_html: str = ""
