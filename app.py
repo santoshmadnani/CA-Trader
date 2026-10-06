@@ -2,7 +2,7 @@ from __future__ import annotations
 # To avoid syntax errors when using string without quotes.
 
 import uuid
-# Generates and assigns unique ID to orders or sessions.
+# Generates and assigns unique ID to orders, positions, etc.
 
 import asyncio
 # Responsible for loading multiple live data, i.e., LTP, live candle in charts, option chain, etc. simultaneously.
@@ -45,10 +45,10 @@ import os
 # Interacts with the computer operating system to read environment secrets (.env), check file paths, and manage server memory.
 
 import re
-# Acts as a smart search magnifying glass to detect specific patterns like extracting strike prices, dates, or symbols from text strings.
+# Useful to search for options of a stock, i.e., finding NIFTY24OCT25000CE when NIFTY50 is selected as instrument.
 
 import html
-# Cleans and sanitizes raw text from user inputs or broker alerts to prevent malicious scripts from breaking the browser interface.
+# Cleans and sanitizes raw text from user inputs or broker alerts to prevent malicious scripts from breaking the browser interface and avoids treating those inputs as a code and rather a text to display.
 
 import secrets
 # Generates unguessable, cryptographically secure tokens and session keys so your trading session cannot be hijacked.
@@ -67,18 +67,16 @@ import threading
 
 import time
 # Tracks exact timestamps, measures execution speeds, and manages delays or clock intervals between market ticks.
+
 from concurrent.futures import ThreadPoolExecutor, wait, as_completed, TimeoutError as FuturesTimeoutError
 # Coordinates multiple background worker threads simultaneously so market updates, analysis, and order tasks execute concurrently without freezing the server.
 
 import traceback
 # Prints detailed diagnostic traces if a crash happens, pinpointing the exact file, line number, and function for fast debugging.
 
-import uuid
-# Generates globally unique order IDs, tracking tokens, and transaction identifiers so trades never collide or get mixed up.
-
 import collections
 from collections import defaultdict, deque
-# High-performance collections: defaultdict auto-creates missing dictionary keys; deque maintains fast fixed-length rolling buffers for candle streams.
+# defaultdict prevents crashes by returning empty/blank data structures when a new symbol is selected before its data arrives. deque maintains a fixed-size rolling buffer for incoming live ticks/candles, discarding old ones so RAM doesn't fill up over long trading sessions.
 
 from datetime import datetime, timedelta, timezone
 # Handles calendar dates, timestamps, market session open/close boundaries, and time offsets.
