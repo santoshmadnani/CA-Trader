@@ -546,13 +546,16 @@ _configured_db_env = os.getenv("CA_DATABASE_PATH")
 if _configured_db_env:
     _configured_db_path = Path(_configured_db_env)
 else:
-    _data_db = BASE_DIR / "data" / "ca_trader.sqlite3"
     _root_db = BASE_DIR / "ca_trader.sqlite3"
-    if _data_db.exists() and _root_db.exists():
-        _configured_db_path = _data_db if _data_db.stat().st_mtime >= _root_db.stat().st_mtime else _root_db
-    elif _data_db.exists():
-        _configured_db_path = _data_db
-    else:
+    _data_db = BASE_DIR / "data" / "ca_trader.sqlite3"
+    try:
+        if _root_db.exists() and not _root_db.is_symlink():
+            _configured_db_path = _root_db
+        elif _data_db.exists():
+            _configured_db_path = _data_db
+        else:
+            _configured_db_path = _root_db
+    except Exception:
         _configured_db_path = _root_db
 # Preserve the production database used by older CA Trader deployments.  Some
 # deployment images set CA_DATABASE_PATH=/app/data/ca_trader.sqlite3 while the

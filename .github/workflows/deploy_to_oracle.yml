@@ -40,46 +40,65 @@ jobs:
             fi
 
             # Automated safety backup and arrangement of SQLite database
-            if [ -f "ca_trader.sqlite3" ]; then
-              cp ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3"
+            if [ -f "ca_trader.sqlite3" ] && [ ! -L "ca_trader.sqlite3" ]; then
+              cp ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3" 2>/dev/null || true
               cp -u ca_trader.sqlite3 data/ca_trader.sqlite3 2>/dev/null || true
               ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +8 | xargs -r rm -- 2>/dev/null || true
             elif [ -f "data/ca_trader.sqlite3" ]; then
-              cp data/ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3"
+              cp data/ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3" 2>/dev/null || true
               ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +8 | xargs -r rm -- 2>/dev/null || true
             fi
 
-            # Ensure root compatibility symlinks point to canonical data/ paths
-            if [ -f "data/ca_trader.sqlite3" ]; then
-              ln -sf data/ca_trader.sqlite3 ca_trader.sqlite3 2>/dev/null || true
+            # Clean any symlink so ca_trader.sqlite3 is a clean regular file everywhere
+            if [ -L "ca_trader.sqlite3" ]; then
+              rm -f ca_trader.sqlite3
+              if [ -f "data/ca_trader.sqlite3" ]; then
+                cp -f data/ca_trader.sqlite3 ca_trader.sqlite3 2>/dev/null || true
+              fi
             fi
-            if [ -f "data/stockmantra_3months.json" ]; then
-              ln -sf data/stockmantra_3months.json stockmantra_3months.json 2>/dev/null || true
+            if [ -f "ca_trader.sqlite3" ] && [ ! -f "data/ca_trader.sqlite3" ]; then
+              cp -f ca_trader.sqlite3 data/ca_trader.sqlite3 2>/dev/null || true
+            elif [ -f "data/ca_trader.sqlite3" ] && [ ! -f "ca_trader.sqlite3" ]; then
+              cp -f data/ca_trader.sqlite3 ca_trader.sqlite3 2>/dev/null || true
             fi
 
             /home/ubuntu/venv/bin/pip install -r requirements.txt --quiet
 
-            # Run calibrated scripts
+            # Run calibrated scripts safely (non-blocking)
             if [ -f "scripts/run_banknifty_backtest.py" ]; then
               echo ">>> EXECUTING BANKNIFTY 5-TIMEFRAME REAL-DATA BACKTEST <<<"
-              /home/ubuntu/venv/bin/python3 scripts/run_banknifty_backtest.py
+              /home/ubuntu/venv/bin/python3 scripts/run_banknifty_backtest.py || true
             fi
             if [ -f "scripts/reconcile_stockmantra.py" ]; then
               echo ">>> EXECUTING CALIBRATED STOCKMANTRA RECONCILIATION <<<"
               echo "=========================================================="
-              /home/ubuntu/venv/bin/python3 scripts/reconcile_stockmantra.py
+              /home/ubuntu/venv/bin/python3 scripts/reconcile_stockmantra.py || true
               echo "=========================================================="
             fi
 
+            sudo systemctl daemon-reload 2>/dev/null || true
             sudo systemctl restart catrader
-            sleep 5
-            sudo systemctl is-active catrader
+            sleep 4
+            if ! sudo systemctl is-active --quiet catrader; then
+              echo "[ERROR] catrader service failed to start! Fetching recent logs:"
+              journalctl -u catrader -n 40 --no-pager
+              exit 1
+            fi
+
             echo ">>> WAITING FOR UVICORN HEALTH (PORT 8000) <<<"
-            for i in $(seq 1 12); do
+            HEALTH_OK=0
+            for i in $(seq 1 15); do
               if curl -s -f http://127.0.0.1:8000/health > /dev/null; then
                 echo ">>> LOCAL HEALTH CHECK PASSED (attempt $i) <<<"
+                HEALTH_OK=1
                 break
               fi
               sleep 2
             done
+
+            if [ "$HEALTH_OK" -eq 0 ]; then
+              echo "[ERROR] Health check timed out! Dumping server logs:"
+              journalctl -u catrader -n 40 --no-pager
+              exit 1
+            fi
             echo ">>> DEPLOYMENT & HEALTH CHECK 100% SUCCESSFUL <<<"

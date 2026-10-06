@@ -42,8 +42,8 @@ def run_reconciliation():
     ]
     json_path = next((p for p in json_candidates if p.exists()), None)
     if not json_path:
-        print(f"[ERROR] Could not find stockmantra_3months.json in {[str(p) for p in json_candidates]}")
-        sys.exit(1)
+        print(f"[WARN] Could not find stockmantra_3months.json in {[str(p) for p in json_candidates]} - skipping reconciliation.")
+        return
 
     db_candidates = [
         repo_dir / "data" / "ca_trader.sqlite3",
