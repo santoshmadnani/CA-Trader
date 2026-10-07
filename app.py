@@ -8147,7 +8147,7 @@ async def telegram_agent_dispatch(payload: dict, request: Request) -> dict[str, 
         cfg = get_user_telegram_config(db_exec, uid)
         if not cfg or not cfg.get("bot_token"):
             tg_row = db_exec(
-                "SELECT value_json FROM settings WHERE key='telegram_config' AND value_json LIKE '%bot_token%' ORDER BY id DESC LIMIT 1",
+                "SELECT value_json FROM settings WHERE key='telegram_config' AND value_json LIKE '%bot_token%' LIMIT 1",
                 [], "one"
             )
             if tg_row and tg_row.get("value_json"):
@@ -8221,7 +8221,7 @@ async def run_agent_test_dispatch(request: Request) -> dict[str, Any]:
     """Runs a live agent audit probe and dispatches the live report to Telegram."""
     try:
         tg_row = db_exec(
-            "SELECT value_json FROM settings WHERE key='telegram_config' AND value_json LIKE '%bot_token%' ORDER BY id DESC LIMIT 1",
+            "SELECT value_json FROM settings WHERE key='telegram_config' AND value_json LIKE '%bot_token%' LIMIT 1",
             [], "one"
         )
         cfg = None
