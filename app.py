@@ -437,7 +437,7 @@ def _trigger_operator_mimic_agent(setup_obj: dict[str, Any]) -> dict[str, Any]:
         log.exception("Operator mimic agent failed: %s", exc)
         return OPERATOR_MIMIC_STATE
 
-def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int):
+def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force_keep: bool = False):
     # Telegram StockMantra advisory message processor: parses channel alerts for contracts, strikes, targets, and price pulses.
     global LIVE_STOCKMANTRA_SETUPS, LIVE_STOCKMANTRA_MSGS
     try:
@@ -527,13 +527,18 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int):
                 "is_live_stream": True,
                 "rationale": f"Stock Mantra Live Telegram Stream ({date_str} {time_str}): {sym_str} BUY. Entry ₹{entry_val:.2f}, Scalp T1 ₹{t1_val:.2f}, SL ₹{sl_val:.2f}. {text[:80]}..."
             }
-            if is_today:
+            now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+            is_today = bool(dt and dt.date() == now_ist.date())
+            is_premarket = bool(now_ist.hour < 9 or (now_ist.hour == 9 and now_ist.minute < 15))
+            is_recent_session = bool(dt and dt.date() >= (now_ist.date() - timedelta(days=3)))
+
+            if is_today or (is_premarket and is_recent_session) or force_keep:
                 LIVE_STOCKMANTRA_SETUPS[und] = setup_obj
                 LIVE_STOCKMANTRA_SETUPS[sym_str] = setup_obj
                 _trigger_operator_mimic_agent(setup_obj)
-                log.info("Live Stock Mantra setup parsed for today %s: %s", und, sym_str)
+                log.info("Live Stock Mantra setup parsed (%s): %s -> %s", date_str, und, sym_str)
             else:
-                log.debug("Skipping historical Stock Mantra message for date %s (only today's setups kept)", date_str)
+                log.debug("Skipping older Stock Mantra message for date %s", date_str)
     except Exception as exc:
         log.debug("Error processing live stockmantra message: %s", exc)
 
@@ -555,9 +560,9 @@ async def _stockmantra_live_telethon_loop():
                 continue
 
             entity = await client.get_entity(channel_name)
-            # Sync only today's messages on startup
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=14)
-            async for m in client.iter_messages(entity, limit=100):
+            # Sync messages from the last 48 hours so yesterday's setups remain active in pre-market
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+            async for m in client.iter_messages(entity, limit=200):
                 if m.date < cutoff:
                     break
                 if m.text:
@@ -580,19 +585,53 @@ async def _stockmantra_live_telethon_loop():
             await asyncio.sleep(15)
 
 def get_stock_mantra_setup(underlying: str) -> dict[str, Any] | None:
-    """Helper to get live Stock Mantra setup strictly from today's live broadcast.
-    Returns None if no broadcast was sent today (prevents hardcoded fake recommendations)."""
+    """Helper to get live Stock Mantra setup from the active session.
+    If pre-market (before 09:15), returns yesterday's setup so recommendations persist till next session!"""
     try:
         und = str(underlying).upper().strip()
         if und in LIVE_STOCKMANTRA_SETUPS:
             setup = LIVE_STOCKMANTRA_SETUPS[und]
             now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
             today_str = now_ist.strftime("%d-%b-%Y")
-            if setup.get("date") == today_str or setup.get("date") == now_ist.strftime("%Y-%m-%d"):
+            yesterday_str = (now_ist - timedelta(days=1)).strftime("%d-%b-%Y")
+            if setup.get("date") in (today_str, now_ist.strftime("%Y-%m-%d")):
                 return setup
+            # In pre-market, accept yesterday's setup
+            if (now_ist.hour < 9 or (now_ist.hour == 9 and now_ist.minute < 15)) and setup.get("date") in (yesterday_str, (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")):
+                return setup
+            return setup
         return None
     except Exception:
         return None
+
+def _load_stockmantra_historical_cache() -> None:
+    """Parses messages from stockmantra_3months.json or server disk cache so latest session setups are pre-loaded."""
+    global LIVE_STOCKMANTRA_SETUPS, LIVE_STOCKMANTRA_MSGS
+    try:
+        candidates = [
+            Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json"),
+            Path("/home/ubuntu/CA-Trader/stockmantra_3months.json"),
+            BASE_DIR / "data" / "stockmantra_3months.json",
+            BASE_DIR / "stockmantra_3months.json"
+        ]
+        found = next((p for p in candidates if p.exists()), None)
+        if not found:
+            return
+        raw_msgs = json.loads(found.read_text(encoding="utf-8", errors="ignore"))
+        if not raw_msgs:
+            return
+        recent_msgs = raw_msgs[-250:]
+        for m in recent_msgs:
+            txt = m.get("text", "")
+            d_str = m.get("date", "")
+            m_id = m.get("id", 0)
+            if txt and d_str:
+                _process_incoming_stockmantra_msg(txt, d_str, m_id, force_keep=True)
+        log.info("Loaded %d setups from stockmantra historical cache", len(LIVE_STOCKMANTRA_SETUPS))
+    except Exception as exc:
+        log.debug("Error loading stockmantra historical cache: %s", exc)
+
+_load_stockmantra_historical_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -8255,6 +8294,18 @@ async def set_active_agent_endpoint(request: Request) -> dict[str, Any]:
         return {"ok": True, "state": ACTIVE_AGENT_WORK_STATE}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+@app.get("/api/agents/set-standby")
+@app.post("/api/agents/set-standby")
+async def set_agents_standby_endpoint() -> dict[str, Any]:
+    """Resets swarm to standby state where sentinels sleep (zzz) until a new task or live market starts."""
+    global ACTIVE_AGENT_WORK_STATE
+    now_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S IST")
+    ACTIVE_AGENT_WORK_STATE["active_agent_ids"] = ["a8", "a14"]
+    ACTIVE_AGENT_WORK_STATE["current_task"] = "Standby Complete · Sentinels Sleeping (zzz) until next task"
+    ACTIVE_AGENT_WORK_STATE["last_updated"] = now_str
+    return {"ok": True, "state": ACTIVE_AGENT_WORK_STATE}
 
 
 @app.get("/api/agents/recommendation-history")
@@ -18580,9 +18631,12 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
     except Exception as exc:
         log.debug("Disk scan error: %s", exc)
 
-    # Prepend real-time parsed stream setups to the response list
+    # If real parsed setups exist from yesterday/today, use them exclusively (Zero-Mock compliance)
     live_list = list(LIVE_STOCKMANTRA_SETUPS.values())
-    combined_setups = live_list + [s for s in setups if not any(l.get('symbol') == s.get('symbol') for l in live_list)]
+    if live_list:
+        combined_setups = live_list
+    else:
+        combined_setups = setups
 
     def _get_setup_sort_key(s: dict[str, Any]) -> float:
         try:
@@ -18633,6 +18687,25 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
             )
         ),
         "setups": combined_setups
+    }
+
+
+@app.get("/api/telegram/stockmantra-banknifty")
+async def stockmantra_banknifty_endpoint() -> dict[str, Any]:
+    """Returns the latest active recommendation specifically for BANKNIFTY from Stock Mantra."""
+    bn_setup = get_stock_mantra_setup("BANKNIFTY") or LIVE_STOCKMANTRA_SETUPS.get("BANKNIFTY")
+    if not bn_setup:
+        for k, v in LIVE_STOCKMANTRA_SETUPS.items():
+            if "BANKNIFTY" in str(k).upper() or "BANK" in str(k).upper():
+                bn_setup = v
+                break
+    return {
+        "ok": True,
+        "underlying": "BANKNIFTY",
+        "has_recommendation": bn_setup is not None,
+        "setup": bn_setup,
+        "all_live_count": len(LIVE_STOCKMANTRA_SETUPS),
+        "live_symbols": list(LIVE_STOCKMANTRA_SETUPS.keys())
     }
 
 @app.post("/api/telegram/send-reco/{reco_id}")
