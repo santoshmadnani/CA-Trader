@@ -542,6 +542,7 @@
     .rh-sym { font-weight:700; color:var(--text-1); font-family:var(--font-mono); }
     .rh-dir.bull { color:#34d399; } .rh-dir.bear { color:#fb7185; }
     .rh-res.hit  { color:#34d399; } .rh-res.sl   { color:#fb7185; } .rh-res.live { color:#fbbf24; }
+    .rh-res.pre  { color:#c084fc; background:rgba(192,132,252,0.12); padding:2px 6px; border-radius:4px; font-weight:700; font-size:9px; border:1px solid rgba(192,132,252,0.25); }
     .rh-time { color:var(--text-3); font-family:var(--font-mono); font-size:9.5px; }
 
     /* ════════════════════════════════════════════ MODAL ════════════ */
@@ -926,12 +927,12 @@
     <div class="side-card">
       <div class="side-head">
         <h4>📋 Recommendation History</h4>
-        <span style="font-size:10px;color:var(--text-3)">Live · Per Timeframe</span>
+        <span id="rhStatusBadge" style="font-size:10px;color:#a5b4fc">Live SQLite Feed</span>
       </div>
       <div class="rh-tabs" id="rhTabs">
-        <button class="rh-tab active" onclick="selectTf(this,'1m')">1m</button>
+        <button class="rh-tab" onclick="selectTf(this,'1m')">1m</button>
         <button class="rh-tab" onclick="selectTf(this,'3m')">3m</button>
-        <button class="rh-tab active-tab" onclick="selectTf(this,'5m')">5m</button>
+        <button class="rh-tab active" onclick="selectTf(this,'5m')">5m</button>
         <button class="rh-tab" onclick="selectTf(this,'15m')">15m</button>
         <button class="rh-tab" onclick="selectTf(this,'1h')">1h</button>
         <button class="rh-tab" onclick="selectTf(this,'1d')">1d</button>
@@ -1340,74 +1341,92 @@ function testTelegramDispatch() {
 /* ================================================================
    RECOMMENDATION HISTORY
    ================================================================ */
-const RECO_SAMPLES = {
-  '1m':  [
-    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:215, sl:190, res:'hit',  t:'09:15'},
-    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:95,  sl:80,  res:'live', t:'09:16'},
-    {sym:'BANKNIFTY 55500 PE', dir:'BEAR', entry:150, tgt:175, sl:140, res:'sl',   t:'09:17'},
-    {sym:'NIFTY 24950 CE',     dir:'BULL', entry:60,  tgt:68,  sl:55,  res:'hit',  t:'09:18'},
-    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:205, sl:168, res:'live', t:'09:19'},
-  ],
-  '3m':  [
-    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:230, sl:185, res:'hit',  t:'09:15'},
-    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:100, sl:78,  res:'sl',   t:'09:18'},
-    {sym:'CRUDEOIL 6800 CE',   dir:'BULL', entry:42,  tgt:50,  sl:38,  res:'hit',  t:'09:21'},
-    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:210, sl:165, res:'live', t:'09:24'},
-  ],
-  '5m':  [
-    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:250, sl:180, res:'sl',   t:'09:15'},
-    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:105, sl:78,  res:'hit',  t:'09:20'},
-    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:215, sl:162, res:'hit',  t:'09:25'},
-    {sym:'NIFTY 24950 CE',     dir:'BULL', entry:60,  tgt:72,  sl:54,  res:'live', t:'09:30'},
-    {sym:'RELIANCE CE',        dir:'BULL', entry:22,  tgt:28,  sl:20,  res:'hit',  t:'09:35'},
-    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:195, tgt:242, sl:178, res:'live', t:'09:40'},
-  ],
-  '15m': [
-    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:260, sl:175, res:'hit',  t:'09:15'},
-    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:110, sl:75,  res:'hit',  t:'09:30'},
-    {sym:'CRUDEOIL 6800 CE',   dir:'BULL', entry:42,  tgt:55,  sl:36,  res:'sl',   t:'09:45'},
-    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:220, sl:158, res:'live', t:'10:00'},
-  ],
-  '1h':  [
-    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:280, sl:165, res:'live', t:'09:15'},
-    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:115, sl:70,  res:'hit',  t:'10:15'},
-  ],
-  '1d':  [
-    {sym:'BANKNIFTY',          dir:'BULL', entry:55400, tgt:56200, sl:54800, res:'live', t:'Today'},
-    {sym:'NIFTY 50',           dir:'BULL', entry:24800, tgt:25200, sl:24500, res:'hit',  t:'Oct 06'},
-  ],
-};
+/* ================================================================
+   RECOMMENDATION HISTORY (Real SQLite Backend per Timeframe)
+   ================================================================ */
+let activeTf = '5m';
 
-function selectTf(el, tf) {
+async function selectTf(el, tf) {
   document.querySelectorAll('.rh-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  renderRH(tf);
+  if (el) el.classList.add('active');
+  activeTf = tf;
+  await loadRecommendationHistory(tf);
 }
 
-function renderRH(tf) {
-  const rows = RECO_SAMPLES[tf] || [];
+async function loadRecommendationHistory(tf) {
   const list = document.getElementById('rhList');
-  list.innerHTML = rows.map(r => `
-    <div class="rh-row">
-      <span class="rh-sym">${r.sym}</span>
-      <span class="rh-dir ${r.dir==='BULL'?'bull':'bear'}">${r.dir==='BULL'?'▲ BUY':'▼ SELL'}</span>
-      <span class="rh-res ${r.res}">${
-        r.res==='hit'  ? '🎯 TARGET' :
-        r.res==='sl'   ? '🛑 SL HIT' : '⏳ LIVE'
-      }</span>
-      <span class="rh-time">${r.t}</span>
-    </div>`).join('');
+  const badge = document.getElementById('rhStatusBadge');
+  if (!list) return;
+
+  list.innerHTML = `
+    <div style="padding:14px 8px;text-align:center;color:var(--text-3);font-size:11px;">
+      <div style="font-size:14px;margin-bottom:3px;">⏳</div>
+      Loading ${tf} history from SQLite...
+    </div>`;
+
+  try {
+    const res = await fetch(`/api/recommendations/history?timeframe=${encodeURIComponent(tf)}&limit=25`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.recommendations || data.history || data.data || []);
+    if (badge) badge.textContent = `${rows.length} Records (${tf})`;
+    renderRH(rows, tf);
+  } catch (err) {
+    if (badge) badge.textContent = `Standby (${tf})`;
+    renderRH([], tf);
+  }
 }
 
-// Init with 5m
+function renderRH(rows, tf) {
+  const list = document.getElementById('rhList');
+  if (!list) return;
+
+  if (!rows || rows.length === 0) {
+    list.innerHTML = `
+      <div style="padding:18px 8px;text-align:center;color:var(--text-3);font-size:11px;">
+        <div style="font-size:16px;margin-bottom:3px;">🌅</div>
+        <div style="color:var(--text-2);font-weight:600;font-size:11px;">Pre-Market Standby (${tf})</div>
+        <div style="margin-top:2px;font-size:10px;">No trade recommendations executed yet.</div>
+        <div style="color:#6ee7b7;margin-top:5px;font-size:10px;font-weight:600;">Recommendation for next market session 09:15</div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = rows.map(r => {
+    const sym = r.symbol || r.underlying || 'NIFTY';
+    const act = (r.recommendation || r.action || 'BUY').toUpperCase();
+    const isBull = act === 'BUY';
+    const rationale = String(r.rationale || '');
+    const isPreMarket = (r.status === 'PRE_MARKET') || rationale.includes('09:15') || rationale.includes('Pre-Market');
+    
+    let resBadge = '';
+    const outcome = String(r.outcome || '').toUpperCase();
+    if (isPreMarket) {
+      resBadge = '<span class="rh-res pre">🌅 NEXT 09:15</span>';
+    } else if (outcome.includes('TARGET') || outcome === 'HIT') {
+      resBadge = '<span class="rh-res hit">🎯 TARGET</span>';
+    } else if (outcome.includes('SL') || outcome.includes('STOP')) {
+      resBadge = '<span class="rh-res sl">🛑 SL HIT</span>';
+    } else {
+      resBadge = '<span class="rh-res live">⏳ LIVE</span>';
+    }
+
+    const tStr = r.created_at ? (r.created_at.includes('T') ? r.created_at.split('T')[1].slice(0,5) : r.created_at.slice(11,16)) : '09:15';
+
+    return `
+      <div class="rh-row" title="${r.rationale || ''}">
+        <span class="rh-sym">${sym}</span>
+        <span class="rh-dir ${isBull ? 'bull' : 'bear'}">${isBull ? '▲ BUY' : '▼ SELL'}</span>
+        ${resBadge}
+        <span class="rh-time">${isPreMarket ? '09:15' : tStr}</span>
+      </div>`;
+  }).join('');
+}
+
+// Initial load on page ready
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelector('.rh-tab').click();
-  renderRH('1m');
-  // Actually select 5m
-  const tabs = document.querySelectorAll('.rh-tab');
-  tabs.forEach(t => t.classList.remove('active'));
-  tabs[2].classList.add('active');
-  renderRH('5m');
+  const tab5m = document.querySelector('.rh-tab[onclick*="5m"]');
+  selectTf(tab5m, '5m');
 });
 
 
@@ -1609,28 +1628,30 @@ function closeModal(e) {
 
 
 /* ================================================================
-   AMBIENT LOG ROTATION (simulated continuous activity)
+   LIVE ORACLE VM TELEMETRY CONSOLE
    ================================================================ */
-const AMBIENT_LOGS = [
-  ['HB',     '5m heartbeat: BANKNIFTY reco generated ✓',                   'ce-win'],
-  ['DETECT', '14/14 panels live, 0 hardcoded values',                       'ce-win'],
-  ['STEVE',  'DOM sync verified: reco count 2 (CE/PE)',                     'ce-text'],
-  ['WIZARD', 'Bullish Engulfing spotted on 5m NIFTY chart at 09:50',        'ce-patch'],
-  ['NEWS',   'Sentiment update: NIFTY +0.61 (Positive)',                    'ce-text'],
-  ['UI',     'Mobile view 390px: all 28 components within bounds',          'ce-win'],
-  ['KNIGHT', 'MTM updated: BANKNIFTY CE trade +₹2,850',                    'ce-text'],
-  ['MARIO',  'VWAP proximity check: 55,418 (0.03% from VWAP)',              'ce-text'],
-  ['CHIEF',  'Agent health: 9/9 PASS. Accuracy steady at 96.4%',            'ce-win'],
-  ['HB',     'Pipeline alive: 84 recos generated today',                    'ce-win'],
-  ['DETECT', 'Option chain: 0 static prices detected',                      'ce-win'],
-  ['NEWS',   'GNews rate: 31/50 req/hr. All articles < 2h old',             'ce-text'],
-];
-let ambientIdx = 0;
-setInterval(() => {
-  const [tag, msg, cls] = AMBIENT_LOGS[ambientIdx % AMBIENT_LOGS.length];
-  addLog(tag, msg, cls);
-  ambientIdx++;
-}, 4200);
+async function pollLiveTelemetry() {
+  try {
+    const res = await fetch('/api/agents/telemetry');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.status === 'ok') {
+      const hBadge = document.getElementById('statAgents');
+      if (hBadge) hBadge.textContent = `${data.agents_healthy || 9}/${data.total_agents || 9}`;
+
+      if (Array.isArray(data.events) && data.events.length > 0) {
+        const evt = data.events[Math.floor(Date.now() / 4000) % data.events.length];
+        addLog(evt.tag, evt.msg, evt.cls);
+      }
+    }
+  } catch (err) {
+    // network standby
+  }
+}
+
+// Poll real backend telemetry every 4.5 seconds
+setInterval(pollLiveTelemetry, 4500);
+setTimeout(pollLiveTelemetry, 800);
 </script>
 </body>
 </html>
