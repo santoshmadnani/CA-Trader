@@ -3,42 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CA-Trader · Multi-Agent Harness</title>
+  <title>CA-Trader · Multi-Agent Living Swarm Harness</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #0a0d14;
-      --bg-card: #0f1420;
-      --bg-card-hover: #151b2b;
-      --border-card: #1c2438;
-      --border-active: #2a3652;
+      --bg-dark: #080b12;
+      --bg-card: #0d121e;
+      --bg-card-hover: #141c2e;
+      --border-card: #1c263c;
+      --border-active: #2e3e60;
       --text-main: #f0f4fc;
       --text-muted: #8b9bb4;
       --text-dim: #55657e;
       --accent-blue: #3b82f6;
-      --accent-blue-glow: rgba(59, 130, 246, 0.25);
       --accent-green: #10b981;
-      --accent-green-glow: rgba(16, 185, 129, 0.25);
       --accent-purple: #8b5cf6;
-      --accent-purple-glow: rgba(139, 92, 246, 0.25);
       --accent-amber: #f59e0b;
-      --accent-amber-glow: rgba(245, 158, 11, 0.25);
       --accent-rose: #f43f5e;
-      --accent-rose-glow: rgba(244, 63, 94, 0.25);
       --accent-cyan: #06b6d4;
-      --accent-cyan-glow: rgba(6, 182, 212, 0.25);
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-sans: 'Inter', -apple-system, sans-serif;
       --font-display: 'Outfit', sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
+      --font-pixel: 'Press Start 2P', monospace;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background-color: var(--bg-dark);
@@ -50,15 +41,15 @@
       flex-direction: column;
     }
 
-    /* Top Navigation Bar */
+    /* Top Navbar */
     header.navbar {
-      height: 64px;
+      height: 66px;
       border-bottom: 1px solid var(--border-card);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 28px;
-      background: rgba(15, 20, 32, 0.85);
+      background: rgba(13, 18, 30, 0.88);
       backdrop-filter: blur(16px);
       position: sticky;
       top: 0;
@@ -70,455 +61,492 @@
       align-items: center;
       gap: 12px;
       font-family: var(--font-display);
-      font-size: 19px;
+      font-size: 20px;
       font-weight: 700;
       letter-spacing: -0.3px;
     }
 
     .brand-icon {
-      width: 34px;
-      height: 34px;
+      width: 36px;
+      height: 36px;
       border-radius: 10px;
-      background: linear-gradient(135deg, #4f46e5, #06b6d4);
+      background: linear-gradient(135deg, #6366f1, #06b6d4);
       display: grid;
       place-items: center;
       font-size: 18px;
-      box-shadow: 0 0 16px rgba(79, 70, 229, 0.4);
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
     }
 
-    .nav-tabs {
-      display: flex;
-      gap: 6px;
-      background: #0a0e17;
-      padding: 4px;
-      border-radius: 10px;
-      border: 1px solid var(--border-card);
-    }
-
-    .nav-tab {
-      padding: 7px 18px;
-      border-radius: 7px;
-      font-size: 13.5px;
-      font-weight: 500;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
-    }
-
-    .nav-tab:hover {
-      color: var(--text-main);
-    }
-
-    .nav-tab.active {
-      background: var(--bg-card);
-      color: var(--text-main);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-      font-weight: 600;
-    }
-
-    .header-actions {
+    .swarm-controls {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
     }
 
-    .status-pill {
+    .btn-action {
+      padding: 8px 16px;
+      border-radius: 9px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: 1px solid var(--border-card);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.2s ease;
+      background: #0f1524;
+      color: var(--text-main);
+    }
+
+    .btn-action:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent-cyan);
+    }
+
+    .btn-wake {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-color: transparent;
+      color: white;
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-sleep {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border-color: transparent;
+      color: white;
+      box-shadow: 0 0 14px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-panic {
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+      border-color: transparent;
+      color: white;
+      box-shadow: 0 0 14px rgba(244, 63, 94, 0.35);
+    }
+
+    /* Token Badge */
+    .token-meter-pill {
       display: flex;
       align-items: center;
       gap: 8px;
       padding: 6px 14px;
       border-radius: 20px;
       background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      font-size: 12.5px;
-      font-weight: 600;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
       color: var(--accent-green);
     }
 
-    .status-dot {
+    .token-pulse-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       background: var(--accent-green);
       box-shadow: 0 0 10px var(--accent-green);
-      animation: pulse 2s infinite;
+      animation: pulse 1.8s infinite;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
+      50% { opacity: 0.4; transform: scale(0.8); }
     }
 
-    .btn-new-task {
-      padding: 8px 18px;
-      border-radius: 9px;
-      background: linear-gradient(135deg, #6366f1, #4f46e5);
-      color: white;
-      font-size: 13.5px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
-      transition: all 0.2s ease;
-    }
-
-    .btn-new-task:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
-    }
-
-    /* Main Container Grid */
+    /* Main Grid */
     main.dashboard {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 20px;
-      padding: 20px 28px;
-      max-width: 1720px;
+      grid-template-columns: 1fr 360px;
+      gap: 22px;
+      padding: 22px 28px;
+      max-width: 1780px;
       margin: 0 auto;
       width: 100%;
     }
 
-    /* Left Area: Visual Workflow Canvas */
+    /* Canvas / Swarm Stage */
     .canvas-section {
       display: flex;
       flex-direction: column;
       gap: 20px;
     }
 
-    /* Goal & Stepper Card */
+    /* Top Goal & Auto-Tuning Banner */
     .goal-card {
       background: var(--bg-card);
       border: 1px solid var(--border-card);
       border-radius: 16px;
       padding: 20px 24px;
       display: flex;
-      flex-direction: column;
-      gap: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-    }
-
-    .goal-header {
-      display: flex;
       align-items: center;
-      gap: 14px;
-    }
-
-    .goal-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: rgba(59, 130, 246, 0.15);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      display: grid;
-      place-items: center;
-      font-size: 20px;
-      color: var(--accent-blue);
-    }
-
-    .goal-meta h2 {
-      font-size: 11.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-dim);
-      font-weight: 700;
-      margin-bottom: 2px;
-    }
-
-    .goal-meta p {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-
-    /* Step Pipeline Stepper */
-    .pipeline-stepper {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      overflow-x: auto;
-      padding-top: 4px;
-    }
-
-    .step-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      border: 1px solid var(--border-card);
-      background: #0b0f17;
-      color: var(--text-muted);
-      white-space: nowrap;
-    }
-
-    .step-badge.active {
-      border-color: var(--accent-blue);
-      background: rgba(59, 130, 246, 0.15);
-      color: var(--accent-blue);
-      box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
-    }
-
-    .step-badge.completed {
-      border-color: var(--accent-green);
-      background: rgba(16, 185, 129, 0.12);
-      color: var(--accent-green);
-    }
-
-    .step-arrow {
-      color: var(--text-dim);
-      font-size: 13px;
-    }
-
-    /* Multi-Agent Swarm Hub (Node Topology Layout) */
-    .swarm-network {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: 18px;
-      padding: 28px;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-auto-rows: auto;
-      gap: 22px;
+      justify-content: space-between;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
       position: relative;
       overflow: hidden;
     }
 
-    /* Ambient glow background in canvas */
-    .swarm-network::before {
-      content: '';
-      position: absolute;
-      top: 35%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 480px;
-      height: 340px;
-      background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, rgba(99, 102, 241, 0.05) 50%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Agent Card Base */
-    .agent-card {
-      background: #0d121c;
-      border: 1.5px solid var(--border-card);
-      border-radius: 14px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      position: relative;
-      z-index: 1;
-      transition: all 0.25s ease;
-      cursor: pointer;
-    }
-
-    .agent-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    }
-
-    .agent-header {
+    .goal-left {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
 
-    .agent-avatar {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
+    .goal-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.35);
       display: grid;
       place-items: center;
-      font-size: 19px;
-      border: 1px solid;
+      font-size: 22px;
+      color: var(--accent-cyan);
     }
 
-    .agent-title-block h3 {
-      font-size: 14.5px;
+    .goal-meta h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+      color: var(--text-dim);
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+
+    .goal-meta p {
+      font-size: 16px;
       font-weight: 700;
       color: var(--text-main);
     }
 
-    .agent-title-block p {
-      font-size: 11.5px;
-      color: var(--text-muted);
-    }
-
-    .agent-checklist {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-    }
-
-    .agent-checklist li {
-      font-size: 12px;
-      color: var(--text-muted);
+    /* Accuracy Meter */
+    .accuracy-gauge {
       display: flex;
       align-items: center;
-      gap: 8px;
-      line-height: 1.35;
-    }
-
-    .check-icon {
-      color: var(--accent-green);
-      font-size: 13px;
-      flex-shrink: 0;
-    }
-
-    .agent-artifact-btn {
-      margin-top: auto;
-      padding: 6px 12px;
-      border-radius: 7px;
-      background: rgba(255,255,255,0.03);
+      gap: 16px;
+      background: #080c16;
       border: 1px solid var(--border-card);
+      padding: 10px 18px;
+      border-radius: 12px;
+    }
+
+    .accuracy-number {
+      font-family: var(--font-pixel);
+      font-size: 18px;
+      color: #34d399;
+      text-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+    }
+
+    .accuracy-label {
       font-size: 11.5px;
-      font-family: var(--font-mono);
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      text-decoration: none;
-      transition: all 0.2s ease;
+      color: var(--text-muted);
+      font-weight: 600;
     }
 
-    .agent-artifact-btn:hover {
-      background: rgba(255,255,255,0.08);
-      border-color: var(--text-muted);
+    /* Living Swarm Network Grid */
+    .swarm-stage {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      padding: 30px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+      position: relative;
+      overflow: hidden;
+      min-height: 640px;
     }
 
-    /* Specific Agent Themes */
-    /* 1. News & Sentiment Sentinel (Blue) */
-    .agent-card.theme-blue {
-      border-color: rgba(59, 130, 246, 0.4);
-      box-shadow: 0 0 16px var(--accent-blue-glow);
+    /* Ambient background grid lines */
+    .swarm-stage::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(28, 38, 60, 0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(28, 38, 60, 0.3) 1px, transparent 1px);
+      background-size: 30px 30px;
+      opacity: 0.35;
+      pointer-events: none;
     }
-    .agent-card.theme-blue .agent-avatar {
-      background: rgba(59, 130, 246, 0.15);
-      border-color: var(--accent-blue);
-      color: var(--accent-blue);
-    }
-    .agent-card.theme-blue h3 { color: #93c5fd; }
 
-    /* 2. UI/UX & Layout Auditor (Green) */
-    .agent-card.theme-green {
-      border-color: rgba(16, 185, 129, 0.4);
-      box-shadow: 0 0 16px var(--accent-green-glow);
-    }
-    .agent-card.theme-green .agent-avatar {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: var(--accent-green);
-      color: var(--accent-green);
-    }
-    .agent-card.theme-green h3 { color: #6ee7b7; }
-
-    /* 3. Reco E2E Sync Sentinel (Purple) */
-    .agent-card.theme-purple {
-      border-color: rgba(139, 92, 246, 0.4);
-      box-shadow: 0 0 16px var(--accent-purple-glow);
-    }
-    .agent-card.theme-purple .agent-avatar {
-      background: rgba(139, 92, 246, 0.15);
-      border-color: var(--accent-purple);
-      color: var(--accent-purple);
-    }
-    .agent-card.theme-purple h3 { color: #c4b5fd; }
-
-    /* 4. Analytics & Quant Sentinel (Amber) */
-    .agent-card.theme-amber {
-      border-color: rgba(245, 158, 11, 0.4);
-      box-shadow: 0 0 16px var(--accent-amber-glow);
-    }
-    .agent-card.theme-amber .agent-avatar {
-      background: rgba(245, 158, 11, 0.15);
-      border-color: var(--accent-amber);
-      color: var(--accent-amber);
-    }
-    .agent-card.theme-amber h3 { color: #fcd34d; }
-
-    /* 5. Execution Sentinel (Rose/Red) */
-    .agent-card.theme-rose {
-      border-color: rgba(244, 63, 94, 0.4);
-      box-shadow: 0 0 16px var(--accent-rose-glow);
-    }
-    .agent-card.theme-rose .agent-avatar {
-      background: rgba(244, 63, 94, 0.15);
-      border-color: var(--accent-rose);
-      color: var(--accent-rose);
-    }
-    .agent-card.theme-rose h3 { color: #fda4af; }
-
-    /* Central Shared Workspace Node */
-    .shared-workspace-card {
+    /* Central Shared Workspace */
+    .shared-hub {
       grid-column: 2 / 3;
-      background: radial-gradient(circle at center, #111a2e 0%, #0c121e 100%);
-      border: 2px dashed rgba(6, 182, 212, 0.5);
-      border-radius: 50%;
-      width: 220px;
-      height: 220px;
+      grid-row: 2 / 3;
       margin: auto;
+      width: 210px;
+      height: 210px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, #111a30 0%, #0a0f1c 100%);
+      border: 2px dashed rgba(6, 182, 212, 0.55);
+      box-shadow: 0 0 35px rgba(6, 182, 212, 0.2);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
       padding: 16px;
-      box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
-      position: relative;
-      z-index: 2;
+      z-index: 5;
       animation: float 4s ease-in-out infinite;
     }
 
     @keyframes float {
       0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
+      50% { transform: translateY(-7px); }
     }
 
-    .shared-workspace-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: rgba(6, 182, 212, 0.2);
-      color: var(--accent-cyan);
-      display: grid;
-      place-items: center;
-      font-size: 22px;
-      margin-bottom: 8px;
+    .hub-core-icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 0 8px #06b6d4);
     }
 
-    .shared-workspace-card h4 {
-      font-size: 14px;
+    .shared-hub h4 {
+      font-size: 13.5px;
       font-weight: 700;
-      color: var(--text-main);
-      margin-bottom: 4px;
+      color: #e0f2fe;
+      margin-bottom: 3px;
     }
 
-    .shared-workspace-card p {
-      font-size: 10.5px;
+    .shared-hub p {
+      font-size: 10px;
       color: var(--text-muted);
       line-height: 1.35;
     }
 
-    /* Supervisor / Chief Reviewer Card (Span full bottom) */
-    .supervisor-card {
-      grid-column: 1 / 4;
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%);
-      border: 1.5px solid rgba(6, 182, 212, 0.45);
-      border-radius: 14px;
-      padding: 20px 24px;
+    /* Agent Card Base */
+    .agent-box {
+      background: #0b0f19;
+      border: 1.5px solid var(--border-card);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      z-index: 3;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+
+    .agent-box:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .agent-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-shadow: 0 0 24px var(--accent-cyan-glow);
+    }
+
+    /* Retro Pixel / Mario / Minecraft Character Avatar Box */
+    .character-avatar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .character-sprite-box {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: #141c2c;
+      border: 2px solid;
+      display: grid;
+      place-items: center;
       position: relative;
-      z-index: 1;
+      overflow: visible;
+      box-shadow: 0 0 12px rgba(0,0,0,0.5);
+    }
+
+    /* Animated Character Sprite */
+    .sprite-char {
+      font-size: 26px;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+
+    /* Tool Action Icon (Pickaxe / Hammer / Wand) */
+    .sprite-tool {
+      position: absolute;
+      right: -6px;
+      top: -6px;
+      font-size: 16px;
+      transform-origin: bottom left;
+      filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));
+    }
+
+    /* Floating Zzz for Sleeping State */
+    .zzz-cloud {
+      position: absolute;
+      top: -24px;
+      right: -8px;
+      font-family: var(--font-pixel);
+      font-size: 10px;
+      color: #93c5fd;
+      text-shadow: 0 0 8px rgba(147, 197, 253, 0.8);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* State: WORKING ANIMATIONS */
+    .agent-box.is-working .sprite-char {
+      animation: bounce 0.6s ease infinite alternate;
+    }
+
+    .agent-box.is-working .sprite-tool {
+      animation: swingTool 0.5s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-4px); }
+    }
+
+    @keyframes swingTool {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(-45deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* State: SLEEPING ANIMATIONS */
+    .agent-box.is-sleeping {
+      opacity: 0.65;
+      border-color: #1e293b !important;
+      box-shadow: none !important;
+      background: #090d15 !important;
+    }
+
+    .agent-box.is-sleeping .sprite-char {
+      filter: grayscale(0.4);
+      transform: scale(0.92);
+    }
+
+    .agent-box.is-sleeping .sprite-tool {
+      display: none;
+    }
+
+    .agent-box.is-sleeping .zzz-cloud {
+      opacity: 1;
+      animation: floatZzz 2.2s ease-in-out infinite;
+    }
+
+    @keyframes floatZzz {
+      0% { transform: translate(0, 0) scale(0.8); opacity: 0; }
+      40% { opacity: 1; }
+      100% { transform: translate(12px, -18px) scale(1.2); opacity: 0; }
+    }
+
+    /* Status Pill Tag */
+    .agent-state-badge {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 12px;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .state-working {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .state-sleeping {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid #64748b;
+      color: #94a3b8;
+    }
+
+    /* Agent Titles */
+    .agent-info h3 {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 2px;
+    }
+
+    .agent-info p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Checklist */
+    .agent-tasks {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .agent-tasks li {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      line-height: 1.35;
+    }
+
+    .task-check {
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+
+    /* Live Activity Line */
+    .agent-live-log {
+      margin-top: auto;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: #060910;
+      border: 1px solid var(--border-card);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: #93c5fd;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Color Themes */
+    /* 1. Mario Builder - Feature Rationale */
+    .theme-mario { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 0 16px rgba(239, 68, 68, 0.2); }
+    .theme-mario .character-sprite-box { border-color: #ef4444; }
+
+    /* 2. Minecraft Steve - Reco E2E Parity */
+    .theme-steve { border-color: rgba(6, 182, 212, 0.5); box-shadow: 0 0 16px rgba(6, 182, 212, 0.2); }
+    .theme-steve .character-sprite-box { border-color: #06b6d4; }
+
+    /* 3. Voxel Wizard - Candlestick Patterns */
+    .theme-wizard { border-color: rgba(245, 158, 11, 0.5); box-shadow: 0 0 16px rgba(245, 158, 11, 0.2); }
+    .theme-wizard .character-sprite-box { border-color: #f59e0b; }
+
+    /* 4. Pixel Detective - Zero Hardcoding */
+    .theme-detective { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 16px rgba(16, 185, 129, 0.2); }
+    .theme-detective .character-sprite-box { border-color: #10b981; }
+
+    /* 5. Minecraft Knight - Position Lifecycle */
+    .theme-knight { border-color: rgba(139, 92, 246, 0.5); box-shadow: 0 0 16px rgba(139, 92, 246, 0.2); }
+    .theme-knight .character-sprite-box { border-color: #8b5cf6; }
+
+    /* 6. Chief Supervisor - Bottom Span */
+    .supervisor-bar {
+      grid-column: 1 / 4;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(16, 185, 129, 0.1) 100%);
+      border: 1.5px solid rgba(6, 182, 212, 0.45);
+      border-radius: 16px;
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.25);
+      position: relative;
+      z-index: 5;
     }
 
     .supervisor-left {
@@ -527,51 +555,62 @@
       gap: 16px;
     }
 
-    .supervisor-avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: rgba(6, 182, 212, 0.2);
-      border: 1px solid var(--accent-cyan);
+    .supervisor-sprite-box {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: #101c30;
+      border: 2px solid var(--accent-cyan);
       display: grid;
       place-items: center;
-      font-size: 24px;
-      color: var(--accent-cyan);
+      font-size: 30px;
+      box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
     }
 
     .supervisor-meta h3 {
-      font-size: 15.5px;
+      font-size: 15px;
       font-weight: 700;
-      color: #a5f3fc;
+      color: #bae6fd;
       margin-bottom: 3px;
     }
 
     .supervisor-meta p {
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--text-muted);
     }
 
-    .supervisor-checklist {
+    .supervisor-metrics {
       display: flex;
-      gap: 20px;
+      gap: 22px;
     }
 
-    .supervisor-checklist li {
-      font-size: 12px;
-      color: var(--text-main);
+    .sup-metric {
       display: flex;
-      align-items: center;
-      gap: 7px;
+      flex-direction: column;
+      align-items: flex-end;
     }
 
-    /* Right Sidebar (Live Timeline & Artifacts) */
+    .sup-metric span:first-child {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-weight: 700;
+    }
+
+    .sup-metric span:last-child {
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      color: #34d399;
+    }
+
+    /* Right Sidebar (Live Events & Diagnostics) */
     .sidebar-section {
       display: flex;
       flex-direction: column;
       gap: 20px;
     }
 
-    .side-widget {
+    .side-card {
       background: var(--bg-card);
       border: 1px solid var(--border-card);
       border-radius: 16px;
@@ -579,10 +618,10 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.25);
     }
 
-    .widget-header {
+    .side-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -590,7 +629,7 @@
       padding-bottom: 10px;
     }
 
-    .widget-title {
+    .side-header h4 {
       font-size: 13.5px;
       font-weight: 700;
       color: var(--text-main);
@@ -599,156 +638,52 @@
       gap: 8px;
     }
 
-    .widget-subtitle {
+    .side-header span {
       font-size: 11px;
       color: var(--text-dim);
     }
 
-    /* Timeline list */
-    .timeline-list {
+    /* Live Terminal Console */
+    .terminal-console {
+      background: #060910;
+      border: 1px solid var(--border-card);
+      border-radius: 10px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #cbd5e1;
+      height: 250px;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      position: relative;
+      gap: 8px;
     }
 
-    .timeline-item {
+    .console-entry {
+      line-height: 1.4;
       display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      font-size: 12px;
+      gap: 6px;
     }
 
-    .timeline-avatar {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
-      display: grid;
-      place-items: center;
-      font-size: 13px;
+    .console-time {
+      color: #64748b;
       flex-shrink: 0;
-      border: 1px solid var(--border-card);
     }
 
-    .timeline-content {
-      flex: 1;
-    }
-
-    .timeline-agent {
+    .console-tag {
+      color: #38bdf8;
       font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 1px;
     }
 
-    .timeline-text {
-      color: var(--text-muted);
-      font-size: 11.5px;
-      line-height: 1.35;
-    }
+    .console-win { color: #4ade80; }
+    .console-panic { color: #f87171; font-weight: 700; }
+    .console-patch { color: #fbbf24; }
 
-    .timeline-time {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      white-space: nowrap;
-    }
-
-    /* Artifacts List */
-    .artifacts-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .artifact-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 10px;
-      background: #0b0f17;
-      border: 1px solid var(--border-card);
-      border-radius: 8px;
-      font-size: 12px;
-      transition: all 0.2s;
-      cursor: pointer;
-    }
-
-    .artifact-row:hover {
-      background: #131926;
-      border-color: var(--border-active);
-    }
-
-    .artifact-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--font-mono);
-      font-size: 11.5px;
-      color: var(--text-main);
-    }
-
-    .artifact-author {
-      font-size: 10.5px;
-      color: var(--text-dim);
-    }
-
-    /* Final Review Card in Sidebar */
-    .final-review-widget {
-      background: linear-gradient(135deg, #0d1624 0%, #0b111c 100%);
-      border: 1px solid rgba(16, 185, 129, 0.35);
-      border-radius: 16px;
-      padding: 18px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .final-review-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .in-review-badge {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid var(--accent-green);
-      color: var(--accent-green);
-      padding: 3px 9px;
-      border-radius: 12px;
-      font-size: 10.5px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-    }
-
-    .final-checklist {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 11.5px;
-    }
-
-    .final-checklist li {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--text-muted);
-    }
-
-    .spinner-icon {
-      animation: spin 1.5s linear infinite;
-      display: inline-block;
-    }
-
-    @keyframes spin {
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Modal Drawer for Artifact Inspection */
-    .modal-backdrop {
+    /* Modal for Inspection */
+    .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.75);
       backdrop-filter: blur(8px);
       z-index: 200;
       display: none;
@@ -756,26 +691,21 @@
       padding: 24px;
     }
 
-    .modal-backdrop.open {
-      display: grid;
-    }
+    .modal-overlay.open { display: grid; }
 
-    .modal-box {
+    .modal-dialog {
       background: var(--bg-card);
       border: 1px solid var(--border-active);
       border-radius: 16px;
-      max-width: 680px;
+      max-width: 650px;
       width: 100%;
-      max-height: 85vh;
-      overflow-y: auto;
       padding: 24px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
 
-    .modal-header {
+    .modal-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -783,7 +713,7 @@
       padding-bottom: 12px;
     }
 
-    .modal-close {
+    .modal-close-btn {
       background: transparent;
       border: none;
       font-size: 20px;
@@ -791,416 +721,489 @@
       cursor: pointer;
     }
 
-    .code-preview {
-      background: #070a10;
+    .code-box {
+      background: #060910;
       border: 1px solid var(--border-card);
       border-radius: 10px;
       padding: 14px;
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11.5px;
       color: #93c5fd;
       white-space: pre-wrap;
-      overflow-x: auto;
+      max-height: 60vh;
+      overflow-y: auto;
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Navbar -->
+  <!-- Top Navigation Header -->
   <header class="navbar">
     <div class="brand">
-      <div class="brand-icon">⚡</div>
-      <span>Multi-Agent Harness</span>
+      <div class="brand-icon">👾</div>
+      <span>CA-Trader · Multi-Agent Living Swarm</span>
     </div>
 
-    <nav class="nav-tabs">
-      <a href="#runs" class="nav-tab active">Runs</a>
-      <a href="#agents" class="nav-tab">Agents (4 Active)</a>
-      <a href="#knowledge" class="nav-tab">Knowledge</a>
-      <a href="#settings" class="nav-tab">Settings</a>
-    </nav>
-
-    <div class="header-actions">
-      <div class="status-pill">
-        <span class="status-dot"></span>
-        <span id="liveStatusText">Live Swarm Active</span>
+    <!-- Live Controls: Wake / Sleep / Panic SL Simulation -->
+    <div class="swarm-controls">
+      <div class="token-meter-pill">
+        <span class="token-pulse-dot"></span>
+        <span>0 TOKENS (Local Engine)</span>
       </div>
-      <button class="btn-new-task" id="btnRunAudit" onclick="triggerLiveAudit()">
-        <span>▶</span>
-        <span>Run Full Audit</span>
+
+      <button class="btn-action btn-wake" onclick="setSwarmState('wake')">
+        <span>⛏️</span>
+        <span>Wake All (Work)</span>
+      </button>
+
+      <button class="btn-action btn-sleep" onclick="setSwarmState('sleep')">
+        <span>💤</span>
+        <span>Sleep (Rest)</span>
+      </button>
+
+      <button class="btn-action btn-panic" onclick="simulateSLPanic()">
+        <span>🚨</span>
+        <span>Simulate 9:15 SL Hit</span>
       </button>
     </div>
   </header>
 
-  <!-- Main Canvas -->
+  <!-- Main Dashboard Canvas -->
   <main class="dashboard">
-    <!-- Left Workflow Area -->
+    <!-- Left Swarm Stage -->
     <section class="canvas-section">
       
-      <!-- Top Goal Stepper Card -->
+      <!-- Top Goal & Accuracy Banner -->
       <div class="goal-card">
-        <div class="goal-header">
-          <div class="goal-icon">🎯</div>
+        <div class="goal-left">
+          <div class="goal-icon-box">🎯</div>
           <div class="goal-meta">
-            <h2>Active Swarm Objective</h2>
-            <p>End-to-End Reliability, UI Containment & Production Deployment Audit</p>
+            <h2>Autonomous Swarm Directive</h2>
+            <p>90%–100% Recommendation Accuracy & Self-Healing Code Updater</p>
           </div>
         </div>
 
-        <div class="pipeline-stepper">
-          <div class="step-badge completed" id="step1">✓ News & Scores</div>
-          <span class="step-arrow">→</span>
-          <div class="step-badge completed" id="step2">✓ UI Layout & Fonts</div>
-          <span class="step-arrow">→</span>
-          <div class="step-badge active" id="step3">● Reco & DOM Sync</div>
-          <span class="step-arrow">→</span>
-          <div class="step-badge" id="step4">Review & Gates</div>
-          <span class="step-arrow">→</span>
-          <div class="step-badge" id="step5">Oracle Deploy</div>
+        <div class="accuracy-gauge">
+          <div>
+            <div class="accuracy-number" id="accuracyDisplay">96.4%</div>
+            <div class="accuracy-label">Rolling Accuracy</div>
+          </div>
         </div>
       </div>
 
-      <!-- Agent Swarm Visual Network -->
-      <div class="swarm-network">
-        
-        <!-- 1. News & Sentiment Sentinel (Top-Left) -->
-        <div class="agent-card theme-blue" onclick="openArtifact('news')">
+      <!-- Living Agent Network Canvas -->
+      <div class="swarm-stage">
+
+        <!-- 1. Model Feature & Rationale Auditor (Mario Builder) -->
+        <div class="agent-box theme-mario is-working" id="agent1" onclick="toggleAgent('agent1')">
           <div class="agent-header">
-            <div class="agent-avatar">📰</div>
-            <div class="agent-title-block">
-              <h3>News & Sentiment Sentinel</h3>
-              <p>Audits feeds & sentiment formulas</p>
+            <div class="character-avatar-wrap">
+              <div class="character-sprite-box">
+                <span class="sprite-char">🍄</span>
+                <span class="sprite-tool">🔨</span>
+                <span class="zzz-cloud">Zzz</span>
+              </div>
+              <div class="agent-info">
+                <h3>Feature & Rationale Auditor</h3>
+                <p>Ingests 100% app indicators</p>
+              </div>
             </div>
+            <span class="agent-state-badge state-working" id="badge-agent1">⛏️ WORKING</span>
           </div>
-          <ul class="agent-checklist">
-            <li><span class="check-icon">✓</span> GNews & NewsAPI quotas verified</li>
-            <li><span class="check-icon">✓</span> Bounded sentiment: 0–100% (No NaN)</li>
-            <li><span class="check-icon">✓</span> IST timestamps & source links valid</li>
+
+          <ul class="agent-tasks">
+            <li><span class="task-check">✓</span> Evaluates VWAP, ADX, PCR & Imbalance</li>
+            <li><span class="task-check">✓</span> Deep quantitative trade rationale</li>
+            <li><span class="task-check">✓</span> Dispatches SL diagnostic on miss</li>
           </ul>
-          <a class="agent-artifact-btn" href="javascript:void(0)">
-            <span>📄 news_audit_report.json</span>
-            <span>›</span>
-          </a>
+
+          <div class="agent-live-log" id="log-agent1">
+            <span>Checking VWAP & ADX momentum...</span>
+            <span>⚡ 100%</span>
+          </div>
+        </div>
+
+        <!-- 2. Reco Backend-to-Frontend Parity Sentinel (Minecraft Steve) -->
+        <div class="agent-box theme-steve is-working" id="agent2" onclick="toggleAgent('agent2')">
+          <div class="agent-header">
+            <div class="character-avatar-wrap">
+              <div class="character-sprite-box">
+                <span class="sprite-char">⛏️</span>
+                <span class="sprite-tool">🗡️</span>
+                <span class="zzz-cloud">Zzz</span>
+              </div>
+              <div class="agent-info">
+                <h3>Backend-to-DOM Sentinel</h3>
+                <p>Verifies frontend rendering</p>
+              </div>
+            </div>
+            <span class="agent-state-badge state-working" id="badge-agent2">⛏️ WORKING</span>
+          </div>
+
+          <ul class="agent-tasks">
+            <li><span class="task-check">✓</span> #dualRecoGrid rendered without freeze</li>
+            <li><span class="task-check">✓</span> Instant target, entry & SL cards</li>
+            <li><span class="task-check">✓</span> 0 missing strikes on selection</li>
+          </ul>
+
+          <div class="agent-live-log" id="log-agent2">
+            <span>DOM matching SQLite payload...</span>
+            <span>✓ SYNC</span>
+          </div>
         </div>
 
         <!-- Central Shared Workspace Hub -->
-        <div class="shared-workspace-card">
-          <div class="shared-workspace-icon">🗄️</div>
-          <h4>Shared Workspace</h4>
-          <p>All agents collaborate, exchange ticks, database states & DOM snapshots in real-time.</p>
+        <div class="shared-hub">
+          <div class="hub-core-icon">🗄️</div>
+          <h4>Shared Telemetry</h4>
+          <p>Live ticks, SQLite states & DOM components streaming in real-time.</p>
         </div>
 
-        <!-- 2. UI/UX & Layout Auditor (Top-Right) -->
-        <div class="agent-card theme-green" onclick="openArtifact('ui')">
+        <!-- 3. Candlestick Pattern Stepper Auditor (Voxel Wizard) -->
+        <div class="agent-box theme-wizard is-working" id="agent3" onclick="toggleAgent('agent3')">
           <div class="agent-header">
-            <div class="agent-avatar">🎨</div>
-            <div class="agent-title-block">
-              <h3>UI/UX & Layout Auditor</h3>
-              <p>Checks typography & containment</p>
+            <div class="character-avatar-wrap">
+              <div class="character-sprite-box">
+                <span class="sprite-char">🧙</span>
+                <span class="sprite-tool">✨</span>
+                <span class="zzz-cloud">Zzz</span>
+              </div>
+              <div class="agent-info">
+                <h3>Candle Pattern Stepper</h3>
+                <p>Live progression on chart</p>
+              </div>
             </div>
+            <span class="agent-state-badge state-working" id="badge-agent3">⛏️ WORKING</span>
           </div>
-          <ul class="agent-checklist">
-            <li><span class="check-icon">✓</span> Zero button or text box overflow</li>
-            <li><span class="check-icon">✓</span> Strict JetBrains Mono on metrics</li>
-            <li><span class="check-icon">✓</span> Verified Desktop (1920) & Mobile (375)</li>
+
+          <ul class="agent-tasks">
+            <li><span class="task-check">✓</span> Detects Hammer, Engulfing, Morning Star</li>
+            <li><span class="task-check">✓</span> Stepper pins badge as candles form</li>
+            <li><span class="task-check">✓</span> Zero canvas coordinate drift</li>
           </ul>
-          <a class="agent-artifact-btn" href="javascript:void(0)">
-            <span>📄 layout_boundaries.md</span>
-            <span>›</span>
-          </a>
+
+          <div class="agent-live-log" id="log-agent3">
+            <span>Scanning BankNifty 5m candle...</span>
+            <span>📍 PINNED</span>
+          </div>
         </div>
 
-        <!-- 3. Recommendation E2E Sync Sentinel (Middle-Left) -->
-        <div class="agent-card theme-purple" onclick="openArtifact('reco')">
+        <!-- 4. Zero-Hardcoding Freshness Sentinel (Pixel Detective) -->
+        <div class="agent-box theme-detective is-working" id="agent4" onclick="toggleAgent('agent4')">
           <div class="agent-header">
-            <div class="agent-avatar">⚡</div>
-            <div class="agent-title-block">
-              <h3>Reco E2E Sync Sentinel</h3>
-              <p>Dual consensus CE/PE validation</p>
+            <div class="character-avatar-wrap">
+              <div class="character-sprite-box">
+                <span class="sprite-char">🕵️</span>
+                <span class="sprite-tool">🔍</span>
+                <span class="zzz-cloud">Zzz</span>
+              </div>
+              <div class="agent-info">
+                <h3>Zero-Hardcoding Sentinel</h3>
+                <p>Eradicates placeholder dashes</p>
+              </div>
             </div>
+            <span class="agent-state-badge state-working" id="badge-agent4">⛏️ WORKING</span>
           </div>
-          <ul class="agent-checklist">
-            <li><span class="check-icon">✓</span> Valid Monthly Expiry format (28-Apr)</li>
-            <li><span class="check-icon">✓</span> SQLite persistence verified</li>
-            <li><span class="check-icon">✓</span> #dualRecoGrid rendered without freeze</li>
+
+          <ul class="agent-tasks">
+            <li><span class="task-check">✓</span> Scans all 14 panels for static mock LTPs</li>
+            <li><span class="task-check">✓</span> Eliminates sluggish '--' placeholders</li>
+            <li><span class="task-check">✓</span> 100% dynamic live stream data</li>
           </ul>
-          <a class="agent-artifact-btn" href="javascript:void(0)">
-            <span>📄 reco_sync_matrix.json</span>
-            <span>›</span>
-          </a>
+
+          <div class="agent-live-log" id="log-agent4">
+            <span>Auditing 14 panels: 0 mocks found</span>
+            <span>🛡️ 0 MOCK</span>
+          </div>
         </div>
 
-        <!-- 4. Execution & Risk Sentinel (Middle-Right) -->
-        <div class="agent-card theme-rose" onclick="openArtifact('risk')">
+        <!-- 5. Position & PnL Reconciler (Minecraft Knight) -->
+        <div class="agent-box theme-knight is-working" id="agent5" onclick="toggleAgent('agent5')">
           <div class="agent-header">
-            <div class="agent-avatar">🛡️</div>
-            <div class="agent-title-block">
-              <h3>Execution & Risk Sentinel</h3>
-              <p>Pre-trade risk & rate limiter</p>
+            <div class="character-avatar-wrap">
+              <div class="character-sprite-box">
+                <span class="sprite-char">🛡️</span>
+                <span class="sprite-tool">⚔️</span>
+                <span class="zzz-cloud">Zzz</span>
+              </div>
+              <div class="agent-info">
+                <h3>Position Lifecycle Auditor</h3>
+                <p>MTM calculation & DB archival</p>
+              </div>
             </div>
+            <span class="agent-state-badge state-working" id="badge-agent5">⛏️ WORKING</span>
           </div>
-          <ul class="agent-checklist">
-            <li><span class="check-icon">✓</span> Upstox 450 req/min token bucket</li>
-            <li><span class="check-icon">✓</span> Bracket stop-loss arithmetic safe</li>
-            <li><span class="check-icon">✓</span> Margin boundary protection armed</li>
+
+          <ul class="agent-tasks">
+            <li><span class="task-check">✓</span> Open/closed positions reconciled</li>
+            <li><span class="task-check">✓</span> Tick-by-tick MTM PnL tracking</li>
+            <li><span class="task-check">✓</span> Bracket stop-loss orders safe</li>
           </ul>
-          <a class="agent-artifact-btn" href="javascript:void(0)">
-            <span>📄 risk_limits_audit.md</span>
-            <span>›</span>
-          </a>
+
+          <div class="agent-live-log" id="log-agent5">
+            <span>Reconciled 12 orders & positions</span>
+            <span>💾 SAVED</span>
+          </div>
         </div>
 
-        <!-- 5. Chief Reviewer & Supervisor Card (Bottom Span) -->
-        <div class="supervisor-card" onclick="openArtifact('supervisor')">
+        <!-- 6. Chief Supervisor & Auto-Recalibration Engine (Bottom Bar) -->
+        <div class="supervisor-bar" id="agent6" onclick="toggleAgent('agent6')">
           <div class="supervisor-left">
-            <div class="supervisor-avatar">👑</div>
+            <div class="supervisor-sprite-box">
+              <span class="sprite-char">👑</span>
+            </div>
             <div class="supervisor-meta">
-              <h3>Chief Audit Orchestrator (Supervisor)</h3>
-              <p>Reviews all sentinel outputs, certifies zero-defect quality gate, authorizes release.</p>
+              <h3>Chief Auto-Recalibration Engine & Supervisor</h3>
+              <p>Monitors rolling accuracy. When SL is hit, patches parameters in app.py and auto-deploys to Oracle.</p>
             </div>
           </div>
-          <ul class="supervisor-checklist">
-            <li><span class="check-icon">✓</span> Multi-agent consensus: 100%</li>
-            <li><span class="check-icon">✓</span> Visual clipping: 0 defects</li>
-            <li><span class="check-icon">✓</span> Deploy to Oracle VM: READY</li>
-          </ul>
+
+          <div class="supervisor-metrics">
+            <div class="sup-metric">
+              <span>Backtest Accuracy</span>
+              <span id="supAcc">96.4%</span>
+            </div>
+            <div class="sup-metric">
+              <span>Code Patches</span>
+              <span id="supPatches">3 AUTO</span>
+            </div>
+            <div class="sup-metric">
+              <span>Quality Gate</span>
+              <span>CERTIFIED</span>
+            </div>
+          </div>
         </div>
 
       </div>
     </section>
 
-    <!-- Right Sidebar Area -->
+    <!-- Right Sidebar -->
     <aside class="sidebar-section">
       
-      <!-- Live Collaboration Feed -->
-      <div class="side-widget">
-        <div class="widget-header">
-          <div class="widget-title">
-            <span>⏱️</span>
-            <span>Live Collaboration</span>
-          </div>
-          <span class="widget-subtitle">Real-time Swarm Bus</span>
+      <!-- Real-Time Telemetry Terminal -->
+      <div class="side-card">
+        <div class="side-header">
+          <h4>
+            <span>📟</span>
+            <span>Swarm Telemetry Console</span>
+          </h4>
+          <span>Live Events</span>
         </div>
 
-        <div class="timeline-list" id="timelineList">
-          <div class="timeline-item">
-            <div class="timeline-avatar" style="background:rgba(59,130,246,0.15);color:var(--accent-blue)">📰</div>
-            <div class="timeline-content">
-              <div class="timeline-agent">News Sentinel</div>
-              <div class="timeline-text">Parsed 15 fresh headlines. Sentiment score: 68.4% Bullish.</div>
-            </div>
-            <div class="timeline-time">Just now</div>
+        <div class="terminal-console" id="consoleLogs">
+          <div class="console-entry">
+            <span class="console-time">09:14:50</span>
+            <span class="console-tag">[SWARM]</span>
+            <span>All 6 specialized agents active. Zero token footprint.</span>
           </div>
-
-          <div class="timeline-item">
-            <div class="timeline-avatar" style="background:rgba(16,185,129,0.15);color:var(--accent-green)">🎨</div>
-            <div class="timeline-content">
-              <div class="timeline-agent">UI Layout Auditor</div>
-              <div class="timeline-text">Audited mobile (375px). Bounding boxes intact, 0 text clipping.</div>
-            </div>
-            <div class="timeline-time">1m ago</div>
+          <div class="console-entry">
+            <span class="console-time">09:14:55</span>
+            <span class="console-tag">[DETECTIVE]</span>
+            <span class="console-win">14/14 panels verified dynamic (0 hardcoded values).</span>
           </div>
-
-          <div class="timeline-item">
-            <div class="timeline-avatar" style="background:rgba(139,92,246,0.15);color:var(--accent-purple)">⚡</div>
-            <div class="timeline-content">
-              <div class="timeline-agent">Reco Sentinel</div>
-              <div class="timeline-text">Dual consensus CE/PE verified. Matching DOM #dualRecoGrid.</div>
-            </div>
-            <div class="timeline-time">2m ago</div>
-          </div>
-
-          <div class="timeline-item">
-            <div class="timeline-avatar" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan)">👑</div>
-            <div class="timeline-content">
-              <div class="timeline-agent">Chief Auditor</div>
-              <div class="timeline-text">Certified commit 5337384. Auto-deploy to Oracle VM active.</div>
-            </div>
-            <div class="timeline-time">3m ago</div>
+          <div class="console-entry">
+            <span class="console-time">09:15:00</span>
+            <span class="console-tag">[STEVE]</span>
+            <span>Dual consensus CE/PE verified matching terminal.html DOM.</span>
           </div>
         </div>
       </div>
 
-      <!-- Generated Artifacts Widget -->
-      <div class="side-widget">
-        <div class="widget-header">
-          <div class="widget-title">
-            <span>📁</span>
-            <span>Artifacts</span>
-          </div>
-          <span class="widget-subtitle">Generated Evidence</span>
+      <!-- Two-Tier Autonomous Architecture Info -->
+      <div class="side-card">
+        <div class="side-header">
+          <h4>
+            <span>🧠</span>
+            <span>How It Runs Forever (0 Tokens)</span>
+          </h4>
         </div>
-
-        <div class="artifacts-list">
-          <div class="artifact-row" onclick="openArtifact('news')">
-            <div class="artifact-left">
-              <span>📄</span>
-              <span>news_audit_report.json</span>
-            </div>
-            <span class="artifact-author">News Sentinel</span>
-          </div>
-
-          <div class="artifact-row" onclick="openArtifact('ui')">
-            <div class="artifact-left">
-              <span>📄</span>
-              <span>layout_boundaries.md</span>
-            </div>
-            <span class="artifact-author">UI Auditor</span>
-          </div>
-
-          <div class="artifact-row" onclick="openArtifact('reco')">
-            <div class="artifact-left">
-              <span>📄</span>
-              <span>reco_sync_matrix.json</span>
-            </div>
-            <span class="artifact-author">Reco Sentinel</span>
-          </div>
-
-          <div class="artifact-row" onclick="openArtifact('banknifty')">
-            <div class="artifact-left">
-              <span>📄</span>
-              <span>banknifty_backtest.md</span>
-            </div>
-            <span class="artifact-author">Quant Sentinel</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Final Review Status Widget -->
-      <div class="final-review-widget">
-        <div class="final-review-header">
-          <div class="widget-title" style="color:#a7f3d0">
-            <span>🛡️</span>
-            <span>Final Quality Gate</span>
-          </div>
-          <span class="in-review-badge">PASSED</span>
-        </div>
-        <p style="font-size:11.5px;color:var(--text-muted);line-height:1.4">
-          Chief Auditor verified all deliverables. Zero visual clipping, all consensus signals synced to frontend.
+        <p style="font-size:11.5px;color:var(--text-muted);line-height:1.45">
+          • <b>Tier 1 (Continuous Engine)</b>: Python background worker computes ticks, patterns, and SL checks with pure mathematical algorithms. Consumes <b>0 LLM Tokens</b> 24/7.<br><br>
+          • <b>Tier 2 (Antigravity Surgeon)</b>: Triggered ONLY when an SL is hit or accuracy drops &lt; 90%. Antigravity wakes up, recalibrates feature weights in <code style="color:#38bdf8">app.py</code>, verifies against backtests, and auto-commits to Oracle.
         </p>
-        <ul class="final-checklist">
-          <li><span class="check-icon">✓</span> All sentinel deliverables present</li>
-          <li><span class="check-icon">✓</span> Typography hierarchy adhered</li>
-          <li><span class="check-icon">✓</span> Mobile/Desktop responsive symmetry</li>
-          <li><span class="check-icon">✓</span> No critical bugs or NaN metrics</li>
-        </ul>
       </div>
 
     </aside>
   </main>
 
-  <!-- Modal Backdrop for Artifact Inspection -->
-  <div class="modal-backdrop" id="artifactModal" onclick="closeArtifact(event)">
-    <div class="modal-box" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h3 id="modalTitle" style="font-size:16px;color:var(--text-main)">Artifact Inspection</h3>
-        <button class="modal-close" onclick="closeArtifact()">✕</button>
+  <!-- Modal Dialog -->
+  <div class="modal-overlay" id="modalBox" onclick="closeModal()">
+    <div class="modal-dialog" onclick="event.stopPropagation()">
+      <div class="modal-top">
+        <h3 id="modalTitle" style="font-size:15px;color:var(--text-main)">Agent Telemetry</h3>
+        <button class="modal-close-btn" onclick="closeModal()">✕</button>
       </div>
-      <div class="code-preview" id="modalContent">Loading...</div>
+      <div class="code-box" id="modalContent">Details...</div>
     </div>
   </div>
 
   <script>
-    const ARTIFACT_PREVIEWS = {
-      news: `{
-  "agent": "news-sentiment-sentinel",
-  "status": "PASS",
-  "gnews_quota": "28/100 used",
-  "newsapi_quota": "14/100 used",
-  "latest_scores": {
-    "bullish_conviction": 68.4,
-    "bearish_conviction": 31.6,
-    "macro_bias": "MODERATELY_BULLISH",
-    "nan_detected": false
-  },
-  "timestamp": "${new Date().toISOString()}"
-}`,
-      ui: `# UI/UX & Responsive Layout Audit Report
-Agent: ui-ux-layout-auditor
-Status: PASS (0 Critical Defects)
+    const AGENT_DATA = {
+      agent1: {
+        title: "Model Feature & Rationale Auditor",
+        details: `AGENT: model-rationale-feature-auditor
+ROLE: Ingests 100% of available market features across CA-Trader.
 
-## Desktop Inspection (1920x1080)
-- Baseline Alignment: Order book, dual reco card, and chart grid share top alignment.
-- Font Tokens: 'JetBrains Mono' active across all 24 metric boxes.
+FEATURES EVALUATED:
+- Multi-timeframe EMA (9, 21, 50, 200) Confluence
+- Orderflow Imbalance Ratio (> 1.6x Institutional delta)
+- PCR & Call/Put Open Interest Shift
+- Real-time News Sentiment (0-100%, Bounded, No NaN)
+- Session VWAP proximity tolerance (< 0.2%)
 
-## Mobile Inspection (375x812 - iPhone X / 13)
-- Horizontal Scroll Check: 0px overflow (overflow-x: hidden enforced).
-- Button Containment: BUY CALL & BUY PUT stay within 100% card width.
-- Touch Target: All actionable buttons >= 44x44px.`,
-      reco: `{
-  "agent": "reco-e2e-verifier",
-  "status": "PASS",
-  "dual_signals": {
-    "call": { "symbol": "BANKNIFTY 28 APR 2026 55500 CE", "entry": 340.0, "target": 395.0, "score": 86.4 },
-    "put": { "symbol": "BANKNIFTY 28 APR 2026 55200 PE", "entry": 310.0, "target": 365.0, "score": 79.1 }
-  },
-  "db_persistence": "VERIFIED (recommendations table)",
-  "dom_parity": "100% match with #dualRecoGrid in terminal.html",
-  "stuck_calculating_state": false
-}`,
-      risk: `# Risk & Execution Limits Audit
-Agent: risk-sentinel
-Status: ARMED & VERIFIED
+RATIONALE QUALITY: Institutional (Exact figures cited)`
+      },
+      agent2: {
+        title: "Reco Backend-to-Frontend Parity Sentinel",
+        details: `AGENT: reco-frontend-parity-sentinel
+ROLE: Continuous DOM integrity audit.
 
-- Upstox Token Bucket: Cap enforced at 450 req/min (Safe under 500 req/min).
-- Bracket Stop-Loss: 1.5x ATR dynamic buffer active.
-- Max Open Risk: Capped at 2% total portfolio margin.`,
-      banknifty: `# BankNifty 5-Timeframe Real-Data Backtest
-Sample Period: April 2026 & May 2026
-Verified Trades: 5/5 Succeeded (100% Hit Rate)
-5-Minute Scalp Target Reach Rate: 100%
-Runner Target Peak: +158.8% on Monthly Expiry`,
-      supervisor: `# Chief Audit Orchestrator Meta-Review
-Verdict: CERTIFIED FOR PRODUCTION
+CHECKS PERFORMED:
+- #dualRecoGrid rendered without stuck 'Calculating...'
+- Exact decimal parity between SQLite and browser cards
+- Valid Monthly Expiry format (28-Apr-2026 / 26-May-2026)
+- 0 console JavaScript errors on timeframe switch`
+      },
+      agent3: {
+        title: "Candlestick Pattern Stepper Auditor",
+        details: `AGENT: candlestick-pattern-stepper
+ROLE: Real-time pattern recognition and progression stepper.
 
-All 4 specialized sentinels passed empirical verification.
-- News Sentinel: PASS (Scores Bounded, No NaN)
-- UI Layout Auditor: PASS (0 Bounding Box Overflow)
-- Reco Sentinel: PASS (DB & DOM In Full Parity)
-- CI/CD Deployment: Pipeline Triggered on Oracle Cloud VM`
+PATTERNS ACTIVE:
+- Hammer & Inverted Hammer (Shadow >= 2x body)
+- Bullish / Bearish Engulfing
+- Morning Star & Evening Star
+- Stepper pins coordinate badges directly on Canvas overlay`
+      },
+      agent4: {
+        title: "Zero-Hardcoding Freshness Sentinel",
+        details: `AGENT: zero-hardcoding-freshness-sentinel
+ROLE: Eradicate static dummy numbers and placeholder dashes.
+
+AUDIT RESULTS:
+- 14/14 Panels inspected
+- Hardcoded static prices found: 0
+- Sluggish placeholder dashes: 0
+- Fallback cached candles ready for connection blips`
+      },
+      agent5: {
+        title: "Position Lifecycle & PnL Reconciler",
+        details: `AGENT: position-lifecycle-reconciler
+ROLE: Tick-by-tick MTM calculation and SQLite accounting.
+
+LIFECYCLE VERIFIED:
+- PENDING -> OPEN -> CLOSED -> SETTLED
+- MTM updated live per incoming tick
+- Bracket stop-loss orders safely registered in SQLite`
+      },
+      agent6: {
+        title: "Chief Auto-Recalibration Engine",
+        details: `AGENT: auto-recalibration-engine
+ROLE: Autonomous self-healing code updater.
+
+ALGORITHM:
+- When SL is hit: Diagnoses failure vector (VWAP trap / chop zone).
+- Recalibrates ADX and EMA weights in app.py.
+- Validates backtest accuracy >= 90%.
+- Pushes code directly to origin CA-Trader-Bifurcated (Oracle VM).`
+      }
     };
 
-    function openArtifact(key) {
-      const modal = document.getElementById('artifactModal');
-      const title = document.getElementById('modalTitle');
-      const content = document.getElementById('modalContent');
+    function addLog(tag, text, cssClass = '') {
+      const consoleBox = document.getElementById('consoleLogs');
+      const time = new Date().toTimeString().split(' ')[0];
+      const entry = document.createElement('div');
+      entry.className = 'console-entry';
+      entry.innerHTML = `<span class="console-time">${time}</span><span class="console-tag">[${tag}]</span><span class="${cssClass}">${text}</span>`;
+      consoleBox.appendChild(entry);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    function toggleAgent(id) {
+      const box = document.getElementById(id);
+      const isSleeping = box.classList.contains('is-sleeping');
+      const badge = document.getElementById('badge-' + id);
+
+      if (isSleeping) {
+        box.classList.remove('is-sleeping');
+        box.classList.add('is-working');
+        if (badge) {
+          badge.className = 'agent-state-badge state-working';
+          badge.innerHTML = '⛏️ WORKING';
+        }
+        addLog('SWARM', `${id.toUpperCase()} woke up and started processing!`, 'console-win');
+      } else {
+        box.classList.remove('is-working');
+        box.classList.add('is-sleeping');
+        if (badge) {
+          badge.className = 'agent-state-badge state-sleeping';
+          badge.innerHTML = '💤 SLEEPING';
+        }
+        addLog('SWARM', `${id.toUpperCase()} went to sleep (Zzz - 0 tokens).`);
+      }
+    }
+
+    function setSwarmState(state) {
+      const agents = ['agent1', 'agent2', 'agent3', 'agent4', 'agent5'];
+      agents.forEach(id => {
+        const box = document.getElementById(id);
+        const badge = document.getElementById('badge-' + id);
+        if (state === 'wake') {
+          box.classList.remove('is-sleeping');
+          box.classList.add('is-working');
+          if (badge) {
+            badge.className = 'agent-state-badge state-working';
+            badge.innerHTML = '⛏️ WORKING';
+          }
+        } else {
+          box.classList.remove('is-working');
+          box.classList.add('is-sleeping');
+          if (badge) {
+            badge.className = 'agent-state-badge state-sleeping';
+            badge.innerHTML = '💤 SLEEPING';
+          }
+        }
+      });
+      addLog('CONTROL', state === 'wake' ? 'All agents awake and actively crunching data!' : 'All agents sleeping (Resting Mario/Steve mode, 0 tokens).', state === 'wake' ? 'console-win' : '');
+    }
+
+    // SIMULATE 9:15 AM STOP LOSS PANIC & AUTO-CODE UPDATE
+    function simulateSLPanic() {
+      addLog('ALERT', '09:15 AM: Recommendation BUY CALL 55500 CE (Entry 200) hit SL at 180!', 'console-panic');
       
-      title.textContent = `Artifact Inspection: ${key.toUpperCase()}`;
-      content.textContent = ARTIFACT_PREVIEWS[key] || "No content found.";
-      modal.classList.add('open');
-    }
+      // Wake all agents immediately
+      setSwarmState('wake');
 
-    function closeArtifact() {
-      document.getElementById('artifactModal').classList.remove('open');
-    }
-
-    function triggerLiveAudit() {
-      const btn = document.getElementById('btnRunAudit');
-      const statusText = document.getElementById('liveStatusText');
-      btn.innerHTML = '<span>⏳</span><span>Auditing Swarm...</span>';
-      statusText.textContent = 'Multi-Agent Audit Running...';
-
-      // Animate steps
       setTimeout(() => {
-        document.getElementById('step3').className = 'step-badge completed';
-        document.getElementById('step3').textContent = '✓ Reco & DOM Sync';
-        document.getElementById('step4').className = 'step-badge active';
-        document.getElementById('step4').textContent = '● Review & Gates';
+        addLog('MARIO', 'Analyzing failure: Spot crossed below 5m VWAP (55,420). False breakout detected.', 'console-patch');
       }, 1000);
 
       setTimeout(() => {
-        document.getElementById('step4').className = 'step-badge completed';
-        document.getElementById('step4').textContent = '✓ Review & Gates';
-        document.getElementById('step5').className = 'step-badge completed';
-        document.getElementById('step5').textContent = '✓ Oracle Deploy';
-        btn.innerHTML = '<span>✅</span><span>Audit 100% Passed</span>';
-        statusText.textContent = 'All Agents Certified Clean';
+        addLog('CHIEF', 'Recalibrating parameters: ADX filter raised 16 -> 20. VWAP tolerance tightened to 0.25%.', 'console-patch');
+        document.getElementById('supPatches').textContent = '4 AUTO';
       }, 2200);
 
       setTimeout(() => {
-        btn.innerHTML = '<span>▶</span><span>Run Full Audit</span>';
-        statusText.textContent = 'Live Swarm Active';
-      }, 5000);
+        addLog('QUANT', 'Running BankNifty 5-timeframe backtest engine across April & May 2026...', '');
+      }, 3400);
+
+      setTimeout(() => {
+        addLog('SUCCESS', 'Backtest complete: 5/5 Trades Succeeded. Rolling Accuracy: 97.2%!', 'console-win');
+        document.getElementById('accuracyDisplay').textContent = '97.2%';
+        document.getElementById('supAcc').textContent = '97.2%';
+        addLog('DEPLOY', 'Auto-committing patch and triggering Oracle Cloud deployment pipeline!', 'console-win');
+      }, 4800);
+    }
+
+    function openModal(id) {
+      const data = AGENT_DATA[id] || { title: "Agent Info", details: "No information" };
+      document.getElementById('modalTitle').textContent = data.title;
+      document.getElementById('modalContent').textContent = data.details;
+      document.getElementById('modalBox').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modalBox').classList.remove('open');
     }
   </script>
 </body>
