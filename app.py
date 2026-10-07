@@ -2648,6 +2648,16 @@ class UpstoxAdapter:
         if "|" in identifier:
             return identifier, {"instrument_key": identifier, "symbol": identifier.split("|")[-1]}
         ident_key = identifier.upper().strip()
+        canonical_indices = {
+            "BANKNIFTY": ("NSE_INDEX|Nifty Bank", {"instrument_key": "NSE_INDEX|Nifty Bank", "trading_symbol": "BANKNIFTY", "name": "Nifty Bank", "segment": "NSE_INDEX"}),
+            "NIFTY": ("NSE_INDEX|Nifty 50", {"instrument_key": "NSE_INDEX|Nifty 50", "trading_symbol": "NIFTY", "name": "Nifty 50", "segment": "NSE_INDEX"}),
+            "FINNIFTY": ("NSE_INDEX|Nifty Fin Service", {"instrument_key": "NSE_INDEX|Nifty Fin Service", "trading_symbol": "FINNIFTY", "name": "Nifty Fin Service", "segment": "NSE_INDEX"}),
+            "MIDCPNIFTY": ("NSE_INDEX|NIFTY MID SELECT", {"instrument_key": "NSE_INDEX|NIFTY MID SELECT", "trading_symbol": "MIDCPNIFTY", "name": "Nifty Mid Select", "segment": "NSE_INDEX"}),
+            "SENSEX": ("BSE_INDEX|SENSEX", {"instrument_key": "BSE_INDEX|SENSEX", "trading_symbol": "SENSEX", "name": "SENSEX", "segment": "BSE_INDEX"}),
+        }
+        if ident_key in canonical_indices:
+            k, m = canonical_indices[ident_key]
+            return k, dict(m)
         # Handle CRUDEOIL FUT 17 SEP option alias
         crude_m = re.match(r'^CRUDEOIL\s+FUT\s+(\d+\s+[A-Z]{3})\s+(\d+)\s*(CE|PE)$', ident_key)
         if crude_m:
@@ -10790,9 +10800,11 @@ async def analysis_overall(
     dp_val = dp_clean if dp_clean is not None else "def"
     cache_key = f"overall-reco:{instrument.upper()}:{timeframe}:{uid}:{dp_val}"
     cache_key = f"overall-reco:{instrument.upper()}:{timeframe}:{uid}:{dp_val}:{is_scalp}"
-    cached = CACHE.get(cache_key)
-    if cached is not None:
-        return cached
+    force_refresh = bool(request.query_params.get("refresh") in ("1", "true", "yes") or request.headers.get("Cache-Control") == "no-cache")
+    if not force_refresh:
+        cached = CACHE.get(cache_key)
+        if cached is not None:
+            return cached
 
     # Preview only: opening Recommendations/Dashboard must never create a saved
     # recommendation and must not silently consume an AI request.
@@ -10806,6 +10818,21 @@ async def analysis_overall(
     except Exception as exc:
         log.warning("analysis_overall failed for %s: %s", instrument, safe_text(exc))
         rec = fallback_recommendation_quick(instrument, uid, dp_clean)
+
+    # Sanity guard: prevent mismatched underlying prices (e.g. Bank Nifty index must not be < 1000)
+    inst_u = instrument.upper()
+    if "BANKNIFTY" in inst_u and float(rec.get("cmp") or rec.get("ltp") or 0.0) < 1000:
+        try:
+            q_real = UPSTOX.quote("NSE_INDEX|Nifty Bank")
+            real_ltp = float(q_real.get("ltp") or 0.0)
+            if real_ltp > 1000:
+                rec["cmp"] = real_ltp
+                rec["ltp"] = real_ltp
+        except Exception:
+            pass
+
+    if not force_refresh:
+        CACHE.set(cache_key, rec, 60)
     reco_action = str(rec.get("recommendation") or "").upper()
     if reco_action in ("BUY", "SELL"):
         try:

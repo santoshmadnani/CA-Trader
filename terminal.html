@@ -28544,7 +28544,12 @@ async function loadDashboard(force = false) {
                 String(parsed.underlying || '').toUpperCase().includes(baseSym.toUpperCase()) ||
                 baseSym.toUpperCase().includes(String(parsed.symbol || '').toUpperCase())
               )) {
-                rec = parsed;
+                const storedP = Number(parsed.cmp || parsed.ltp || parsed.entry || 0);
+                if (ltp > 0 && storedP > 0 && Math.abs(storedP - ltp) / Math.max(storedP, ltp) > 0.25) {
+                  try { sessionStorage.removeItem('ca_reco_' + baseSym); } catch (_) { }
+                } else {
+                  rec = parsed;
+                }
               }
             }
           } catch (_) { }
@@ -28589,11 +28594,16 @@ async function loadDashboard(force = false) {
         renderRecoViews(rec);
 
         // Asynchronously fetch fresh recommendations in background without blocking initial paint
-        fetchApi(`/api/recommendations/${encodeURIComponent(sym)}`, { timeoutMs: 8000 }).then(rd => {
+        const recoUrl = `/api/recommendations/${encodeURIComponent(sym)}?refresh=1&t=${Date.now()}`;
+        fetchApi(recoUrl, { timeoutMs: 8000, cache: 'no-store' }).then(rd => {
           if (rd && (rd.recommendation || rd.action)) {
             const curSym = getSym();
             const curBase = getUnderlying(curSym);
             if (curBase.toUpperCase() !== baseSym.toUpperCase()) return;
+            const rdP = Number(rd.cmp || rd.ltp || rd.entry || 0);
+            if (ltp > 0 && rdP > 0 && Math.abs(rdP - ltp) / Math.max(rdP, ltp) > 0.25) {
+              return; // Ignore divergent/mismatched payload
+            }
             window.__caCurrentChartReco = rd;
             try { sessionStorage.setItem('ca_reco_' + baseSym, JSON.stringify(rd)); } catch (_) { }
             renderRecoViews(rd);
