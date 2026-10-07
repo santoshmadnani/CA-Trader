@@ -8031,7 +8031,7 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
         reco_count = int(reco_stat.get("c") or 0) if reco_stat else 0
 
         pos_stat = db_exec(
-            "SELECT COUNT(*) as c FROM trades WHERE status='OPEN'",
+            "SELECT COUNT(*) as c FROM positions WHERE quantity != 0",
             [], "one"
         )
         open_pos_count = int(pos_stat.get("c") or 0) if pos_stat else 0
