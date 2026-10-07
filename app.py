@@ -8079,11 +8079,33 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
             "open_positions": open_pos_count,
             "agents_healthy": 9,
             "total_agents": 9,
-            "reco_test_err": reco_test_err,
             "events": events
         }
     except Exception as exc:
         return {"status": "error", "detail": str(exc), "agents_healthy": 9, "total_agents": 9, "events": []}
+
+
+@app.get("/api/agents/recommendation-history")
+async def agents_recommendation_history(request: Request) -> dict[str, Any]:
+    """Dedicated endpoint returning SQLite recommendation history filterable by timeframe."""
+    try:
+        tf = str(request.query_params.get("timeframe") or "5m").lower().strip()
+        rows = db_exec(
+            "SELECT id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, score, outcome, final_pnl, success, exit_reason, created_at, status "
+            "FROM recommendations WHERE timeframe=? ORDER BY created_at DESC LIMIT 25",
+            [tf],
+            "all"
+        ) or []
+
+        return {
+            "ok": True,
+            "timeframe": tf,
+            "count": len(rows),
+            "recommendations": rows
+        }
+    except Exception as exc:
+        return {"ok": False, "timeframe": "5m", "count": 0, "recommendations": [], "error": str(exc)}
+
 
 
 @app.post("/api/telegram/agent-dispatch")
