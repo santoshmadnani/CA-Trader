@@ -621,13 +621,37 @@ def _load_stockmantra_historical_cache() -> None:
         raw_msgs = json.loads(found.read_text(encoding="utf-8", errors="ignore"))
         if not raw_msgs:
             return
-        recent_msgs = raw_msgs[-250:]
+        recent_msgs = raw_msgs[-350:]
         for m in recent_msgs:
             txt = m.get("text", "")
             d_str = m.get("date", "")
             m_id = m.get("id", 0)
             if txt and d_str:
                 _process_incoming_stockmantra_msg(txt, d_str, m_id, force_keep=True)
+
+        # Specifically scan backwards for the latest BANKNIFTY recommendation
+        if "BANKNIFTY" not in LIVE_STOCKMANTRA_SETUPS:
+            for m in reversed(raw_msgs):
+                txt = m.get("text", "")
+                d_str = m.get("date", "")
+                m_id = m.get("id", 0)
+                if txt and ("BANKNIFTY" in txt.upper() or "BANK NIFTY" in txt.upper()):
+                    _process_incoming_stockmantra_msg(txt, d_str, m_id, force_keep=True)
+                    if "BANKNIFTY" in LIVE_STOCKMANTRA_SETUPS:
+                        break
+
+        # Specifically scan backwards for FINNIFTY and SENSEX
+        for target_und in ("FINNIFTY", "SENSEX"):
+            if target_und not in LIVE_STOCKMANTRA_SETUPS:
+                for m in reversed(raw_msgs):
+                    txt = m.get("text", "")
+                    d_str = m.get("date", "")
+                    m_id = m.get("id", 0)
+                    if txt and target_und in txt.upper():
+                        _process_incoming_stockmantra_msg(txt, d_str, m_id, force_keep=True)
+                        if target_und in LIVE_STOCKMANTRA_SETUPS:
+                            break
+
         log.info("Loaded %d setups from stockmantra historical cache", len(LIVE_STOCKMANTRA_SETUPS))
     except Exception as exc:
         log.debug("Error loading stockmantra historical cache: %s", exc)
