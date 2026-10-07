@@ -542,6 +542,7 @@ PORT = int(os.getenv("FLASK_PORT", os.getenv("PORT", "8000")))
 DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
 AUTH_ENABLED = os.getenv("CA_AUTH_ENABLED", "1") == "1"
 AUTH_IDLE_HOURS = float(os.getenv("CA_AUTH_IDLE_HOURS", "12"))
+AUTH_SECRET = os.getenv("CA_AUTH_SECRET") or secrets.token_hex(32)
 _configured_db_env = os.getenv("CA_DATABASE_PATH")
 if _configured_db_env:
     _configured_db_path = Path(_configured_db_env)
