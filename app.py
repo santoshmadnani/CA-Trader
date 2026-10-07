@@ -18584,6 +18584,32 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
     live_list = list(LIVE_STOCKMANTRA_SETUPS.values())
     combined_setups = live_list + [s for s in setups if not any(l.get('symbol') == s.get('symbol') for l in live_list)]
 
+    def _get_setup_sort_key(s: dict[str, Any]) -> float:
+        try:
+            pub = str(s.get("published_at") or "").replace("IST", "").strip()
+            for fmt in ("%d-%b-%Y %I:%M %p", "%d-%b-%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %I:%M %p"):
+                try:
+                    return datetime.strptime(pub, fmt).timestamp()
+                except Exception:
+                    pass
+            d_str = str(s.get("date") or "").strip()
+            t_str = str(s.get("time") or "").replace("IST", "").strip()
+            combined = f"{d_str} {t_str}".strip()
+            for fmt in ("%d-%b-%Y %I:%M %p", "%d-%b-%Y %H:%M", "%Y-%m-%d %H:%M:%S"):
+                try:
+                    return datetime.strptime(combined, fmt).timestamp()
+                except Exception:
+                    pass
+            if t_str:
+                dt_t = datetime.strptime(t_str, "%I:%M %p")
+                now = datetime.now()
+                return now.replace(hour=dt_t.hour, minute=dt_t.minute, second=0).timestamp()
+        except Exception:
+            pass
+        return 0.0
+
+    combined_setups.sort(key=_get_setup_sort_key, reverse=True)
+
     return {
         "ok": True,
         "source": "Stock Mantra Live Telegram Stream & Quantitative Reconciliation",

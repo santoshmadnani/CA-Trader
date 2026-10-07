@@ -9685,7 +9685,7 @@ function attachResilientClickDelegation() {
               <thead>
                 <tr
                   style="background:var(--surface-2);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;">
-                  <th style="padding:8px 10px;text-align:left;min-width:140px;">Symbol / Time</th>
+                  <th style="padding:8px 10px;text-align:left;min-width:170px;">Symbol · Date &amp; Time (Latest First)</th>
                   <th style="padding:8px 10px;text-align:center;width:80px;">Signal</th>
                   <th style="padding:8px 10px;text-align:right;width:90px;">Entry</th>
                   <th style="padding:8px 10px;text-align:right;width:90px;">Target 1</th>
@@ -38557,7 +38557,31 @@ function makeUniversalDraggable(targetEl, handleEl) {
       try {
         const res = await fetch('/api/telegram/stock-mantra-feed', { credentials: 'include' });
         const data = await res.json();
-        const setups = data.setups || [];
+        let setups = (data.setups || []).slice();
+
+        // Sort latest recommendation first by parsing published timestamp, date and time
+        const parseSetupTime = (s) => {
+          try {
+            if (s.published_at) {
+              const ts = Date.parse(s.published_at.replace('IST', '').trim());
+              if (!isNaN(ts)) return ts;
+            }
+            const d = (s.date || '').trim();
+            const t = (s.time || '').replace('IST', '').trim();
+            if (d && t) {
+              const ts = Date.parse(`${d} ${t}`);
+              if (!isNaN(ts)) return ts;
+            }
+            if (t) {
+              const today = new Date().toISOString().slice(0, 10);
+              const ts = Date.parse(`${today} ${t}`);
+              if (!isNaN(ts)) return ts;
+            }
+          } catch (_) {}
+          return 0;
+        };
+        setups.sort((a, b) => parseSetupTime(b) - parseSetupTime(a));
+
         window.__caStockMantraSetups = setups;
 
         if (!setups.length) {
@@ -38567,11 +38591,20 @@ function makeUniversalDraggable(targetEl, handleEl) {
 
         tbody.innerHTML = setups.map(s => {
           const isBuy = s.signal === 'BUY';
+          const dateStr = s.date || 'Today';
+          const timeStr = s.time || '09:15 AM IST';
           return `
         <tr style="border-bottom:1px solid var(--border-soft);background:var(--surface);">
           <td style="padding:7px 10px;font-weight:700;font-family:var(--font-mono);color:var(--text);">
-            <span>${esc(s.symbol)}</span>
-            <div style="font-size:9.5px;color:var(--text-dim);font-weight:400;">${esc(s.time)} · ${esc(s.channel)}</div>
+            <div style="font-size:12px;display:flex;align-items:center;gap:6px;">
+              <span>${esc(s.symbol)}</span>
+              ${s.is_live_stream ? '<span class="tag buy" style="font-size:9px;padding:1px 5px;">LIVE</span>' : ''}
+            </div>
+            <div style="font-size:10px;color:var(--gold);font-weight:600;margin-top:3px;font-family:var(--font-mono);display:flex;align-items:center;gap:6px;">
+              <span>📅 ${esc(dateStr)}</span>
+              <span>⏰ ${esc(timeStr)}</span>
+            </div>
+            <div style="font-size:9px;color:var(--text-dim);font-weight:400;margin-top:1px;">${esc(s.channel || '@stockmantraindex')}</div>
           </td>
           <td style="padding:7px 10px;text-align:center;">
             <span class="tag ${isBuy ? 'buy' : 'sell'}" style="font-weight:700;">${s.signal}</span>
