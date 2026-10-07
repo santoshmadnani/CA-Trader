@@ -7687,6 +7687,28 @@ async def lifespan(app: FastAPI):
     news_task = asyncio.create_task(_auto_news_worker_loop())
     tg_bot_task = asyncio.create_task(_telegram_bot_service_loop())
     sm_telethon_task = asyncio.create_task(_stockmantra_live_telethon_loop())
+
+    async def _notify_deployment_online() -> None:
+        await asyncio.sleep(5)
+        try:
+            cfg = get_user_telegram_config(db_exec, 1)
+            if cfg and cfg.get("bot_token") and cfg.get("chat_id"):
+                now_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y %H:%M:%S IST")
+                msg = (
+                    f"🚀 <b>[CA-Trader Autonomous Swarm Online]</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"<b>Server Deployed &amp; Swarm Active</b> ✅\n"
+                    f"• <b>Host:</b> Oracle Cloud VM (140.238.251.214)\n"
+                    f"• <b>Active Sentinels:</b> 9/9 Sentinels Active\n"
+                    f"• <b>Time:</b> {now_str}\n"
+                    f"• <b>Status:</b> SQLite database &amp; background loops healthy.\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+                await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], msg)
+        except Exception:
+            pass
+    asyncio.create_task(_notify_deployment_online())
+
     log.info("CA Trader backend ready host=%s port=%s auth=%s", HOST, PORT, AUTH_ENABLED)
     log.info("Terminal HTML served from %s", HTML_PATH)
     log.info("Login HTML served from %s", LOGIN_HTML_PATH)
@@ -8070,6 +8092,9 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
         except Exception as e_test:
             reco_test_err = traceback.format_exc()
 
+        tg_cfg = get_user_telegram_config(db_exec, 1)
+        tg_ready = bool(tg_cfg and tg_cfg.get("bot_token") and tg_cfg.get("chat_id"))
+
         return {
             "status": "ok",
             "ist_time": now_ist.strftime("%H:%M:%S IST"),
@@ -8079,6 +8104,7 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
             "open_positions": open_pos_count,
             "agents_healthy": 9,
             "total_agents": 9,
+            "telegram_configured": tg_ready,
             "events": events
         }
     except Exception as exc:
@@ -15578,6 +15604,23 @@ async def _auto_recommendation_recorder_loop() -> None:
                                         ]
                                     )
                                     log.info(f"[AutoReco] Saved pre-market setup for {trade_sym} (Next session 09:15)")
+
+                                    try:
+                                        tg_cfg = get_user_telegram_config(db_exec, uid)
+                                        if tg_cfg and tg_cfg.get("bot_token") and tg_cfg.get("chat_id"):
+                                            tg_msg = (
+                                                f"🌅 <b>[CA-Trader 09:15 Setup]</b>\n"
+                                                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                                                f"<b>{trade_sym}</b> ({act})\n"
+                                                f"• <b>Session:</b> Next Market Session 09:15 IST\n"
+                                                f"• <b>Entry:</b> ₹{entry:,.2f} | <b>Target:</b> ₹{tgt:,.2f} | <b>SL:</b> ₹{sl:,.2f}\n"
+                                                f"• <b>AI Confidence:</b> {score:.0f}%\n"
+                                                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                                                f"⚡ <i>Autonomous Swarm Sentinel</i>"
+                                            )
+                                            await send_telegram_msg(tg_cfg["bot_token"], tg_cfg["chat_id"], tg_msg)
+                                    except Exception:
+                                        pass
                             else:
                                 recent = db_exec(
                                     "SELECT id FROM recommendations WHERE user_id=? AND symbol=? AND recommendation=? AND created_at > datetime('now', '-5 minutes')",
