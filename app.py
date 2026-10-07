@@ -357,6 +357,13 @@ OPERATOR_MIMIC_STATE: dict[str, Any] = {
     ]
 }
 
+ACTIVE_AGENT_WORK_STATE: dict[str, Any] = {
+    "active_agent_ids": ["a10", "a8", "a14"],
+    "current_task": "Pre-Market Standby & Operator Mimic Sentinel Active",
+    "active_agent_names": ["Operator Mimic", "5M Heartbeat", "09:15 Consolidator"],
+    "last_updated": "08:15 IST"
+}
+
 def _trigger_operator_mimic_agent(setup_obj: dict[str, Any]) -> dict[str, Any]:
     """Operator Mimic Engine: Active whenever Stock Mantra index setups arrive.
     Reverse-engineers operator logic, adjusts formula thresholds, and updates rationale
@@ -8203,12 +8210,51 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
             "open_positions": open_pos_count,
             "agents_healthy": 16,
             "total_agents": 16,
+            "active_agent_ids": ACTIVE_AGENT_WORK_STATE.get("active_agent_ids", ["a10", "a8", "a14"]),
+            "current_task": ACTIVE_AGENT_WORK_STATE.get("current_task", "Autonomous Swarm Active"),
+            "active_agent_names": ACTIVE_AGENT_WORK_STATE.get("active_agent_names", []),
             "operator_mimic": OPERATOR_MIMIC_STATE,
             "telegram_configured": tg_ready,
             "events": events
         }
     except Exception as exc:
         return {"status": "error", "detail": str(exc), "agents_healthy": 9, "total_agents": 9, "events": []}
+
+
+@app.get("/api/agents/set-active")
+@app.post("/api/agents/set-active")
+async def set_active_agent_endpoint(request: Request) -> dict[str, Any]:
+    """Dynamically activates designated agent(s) on a development or live task.
+    All non-active agents automatically transition to sleeping (zzz) state."""
+    global ACTIVE_AGENT_WORK_STATE
+    try:
+        params = request.query_params
+        body = {}
+        if request.method == "POST":
+            try:
+                body = await request.json()
+            except Exception:
+                pass
+        ids_raw = body.get("active_ids") or params.get("active_ids") or "a10"
+        if isinstance(ids_raw, str):
+            ids = [x.strip() for x in ids_raw.split(",") if x.strip()]
+        else:
+            ids = list(ids_raw)
+
+        task_desc = str(body.get("task") or params.get("task") or "Autonomous Code & Strategy Engineering")
+        names_raw = body.get("names") or params.get("names") or ""
+        names = [x.strip() for x in names_raw.split(",") if x.strip()] if isinstance(names_raw, str) else list(names_raw)
+
+        ACTIVE_AGENT_WORK_STATE["active_agent_ids"] = ids
+        ACTIVE_AGENT_WORK_STATE["current_task"] = task_desc
+        if names:
+            ACTIVE_AGENT_WORK_STATE["active_agent_names"] = names
+        now_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S IST")
+        ACTIVE_AGENT_WORK_STATE["last_updated"] = now_str
+
+        return {"ok": True, "state": ACTIVE_AGENT_WORK_STATE}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 @app.get("/api/agents/recommendation-history")

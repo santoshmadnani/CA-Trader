@@ -737,7 +737,10 @@
       <svg id="wireCanvas"></svg>
 
       <div class="stage-label">
-        <span>🤖 Autonomous AI Sentinel Mesh · 16 Specialized Sentinels Active</span>
+        <div>
+          <span>🤖 Autonomous AI Sentinel Mesh · 16 Specialized Sentinels Active</span>
+          <span id="stageTaskDesc" style="color:#fde047;font-family:var(--font-mono);font-size:10.5px;margin-left:14px;">🎯 Ready for prompt instructions</span>
+        </div>
         <span style="color:#6ee7b7">Hover or Tap card for monitored formulas &amp; checks</span>
       </div>
 
@@ -1496,6 +1499,28 @@ async function pollLiveTelemetry() {
           if (wa) wa.textContent = m.mimic_weights.adx_threshold;
           if (wv) wv.textContent = m.mimic_weights.vwap_pullback_pct + '%';
         }
+      }
+
+      // Dynamic Active Agent vs Sleep (Zzz) state based on active prompt task
+      if (!allSleeping && Array.isArray(data.active_agent_ids)) {
+        const activeSet = new Set(data.active_agent_ids);
+        document.querySelectorAll('.ag-card').forEach(card => {
+          const isAct = activeSet.has(card.id);
+          const badge = card.querySelector('.ag-badge');
+          if (isAct) {
+            card.classList.add('is-working');
+            card.classList.remove('is-sleeping');
+            if (badge) { badge.className = 'ag-badge badge-work'; badge.textContent = '⛏️ ON'; }
+          } else {
+            card.classList.remove('is-working');
+            card.classList.add('is-sleeping');
+            if (badge) { badge.className = 'ag-badge badge-sleep'; badge.textContent = '💤 ZZZ'; }
+          }
+        });
+      }
+      if (data.current_task) {
+        const taskEl = document.getElementById('stageTaskDesc');
+        if (taskEl) taskEl.textContent = `🎯 Task: ${data.current_task}`;
       }
 
       if (Array.isArray(data.events) && data.events.length > 0) {
