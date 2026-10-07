@@ -2365,3 +2365,39 @@ body.app-shell-mode .main-content {
   }
 }
 
+/* Light Theme Contrast Enforcement for Symbols and Headers */
+[data-theme="light"] .universal-sym-title,
+[data-theme="light"] .universal-sym-ltp,
+[data-theme="light"] #undSymbol,
+[data-theme="light"] #undSubTitle,
+[data-theme="light"] .wl-sym,
+[data-theme="light"] .chart-symbol-line span,
+body.light-theme .universal-sym-title,
+body.light-theme .universal-sym-ltp,
+body.light-theme #undSymbol,
+body.light-theme #undSubTitle,
+body.light-theme .wl-sym,
+body.light-theme .chart-symbol-line span,
+[data-theme="ivory"] .universal-sym-title,
+[data-theme="mint"] .universal-sym-title,
+[data-theme="cream"] .universal-sym-title {
+  color: #0f172a !important;
+}
+
+/* 60 FPS Hardware Acceleration & Zero-Jank Section Transitions */
+.tab-pane,
+.panel,
+.card,
+.chart-card,
+.dashboard-grid,
+.watchlist-pane,
+.reco-card {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.tab-pane {
+  contain: layout style;
+}

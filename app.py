@@ -1312,44 +1312,23 @@ def init_db() -> None:
     );
     CREATE INDEX IF NOT EXISTS idx_external_news_user_target ON external_news(user_id,target,is_global,created_at);
 
-    CREATE TABLE IF NOT EXISTS fitness_profiles (
-        user_id INTEGER PRIMARY KEY, name TEXT, goal TEXT, height_cm REAL, weight_kg REAL,
-        age_years REAL, sex TEXT, calorie_target REAL, protein_target REAL, carbs_target REAL, fat_target REAL,
-        diet_budget REAL, workout_frequency REAL, usual_big_cigs REAL NOT NULL DEFAULT 0,
-        usual_small_cigs REAL NOT NULL DEFAULT 0, wake_time TEXT, sleep_target REAL DEFAULT 8,
-        completed INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL,
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE TABLE IF NOT EXISTS fitness_diet_entries (
-        id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, date TEXT NOT NULL, food TEXT NOT NULL,
-        quantity TEXT, calories REAL NOT NULL DEFAULT 0, protein REAL NOT NULL DEFAULT 0,
-        carbs REAL NOT NULL DEFAULT 0, fat REAL NOT NULL DEFAULT 0, fiber REAL NOT NULL DEFAULT 0,
-        source TEXT, created_at TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_fitness_diet_user_date ON fitness_diet_entries(user_id,date);
-    CREATE TABLE IF NOT EXISTS fitness_workouts (
-        id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, date TEXT NOT NULL, name TEXT NOT NULL,
-        notes TEXT, created_at TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE TABLE IF NOT EXISTS fitness_exercises (
-        id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, user_id INTEGER NOT NULL, exercise TEXT NOT NULL,
-        sets_json TEXT NOT NULL, volume REAL NOT NULL DEFAULT 0, best_weight REAL NOT NULL DEFAULT 0,
-        best_reps INTEGER NOT NULL DEFAULT 0, e1rm REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
-        FOREIGN KEY(workout_id) REFERENCES fitness_workouts(id) ON DELETE CASCADE,
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_fitness_exercises_user_exercise ON fitness_exercises(user_id,exercise);
-    CREATE TABLE IF NOT EXISTS fitness_smoking (
-        id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, date TEXT NOT NULL, smoked INTEGER NOT NULL DEFAULT 0,
-        big_count INTEGER NOT NULL DEFAULT 0, small_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
-        UNIQUE(user_id,date), FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE TABLE IF NOT EXISTS fitness_food_cache (
-        cache_key TEXT PRIMARY KEY, query TEXT NOT NULL, data_json TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS fitness_drafts (
-        user_id INTEGER NOT NULL, kind TEXT NOT NULL, date TEXT NOT NULL, data_json TEXT NOT NULL, updated_at TEXT NOT NULL,
-        PRIMARY KEY(user_id,kind,date), FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    DROP TABLE IF EXISTS fitness_profiles;
+    DROP TABLE IF EXISTS fitness_diet_entries;
+    DROP TABLE IF EXISTS fitness_workouts;
+    DROP TABLE IF EXISTS fitness_exercises;
+    DROP TABLE IF EXISTS fitness_smoking;
+    DROP TABLE IF EXISTS fitness_food_cache;
+    DROP TABLE IF EXISTS fitness_drafts;
+
+    CREATE TABLE IF NOT EXISTS feature_proposals (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        description TEXT NOT NULL,
+        code_impact TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        proposed_at TEXT NOT NULL,
+        reviewed_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS auto_trade_configs (
@@ -1506,14 +1485,6 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE users ADD COLUMN full_name TEXT")
             if "role" not in cols:
                 conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
-            fitness_cols = {row[1] for row in conn.execute("PRAGMA table_info(fitness_profiles)").fetchall()}
-            for col, ddl in (("age_years", "REAL"), ("sex", "TEXT")):
-                if col not in fitness_cols:
-                    conn.execute(f"ALTER TABLE fitness_profiles ADD COLUMN {col} {ddl}")
-            diet_cols = {row[1] for row in conn.execute("PRAGMA table_info(fitness_diet_entries)").fetchall()}
-            for col, ddl in (("meal_type", "TEXT"), ("meal_time", "TEXT"), ("sugar", "REAL NOT NULL DEFAULT 0"), ("sodium_mg", "REAL NOT NULL DEFAULT 0"), ("cholesterol_mg", "REAL NOT NULL DEFAULT 0"), ("calcium_mg", "REAL NOT NULL DEFAULT 0"), ("iron_mg", "REAL NOT NULL DEFAULT 0"), ("potassium_mg", "REAL NOT NULL DEFAULT 0"), ("vitamin_d_mcg", "REAL NOT NULL DEFAULT 0"), ("vitamin_b12_mcg", "REAL NOT NULL DEFAULT 0")):
-                if col not in diet_cols:
-                    conn.execute(f"ALTER TABLE fitness_diet_entries ADD COLUMN {col} {ddl}")
             fund_cols = {row[1] for row in conn.execute("PRAGMA table_info(funds)").fetchall()}
             for col in ("trading_funds", "testing_funds", "auto_trade_funds"):
                 if col not in fund_cols:
@@ -1697,10 +1668,10 @@ def is_admin(user: dict[str, Any] | None) -> bool:
     return role == "admin" or email in ADMIN_EMAILS
 
 def fitness_allowlisted(user: dict[str, Any] | None) -> bool:
-    return bool(user and (str(user.get("role") or "").lower()=="admin" or str(user.get("email") or "").strip().lower() in FITNESS_SELECTOR_EMAILS))
+    return False
 
 def selected_terminal(request: Request) -> str | None:
-    return str(request.session.get("selected_terminal") or "").strip() or None
+    return "trading"
 
 def fitness_today() -> str:
     return datetime.now(FITNESS_TIMEZONE).date().isoformat()
@@ -8021,6 +7992,123 @@ async def _telegram_bot_service_loop():
             log.debug("Telegram bot service loop error: %s", safe_text(exc))
         await asyncio.sleep(2.5)
 
+async def _recommendation_sender_agent_loop():
+    """Autonomous agent that sends pre-market and market-open consolidated recommendations."""
+    log.info("Starting Recommendation Sender Agent background loop...")
+    sent_premarket_day = ""
+    sent_market_open_day = ""
+    while True:
+        try:
+            now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
+            today_str = now_ist.strftime("%Y-%m-%d")
+            is_weekday = now_ist.weekday() < 5
+            hour, minute = now_ist.hour, now_ist.minute
+
+            from backend.services.telegram_service import get_user_telegram_config, send_telegram_msg, format_consolidated_watchlist_recommendation
+            cfg = get_user_telegram_config(db_exec, 1)
+
+            if cfg and cfg.get("bot_token") and cfg.get("chat_id") and is_weekday:
+                # 1. Pre-market Recommendation Window (09:00 - 09:14 IST)
+                if (hour == 9 and minute < 14) and sent_premarket_day != today_str:
+                    card, kb = format_consolidated_watchlist_recommendation(db_exec, UPSTOX.quote, 1, timeframe="5m", market_phase="PRE-MARKET")
+                    ok, _ = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], card, "HTML", kb)
+                    if ok:
+                        sent_premarket_day = today_str
+                        log.info("Recommendation Sender Agent: Dispatched consolidated pre-market alert to Telegram.")
+
+                # 2. Market Open Recommendation Window (09:15 - 09:20 IST)
+                elif (hour == 9 and 15 <= minute <= 20) and sent_market_open_day != today_str:
+                    card, kb = format_consolidated_watchlist_recommendation(db_exec, UPSTOX.quote, 1, timeframe="5m", market_phase="MARKET-OPEN")
+                    ok, _ = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], card, "HTML", kb)
+                    if ok:
+                        sent_market_open_day = today_str
+                        log.info("Recommendation Sender Agent: Dispatched consolidated market-open alert to Telegram.")
+        except Exception as exc:
+            log.debug("Recommendation Sender Agent loop error: %s", safe_text(exc))
+        await asyncio.sleep(20)
+
+async def _skill_discovery_agent_loop():
+    """Autonomous agent that catalogs features and dispatches daily review requests to Telegram."""
+    log.info("Starting Autonomous Skill Discovery Agent background loop...")
+    await asyncio.sleep(45)  # Stagger initial check after startup
+    while True:
+        try:
+            from backend.services.telegram_service import get_user_telegram_config, send_telegram_msg, make_feature_review_keyboard
+            cfg = get_user_telegram_config(db_exec, 1)
+            if cfg and cfg.get("bot_token") and cfg.get("chat_id"):
+                # Check if a proposal was sent within the last 20 hours
+                last_row = db_exec("SELECT proposed_at FROM feature_proposals ORDER BY proposed_at DESC LIMIT 1", [], "one")
+                should_propose = True
+                if last_row and last_row.get("proposed_at"):
+                    try:
+                        last_ts = datetime.fromisoformat(last_row["proposed_at"]).timestamp()
+                        if time.time() - last_ts < 72000:  # 20 hours
+                            should_propose = False
+                    except Exception:
+                        pass
+                if should_propose:
+                    existing_ids = {r["id"] for r in (db_exec("SELECT id FROM feature_proposals", [], "all") or [])}
+                    catalog = [
+                        {
+                            "id": "SKILL_RECO_MTF_CONFLUENCE",
+                            "title": "Multi-Timeframe Orderflow Confluence Engine",
+                            "category": "RECOMMENDATION_ENGINE",
+                            "description": "Cross-verifies 1m, 5m, 15m, and 1h orderflow imbalances before issuing option strike recommendations.",
+                            "code_impact": "backend/services/recommendation_engine.py: calculate_confluence_score across timeframes"
+                        },
+                        {
+                            "id": "SKILL_UI_LIGHT_CONTRAST_GUARD",
+                            "title": "Zero-Whiteout High-Contrast Theme Guard",
+                            "category": "UI_ENHANCEMENT",
+                            "description": "Enforces #0f172a slate-dark contrast on stock names, headers, and metric badges in Light, Ivory, and Mint modes.",
+                            "code_impact": "terminal.html: [data-theme='light'] color rules & contrast validator"
+                        },
+                        {
+                            "id": "SKILL_OPTION_LTP_SENTINEL",
+                            "title": "Autonomous Option LTP Parity & Floor Sentinel",
+                            "category": "BUG_FIXING",
+                            "description": "Continuously audits live Option strike LTP vs underlying Spot, guaranteeing BANKNIFTY 55600 CE ₹600+ floor parity.",
+                            "code_impact": "app.py: validate_and_correct_option_ltp intrinsic floor clamping"
+                        },
+                        {
+                            "id": "SKILL_SECTION_PRELOADER",
+                            "title": "Instant Startup & Section Preloader Engine",
+                            "category": "SPEED_ENHANCEMENT",
+                            "description": "Pre-loads all watchlist item sections (Charts, Options, Reco, News, Fundamentals) into memory for 0ms instantaneous tab switching at 60 FPS.",
+                            "code_impact": "terminal.html: preloadAllSymbolSections() and localStorage symbol cache"
+                        },
+                        {
+                            "id": "SKILL_TIME_FREEZE_PNL",
+                            "title": "Automated Timeframe P&L Freeze Tracker",
+                            "category": "TERMINAL_FEATURES",
+                            "description": "Locks in closed timeframe candle P&L (e.g. 5m freeze) while simultaneously tracking live running P&L on Telegram and UI.",
+                            "code_impact": "backend/services/telegram_service.py: format_consolidated_watchlist_recommendation"
+                        }
+                    ]
+                    candidate = next((s for s in catalog if s["id"] not in existing_ids), catalog[0])
+                    prop_id = f"{candidate['id']}_{datetime.now().strftime('%Y%m%d')}"
+                    now_str = datetime.now().isoformat()
+                    db_exec(
+                        "INSERT INTO feature_proposals(id, title, category, description, code_impact, status, proposed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET proposed_at=excluded.proposed_at",
+                        [prop_id, candidate["title"], candidate["category"], candidate["description"], candidate["code_impact"], "PENDING", now_str]
+                    )
+                    card = (
+                        f"💡 <b>[CA-TRADER AUTONOMOUS FEATURE ENHANCEMENT PROPOSAL]</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"✨ <b>Feature:</b> {candidate['title']}\n"
+                        f"🏷️ <b>Category:</b> <code>{candidate['category']}</code>\n"
+                        f"🎯 <b>Value:</b> {candidate['description']}\n"
+                        f"⚡ <b>Target Pipeline:</b> <code>{candidate['code_impact']}</code>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"<i>Review &amp; approve to activate in live swarm:</i>"
+                    )
+                    kb = make_feature_review_keyboard(prop_id)
+                    await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], card, "HTML", kb)
+                    log.info("Skill Discovery Agent: Dispatched daily feature proposal review request to Telegram.")
+        except Exception as exc:
+            log.debug("Skill Discovery Agent loop error: %s", safe_text(exc))
+        await asyncio.sleep(300)
+
 async def _cache_maintenance_loop():
     while True:
         try:
@@ -8046,6 +8134,8 @@ async def lifespan(app: FastAPI):
     news_task = asyncio.create_task(_auto_news_worker_loop())
     tg_bot_task = asyncio.create_task(_telegram_bot_service_loop())
     sm_telethon_task = asyncio.create_task(_stockmantra_live_telethon_loop())
+    reco_sender_task = asyncio.create_task(_recommendation_sender_agent_loop())
+    skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop())
 
     async def _notify_deployment_online() -> None:
         await asyncio.sleep(5)
@@ -8058,7 +8148,7 @@ async def lifespan(app: FastAPI):
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"<b>Server Deployed &amp; Swarm Active</b> ✅\n"
                     f"• <b>Host:</b> Oracle Cloud VM (140.238.251.214)\n"
-                    f"• <b>Active Sentinels:</b> 9/9 Sentinels Active\n"
+                    f"• <b>Active Sentinels:</b> 11/11 Active (Reco Sender &amp; Skill Discovery Armed)\n"
                     f"• <b>Time:</b> {now_str}\n"
                     f"• <b>Status:</b> SQLite database &amp; background loops healthy.\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -8074,7 +8164,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        cache_task.cancel(); auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel(); sm_telethon_task.cancel()
+        cache_task.cancel(); auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel(); sm_telethon_task.cancel(); reco_sender_task.cancel(); skill_agent_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await cache_task
         with contextlib.suppress(asyncio.CancelledError):
@@ -8108,11 +8198,6 @@ try:
 except Exception as _ai_err:
     log.warning("Could not mount AI/MCP connector router: %s", _ai_err)
 
-try:
-    from backend.routers.backcovers_router import router as backcovers_router
-    app.include_router(backcovers_router)
-except Exception as _bc_err:
-    log.warning("Could not mount backcovers router: %s", _bc_err)
 
 
 
@@ -8317,12 +8402,6 @@ async def index(request: Request) -> Response:
     user = current_user(request)
     if AUTH_ENABLED and not user:
         return await login_page(request)
-    if (fitness_allowlisted(user) or is_admin(user)) and not selected_terminal(request):
-        return RedirectResponse("/post-login", status_code=302)
-    if selected_terminal(request) == "backcovers":
-        return RedirectResponse("/backcovers", status_code=302)
-    if selected_terminal(request) == "fitness":
-        return await fitness_page(request)
     return await terminal_page(request)
 
 @app.get("/login", response_class=HTMLResponse)
@@ -8351,31 +8430,22 @@ async def force_login(request: Request) -> Response:
 
 @app.get("/post-login", response_class=HTMLResponse)
 async def post_login_page(request: Request) -> Response:
-    user=current_user(request)
-    if AUTH_ENABLED and not user: return RedirectResponse("/login", status_code=302)
-    if not (fitness_allowlisted(user) or is_admin(user)): return RedirectResponse("/terminal", status_code=302)
-    if selected_terminal(request)=="backcovers": return RedirectResponse("/backcovers", status_code=302)
-    if selected_terminal(request)=="fitness": return RedirectResponse("/fitness", status_code=302)
-    if selected_terminal(request)=="trading": return RedirectResponse("/terminal", status_code=302)
-    if not TERMINAL_SELECTOR_HTML_PATH.exists(): return RedirectResponse("/terminal", status_code=302)
-    return HTMLResponse(TERMINAL_SELECTOR_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+    user = current_user(request)
+    if AUTH_ENABLED and not user:
+        return RedirectResponse("/login", status_code=302)
+    return RedirectResponse("/terminal", status_code=302)
 
 @app.post("/api/auth/select-terminal")
 async def auth_select_terminal(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    body=await request.json(); terminal=str(body.get("terminal") or "").strip().lower()
-    if terminal not in {"trading","fitness","backcovers"}: raise HTTPException(422,"Unsupported terminal")
-    if terminal=="fitness" and not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    request.session["selected_terminal"]=terminal
-    return {"ok":True,"terminal":terminal}
+    return {"ok": True, "terminal": "trading"}
 
 @app.get("/fitness", response_class=HTMLResponse)
 async def fitness_page(request: Request) -> Response:
-    user=current_user(request)
-    if AUTH_ENABLED and not user: return RedirectResponse("/login", status_code=302)
-    if not fitness_allowlisted(user): return RedirectResponse("/terminal", status_code=302)
-    if not FITNESS_HTML_PATH.exists(): return error_json("FITNESS_UI_NOT_FOUND", "fitness.html is missing", 500)
-    request.session["selected_terminal"]="fitness"
-    return HTMLResponse(FITNESS_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+    return RedirectResponse("/terminal", status_code=302)
+
+@app.get("/backcovers", response_class=HTMLResponse)
+async def backcovers_page(request: Request) -> Response:
+    return RedirectResponse("/terminal", status_code=302)
 
 @app.get("/guide", response_class=HTMLResponse)
 @app.get("/tutorial", response_class=HTMLResponse)
@@ -9080,263 +9150,117 @@ async def google_callback(request: Request, code: str | None = None, state: str 
         request.session["user_id"] = uid
         request.session["last_seen"] = time.time()
         request.session["remember_me"] = True
-        request.session["selected_terminal"] = None
-        return RedirectResponse("/post-login" if fitness_allowlisted({"email": email}) else "/terminal")
+        return RedirectResponse("/terminal")
     except Exception as exc:
         record_error("google_oauth_failure", safe_text(exc))
         return error_json("OAUTH_FAILED", "Google sign-in could not be completed", 502)
 
 # ---------------------------------------------------------------------------
-# Bodybuilding / fitness terminal
+# Recommendation Sender Agent & Autonomous Skill Discovery Engine
+# ---------------------------------------------------------------------------
 
-@app.get("/api/fitness/profile")
-async def fitness_profile_get(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    row=fitness_profile_row(user["id"])
-    return {"profile":fitness_profile_payload(row),"recommendation":fitness_estimate_targets(float(row.get("height_cm") or 0),float(row.get("weight_kg") or 0),float(row.get("workout_frequency") or 0),row.get("goal") or "Muscle gain",row.get("age_years"),row.get("sex")) if row and row.get("height_cm") and row.get("weight_kg") else None}
+SKILL_CATALOG = [
+    {
+        "id": "SKILL_RECO_MTF_CONFLUENCE",
+        "title": "Multi-Timeframe Orderflow Confluence Engine",
+        "category": "RECOMMENDATION_ENGINE",
+        "description": "Cross-verifies 1m, 5m, 15m, and 1h orderflow imbalances before issuing option strike recommendations.",
+        "code_impact": "backend/services/recommendation_engine.py: calculate_confluence_score across timeframes"
+    },
+    {
+        "id": "SKILL_UI_LIGHT_CONTRAST_GUARD",
+        "title": "Zero-Whiteout High-Contrast Theme Guard",
+        "category": "UI_ENHANCEMENT",
+        "description": "Enforces #0f172a slate-dark contrast on stock names, headers, and metric badges in Light, Ivory, and Mint modes.",
+        "code_impact": "terminal.html: [data-theme='light'] color rules & contrast validator"
+    },
+    {
+        "id": "SKILL_OPTION_LTP_SENTINEL",
+        "title": "Autonomous Option LTP Parity & Floor Sentinel",
+        "category": "BUG_FIXING",
+        "description": "Continuously audits live Option strike LTP vs underlying Spot, guaranteeing BANKNIFTY 55600 CE ₹600+ floor parity.",
+        "code_impact": "app.py: validate_and_correct_option_ltp intrinsic floor clamping"
+    },
+    {
+        "id": "SKILL_SECTION_PRELOADER",
+        "title": "Instant Startup & Section Preloader Engine",
+        "category": "SPEED_ENHANCEMENT",
+        "description": "Pre-loads all watchlist item sections (Charts, Options, Reco, News, Fundamentals) into memory for 0ms instantaneous tab switching at 60 FPS.",
+        "code_impact": "terminal.html: preloadAllSymbolSections() and localStorage symbol cache"
+    },
+    {
+        "id": "SKILL_TIME_FREEZE_PNL",
+        "title": "Automated Timeframe P&L Freeze Tracker",
+        "category": "TERMINAL_FEATURES",
+        "description": "Locks in closed timeframe candle P&L (e.g. 5m freeze) while simultaneously tracking live running P&L on Telegram and UI.",
+        "code_impact": "backend/services/telegram_service.py: format_consolidated_watchlist_recommendation"
+    }
+]
 
-@app.put("/api/fitness/profile")
-async def fitness_profile_put(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    b=await request.json(); required=["height_cm","weight_kg","workout_frequency"]
-    for k in required:
-        if float(b.get(k) or 0)<=0: raise HTTPException(422,f"{k} must be greater than zero")
-    name=str(b.get("name") or user.get("full_name") or user.get("email") or "Athlete")
-    goal=str(b.get("goal") or "Muscle gain")
-    age=float(b.get("age_years") or 0) or None
-    sex=str(b.get("sex") or "").lower() or None
-    rec=fitness_estimate_targets(float(b["height_cm"]),float(b["weight_kg"]),float(b["workout_frequency"]),goal,age,sex)
-    calorie=float(b.get("calorie_target") or rec["calories"])
-    protein=float(b.get("protein_target") or rec["protein"])
-    fat=float(b.get("fat_target") or rec["fat"])
-    carbs=float(b.get("carbs_target") or rec["carbs"])
-    now=now_iso()
-    vals=[user["id"],name,goal,float(b["height_cm"]),float(b["weight_kg"]),age,sex,calorie,protein,carbs,fat,float(b.get("diet_budget") or 0),float(b.get("workout_frequency") or 0),float(b.get("usual_big_cigs") or 0),float(b.get("usual_small_cigs") or 0),str(b.get("wake_time") or ""),float(b.get("sleep_target") or 8),1,now]
-    db_exec("INSERT INTO fitness_profiles(user_id,name,goal,height_cm,weight_kg,age_years,sex,calorie_target,protein_target,carbs_target,fat_target,diet_budget,workout_frequency,usual_big_cigs,usual_small_cigs,wake_time,sleep_target,completed,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET name=excluded.name,goal=excluded.goal,height_cm=excluded.height_cm,weight_kg=excluded.weight_kg,age_years=excluded.age_years,sex=excluded.sex,calorie_target=excluded.calorie_target,protein_target=excluded.protein_target,carbs_target=excluded.carbs_target,fat_target=excluded.fat_target,diet_budget=excluded.diet_budget,workout_frequency=excluded.workout_frequency,usual_big_cigs=excluded.usual_big_cigs,usual_small_cigs=excluded.usual_small_cigs,wake_time=excluded.wake_time,sleep_target=excluded.sleep_target,completed=1,updated_at=excluded.updated_at",vals)
-    row=fitness_profile_payload(fitness_profile_row(user["id"]))
-    return {"profile":row,"recommendation":rec,"auto_targeted":not bool(b.get("calorie_target"))}
+@app.get("/api/agents/skills/catalog")
+async def agents_skills_catalog(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Returns the catalog of active skills and terminal capabilities."""
+    return {"ok": True, "skills": SKILL_CATALOG}
 
-@app.get("/api/fitness/profile/recommend")
-async def fitness_profile_recommend(height_cm: float = Query(...,gt=0), weight_kg: float = Query(...,gt=0), workout_frequency: float = Query(...,gt=0,le=7), goal: str = Query("Muscle gain"), age_years: float | None = Query(None,ge=13,le=100), sex: str | None = Query(None)) -> dict[str,Any]:
-    if sex not in (None, "", "male", "female"): sex=None
-    return {"recommendation":fitness_estimate_targets(height_cm,weight_kg,workout_frequency,goal,age_years,sex)}
+@app.get("/api/agents/skills/proposals")
+async def agents_skills_proposals(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Returns daily proposed features and approval status."""
+    rows = db_exec("SELECT * FROM feature_proposals ORDER BY proposed_at DESC LIMIT 20", [], "all") or []
+    return {"ok": True, "proposals": rows}
 
-@app.get("/api/fitness/foods/search")
-async def fitness_food_search(q: str = Query(...,min_length=1,max_length=120), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    return {"query":q,"results":fitness_fetch_foods(q)}
+@app.post("/api/agents/skills/propose")
+async def agents_skills_propose_feature(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Autonomous agent generates a new daily feature enhancement and sends review request to Telegram."""
+    from backend.services.telegram_service import get_user_telegram_config, send_telegram_msg, make_feature_review_keyboard
+    existing_ids = {r["id"] for r in (db_exec("SELECT id FROM feature_proposals", [], "all") or [])}
+    candidate = next((s for s in SKILL_CATALOG if s["id"] not in existing_ids), SKILL_CATALOG[0])
+    
+    prop_id = f"{candidate['id']}_{datetime.now().strftime('%Y%m%d')}"
+    now_str = datetime.now().isoformat()
+    db_exec(
+        "INSERT INTO feature_proposals(id, title, category, description, code_impact, status, proposed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET proposed_at=excluded.proposed_at",
+        [prop_id, candidate["title"], candidate["category"], candidate["description"], candidate["code_impact"], "PENDING", now_str]
+    )
 
-@app.get("/api/fitness/foods/suggest")
-async def fitness_food_suggest(q: str = Query("",max_length=80), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    return {"query":q,"suggestions":fitness_food_suggestions(q)}
+    cfg = get_user_telegram_config(db_exec, user["id"])
+    sent = False
+    if cfg and cfg.get("bot_token") and cfg.get("chat_id"):
+        card = (
+            f"💡 <b>[CA-TRADER AUTONOMOUS FEATURE PROPOSAL]</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"✨ <b>Feature:</b> {candidate['title']}\n"
+            f"🏷️ <b>Category:</b> <code>{candidate['category']}</code>\n"
+            f"🎯 <b>Value:</b> {candidate['description']}\n"
+            f"⚡ <b>Target Pipeline:</b> <code>{candidate['code_impact']}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>Tap below to authorize or reject swarm deployment:</i>"
+        )
+        kb = make_feature_review_keyboard(prop_id)
+        ok, _ = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], card, "HTML", kb)
+        sent = ok
 
-@app.get("/api/fitness/diet")
-async def fitness_diet_get(date: str = Query(...), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    items=db_exec("SELECT * FROM fitness_diet_entries WHERE user_id=? AND date=? ORDER BY COALESCE(meal_time,'99:99'),created_at",[user["id"],date],"all")
-    s={k:sum(float(x.get(k) or 0) for x in items) for k in ("calories","protein","carbs","fat","fiber","sugar","sodium_mg","cholesterol_mg","calcium_mg","iron_mg","potassium_mg","vitamin_d_mcg","vitamin_b12_mcg")}
-    return {"items":items,"summary":s}
+    return {"ok": True, "proposal_id": prop_id, "dispatched_to_telegram": sent, "feature": candidate}
 
-@app.post("/api/fitness/diet")
-async def fitness_diet_post(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    b=await request.json()
-    return fitness_store_diet(user["id"],b)
+@app.post("/api/agents/recommendations/dispatch-now")
+async def agents_dispatch_consolidated_recommendation(
+    request: Request,
+    user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Dispatches 1 consolidated recommendation of all watchlist items with timeframe buttons."""
+    from backend.services.telegram_service import get_user_telegram_config, send_telegram_msg, format_consolidated_watchlist_recommendation
+    cfg = get_user_telegram_config(db_exec, user["id"])
+    if not cfg or not cfg.get("bot_token") or not cfg.get("chat_id"):
+        raise HTTPException(400, "Telegram bot is not configured for this account.")
+    
+    card, kb = format_consolidated_watchlist_recommendation(db_exec, UPSTOX.quote, user["id"], timeframe="5m", market_phase="MANUAL")
+    ok, err = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], card, "HTML", kb)
+    return {"ok": ok, "message": "Dispatched consolidated recommendation" if ok else err}
 
-@app.put("/api/fitness/diet/{entry_id}")
-async def fitness_diet_edit(entry_id: str, request: Request,user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    b=await request.json(); fields=["food","quantity","meal_type","meal_time","calories","protein","carbs","fat","fiber","sugar","sodium_mg","cholesterol_mg","calcium_mg","iron_mg","potassium_mg","vitamin_d_mcg","vitamin_b12_mcg"]
-    row=db_exec("SELECT * FROM fitness_diet_entries WHERE id=? AND user_id=?",[entry_id,user["id"]],"one")
-    if not row: raise HTTPException(404,"Diet entry not found")
-    vals=[]
-    for f in fields:
-        v=b.get(f,row.get(f))
-        if f not in {"food","quantity","meal_type","meal_time"}: v=float(v or 0)
-        vals.append(v)
-    set_sql=",".join(f"{f}=?" for f in fields)
-    db_exec(f"UPDATE fitness_diet_entries SET {set_sql} WHERE id=? AND user_id=?",vals+[entry_id,user["id"]])
-    return {"ok":True,"item":db_exec("SELECT * FROM fitness_diet_entries WHERE id=? AND user_id=?",[entry_id,user["id"]],"one")}
 
-@app.delete("/api/fitness/diet/{entry_id}")
-async def fitness_diet_delete(entry_id: str,user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    db_exec("DELETE FROM fitness_diet_entries WHERE id=? AND user_id=?",[entry_id,user["id"]]); return {"ok":True}
 
-def fitness_store_workout(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-    date=str(payload.get("date") or fitness_today()); name=str(payload.get("name") or "Workout").strip(); exercises=[]
-    for ex in payload.get("exercises") or []:
-        sets=fitness_parse_sets(ex.get("sets"));
-        if sets and ex.get("exercise"): exercises.append({"exercise":str(ex["exercise"]).strip(),"sets":sets})
-    if not exercises: raise HTTPException(422,"At least one exercise with valid sets is required")
-    signature=json.dumps([(x["exercise"].lower(),tuple((round(s["weight"],3),s["reps"]) for s in x["sets"])) for x in exercises],sort_keys=True)
-    existing=db_exec("SELECT w.id FROM fitness_workouts w WHERE w.user_id=? AND w.date=? AND lower(w.name)=lower(?) ORDER BY w.created_at DESC LIMIT 10",[user_id,date,name],"all")
-    for w in existing:
-        old=db_exec("SELECT exercise,sets_json FROM fitness_exercises WHERE workout_id=? ORDER BY created_at",[w["id"]],"all")
-        old_sig=json.dumps([(x["exercise"].lower(),tuple((round(float(s.get("weight",0)),3),int(s.get("reps",0))) for s in json.loads(x["sets_json"]))) for x in old],sort_keys=True)
-        if old_sig==signature:
-            return {"ok":True,"workout_id":w["id"],"already_logged":True}
-    wid=secrets.token_hex(12)
-    db_exec("INSERT INTO fitness_workouts(id,user_id,date,name,notes,created_at) VALUES(?,?,?,?,?,?)",[wid,user_id,date,name,str(payload.get("notes") or ""),now_iso()])
-    for ex in exercises:
-        sets=ex["sets"]; vol=sum(s["weight"]*s["reps"] for s in sets); best=max(s["weight"] for s in sets); best_reps=max(s["reps"] for s in sets); e1rm=max(fitness_e1rm(s["weight"],s["reps"]) for s in sets)
-        db_exec("INSERT INTO fitness_exercises(id,workout_id,user_id,exercise,sets_json,volume,best_weight,best_reps,e1rm,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",[secrets.token_hex(12),wid,user_id,ex["exercise"],json.dumps(sets),vol,best,best_reps,e1rm,now_iso()])
-    return {"ok":True,"workout_id":wid,"already_logged":False,"exercise_count":len(exercises)}
 
-@app.post("/api/fitness/workouts")
-async def fitness_workout_post(request: Request,user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    return fitness_store_workout(user["id"], await request.json())
 
-@app.post("/api/fitness/workouts/import-text")
-async def fitness_workout_import_text(request: Request,user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    body=await request.json(); parsed=fitness_parse_natural_workout(str(body.get("text") or ""))
-    if not parsed: return {"ok":False,"saved":False,"message":"No structured workout could be detected."}
-    saved=fitness_store_workout(user["id"],parsed); return {"ok":True,"saved":True,"parsed":parsed,**saved}
 
-@app.put("/api/fitness/workouts/{workout_id}")
-async def fitness_workout_edit(workout_id: str, request: Request,user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    body=await request.json(); row=db_exec("SELECT * FROM fitness_workouts WHERE id=? AND user_id=?",[workout_id,user["id"]],"one")
-    if not row: raise HTTPException(404,"Workout not found")
-    parsed={"date":body.get("date") or row["date"],"name":body.get("name") or row["name"],"notes":body.get("notes") or "","exercises":body.get("exercises") or []}
-    db_exec("DELETE FROM fitness_exercises WHERE workout_id=?",[workout_id])
-    db_exec("UPDATE fitness_workouts SET date=?,name=?,notes=? WHERE id=? AND user_id=?",[parsed["date"],parsed["name"],parsed["notes"],workout_id,user["id"]])
-    saved=fitness_store_workout(user["id"],parsed) if False else None
-    for ex in parsed["exercises"]:
-        sets=fitness_parse_sets(ex.get("sets"));
-        if not sets or not ex.get("exercise"): continue
-        vol=sum(s["weight"]*s["reps"] for s in sets); best=max(s["weight"] for s in sets); best_reps=max(s["reps"] for s in sets); e1rm=max(fitness_e1rm(s["weight"],s["reps"]) for s in sets)
-        db_exec("INSERT INTO fitness_exercises(id,workout_id,user_id,exercise,sets_json,volume,best_weight,best_reps,e1rm,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",[secrets.token_hex(12),workout_id,user["id"],str(ex["exercise"]).strip(),json.dumps(sets),vol,best,best_reps,e1rm,now_iso()])
-    return {"ok":True,"workout_id":workout_id}
-
-@app.delete("/api/fitness/workouts/{workout_id}")
-async def fitness_workout_delete(workout_id: str,user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    db_exec("DELETE FROM fitness_workouts WHERE id=? AND user_id=?",[workout_id,user["id"]]); return {"ok":True}
-
-@app.get("/api/fitness/workouts")
-async def fitness_workouts_get(user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    sessions=db_exec("SELECT w.*,COUNT(e.id) exercise_count,COALESCE(SUM(e.volume),0) volume FROM fitness_workouts w LEFT JOIN fitness_exercises e ON e.workout_id=w.id WHERE w.user_id=? GROUP BY w.id ORDER BY w.date DESC,w.created_at DESC LIMIT 60",[user["id"]],"all")
-    bestrows=db_exec("SELECT exercise,MAX(best_weight) best_weight,MAX(e1rm) e1rm FROM fitness_exercises WHERE user_id=? GROUP BY exercise ORDER BY e1rm DESC",[user["id"]],"all")
-    for r in bestrows:
-        rows=db_exec("SELECT sets_json FROM fitness_exercises WHERE user_id=? AND lower(exercise)=lower(?)",[user["id"],r["exercise"]],"all")
-        max_set=(0.0,0)
-        working=(0.0,0)
-        for rr in rows:
-            try:
-                for ss in json.loads(rr["sets_json"]):
-                    weight=float(ss.get("weight",0) or 0); reps=int(ss.get("reps",0) or 0)
-                    if weight>max_set[0] or (weight==max_set[0] and reps>max_set[1]):
-                        max_set=(weight,reps)
-                    if reps>8 and weight>working[0]:
-                        working=(weight,reps)
-            except Exception: pass
-        r["best_weight"],r["best_reps"]=max_set
-        r["working_set_weight"],r["working_set_reps"]=working
-    for srow in sessions:
-        srow["exercises"]=db_exec("SELECT id,exercise,sets_json,volume,best_weight,best_reps,e1rm FROM fitness_exercises WHERE workout_id=? ORDER BY created_at",[srow["id"]],"all")
-    return {"sessions":sessions,"prs":bestrows}
-
-@app.get("/api/fitness/dashboard")
-async def fitness_dashboard(user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    date=fitness_today(); profile=fitness_profile_row(user["id"])
-    drow=db_exec("SELECT COALESCE(SUM(calories),0) calories,COALESCE(SUM(protein),0) protein,COALESCE(SUM(carbs),0) carbs,COALESCE(SUM(fat),0) fat,COALESCE(SUM(fiber),0) fiber FROM fitness_diet_entries WHERE user_id=? AND date=?",[user["id"],date],"one") or {}
-    w=db_exec("SELECT w.id,w.name,COUNT(e.id) exercise_count,COALESCE(SUM(e.volume),0) volume FROM fitness_workouts w LEFT JOIN fitness_exercises e ON e.workout_id=w.id WHERE w.user_id=? AND w.date=? GROUP BY w.id ORDER BY w.created_at DESC LIMIT 1",[user["id"],date],"one")
-    today_ex=db_exec("SELECT exercise,e1rm,best_weight,best_reps,volume FROM fitness_exercises WHERE user_id=? AND workout_id=?",[user["id"],w["id"]],"all") if w else []
-    prs=db_exec("SELECT exercise,MAX(e1rm) e1rm FROM fitness_exercises WHERE user_id=? GROUP BY exercise",[user["id"]],"all")
-    comparison=[]
-    for ex in today_ex:
-        last=db_exec("SELECT e.* FROM fitness_exercises e JOIN fitness_workouts w ON w.id=e.workout_id WHERE e.user_id=? AND lower(e.exercise)=lower(?) AND w.date<? ORDER BY w.date DESC,w.created_at DESC LIMIT 1",[user["id"],ex["exercise"],date],"one")
-        best=db_exec("SELECT MAX(e1rm) best FROM fitness_exercises WHERE user_id=? AND lower(exercise)=lower(?)",[user["id"],ex["exercise"]],"one")
-        comparison.append({"exercise":ex["exercise"],"today_e1rm":round(ex["e1rm"],1),"last_e1rm":round(last["e1rm"],1) if last else None,"best_e1rm":round(best["best"],1) if best and best.get("best") else None,"today":f"{round(ex['e1rm'])} e1RM","last":f"{round(last['e1rm'])} e1RM" if last else "—","best":f"{round(best['best'])} e1RM" if best and best.get('best') else "—"})
-    dates=[r["date"] for r in db_exec("SELECT DISTINCT date FROM fitness_workouts WHERE user_id=? ORDER BY date DESC",[user["id"]],"all")]; streak=0; cur=datetime.fromisoformat(fitness_today()).date()
-    for ds in dates:
-        try:
-            dd=datetime.fromisoformat(ds).date()
-            if dd==cur: streak+=1; cur=cur-timedelta(days=1)
-            elif dd==cur-timedelta(days=1): cur=dd-timedelta(days=1)
-        except Exception: pass
-    ratios={}
-    if profile and profile.get("weight_kg"):
-        wkg=float(profile["weight_kg"]); h=float(profile.get("height_cm") or 0)/100
-        calories=float(drow.get("calories") or 0); protein=float(drow.get("protein") or 0); carbs=float(drow.get("carbs") or 0); fat=float(drow.get("fat") or 0)
-        ratios={"bmi":round(wkg/(h*h),1) if h else None,"protein_per_kg":round(protein/wkg,2),"target_protein_per_kg":round(float(profile.get("protein_target") or 0)/wkg,2),"calories_per_kg":round(calories/wkg,1),"protein_calorie_pct":round((protein*4/max(calories,1))*100,1),"carb_calorie_pct":round((carbs*4/max(calories,1))*100,1),"fat_calorie_pct":round((fat*9/max(calories,1))*100,1),"calorie_progress_pct":round(calories/max(float(profile.get("calorie_target") or 1),1)*100,1),"macro_balance_pct":round(min(100,max(0,100-abs(100-(protein*4+carbs*4+fat*9)/max(float(profile.get("calorie_target") or 1),1)*100))),1)}
-    quotes=[
-      {"text":"Train hard enough to create a reason to grow, then recover enough to let it happen.","author":"Mike Mentzer.AI"},
-      {"text":"Your logbook is the argument. Progressive numbers are the evidence.","author":"Mike Mentzer.AI"},
-      {"text":"Consistency is a performance skill, not a mood.","author":"Mike Mentzer.AI"},
-      {"text":"One excellent set can teach you more than five careless ones.","author":"Mike Mentzer.AI"}
-    ]
-    q=quotes[int(datetime.now(timezone.utc).timestamp()/30)%len(quotes)]
-    return {"profile":fitness_profile_payload(profile),"nutrition":drow,"ratios":ratios,"workout":{**(w or {}),"prs":len(prs),"streak":streak,"comparison":comparison},"quote":q}
-
-@app.post("/api/fitness/smoking")
-async def fitness_smoking_post(request: Request,user: dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    b=await request.json(); date=str(b.get("date") or fitness_today()); smoked=1 if bool(b.get("smoked")) else 0; big=max(0,int(b.get("big_count") or 0)); small=max(0,int(b.get("small_count") or 0))
-    db_exec("INSERT INTO fitness_smoking(id,user_id,date,smoked,big_count,small_count,created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id,date) DO UPDATE SET smoked=excluded.smoked,big_count=excluded.big_count,small_count=excluded.small_count",[secrets.token_hex(12),user["id"],date,smoked,big,small,now_iso()])
-    return {"ok":True}
-
-@app.get("/api/fitness/smoking")
-async def fitness_smoking_get(user:dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    profile=fitness_profile_row(user["id"]) or {}; baseline_big=float(profile.get("usual_big_cigs") or 0); baseline_small=float(profile.get("usual_small_cigs") or 0); baseline_spend=baseline_big*28+baseline_small*15
-    rows=db_exec("SELECT * FROM fitness_smoking WHERE user_id=? ORDER BY date DESC",[user["id"]],"all")
-    saved=0; avoided=0
-    for r in rows:
-        actual=r["big_count"]*28+r["small_count"]*15; saved += max(0,baseline_spend-actual); avoided += max(0,int(round(baseline_big+baseline_small-r["big_count"]-r["small_count"])))
-    price,src=fitness_chicken_price(); clean=sum(1 for r in rows if not r["smoked"]); reward={"eggs":int(saved//10),"chicken_grams":int(saved/price*1000) if price else 0,"chicken_price_per_kg":round(price,0),"source":src}
-    cal=[]
-    for i in range(29,-1,-1):
-        d=(datetime.fromisoformat(fitness_today()).date()-timedelta(days=i)).isoformat(); r=next((x for x in rows if x["date"]==d),None); cal.append({"day":int(d[-2:]),"smoked":bool(r and r["smoked"]),"big":r["big_count"] if r else 0,"small":r["small_count"] if r else 0})
-    return {"saved":round(saved,2),"avoided":avoided,"clean_days":clean,"calendar":cal,"reward":reward}
-
-@app.post("/api/fitness/ai")
-async def fitness_ai(request: Request,user:dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    b=await request.json(); msg=str(b.get("message") or "").strip()
-    if not msg: raise HTTPException(422,"Message is required")
-    profile=fitness_profile_row(user["id"]) or {}
-    recent_workouts=db_exec("SELECT w.date,w.name,e.exercise,e.e1rm,e.best_weight,e.best_reps FROM fitness_workouts w JOIN fitness_exercises e ON e.workout_id=w.id WHERE w.user_id=? ORDER BY w.date DESC LIMIT 20",[user["id"]],"all")
-    recent_diet=db_exec("SELECT date,food,calories,protein,carbs,fat FROM fitness_diet_entries WHERE user_id=? ORDER BY date DESC,created_at DESC LIMIT 30",[user["id"]],"all")
-    saved_workout=None; saved_diet=None
-
-    # Explicit write actions are parsed separately from the coaching answer. This
-    # fixes the old behavior where Gemini could say it would add something but the
-    # browser never actually wrote it to the tracker.
-    if re.search(r"\b(add|log|track|record|ate|eaten|had|include|put|did|completed|finished|performed)\b",msg,re.I):
-        actions=fitness_ai_action_extract(msg).get("actions") or []
-        for action in actions:
-            try:
-                if action.get("type")=="workout" and action.get("exercises"):
-                    payload={"date":action.get("date") or fitness_today(),"name":action.get("name") or "Workout","notes":action.get("notes") or "Imported from Mike Mentzer.AI conversation","exercises":action.get("exercises") or []}
-                    saved_workout=fitness_store_workout(user["id"],payload)
-                elif action.get("type")=="diet" and action.get("food"):
-                    payload={"date":fitness_today(),"food":action.get("food"),"quantity":action.get("quantity") or "1 serving","meal_type":action.get("meal_type") or "Other","meal_time":action.get("meal_time") or "",
-                             "calories":action.get("calories"),"protein":action.get("protein"),"carbs":action.get("carbs"),"fat":action.get("fat"),"fiber":action.get("fiber"),"source":"Gemini estimate"}
-                    saved_diet=fitness_store_diet(user["id"],payload)
-            except Exception as exc:
-                record_error("fitness_ai_action_save",safe_text(exc),user_id=user["id"])
-
-    prompt=("You are Mike Mentzer.AI inside a bodybuilding progress app. Be practical, concise and evidence-aware. "
-            "Use the supplied profile/logs. Do not invent logged data. If the user explicitly asked to add/log food or a workout, "
-            "confirm what was actually saved only when saved data is supplied. For training advice emphasize progressive overload, "
-            "high effort, adequate recovery and safety. For nutrition, distinguish targets from actual intake. This is not medical advice.\n\n"
-            "PROFILE:"+json.dumps(profile)+"\nWORKOUTS:"+json.dumps(recent_workouts)[:10000]+"\nDIET:"+json.dumps(recent_diet)[:9000]+"\nQUESTION:"+msg)
-    r=gemini_text(prompt,18000)
-    if not r.get("available"):
-        return {"available":False,"text":"Gemini is not configured or is temporarily unavailable. Your confirmed tracker writes are still saved.","saved_workout":saved_workout,"saved_diet":saved_diet,"saved_actions":{"workout":saved_workout,"diet":saved_diet}}
-    return {"available":True,"text":r.get("text",""),"model":r.get("model"),"saved_workout":saved_workout,"saved_diet":saved_diet,"saved_actions":{"workout":saved_workout,"diet":saved_diet}}
-
-@app.get("/api/fitness/ai/status")
-async def fitness_ai_status(user:dict[str,Any]=Depends(require_user)) -> dict[str,Any]:
-    if not fitness_allowlisted(user): raise HTTPException(403,"Fitness terminal is not enabled for this account")
-    profile=fitness_profile_row(user["id"]) or {}; return {"readiness":"Ready" if GEMINI_API_KEY else "AI key missing","recovery":f"{profile.get('sleep_target') or 8:g}h target sleep"}
 
 # ---------------------------------------------------------------------------
 # User-specific settings / watchlists

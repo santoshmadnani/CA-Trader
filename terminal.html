@@ -1554,12 +1554,15 @@ function attachResilientClickDelegation() {
       display: none !important;
       margin-bottom: 20px;
       scroll-margin-top: 132px;
+      contain: content;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
     }
 
     .panel.active {
       display: block !important;
       visibility: visible !important;
-      animation: panelIn .38s cubic-bezier(.16, 1, .3, 1);
+      animation: panelIn .18s cubic-bezier(.16, 1, .3, 1);
     }
 
     @keyframes panelIn {
@@ -6677,6 +6680,25 @@ function attachResilientClickDelegation() {
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
     }
 
+    [data-theme="light"] .universal-sym-title,
+    [data-theme="light"] .universal-sym-ltp,
+    [data-theme="light"] #undSymbol,
+    [data-theme="light"] #undSubTitle,
+    [data-theme="light"] .wl-sym,
+    [data-theme="ivory"] .universal-sym-title,
+    [data-theme="ivory"] .universal-sym-ltp,
+    [data-theme="ivory"] #undSymbol,
+    [data-theme="mint"] .universal-sym-title,
+    [data-theme="mint"] .universal-sym-ltp,
+    [data-theme="cream"] .universal-sym-title,
+    [data-theme="cream"] .universal-sym-ltp,
+    [data-theme="powder"] .universal-sym-title,
+    [data-theme="powder"] .universal-sym-ltp,
+    [data-theme="peach"] .universal-sym-title,
+    [data-theme="peach"] .universal-sym-ltp {
+      color: #0f172a !important;
+    }
+
     /* Removed CA Jarvis Section */
     #dashJarvisTopCard {
       display: none !important;
@@ -8389,7 +8411,7 @@ function attachResilientClickDelegation() {
     .universal-sym-title {
       font-size: 19px !important;
       font-weight: 800 !important;
-      color: #ffffff !important;
+      color: var(--text, #f1f5f9) !important;
       letter-spacing: 0.5px;
       white-space: nowrap;
     }
@@ -8398,7 +8420,7 @@ function attachResilientClickDelegation() {
       font-size: 19px !important;
       font-weight: 800 !important;
       font-family: var(--font-mono) !important;
-      color: #ffffff !important;
+      color: var(--text, #f1f5f9) !important;
       white-space: nowrap;
     }
 
@@ -8961,8 +8983,6 @@ function attachResilientClickDelegation() {
                 <span>Clear Cache</span>
               </button>
             </div>
-            <button class="btn ghost small" id="fitnessSwitchBtn"
-              style="margin-top:7px;width:100%;justify-content:center;display:none;">Switch to Fitness Tracker</button>
             <button class="btn ghost small" id="logoutBtn"
               style="margin-top:7px;width:100%;justify-content:center;color:var(--sell);">Logout</button>
           </div>
@@ -9264,7 +9284,7 @@ function attachResilientClickDelegation() {
               <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
                 <div>
                   <div style="font-weight:800;font-size:14px;color:var(--text);font-family:var(--font-mono);"
-                    id="undSymbol">NIFTY 50</div>
+                    id="undSymbol">BANKNIFTY</div>
                   <div style="font-size:10px;color:var(--text-dim);" id="undSubTitle">Underlying Spot / Cash</div>
                 </div>
                 <span id="undCmp" style="display:none;"></span>
@@ -19210,9 +19230,62 @@ function attachResilientClickDelegation() {
       }
       document.getElementById('wlAtOnlyFilter')?.addEventListener('change', () => { void R(); });
 
+      // High-Speed Section Preloader: loads all sections in background non-blockingly for 0ms transitions
+      window.__caPreloadedSections = window.__caPreloadedSections || {};
+      window.__caOptionChainCache = window.__caOptionChainCache || {};
+      window.__caFundamentalsCache = window.__caFundamentalsCache || {};
+      window.__caNewsCache = window.__caNewsCache || {};
+
+      async function preloadAllSymbolSections(sym) {
+        if (!sym) return;
+        const cleanRoot = String(sym).replace(/FUT|EXP|\d+/g, '').trim().toUpperCase() || 'BANKNIFTY';
+        const cacheKey = cleanRoot;
+        if (window.__caPreloadedSections[cacheKey] && (Date.now() - window.__caPreloadedSections[cacheKey] < 30000)) return;
+        window.__caPreloadedSections[cacheKey] = Date.now();
+
+        const runner = window.requestIdleCallback || ((cb) => setTimeout(cb, 60));
+        runner(() => {
+          // 1. Preload Options Chain & Expiries
+          A('/api/options/' + encodeURIComponent(cleanRoot) + '/expiries', { timeoutMs: 8000 }).then(ex => {
+            if (ex && Array.isArray(ex.expiries) && ex.expiries[0]) {
+              return A('/api/options/' + encodeURIComponent(cleanRoot) + '/chain?expiry=' + encodeURIComponent(ex.expiries[0]), { timeoutMs: 8000 }).then(ch => {
+                window.__caOptionChainCache[cleanRoot] = { expiries: ex.expiries, chain: ch, expiry: ex.expiries[0], ts: Date.now() };
+              });
+            }
+          }).catch(() => {});
+
+          // 2. Preload Fundamentals
+          api('/api/analysis/fundamental/' + encodeURIComponent(cleanRoot)).then(d => {
+            if (d) {
+              d._sym = cleanRoot;
+              d._ts = Date.now();
+              window.__caFundamentalsCache[cleanRoot] = d;
+            }
+          }).catch(() => {});
+
+          // 3. Preload News Feed
+          api(`/api/news/ca-ai-feed?symbol=${encodeURIComponent(cleanRoot)}&mode=all`, { timeoutMs: 8000 }).then(d => {
+            if (d && Array.isArray(d.items)) {
+              window.__caNewsCache[cleanRoot] = d;
+            }
+          }).catch(() => {});
+
+          // 4. Preload Recommendation History
+          if (typeof window.loadRecommendationHistory === 'function') {
+            window.loadRecommendationHistory(cleanRoot).catch(() => {});
+          }
+
+          // 5. Pre-warm macro factors
+          if (typeof window.loadMacroFactors === 'function') {
+            window.loadMacroFactors();
+          }
+        });
+      }
+
       async function onSymbolChanged(sym) {
         S = sym || ''; window.CATraderSymbol = S; selectionSeq++; const localSeq = selectionSeq;
         window.__CA_SELECTED_SYMBOL = S;
+        try { localStorage.setItem('ca_selected_symbol', S); } catch (_) {}
         state.candles = [];
         state.highlightedPattern = null;
         state.panX = 0;
@@ -19257,6 +19330,7 @@ function attachResilientClickDelegation() {
         if (typeof window.updateAllSectionHeaders === 'function') {
           window.updateAllSectionHeaders(cleanRoot);
         }
+        void preloadAllSymbolSections(cleanRoot);
         if (typeof window.loadRecommendationHistory === 'function') {
           void window.loadRecommendationHistory(cleanRoot);
         }
@@ -19340,8 +19414,27 @@ function attachResilientClickDelegation() {
       let __selectionRefreshTimer = null; async function refreshSelectionDependent() { clearTimeout(__selectionRefreshTimer); __selectionRefreshTimer = setTimeout(() => { const tab = document.querySelector('.navtab.active')?.dataset.tab; if (tab === 'news') { APP_CACHE.newsStock = null; APP_CACHE.newsGlobal = null; tabLoadedAt.delete('news'); void loadNews(newsMode) } else if (tab === 'charts') { void (window.loadDepth || (typeof loadDepth === 'function' ? loadDepth : null))?.(); void (window.CATraderAnalysis?.loadChart?.() || Promise.resolve()) } }, 150); }
       async function W0(selectId = null) {
         try {
+          const cachedW = localStorage.getItem('ca_cached_watchlists');
+          if (cachedW) {
+            const parsed = JSON.parse(cachedW);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              W = parsed;
+              const s = document.getElementById('watchlistSelect');
+              if (s) s.innerHTML = W.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join('');
+              G = W.find(w => w.id === (selectId || G?.id)) || W[0] || null;
+              if (G && G.items && G.items.length) {
+                const saved = localStorage.getItem('ca_selected_symbol');
+                S = (saved && G.items.some(i => i.symbol === saved)) ? saved : G.items[0].symbol;
+                window.CATraderSymbol = S;
+              }
+            }
+          }
+        } catch (_) { }
+
+        try {
           const d = await A('/api/watchlists');
           W = d.items || [];
+          try { localStorage.setItem('ca_cached_watchlists', JSON.stringify(W)); } catch (_) { }
           const s = document.getElementById('watchlistSelect');
           if (s) s.innerHTML = W.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join('');
           G = W.find(w => w.id === (selectId || G?.id)) || W[0] || null;
@@ -19357,8 +19450,8 @@ function attachResilientClickDelegation() {
           }
           if (!G.items || !G.items.length) {
             G.items = [
-              { symbol: 'NIFTY', exchange: 'NSE', instrument_type: 'INDEX' },
               { symbol: 'BANKNIFTY', exchange: 'NSE', instrument_type: 'INDEX' },
+              { symbol: 'NIFTY', exchange: 'NSE', instrument_type: 'INDEX' },
               { symbol: 'CRUDEOIL', exchange: 'MCX', instrument_type: 'FUT' },
               { symbol: 'RELIANCE', exchange: 'NSE', instrument_type: 'EQ' },
               { symbol: 'TCS', exchange: 'NSE', instrument_type: 'EQ' }
@@ -19366,12 +19459,13 @@ function attachResilientClickDelegation() {
           }
         }
         if (G?.items?.length) {
-          // Requirement 1: First item in user's watchlist is selected and opened on startup
-          S = G.items[0].symbol;
+          const savedSym = localStorage.getItem('ca_selected_symbol');
+          S = (savedSym && G.items.some(it => it.symbol === savedSym)) ? savedSym : G.items[0].symbol;
         } else {
           S = 'BANKNIFTY';
         }
         window.CATraderSymbol = S;
+        try { localStorage.setItem('ca_selected_symbol', S); } catch (_) { }
         const s = document.getElementById('watchlistSelect');
         if (s) s.value = G?.id || '';
         try { await R(); } catch (e) { console.warn('Render watchlist error:', e); }
@@ -19565,8 +19659,6 @@ function attachResilientClickDelegation() {
 
           const resetBtn = $('resetFundsBtn');
           if (resetBtn) resetBtn.style.display = isAdmin ? 'inline-block' : 'none';
-          const fs = $('fitnessSwitchBtn');
-          if (fs) fs.style.display = isAdmin ? 'flex' : 'none';
         } catch (_) { }
       }
 
@@ -19593,7 +19685,6 @@ function attachResilientClickDelegation() {
       });
       document.getElementById('userChip')?.addEventListener('click', e => { if (e.target.closest('.user-menu')) return; document.getElementById('userMenu')?.classList.toggle('open') });
       document.getElementById('profileDetailsBtn')?.addEventListener('click', () => { document.getElementById('profileModal')?.classList.add('open'); document.getElementById('profileModal')?.setAttribute('aria-hidden', 'false') });
-      document.getElementById('fitnessSwitchBtn')?.addEventListener('click', async () => { try { await A('/api/auth/select-terminal', { method: 'POST', body: JSON.stringify({ terminal: 'fitness' }) }); location.href = '/fitness' } catch (e) { toast(e.message) } });
       document.getElementById('profileModalClose')?.addEventListener('click', () => closeModal('profileModal'));
       document.getElementById('profileSaveBtn')?.addEventListener('click', async () => { const n = document.getElementById('profileNameInput')?.value?.trim(); if (!n) return; try { await A('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({ full_name: n }) }); await loadProfile(); closeModal('profileModal'); document.getElementById('userMenu')?.classList.remove('open') } catch (e) { toast(e.message) } });
 
@@ -19601,7 +19692,7 @@ function attachResilientClickDelegation() {
       let optionState = { expiry: null, chain: null };
       let optChainMode = 'oi'; // 'oi' or 'greeks'
       async function loadOptions() {
-        if (!S) S = window.CATraderSymbol || 'NIFTY';
+        if (!S) S = window.CATraderSymbol || localStorage.getItem('ca_selected_symbol') || 'BANKNIFTY';
         try {
           const underSym = extractUnderlying(S);
           const isMcx = /CRUDE|GOLD|SILVER|NATURALGAS|COPPER|ZINC|LEAD|NICKEL|ALUMINIUM/.test(String(underSym).toUpperCase()) || F === 'mcx';
@@ -19615,10 +19706,18 @@ function attachResilientClickDelegation() {
           updateOptionHeader(q);
           if (document.getElementById('optionsProviderStatus')) document.getElementById('optionsProviderStatus').textContent = 'Loading live option chain…';
           let expiries = [];
-          try {
-            const ex = await A('/api/options/' + encodeURIComponent(underSym) + '/expiries', { timeoutMs: 12000 });
-            expiries = ex.expiries || [];
-          } catch (_) { }
+          if (window.__caOptionChainCache && window.__caOptionChainCache[underSym] && Array.isArray(window.__caOptionChainCache[underSym].expiries)) {
+            expiries = window.__caOptionChainCache[underSym].expiries;
+            if (!optionState.chain && window.__caOptionChainCache[underSym].chain) {
+              optionState.chain = window.__caOptionChainCache[underSym].chain;
+            }
+          }
+          if (!expiries.length) {
+            try {
+              const ex = await A('/api/options/' + encodeURIComponent(underSym) + '/expiries', { timeoutMs: 12000 });
+              expiries = ex.expiries || [];
+            } catch (_) { }
+          }
           if (!optionState.expiry) optionState.expiry = expiries[0] || 'current_week';
 
           // Render Zerodha-style expiry pills
@@ -20219,7 +20318,7 @@ function attachResilientClickDelegation() {
           if (s) s.innerHTML = `<option value="1">Default</option>`;
           window.__CA_WATCHLIST_GROUP = G;
         }
-        if (!S) S = 'NIFTY';
+        if (!S) S = localStorage.getItem('ca_selected_symbol') || 'BANKNIFTY';
         void R();
         void onSymbolChanged(S);
       } catch (e) { console.warn('[CA Trader init] default state:', e); }
@@ -20796,13 +20895,18 @@ async function refreshWatchlistQuotes() {
         if ($('newsStockTab')) $('newsStockTab').textContent = `${sym} Impact`;
 
         // Stale-While-Revalidate: render cached news instantly at 0ms
-        if (Array.isArray(window.__caCurrentNewsItems) && window.__caCurrentNewsItems.length > 0) {
+        if (!window.__caNewsCache) window.__caNewsCache = {};
+        if (window.__caNewsCache[sym] && Array.isArray(window.__caNewsCache[sym].items) && window.__caNewsCache[sym].items.length > 0) {
+          window.__caCurrentNewsItems = window.__caNewsCache[sym].items;
+          renderCaAiNewsList(window.__caCurrentNewsItems, { updated_at: 'Preloaded' }, sym, host);
+        } else if (Array.isArray(window.__caCurrentNewsItems) && window.__caCurrentNewsItems.length > 0) {
           renderCaAiNewsList(window.__caCurrentNewsItems, { updated_at: 'Instant cache' }, sym, host);
         }
 
         try {
           const d = await api(`/api/news/ca-ai-feed?symbol=${encodeURIComponent(sym)}&mode=${encodeURIComponent(mode)}`, { timeoutMs: 12000 });
-          let rawItems = Array.isArray(d.items) ? d.items : [];
+          if (d && Array.isArray(d.items)) { window.__caNewsCache[sym] = d; }
+          let rawItems = Array.isArray(d?.items) ? d.items : [];
           let dismissedKeys = [];
           try { dismissedKeys = JSON.parse(localStorage.getItem('ca_dismissed_news') || '[]'); } catch (_) { }
 
@@ -21004,7 +21108,27 @@ async function refreshWatchlistQuotes() {
           }).join('');
         }
       }
-      async function loadFundamentals() { try { const und = extractUnderlying(selectedSymbol()); const d = await api('/api/analysis/fundamental/' + encodeURIComponent(und)); APP_CACHE.fundamentals = d; renderFundamentals(d); $('fundamentalSubtitle').textContent = `${d.available ? 'Live / internet fallback data' : d.data_quality?.indices ? 'Index · equity ratios not applicable' : 'Data unavailable'} · ${formatTime(d.timestamp)}` } catch (e) { $('fundamentalSignal').innerHTML = `<div class="data-empty">${esc(e.message)}</div>` } }
+      async function loadFundamentals() {
+        try {
+          const und = extractUnderlying(selectedSymbol());
+          if (window.__caFundamentalsCache && window.__caFundamentalsCache[und] && (Date.now() - (window.__caFundamentalsCache[und]._ts || 0) < 60000)) {
+            const d = window.__caFundamentalsCache[und];
+            APP_CACHE.fundamentals = d;
+            renderFundamentals(d);
+            $('fundamentalSubtitle').textContent = `${d.available ? 'Live / internet fallback data' : d.data_quality?.indices ? 'Index · equity ratios not applicable' : 'Data unavailable'} · ${formatTime(d.timestamp)}`;
+            return;
+          }
+          const d = await api('/api/analysis/fundamental/' + encodeURIComponent(und));
+          d._ts = Date.now();
+          if (!window.__caFundamentalsCache) window.__caFundamentalsCache = {};
+          window.__caFundamentalsCache[und] = d;
+          APP_CACHE.fundamentals = d;
+          renderFundamentals(d);
+          $('fundamentalSubtitle').textContent = `${d.available ? 'Live / internet fallback data' : d.data_quality?.indices ? 'Index · equity ratios not applicable' : 'Data unavailable'} · ${formatTime(d.timestamp)}`;
+        } catch (e) {
+          $('fundamentalSignal').innerHTML = `<div class="data-empty">${esc(e.message)}</div>`;
+        }
+      }
       $('refreshFundamentalsBtn')?.addEventListener('click', loadFundamentals);
 
       // ---------------- Market influences (Item 34) ----------------
