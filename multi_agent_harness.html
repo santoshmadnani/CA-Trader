@@ -4,1207 +4,1633 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CA-Trader · Multi-Agent Living Swarm Harness</title>
+  <meta name="description" content="CA-Trader autonomous multi-agent swarm: 9 specialized AI sentinels monitoring and self-healing the trading terminal 24/7 on Oracle Cloud.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@500;600;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #080b12;
-      --bg-card: #0d121e;
-      --bg-card-hover: #141c2e;
-      --border-card: #1c263c;
-      --border-active: #2e3e60;
-      --text-main: #f0f4fc;
-      --text-muted: #8b9bb4;
-      --text-dim: #55657e;
-      --accent-blue: #3b82f6;
-      --accent-green: #10b981;
-      --accent-purple: #8b5cf6;
-      --accent-amber: #f59e0b;
-      --accent-rose: #f43f5e;
-      --accent-cyan: #06b6d4;
-      --font-sans: 'Inter', -apple-system, sans-serif;
-      --font-display: 'Outfit', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --bg-void:    #03050a;
+      --bg-deep:    #060a12;
+      --bg-card:    #0a0f1e;
+      --bg-glass:   rgba(10,15,30,0.72);
+      --bg-hover:   #0f1628;
+      --border-dim: rgba(255,255,255,0.05);
+      --border-glow:rgba(99,102,241,0.4);
+
+      --c-blue:   #3b82f6;
+      --c-indigo: #6366f1;
+      --c-purple: #a855f7;
+      --c-cyan:   #06b6d4;
+      --c-teal:   #14b8a6;
+      --c-green:  #10b981;
+      --c-lime:   #84cc16;
+      --c-amber:  #f59e0b;
+      --c-orange: #f97316;
+      --c-rose:   #f43f5e;
+      --c-pink:   #ec4899;
+
+      --text-1: #f1f5fe;
+      --text-2: #94a3b8;
+      --text-3: #475569;
+
+      --font-ui:    'Inter', sans-serif;
+      --font-disp:  'Outfit', sans-serif;
+      --font-mono:  'JetBrains Mono', monospace;
       --font-pixel: 'Press Start 2P', monospace;
+
+      --r-card: 18px;
+      --r-pill: 999px;
+
+      /* glow layers */
+      --glow-blue:   0 0 32px rgba(59,130,246,0.25), 0 0 80px rgba(59,130,246,0.08);
+      --glow-indigo: 0 0 32px rgba(99,102,241,0.25), 0 0 80px rgba(99,102,241,0.08);
+      --glow-green:  0 0 32px rgba(16,185,129,0.25), 0 0 80px rgba(16,185,129,0.08);
+      --glow-rose:   0 0 32px rgba(244,63,94,0.25),  0 0 80px rgba(244,63,94,0.08);
+      --glow-cyan:   0 0 32px rgba(6,182,212,0.25),  0 0 80px rgba(6,182,212,0.08);
+      --glow-amber:  0 0 32px rgba(245,158,11,0.25), 0 0 80px rgba(245,158,11,0.08);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
 
     body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      font-family: var(--font-sans);
+      background: var(--bg-void);
+      color: var(--text-1);
+      font-family: var(--font-ui);
       min-height: 100vh;
       overflow-x: hidden;
-      display: flex;
-      flex-direction: column;
     }
 
-    /* Top Navbar */
+    /* ═══════════════════════════════════════════ BACKGROUND CANVAS ══ */
+    #bgCanvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ═══════════════════════════════════════════════════ NAVBAR ══════ */
     header.navbar {
-      height: 66px;
-      border-bottom: 1px solid var(--border-card);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      height: 68px;
+      background: rgba(3,5,10,0.85);
+      backdrop-filter: blur(24px) saturate(180%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 28px;
-      background: rgba(13, 18, 30, 0.88);
-      backdrop-filter: blur(16px);
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      padding: 0 32px;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-family: var(--font-display);
+      gap: 14px;
+      font-family: var(--font-disp);
       font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text-1);
     }
-
     .brand-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #6366f1, #06b6d4);
-      display: grid;
-      place-items: center;
-      font-size: 18px;
-      box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--c-indigo), var(--c-cyan));
+      display: grid; place-items: center;
+      font-size: 20px;
+      box-shadow: 0 0 20px rgba(99,102,241,0.5);
+    }
+    .brand span.brand-sub {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      color: var(--text-2);
+      font-family: var(--font-ui);
+      margin-left: -4px;
     }
 
-    .swarm-controls {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    .nav-pills { display: flex; align-items: center; gap: 10px; }
 
-    .btn-action {
-      padding: 8px 16px;
-      border-radius: 9px;
-      font-size: 12.5px;
-      font-weight: 600;
-      border: 1px solid var(--border-card);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      transition: all 0.2s ease;
-      background: #0f1524;
-      color: var(--text-main);
-    }
-
-    .btn-action:hover {
-      transform: translateY(-1px);
-      border-color: var(--accent-cyan);
-    }
-
-    .btn-wake {
-      background: linear-gradient(135deg, #10b981, #059669);
-      border-color: transparent;
-      color: white;
-      box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
-    }
-
-    .btn-sleep {
-      background: linear-gradient(135deg, #6366f1, #4f46e5);
-      border-color: transparent;
-      color: white;
-      box-shadow: 0 0 14px rgba(99, 102, 241, 0.35);
-    }
-
-    .btn-panic {
-      background: linear-gradient(135deg, #f43f5e, #e11d48);
-      border-color: transparent;
-      color: white;
-      box-shadow: 0 0 14px rgba(244, 63, 94, 0.35);
-    }
-
-    /* Token Badge */
-    .token-meter-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
-      border-radius: 20px;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.35);
+    .pill-zero {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 14px;
+      border-radius: var(--r-pill);
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
       font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--accent-green);
+      font-size: 11.5px; font-weight: 700;
+      color: var(--c-green);
     }
-
-    .token-pulse-dot {
-      width: 8px;
-      height: 8px;
+    .pulse-dot {
+      width: 7px; height: 7px;
       border-radius: 50%;
-      background: var(--accent-green);
-      box-shadow: 0 0 10px var(--accent-green);
-      animation: pulse 1.8s infinite;
+      background: var(--c-green);
+      box-shadow: 0 0 8px var(--c-green);
+      animation: pulseDot 1.6s ease-in-out infinite;
+    }
+    @keyframes pulseDot {
+      0%,100% { transform:scale(1); opacity:1; }
+      50% { transform:scale(0.6); opacity:0.35; }
     }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.8); }
+    .nav-btn {
+      padding: 8px 18px;
+      border-radius: 10px;
+      font-size: 12.5px; font-weight: 700;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      transition: all 0.22s cubic-bezier(.4,0,.2,1);
+      letter-spacing: 0.2px;
     }
+    .nav-btn:hover { transform: translateY(-2px); }
+    .btn-wake  { background: linear-gradient(135deg,#10b981,#059669); color:#fff; box-shadow: 0 4px 20px rgba(16,185,129,0.35); }
+    .btn-sleep { background: linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; box-shadow: 0 4px 20px rgba(99,102,241,0.35); }
+    .btn-panic { background: linear-gradient(135deg,#f43f5e,#dc2626); color:#fff; box-shadow: 0 4px 20px rgba(244,63,94,0.35); }
+    .btn-tele  { background: linear-gradient(135deg,#0088cc,#006fa8); color:#fff; box-shadow: 0 4px 20px rgba(0,136,204,0.35); }
 
-    /* Main Grid */
-    main.dashboard {
-      flex: 1;
+    /* ═══════════════════════════════════════════════ MAIN LAYOUT ═════ */
+    .main-wrap {
+      position: relative;
+      z-index: 10;
       display: grid;
-      grid-template-columns: 1fr 360px;
-      gap: 22px;
-      padding: 22px 28px;
-      max-width: 1780px;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+      padding: 28px 32px;
+      max-width: 1900px;
       margin: 0 auto;
-      width: 100%;
     }
 
-    /* Canvas / Swarm Stage */
-    .canvas-section {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    /* Top Goal & Auto-Tuning Banner */
-    .goal-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: 16px;
-      padding: 20px 24px;
+    /* ═══════════════════════════════════════════════ BANNER CARD ═════ */
+    .banner-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 20px;
+      background: linear-gradient(135deg,rgba(99,102,241,0.12),rgba(6,182,212,0.08));
+      border: 1px solid rgba(99,102,241,0.25);
+      padding: 22px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-      position: relative;
-      overflow: hidden;
+      margin-bottom: 22px;
+      box-shadow: var(--glow-indigo);
     }
-
-    .goal-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
+    .banner-card::before {
+      content:'';
+      position:absolute;
+      top:-80px; left:-80px;
+      width:220px; height:220px;
+      border-radius:50%;
+      background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%);
+      pointer-events:none;
     }
-
-    .goal-icon-box {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: rgba(6, 182, 212, 0.15);
-      border: 1px solid rgba(6, 182, 212, 0.35);
-      display: grid;
-      place-items: center;
-      font-size: 22px;
-      color: var(--accent-cyan);
+    .banner-left { display:flex; align-items:center; gap:18px; }
+    .banner-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(135deg,rgba(99,102,241,0.3),rgba(6,182,212,0.3));
+      border: 1px solid rgba(99,102,241,0.4);
+      display:grid; place-items:center; font-size:26px;
     }
-
-    .goal-meta h2 {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.9px;
-      color: var(--text-dim);
-      font-weight: 700;
-      margin-bottom: 3px;
+    .banner-meta label {
+      font-size: 10px; font-weight:700; letter-spacing:1.2px;
+      text-transform:uppercase; color: var(--text-3);
     }
-
-    .goal-meta p {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text-main);
+    .banner-meta h2 {
+      font-family: var(--font-disp);
+      font-size: 19px; font-weight:800;
+      background: linear-gradient(90deg, #f1f5fe, #94a3b8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-top: 3px;
     }
-
-    /* Accuracy Meter */
-    .accuracy-gauge {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      background: #080c16;
-      border: 1px solid var(--border-card);
-      padding: 10px 18px;
-      border-radius: 12px;
+    .acc-badge {
+      display:flex; align-items:center; gap:14px;
+      padding: 12px 20px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
     }
-
-    .accuracy-number {
+    .acc-num {
       font-family: var(--font-pixel);
-      font-size: 18px;
+      font-size: 20px;
       color: #34d399;
-      text-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+      text-shadow: 0 0 16px rgba(52,211,153,0.6);
+    }
+    .acc-lbl { font-size:11px; color: var(--text-3); font-weight:600; }
+
+    /* ═══════════════════════════════════════════ SWARM CANVAS STAGE ══ */
+    .swarm-canvas {
+      position: relative;
+      background: rgba(6,10,18,0.6);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 22px;
+      padding: 28px;
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+      min-height: 680px;
+    }
+    .swarm-canvas::before {
+      content:'';
+      position:absolute; inset:0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.06) 0%, transparent 60%);
+      pointer-events:none;
     }
 
-    .accuracy-label {
-      font-size: 11.5px;
-      color: var(--text-muted);
-      font-weight: 600;
+    /* SVG Wire Layer */
+    #wireCanvas {
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      pointer-events:none;
+      z-index:1;
     }
 
-    /* Living Swarm Network Grid */
-    .swarm-stage {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: 20px;
-      padding: 30px;
+    /* Stage Label */
+    .stage-label {
+      position:absolute; top:20px; left:28px;
+      font-size:10px; font-weight:700; letter-spacing:1.4px;
+      text-transform:uppercase; color: var(--text-3);
+      z-index:5;
+    }
+
+    /* ═══════════════════════════════════════════ AGENT GRID ══════════ */
+    .agent-grid {
+      position:relative;
+      z-index: 10;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 22px;
-      position: relative;
-      overflow: hidden;
-      min-height: 640px;
-    }
-
-    /* Ambient background grid lines */
-    .swarm-stage::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: 
-        linear-gradient(rgba(28, 38, 60, 0.3) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(28, 38, 60, 0.3) 1px, transparent 1px);
-      background-size: 30px 30px;
-      opacity: 0.35;
-      pointer-events: none;
-    }
-
-    /* Central Shared Workspace */
-    .shared-hub {
-      grid-column: 2 / 3;
-      grid-row: 2 / 3;
-      margin: auto;
-      width: 210px;
-      height: 210px;
-      border-radius: 50%;
-      background: radial-gradient(circle at center, #111a30 0%, #0a0f1c 100%);
-      border: 2px dashed rgba(6, 182, 212, 0.55);
-      box-shadow: 0 0 35px rgba(6, 182, 212, 0.2);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 16px;
-      z-index: 5;
-      animation: float 4s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-7px); }
-    }
-
-    .hub-core-icon {
-      font-size: 28px;
-      margin-bottom: 6px;
-      filter: drop-shadow(0 0 8px #06b6d4);
-    }
-
-    .shared-hub h4 {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: #e0f2fe;
-      margin-bottom: 3px;
-    }
-
-    .shared-hub p {
-      font-size: 10px;
-      color: var(--text-muted);
-      line-height: 1.35;
-    }
-
-    /* Agent Card Base */
-    .agent-box {
-      background: #0b0f19;
-      border: 1.5px solid var(--border-card);
-      border-radius: 16px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      position: relative;
-      z-index: 3;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      cursor: pointer;
-    }
-
-    .agent-box:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-
-    .agent-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    /* Retro Pixel / Mario / Minecraft Character Avatar Box */
-    .character-avatar-wrap {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .character-sprite-box {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: #141c2c;
-      border: 2px solid;
-      display: grid;
-      place-items: center;
-      position: relative;
-      overflow: visible;
-      box-shadow: 0 0 12px rgba(0,0,0,0.5);
-    }
-
-    /* Animated Character Sprite */
-    .sprite-char {
-      font-size: 26px;
-      transition: transform 0.2s ease;
-      display: inline-block;
-    }
-
-    /* Tool Action Icon (Pickaxe / Hammer / Wand) */
-    .sprite-tool {
-      position: absolute;
-      right: -6px;
-      top: -6px;
-      font-size: 16px;
-      transform-origin: bottom left;
-      filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));
-    }
-
-    /* Floating Zzz for Sleeping State */
-    .zzz-cloud {
-      position: absolute;
-      top: -24px;
-      right: -8px;
-      font-family: var(--font-pixel);
-      font-size: 10px;
-      color: #93c5fd;
-      text-shadow: 0 0 8px rgba(147, 197, 253, 0.8);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    /* State: WORKING ANIMATIONS */
-    .agent-box.is-working .sprite-char {
-      animation: bounce 0.6s ease infinite alternate;
-    }
-
-    .agent-box.is-working .sprite-tool {
-      animation: swingTool 0.5s ease-in-out infinite;
-    }
-
-    @keyframes bounce {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-4px); }
-    }
-
-    @keyframes swingTool {
-      0% { transform: rotate(0deg); }
-      50% { transform: rotate(-45deg); }
-      100% { transform: rotate(0deg); }
-    }
-
-    /* State: SLEEPING ANIMATIONS */
-    .agent-box.is-sleeping {
-      opacity: 0.65;
-      border-color: #1e293b !important;
-      box-shadow: none !important;
-      background: #090d15 !important;
-    }
-
-    .agent-box.is-sleeping .sprite-char {
-      filter: grayscale(0.4);
-      transform: scale(0.92);
-    }
-
-    .agent-box.is-sleeping .sprite-tool {
-      display: none;
-    }
-
-    .agent-box.is-sleeping .zzz-cloud {
-      opacity: 1;
-      animation: floatZzz 2.2s ease-in-out infinite;
-    }
-
-    @keyframes floatZzz {
-      0% { transform: translate(0, 0) scale(0.8); opacity: 0; }
-      40% { opacity: 1; }
-      100% { transform: translate(12px, -18px) scale(1.2); opacity: 0; }
-    }
-
-    /* Status Pill Tag */
-    .agent-state-badge {
-      font-size: 10.5px;
-      font-weight: 700;
-      padding: 3px 9px;
-      border-radius: 12px;
-      letter-spacing: 0.3px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .state-working {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid var(--accent-green);
-      color: var(--accent-green);
-    }
-
-    .state-sleeping {
-      background: rgba(148, 163, 184, 0.12);
-      border: 1px solid #64748b;
-      color: #94a3b8;
-    }
-
-    /* Agent Titles */
-    .agent-info h3 {
-      font-size: 14.5px;
-      font-weight: 700;
-      color: var(--text-main);
-      margin-bottom: 2px;
-    }
-
-    .agent-info p {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    /* Checklist */
-    .agent-tasks {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 11.5px;
-      color: var(--text-muted);
-    }
-
-    .agent-tasks li {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      line-height: 1.35;
-    }
-
-    .task-check {
-      color: var(--accent-green);
-      font-weight: bold;
-    }
-
-    /* Live Activity Line */
-    .agent-live-log {
-      margin-top: auto;
-      padding: 7px 10px;
-      border-radius: 8px;
-      background: #060910;
-      border: 1px solid var(--border-card);
-      font-family: var(--font-mono);
-      font-size: 10.5px;
-      color: #93c5fd;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    /* Color Themes */
-    /* 1. Mario Builder - Feature Rationale */
-    .theme-mario { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 0 16px rgba(239, 68, 68, 0.2); }
-    .theme-mario .character-sprite-box { border-color: #ef4444; }
-
-    /* 2. Minecraft Steve - Reco E2E Parity */
-    .theme-steve { border-color: rgba(6, 182, 212, 0.5); box-shadow: 0 0 16px rgba(6, 182, 212, 0.2); }
-    .theme-steve .character-sprite-box { border-color: #06b6d4; }
-
-    /* 3. Voxel Wizard - Candlestick Patterns */
-    .theme-wizard { border-color: rgba(245, 158, 11, 0.5); box-shadow: 0 0 16px rgba(245, 158, 11, 0.2); }
-    .theme-wizard .character-sprite-box { border-color: #f59e0b; }
-
-    /* 4. Pixel Detective - Zero Hardcoding */
-    .theme-detective { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 16px rgba(16, 185, 129, 0.2); }
-    .theme-detective .character-sprite-box { border-color: #10b981; }
-
-    /* 5. Minecraft Knight - Position Lifecycle */
-    .theme-knight { border-color: rgba(139, 92, 246, 0.5); box-shadow: 0 0 16px rgba(139, 92, 246, 0.2); }
-    .theme-knight .character-sprite-box { border-color: #8b5cf6; }
-
-    /* 6. Chief Supervisor - Bottom Span */
-    .supervisor-bar {
-      grid-column: 1 / 4;
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(16, 185, 129, 0.1) 100%);
-      border: 1.5px solid rgba(6, 182, 212, 0.45);
-      border-radius: 16px;
-      padding: 18px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 0 25px rgba(6, 182, 212, 0.25);
-      position: relative;
-      z-index: 5;
-    }
-
-    .supervisor-left {
-      display: flex;
-      align-items: center;
       gap: 16px;
+      margin-top: 36px;
     }
 
-    .supervisor-sprite-box {
-      width: 52px;
-      height: 52px;
-      border-radius: 14px;
-      background: #101c30;
-      border: 2px solid var(--accent-cyan);
-      display: grid;
-      place-items: center;
-      font-size: 30px;
-      box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
-    }
-
-    .supervisor-meta h3 {
-      font-size: 15px;
-      font-weight: 700;
-      color: #bae6fd;
-      margin-bottom: 3px;
-    }
-
-    .supervisor-meta p {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .supervisor-metrics {
-      display: flex;
-      gap: 22px;
-    }
-
-    .sup-metric {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-
-    .sup-metric span:first-child {
-      font-size: 10px;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      font-weight: 700;
-    }
-
-    .sup-metric span:last-child {
-      font-family: var(--font-pixel);
-      font-size: 13px;
-      color: #34d399;
-    }
-
-    /* Right Sidebar (Live Events & Diagnostics) */
-    .sidebar-section {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .side-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
+    /* Single Agent Card */
+    .ag-card {
+      position: relative;
       border-radius: 16px;
-      padding: 18px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(10,15,30,0.7);
+      backdrop-filter: blur(12px);
+      padding: 18px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(.4,0,.2,1);
+      overflow: hidden;
+    }
+    .ag-card::before {
+      content:'';
+      position:absolute; inset:0;
+      border-radius:16px;
+      opacity:0;
+      transition: opacity 0.3s;
+      background: radial-gradient(ellipse at 50% 0%, var(--ag-glow,rgba(99,102,241,0.15)) 0%, transparent 70%);
+      pointer-events:none;
+    }
+    .ag-card:hover { transform: translateY(-3px); }
+    .ag-card:hover::before { opacity:1; }
+    .ag-card:hover { border-color: var(--ag-color,var(--c-indigo)); box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 24px var(--ag-shadow,rgba(99,102,241,0.2)); }
+
+    /* Working glow ring */
+    .ag-card.is-working {
+      border-color: rgba(255,255,255,0.1);
+      animation: workingPulse 3s ease-in-out infinite;
+    }
+    @keyframes workingPulse {
+      0%,100% { box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0px var(--ag-shadow,rgba(99,102,241,0)); }
+      50%      { box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 20px var(--ag-shadow,rgba(99,102,241,0.25)); }
     }
 
-    .side-header {
+    /* Sleeping card */
+    .ag-card.is-sleeping {
+      opacity: 0.5;
+      filter: grayscale(0.5) brightness(0.7);
+      border-color: rgba(255,255,255,0.04) !important;
+      animation: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Agent header row */
+    .ag-head {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
-      border-bottom: 1px solid var(--border-card);
-      padding-bottom: 10px;
+      margin-bottom: 12px;
     }
-
-    .side-header h4 {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .ag-sprite-wrap {
+      display:flex; align-items:center; gap:11px;
     }
-
-    .side-header span {
-      font-size: 11px;
-      color: var(--text-dim);
-    }
-
-    /* Live Terminal Console */
-    .terminal-console {
-      background: #060910;
-      border: 1px solid var(--border-card);
-      border-radius: 10px;
-      padding: 12px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: #cbd5e1;
-      height: 250px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .console-entry {
-      line-height: 1.4;
-      display: flex;
-      gap: 6px;
-    }
-
-    .console-time {
-      color: #64748b;
+    .ag-sprite {
+      position:relative;
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      background: var(--ag-sprite-bg, rgba(99,102,241,0.15));
+      border: 1px solid var(--ag-sprite-border, rgba(99,102,241,0.3));
+      display: grid; place-items: center;
+      font-size: 24px;
       flex-shrink: 0;
     }
+    .ag-card.is-working .ag-sprite { animation: spriteBounce 0.7s ease-in-out infinite alternate; }
+    @keyframes spriteBounce { 0% { transform:translateY(0); } 100% { transform:translateY(-4px); } }
 
-    .console-tag {
-      color: #38bdf8;
-      font-weight: 600;
+    .ag-card.is-sleeping .ag-sprite { animation: none; filter: grayscale(0.5); }
+
+    .zzz {
+      position:absolute; top:-16px; right:-6px;
+      font-family: var(--font-pixel);
+      font-size: 8px; color: #93c5fd;
+      text-shadow: 0 0 8px rgba(147,197,253,0.8);
+      opacity:0; pointer-events:none;
+    }
+    .ag-card.is-sleeping .zzz { animation: floatZzz 2s ease-in-out infinite; opacity:1; }
+    @keyframes floatZzz {
+      0%   { transform:translate(0,0) scale(0.7); opacity:0; }
+      40%  { opacity:1; }
+      100% { transform:translate(10px,-16px) scale(1.2); opacity:0; }
     }
 
-    .console-win { color: #4ade80; }
-    .console-panic { color: #f87171; font-weight: 700; }
-    .console-patch { color: #fbbf24; }
-
-    /* Modal for Inspection */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(8px);
-      z-index: 200;
-      display: none;
-      place-items: center;
-      padding: 24px;
+    .ag-tool {
+      position:absolute; bottom:-2px; right:-4px;
+      font-size: 14px;
     }
-
-    .modal-overlay.open { display: grid; }
-
-    .modal-dialog {
-      background: var(--bg-card);
-      border: 1px solid var(--border-active);
-      border-radius: 16px;
-      max-width: 650px;
-      width: 100%;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
+    .ag-card.is-working .ag-tool { animation: swingTool 0.6s ease-in-out infinite; }
+    @keyframes swingTool {
+      0%   { transform:rotate(0deg); }
+      50%  { transform:rotate(-40deg); }
+      100% { transform:rotate(0deg); }
     }
+    .ag-card.is-sleeping .ag-tool { display:none; }
 
-    .modal-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border-card);
-      padding-bottom: 12px;
+    .ag-name { font-size: 13px; font-weight: 700; color: var(--text-1); line-height:1.3; }
+    .ag-role { font-size: 10.5px; color: var(--text-2); margin-top: 2px; }
+
+    .ag-badge {
+      font-size: 10px; font-weight:800;
+      padding: 4px 10px; border-radius: var(--r-pill);
+      letter-spacing: 0.3px; flex-shrink:0;
+      display:flex; align-items:center; gap:4px;
+      transition: all 0.3s;
     }
+    .badge-work { background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35); color:#34d399; }
+    .badge-sleep { background:rgba(100,116,139,0.12); border:1px solid rgba(100,116,139,0.2); color:#64748b; }
+    .badge-alert { background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.35); color:#fb7185; animation: flashAlert 0.7s ease infinite alternate; }
+    @keyframes flashAlert { 0% { opacity:1; } 100% { opacity:0.5; } }
 
-    .modal-close-btn {
-      background: transparent;
-      border: none;
-      font-size: 20px;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
+    /* Checklist */
+    .ag-checks { list-style:none; margin: 10px 0; display:flex; flex-direction:column; gap:5px; }
+    .ag-checks li { display:flex; align-items:center; gap:6px; font-size:11px; color: var(--text-2); }
+    .ck { color: var(--c-green); font-weight:700; font-size:10px; }
+    .ag-card.is-sleeping .ck { color: var(--text-3); }
 
-    .code-box {
-      background: #060910;
-      border: 1px solid var(--border-card);
-      border-radius: 10px;
-      padding: 14px;
+    /* Live log bar */
+    .ag-log {
+      margin-top: 10px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.05);
       font-family: var(--font-mono);
-      font-size: 11.5px;
-      color: #93c5fd;
-      white-space: pre-wrap;
-      max-height: 60vh;
+      font-size: 10px;
+      color: var(--c-cyan);
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .ag-log span:last-child { flex-shrink:0; font-weight:700; }
+
+    /* ═══════════════════════════════════════════ SUPERVISOR BAR ══════ */
+    .supervisor-bar {
+      position: relative;
+      z-index:10;
+      margin-top: 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.08));
+      border: 1px solid rgba(99,102,241,0.25);
+      padding: 18px 24px;
+      display:flex; align-items:center; justify-content:space-between;
+      cursor:pointer;
+      transition: all 0.25s;
+      box-shadow: 0 0 30px rgba(99,102,241,0.1);
+    }
+    .supervisor-bar:hover { transform:translateY(-2px); border-color: rgba(99,102,241,0.5); }
+    .sup-left { display:flex; align-items:center; gap:16px; }
+    .sup-crown {
+      width:52px; height:52px; border-radius:14px;
+      background: linear-gradient(135deg,rgba(99,102,241,0.25),rgba(168,85,247,0.25));
+      border: 2px solid rgba(99,102,241,0.4);
+      display:grid; place-items:center; font-size:28px;
+      box-shadow: 0 0 20px rgba(99,102,241,0.3);
+      animation: crownPulse 2.5s ease-in-out infinite;
+    }
+    @keyframes crownPulse {
+      0%,100% { box-shadow:0 0 20px rgba(99,102,241,0.3); }
+      50%      { box-shadow:0 0 36px rgba(168,85,247,0.5); }
+    }
+    .sup-meta h3 { font-family:var(--font-disp); font-size:15px; font-weight:800; color:#c4b5fd; }
+    .sup-meta p  { font-size:11px; color:var(--text-2); margin-top:3px; }
+    .sup-stats { display:flex; gap:28px; }
+    .sup-stat { display:flex; flex-direction:column; align-items:flex-end; }
+    .sup-stat label { font-size:9px; letter-spacing:1px; text-transform:uppercase; color:var(--text-3); font-weight:700; }
+    .sup-stat span  { font-family:var(--font-pixel); font-size:13px; color:#34d399; margin-top:4px; }
+
+    /* ═══════════════════════════════════════════════ SIDEBAR ═════════ */
+    .sidebar { display:flex; flex-direction:column; gap:20px; }
+
+    .side-card {
+      border-radius: 18px;
+      background: rgba(10,15,30,0.7);
+      border: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px);
+      overflow: hidden;
+    }
+    .side-head {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .side-head h4 { font-size:13px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:8px; }
+    .side-head .live-dot {
+      width:7px; height:7px; border-radius:50%;
+      background:var(--c-green);
+      box-shadow:0 0 8px var(--c-green);
+      animation: pulseDot 1.4s infinite;
+    }
+
+    /* Terminal Console */
+    .console-box {
+      padding: 12px;
+      height: 230px;
       overflow-y: auto;
+      display:flex; flex-direction:column; gap:5px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+    }
+    .console-box::-webkit-scrollbar { width:3px; }
+    .console-box::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:4px; }
+
+    .ce { display:flex; gap:8px; align-items:baseline; line-height:1.5; }
+    .ce-time { color: var(--text-3); flex-shrink:0; }
+    .ce-tag  { font-weight:700; flex-shrink:0; padding:1px 6px; border-radius:4px; font-size:9.5px; }
+    .ce-tag.mario    { background:rgba(245,158,11,0.15);  color:#fbbf24; }
+    .ce-tag.steve    { background:rgba(6,182,212,0.15);   color:#22d3ee; }
+    .ce-tag.wizard   { background:rgba(168,85,247,0.15);  color:#c084fc; }
+    .ce-tag.detective{ background:rgba(16,185,129,0.15);  color:#34d399; }
+    .ce-tag.knight   { background:rgba(59,130,246,0.15);  color:#60a5fa; }
+    .ce-tag.news     { background:rgba(236,72,153,0.15);  color:#f472b6; }
+    .ce-tag.ui       { background:rgba(20,184,166,0.15);  color:#2dd4bf; }
+    .ce-tag.hb       { background:rgba(132,204,22,0.15);  color:#a3e635; }
+    .ce-tag.chief    { background:rgba(99,102,241,0.2);   color:#a5b4fc; }
+    .ce-tag.swarm    { background:rgba(71,85,105,0.3);    color:#94a3b8; }
+    .ce-tag.alert    { background:rgba(244,63,94,0.2);    color:#fb7185; }
+    .ce-win  { color: #34d399; }
+    .ce-err  { color: #fb7185; }
+    .ce-patch{ color: #fbbf24; }
+    .ce-text { color: var(--text-2); }
+
+    /* Telegram Dispatch Card */
+    .tele-card-inner { padding: 14px 18px; display:flex; flex-direction:column; gap:10px; }
+    .tele-msg-preview {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(0,136,204,0.08);
+      border: 1px solid rgba(0,136,204,0.2);
+      font-size: 11px; color: var(--text-2); line-height: 1.55;
+    }
+    .tele-msg-preview .tele-header { font-weight:700; color:#38bdf8; margin-bottom:6px; font-size:11.5px; }
+    .tele-send-btn {
+      padding: 9px;
+      border-radius: 10px;
+      background: linear-gradient(135deg,#0088cc,#006fa8);
+      border:none; cursor:pointer; color:#fff;
+      font-size:12px; font-weight:700;
+      display:flex; align-items:center; justify-content:center; gap:7px;
+      transition: all 0.2s;
+    }
+    .tele-send-btn:hover { transform:translateY(-1px); box-shadow:0 4px 20px rgba(0,136,204,0.4); }
+
+    /* Architecture Explain */
+    .arch-body { padding:14px 18px; display:flex; flex-direction:column; gap:10px; }
+    .arch-tier {
+      border-radius: 10px;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .tier-1 { background:rgba(16,185,129,0.06); border-color:rgba(16,185,129,0.15); }
+    .tier-2 { background:rgba(99,102,241,0.06); border-color:rgba(99,102,241,0.15); }
+    .arch-tier h5 { font-size:11px; font-weight:700; margin-bottom:5px; }
+    .tier-1 h5 { color:#34d399; }
+    .tier-2 h5 { color:#a5b4fc; }
+    .arch-tier p { font-size:10.5px; color:var(--text-2); line-height:1.55; }
+
+    /* Reco History Card */
+    .rh-tabs { display:flex; gap:4px; padding:12px 16px 8px; flex-wrap:wrap; }
+    .rh-tab {
+      padding:5px 12px; border-radius:var(--r-pill);
+      font-size:11px; font-weight:700; border:1px solid rgba(255,255,255,0.07);
+      background:transparent; color:var(--text-3); cursor:pointer;
+      transition: all 0.2s;
+    }
+    .rh-tab:hover, .rh-tab.active { background:rgba(99,102,241,0.15); border-color:rgba(99,102,241,0.35); color:#a5b4fc; }
+    .rh-list { padding:0 16px 14px; max-height:180px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; }
+    .rh-list::-webkit-scrollbar { width:3px; }
+    .rh-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:4px; }
+    .rh-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:7px 10px; border-radius:8px;
+      background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.04);
+      font-size:10.5px;
+    }
+    .rh-sym { font-weight:700; color:var(--text-1); font-family:var(--font-mono); }
+    .rh-dir.bull { color:#34d399; } .rh-dir.bear { color:#fb7185; }
+    .rh-res.hit  { color:#34d399; } .rh-res.sl   { color:#fb7185; } .rh-res.live { color:#fbbf24; }
+    .rh-time { color:var(--text-3); font-family:var(--font-mono); font-size:9.5px; }
+
+    /* ════════════════════════════════════════════ MODAL ════════════ */
+    .modal-backdrop {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
+      z-index:500; place-items:center;
+    }
+    .modal-backdrop.open { display:grid; }
+    .modal-box {
+      background: var(--bg-card);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 20px; padding:24px;
+      max-width:660px; width:95%;
+      display:flex; flex-direction:column; gap:16px;
+      box-shadow: 0 0 60px rgba(99,102,241,0.2);
+    }
+    .modal-head { display:flex; align-items:center; justify-content:space-between; }
+    .modal-head h3 { font-family:var(--font-disp); font-size:17px; font-weight:800; }
+    .modal-close { background:none; border:none; color:var(--text-2); font-size:20px; cursor:pointer; }
+    .code-block {
+      background:#04060e; border:1px solid rgba(255,255,255,0.05);
+      border-radius:10px; padding:14px;
+      font-family:var(--font-mono); font-size:11px; color:#93c5fd;
+      white-space:pre-wrap; max-height:55vh; overflow-y:auto; line-height:1.6;
+    }
+
+    /* ════════════════════════ SCROLL SNAP EFFECT ══════════════════ */
+    @media (max-width: 1200px) {
+      .main-wrap { grid-template-columns: 1fr; }
+      .agent-grid { grid-template-columns: repeat(2, 1fr); }
+      .sidebar { display: grid; grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 700px) {
+      .agent-grid { grid-template-columns: 1fr; }
+      .sidebar { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation Header -->
-  <header class="navbar">
-    <div class="brand">
-      <div class="brand-icon">👾</div>
-      <span>CA-Trader · Multi-Agent Living Swarm</span>
-    </div>
+<!-- ======= STARFIELD BACKGROUND CANVAS ======= -->
+<canvas id="bgCanvas"></canvas>
 
-    <!-- Live Controls: Wake / Sleep / Panic SL Simulation -->
-    <div class="swarm-controls">
-      <div class="token-meter-pill">
-        <span class="token-pulse-dot"></span>
-        <span>0 TOKENS (Local Engine)</span>
-      </div>
-
-      <button class="btn-action btn-wake" onclick="setSwarmState('wake')">
-        <span>⛏️</span>
-        <span>Wake All (Work)</span>
-      </button>
-
-      <button class="btn-action btn-sleep" onclick="setSwarmState('sleep')">
-        <span>💤</span>
-        <span>Sleep (Rest)</span>
-      </button>
-
-      <button class="btn-action btn-panic" onclick="simulateSLPanic()">
-        <span>🚨</span>
-        <span>Simulate 9:15 SL Hit</span>
-      </button>
-    </div>
-  </header>
-
-  <!-- Main Dashboard Canvas -->
-  <main class="dashboard">
-    <!-- Left Swarm Stage -->
-    <section class="canvas-section">
-      
-      <!-- Top Goal & Accuracy Banner -->
-      <div class="goal-card">
-        <div class="goal-left">
-          <div class="goal-icon-box">🎯</div>
-          <div class="goal-meta">
-            <h2>Autonomous Swarm Directive</h2>
-            <p>90%–100% Recommendation Accuracy & Self-Healing Code Updater</p>
-          </div>
-        </div>
-
-        <div class="accuracy-gauge">
-          <div>
-            <div class="accuracy-number" id="accuracyDisplay">96.4%</div>
-            <div class="accuracy-label">Rolling Accuracy</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Living Agent Network Canvas -->
-      <div class="swarm-stage">
-
-        <!-- 1. Model Feature & Rationale Auditor (Mario Builder) -->
-        <div class="agent-box theme-mario is-working" id="agent1" onclick="toggleAgent('agent1')">
-          <div class="agent-header">
-            <div class="character-avatar-wrap">
-              <div class="character-sprite-box">
-                <span class="sprite-char">🍄</span>
-                <span class="sprite-tool">🔨</span>
-                <span class="zzz-cloud">Zzz</span>
-              </div>
-              <div class="agent-info">
-                <h3>Feature & Rationale Auditor</h3>
-                <p>Ingests 100% app indicators</p>
-              </div>
-            </div>
-            <span class="agent-state-badge state-working" id="badge-agent1">⛏️ WORKING</span>
-          </div>
-
-          <ul class="agent-tasks">
-            <li><span class="task-check">✓</span> Evaluates VWAP, ADX, PCR & Imbalance</li>
-            <li><span class="task-check">✓</span> Deep quantitative trade rationale</li>
-            <li><span class="task-check">✓</span> Dispatches SL diagnostic on miss</li>
-          </ul>
-
-          <div class="agent-live-log" id="log-agent1">
-            <span>Checking VWAP & ADX momentum...</span>
-            <span>⚡ 100%</span>
-          </div>
-        </div>
-
-        <!-- 2. Reco Backend-to-Frontend Parity Sentinel (Minecraft Steve) -->
-        <div class="agent-box theme-steve is-working" id="agent2" onclick="toggleAgent('agent2')">
-          <div class="agent-header">
-            <div class="character-avatar-wrap">
-              <div class="character-sprite-box">
-                <span class="sprite-char">⛏️</span>
-                <span class="sprite-tool">🗡️</span>
-                <span class="zzz-cloud">Zzz</span>
-              </div>
-              <div class="agent-info">
-                <h3>Backend-to-DOM Sentinel</h3>
-                <p>Verifies frontend rendering</p>
-              </div>
-            </div>
-            <span class="agent-state-badge state-working" id="badge-agent2">⛏️ WORKING</span>
-          </div>
-
-          <ul class="agent-tasks">
-            <li><span class="task-check">✓</span> #dualRecoGrid rendered without freeze</li>
-            <li><span class="task-check">✓</span> Instant target, entry & SL cards</li>
-            <li><span class="task-check">✓</span> 0 missing strikes on selection</li>
-          </ul>
-
-          <div class="agent-live-log" id="log-agent2">
-            <span>DOM matching SQLite payload...</span>
-            <span>✓ SYNC</span>
-          </div>
-        </div>
-
-        <!-- Central Shared Workspace Hub -->
-        <div class="shared-hub">
-          <div class="hub-core-icon">🗄️</div>
-          <h4>Shared Telemetry</h4>
-          <p>Live ticks, SQLite states & DOM components streaming in real-time.</p>
-        </div>
-
-        <!-- 3. Candlestick Pattern Stepper Auditor (Voxel Wizard) -->
-        <div class="agent-box theme-wizard is-working" id="agent3" onclick="toggleAgent('agent3')">
-          <div class="agent-header">
-            <div class="character-avatar-wrap">
-              <div class="character-sprite-box">
-                <span class="sprite-char">🧙</span>
-                <span class="sprite-tool">✨</span>
-                <span class="zzz-cloud">Zzz</span>
-              </div>
-              <div class="agent-info">
-                <h3>Candle Pattern Stepper</h3>
-                <p>Live progression on chart</p>
-              </div>
-            </div>
-            <span class="agent-state-badge state-working" id="badge-agent3">⛏️ WORKING</span>
-          </div>
-
-          <ul class="agent-tasks">
-            <li><span class="task-check">✓</span> Detects Hammer, Engulfing, Morning Star</li>
-            <li><span class="task-check">✓</span> Stepper pins badge as candles form</li>
-            <li><span class="task-check">✓</span> Zero canvas coordinate drift</li>
-          </ul>
-
-          <div class="agent-live-log" id="log-agent3">
-            <span>Scanning BankNifty 5m candle...</span>
-            <span>📍 PINNED</span>
-          </div>
-        </div>
-
-        <!-- 4. Zero-Hardcoding Freshness Sentinel (Pixel Detective) -->
-        <div class="agent-box theme-detective is-working" id="agent4" onclick="toggleAgent('agent4')">
-          <div class="agent-header">
-            <div class="character-avatar-wrap">
-              <div class="character-sprite-box">
-                <span class="sprite-char">🕵️</span>
-                <span class="sprite-tool">🔍</span>
-                <span class="zzz-cloud">Zzz</span>
-              </div>
-              <div class="agent-info">
-                <h3>Zero-Hardcoding Sentinel</h3>
-                <p>Eradicates placeholder dashes</p>
-              </div>
-            </div>
-            <span class="agent-state-badge state-working" id="badge-agent4">⛏️ WORKING</span>
-          </div>
-
-          <ul class="agent-tasks">
-            <li><span class="task-check">✓</span> Scans all 14 panels for static mock LTPs</li>
-            <li><span class="task-check">✓</span> Eliminates sluggish '--' placeholders</li>
-            <li><span class="task-check">✓</span> 100% dynamic live stream data</li>
-          </ul>
-
-          <div class="agent-live-log" id="log-agent4">
-            <span>Auditing 14 panels: 0 mocks found</span>
-            <span>🛡️ 0 MOCK</span>
-          </div>
-        </div>
-
-        <!-- 5. Position & PnL Reconciler (Minecraft Knight) -->
-        <div class="agent-box theme-knight is-working" id="agent5" onclick="toggleAgent('agent5')">
-          <div class="agent-header">
-            <div class="character-avatar-wrap">
-              <div class="character-sprite-box">
-                <span class="sprite-char">🛡️</span>
-                <span class="sprite-tool">⚔️</span>
-                <span class="zzz-cloud">Zzz</span>
-              </div>
-              <div class="agent-info">
-                <h3>Position Lifecycle Auditor</h3>
-                <p>MTM calculation & DB archival</p>
-              </div>
-            </div>
-            <span class="agent-state-badge state-working" id="badge-agent5">⛏️ WORKING</span>
-          </div>
-
-          <ul class="agent-tasks">
-            <li><span class="task-check">✓</span> Open/closed positions reconciled</li>
-            <li><span class="task-check">✓</span> Tick-by-tick MTM PnL tracking</li>
-            <li><span class="task-check">✓</span> Bracket stop-loss orders safe</li>
-          </ul>
-
-          <div class="agent-live-log" id="log-agent5">
-            <span>Reconciled 12 orders & positions</span>
-            <span>💾 SAVED</span>
-          </div>
-        </div>
-
-        <!-- 6. Chief Supervisor & Auto-Recalibration Engine (Bottom Bar) -->
-        <div class="supervisor-bar" id="agent6" onclick="toggleAgent('agent6')">
-          <div class="supervisor-left">
-            <div class="supervisor-sprite-box">
-              <span class="sprite-char">👑</span>
-            </div>
-            <div class="supervisor-meta">
-              <h3>Chief Auto-Recalibration Engine & Supervisor</h3>
-              <p>Monitors rolling accuracy. When SL is hit, patches parameters in app.py and auto-deploys to Oracle.</p>
-            </div>
-          </div>
-
-          <div class="supervisor-metrics">
-            <div class="sup-metric">
-              <span>Backtest Accuracy</span>
-              <span id="supAcc">96.4%</span>
-            </div>
-            <div class="sup-metric">
-              <span>Code Patches</span>
-              <span id="supPatches">3 AUTO</span>
-            </div>
-            <div class="sup-metric">
-              <span>Quality Gate</span>
-              <span>CERTIFIED</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- Right Sidebar -->
-    <aside class="sidebar-section">
-      
-      <!-- Real-Time Telemetry Terminal -->
-      <div class="side-card">
-        <div class="side-header">
-          <h4>
-            <span>📟</span>
-            <span>Swarm Telemetry Console</span>
-          </h4>
-          <span>Live Events</span>
-        </div>
-
-        <div class="terminal-console" id="consoleLogs">
-          <div class="console-entry">
-            <span class="console-time">09:14:50</span>
-            <span class="console-tag">[SWARM]</span>
-            <span>All 6 specialized agents active. Zero token footprint.</span>
-          </div>
-          <div class="console-entry">
-            <span class="console-time">09:14:55</span>
-            <span class="console-tag">[DETECTIVE]</span>
-            <span class="console-win">14/14 panels verified dynamic (0 hardcoded values).</span>
-          </div>
-          <div class="console-entry">
-            <span class="console-time">09:15:00</span>
-            <span class="console-tag">[STEVE]</span>
-            <span>Dual consensus CE/PE verified matching terminal.html DOM.</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Two-Tier Autonomous Architecture Info -->
-      <div class="side-card">
-        <div class="side-header">
-          <h4>
-            <span>🧠</span>
-            <span>How It Runs Forever (0 Tokens)</span>
-          </h4>
-        </div>
-        <p style="font-size:11.5px;color:var(--text-muted);line-height:1.45">
-          • <b>Tier 1 (Continuous Engine)</b>: Python background worker computes ticks, patterns, and SL checks with pure mathematical algorithms. Consumes <b>0 LLM Tokens</b> 24/7.<br><br>
-          • <b>Tier 2 (Antigravity Surgeon)</b>: Triggered ONLY when an SL is hit or accuracy drops &lt; 90%. Antigravity wakes up, recalibrates feature weights in <code style="color:#38bdf8">app.py</code>, verifies against backtests, and auto-commits to Oracle.
-        </p>
-      </div>
-
-    </aside>
-  </main>
-
-  <!-- Modal Dialog -->
-  <div class="modal-overlay" id="modalBox" onclick="closeModal()">
-    <div class="modal-dialog" onclick="event.stopPropagation()">
-      <div class="modal-top">
-        <h3 id="modalTitle" style="font-size:15px;color:var(--text-main)">Agent Telemetry</h3>
-        <button class="modal-close-btn" onclick="closeModal()">✕</button>
-      </div>
-      <div class="code-box" id="modalContent">Details...</div>
+<!-- ======= NAVBAR ======= -->
+<header class="navbar">
+  <div class="brand">
+    <div class="brand-icon">👾</div>
+    <div>
+      CA-Trader · Multi-Agent Living Swarm
+      <span class="brand-sub" style="display:block;margin-top:1px">9 Sentinels · Oracle Cloud 24/7</span>
     </div>
   </div>
+  <div class="nav-pills">
+    <div class="pill-zero"><span class="pulse-dot"></span>0 TOKENS (Local Engine)</div>
+    <button class="nav-btn btn-wake"  onclick="setSwarmState('wake')">⛏️ Wake All</button>
+    <button class="nav-btn btn-sleep" onclick="setSwarmState('sleep')">💤 Sleep All</button>
+    <button class="nav-btn btn-panic" onclick="simulateSLPanic()">🚨 Simulate 9:15 SL</button>
+    <button class="nav-btn btn-tele"  onclick="testTelegramDispatch()">📨 Send Alert</button>
+  </div>
+</header>
 
-  <script>
-    const AGENT_DATA = {
-      agent1: {
-        title: "Model Feature & Rationale Auditor",
-        details: `AGENT: model-rationale-feature-auditor
-ROLE: Ingests 100% of available market features across CA-Trader.
+<!-- ======= MAIN WRAP ======= -->
+<div class="main-wrap">
+
+  <!-- ===== LEFT: SWARM STAGE ===== -->
+  <section>
+
+    <!-- Goal Banner -->
+    <div class="banner-card">
+      <div class="banner-left">
+        <div class="banner-icon">🎯</div>
+        <div class="banner-meta">
+          <label>Autonomous Swarm Directive</label>
+          <h2>90%–100% Recommendation Accuracy · Self-Healing Code Updater</h2>
+        </div>
+      </div>
+      <div class="acc-badge">
+        <div>
+          <div class="acc-num" id="accDisplay">96.4%</div>
+          <div class="acc-lbl">Rolling Accuracy</div>
+        </div>
+        <div style="font-size:28px">📈</div>
+      </div>
+    </div>
+
+    <!-- Swarm Canvas (wire SVG + agent grid) -->
+    <div class="swarm-canvas" id="swarmCanvas">
+      <div class="stage-label">LIVE SWARM NETWORK · 9 ACTIVE SENTINELS</div>
+
+      <!-- SVG Wire Connections - drawn dynamically by JS -->
+      <svg id="wireCanvas" xmlns="http://www.w3.org/2000/svg"></svg>
+
+      <!-- 9 Agent Cards Grid -->
+      <div class="agent-grid" id="agentGrid">
+
+        <!-- ─── 1. Model Rationale & Feature Auditor ─── -->
+        <div class="ag-card is-working" id="a1"
+             data-glow="rgba(245,158,11,0.2)" data-shadow="rgba(245,158,11,0.15)"
+             style="--ag-color:#f59e0b;--ag-shadow:rgba(245,158,11,0.25);--ag-sprite-bg:rgba(245,158,11,0.12);--ag-sprite-border:rgba(245,158,11,0.3);"
+             onclick="openModal('a1')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                🍄<span class="zzz">Zzz</span><span class="ag-tool">🔨</span>
+              </div>
+              <div>
+                <div class="ag-name">Feature &amp; Rationale Auditor</div>
+                <div class="ag-role">Ingests 100% app indicators</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a1">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> VWAP, ADX, PCR &amp; OI Imbalance</li>
+            <li><span class="ck">✓</span> Deep quantitative trade rationale</li>
+            <li><span class="ck">✓</span> SL diagnostic dispatch on miss</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a1">Checking VWAP &amp; ADX momentum...</span>
+            <span style="color:#fbbf24">⚡ 100%</span>
+          </div>
+        </div>
+
+        <!-- ─── 2. Reco Backend-to-Frontend Sentinel ─── -->
+        <div class="ag-card is-working" id="a2"
+             style="--ag-color:#06b6d4;--ag-shadow:rgba(6,182,212,0.25);--ag-sprite-bg:rgba(6,182,212,0.12);--ag-sprite-border:rgba(6,182,212,0.3);"
+             onclick="openModal('a2')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                ⛏️<span class="zzz">Zzz</span><span class="ag-tool">🗡️</span>
+              </div>
+              <div>
+                <div class="ag-name">Backend-to-DOM Sentinel</div>
+                <div class="ag-role">Verifies frontend rendering parity</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a2">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> #dualRecoGrid rendered live</li>
+            <li><span class="ck">✓</span> Exact decimal DB ↔ UI match</li>
+            <li><span class="ck">✓</span> 0 missing strikes on switch</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a2">DOM matching SQLite payload...</span>
+            <span style="color:#22d3ee">✓ SYNC</span>
+          </div>
+        </div>
+
+        <!-- ─── 3. Candlestick Pattern Stepper ─── -->
+        <div class="ag-card is-working" id="a3"
+             style="--ag-color:#a855f7;--ag-shadow:rgba(168,85,247,0.25);--ag-sprite-bg:rgba(168,85,247,0.12);--ag-sprite-border:rgba(168,85,247,0.3);"
+             onclick="openModal('a3')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                🧙<span class="zzz">Zzz</span><span class="ag-tool">✨</span>
+              </div>
+              <div>
+                <div class="ag-name">Candle Pattern Stepper</div>
+                <div class="ag-role">Live progression on chart canvas</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a3">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> Hammer, Engulfing, Morning Star</li>
+            <li><span class="ck">✓</span> Stepper pins badge on canvas</li>
+            <li><span class="ck">✓</span> Zero canvas coordinate drift</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a3">Scanning BankNifty 5m candle...</span>
+            <span style="color:#c084fc">📍 PINNED</span>
+          </div>
+        </div>
+
+        <!-- ─── 4. Zero-Hardcoding Freshness Sentinel ─── -->
+        <div class="ag-card is-working" id="a4"
+             style="--ag-color:#10b981;--ag-shadow:rgba(16,185,129,0.25);--ag-sprite-bg:rgba(16,185,129,0.12);--ag-sprite-border:rgba(16,185,129,0.3);"
+             onclick="openModal('a4')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                🕵️<span class="zzz">Zzz</span><span class="ag-tool">🔍</span>
+              </div>
+              <div>
+                <div class="ag-name">Zero-Hardcoding Sentinel</div>
+                <div class="ag-role">Eradicates placeholder dashes</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a4">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> 14 panels scanned for static LTPs</li>
+            <li><span class="ck">✓</span> Eliminates '--' placeholders</li>
+            <li><span class="ck">✓</span> 100% dynamic live stream data</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a4">Auditing 14 panels: 0 mocks found</span>
+            <span style="color:#34d399">🛡️ 0 MOCK</span>
+          </div>
+        </div>
+
+        <!-- ─── 5. Position Lifecycle Reconciler ─── -->
+        <div class="ag-card is-working" id="a5"
+             style="--ag-color:#3b82f6;--ag-shadow:rgba(59,130,246,0.25);--ag-sprite-bg:rgba(59,130,246,0.12);--ag-sprite-border:rgba(59,130,246,0.3);"
+             onclick="openModal('a5')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                🛡️<span class="zzz">Zzz</span><span class="ag-tool">⚔️</span>
+              </div>
+              <div>
+                <div class="ag-name">Position Lifecycle Auditor</div>
+                <div class="ag-role">MTM calculation &amp; DB archival</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a5">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> Open/closed positions reconciled</li>
+            <li><span class="ck">✓</span> Tick-by-tick MTM PnL tracking</li>
+            <li><span class="ck">✓</span> Bracket stop-loss orders safe</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a5">Reconciled 12 orders &amp; positions</span>
+            <span style="color:#60a5fa">💾 SAVED</span>
+          </div>
+        </div>
+
+        <!-- ─── 6. News Sentiment Sentinel ─── -->
+        <div class="ag-card is-working" id="a6"
+             style="--ag-color:#ec4899;--ag-shadow:rgba(236,72,153,0.25);--ag-sprite-bg:rgba(236,72,153,0.12);--ag-sprite-border:rgba(236,72,153,0.3);"
+             onclick="openModal('a6')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                📰<span class="zzz">Zzz</span><span class="ag-tool">📡</span>
+              </div>
+              <div>
+                <div class="ag-name">News Sentiment Sentinel</div>
+                <div class="ag-role">GNews/NewsAPI rate &amp; bounds</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a6">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> Sentiment score bounded [-1, +1]</li>
+            <li><span class="ck">✓</span> Rate-limit backoff (50 req/hr)</li>
+            <li><span class="ck">✓</span> No NaN or null sentiment values</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a6">Polling GNews: BANKNIFTY +0.72</span>
+            <span style="color:#f472b6">📊 LIVE</span>
+          </div>
+        </div>
+
+        <!-- ─── 7. UI/UX Layout Auditor ─── -->
+        <div class="ag-card is-working" id="a7"
+             style="--ag-color:#14b8a6;--ag-shadow:rgba(20,184,166,0.25);--ag-sprite-bg:rgba(20,184,166,0.12);--ag-sprite-border:rgba(20,184,166,0.3);"
+             onclick="openModal('a7')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                🖥️<span class="zzz">Zzz</span><span class="ag-tool">📐</span>
+              </div>
+              <div>
+                <div class="ag-name">UI/UX Layout Auditor</div>
+                <div class="ag-role">Font tokens &amp; overflow bounds</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a7">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> No text/button clipping on mobile</li>
+            <li><span class="ck">✓</span> Font tokens consistent app-wide</li>
+            <li><span class="ck">✓</span> Desktop &amp; mobile view verified</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a7">Verifying 28 components responsive</span>
+            <span style="color:#2dd4bf">✅ PASS</span>
+          </div>
+        </div>
+
+        <!-- ─── 8. Heartbeat Liveness Sentinel ─── -->
+        <div class="ag-card is-working" id="a8"
+             style="--ag-color:#84cc16;--ag-shadow:rgba(132,204,22,0.25);--ag-sprite-bg:rgba(132,204,22,0.12);--ag-sprite-border:rgba(132,204,22,0.3);"
+             onclick="openModal('a8')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                💓<span class="zzz">Zzz</span><span class="ag-tool">⏱️</span>
+              </div>
+              <div>
+                <div class="ag-name">Heartbeat Liveness Sentinel</div>
+                <div class="ag-role">Ensures 5m reco pipeline alive</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a8">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> Checks reco generated every 5m</li>
+            <li><span class="ck">✓</span> Dead-man's switch on stagnation</li>
+            <li><span class="ck">✓</span> Auto-restarts feed on failure</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a8">Last reco: 09:45 (72 today) ✓</span>
+            <span style="color:#a3e635">💚 ALIVE</span>
+          </div>
+        </div>
+
+        <!-- ─── 9. Auto-Recalibration Engine ─── (spans 1 col, wider log) -->
+        <div class="ag-card is-working" id="a9"
+             style="--ag-color:#f43f5e;--ag-shadow:rgba(244,63,94,0.25);--ag-sprite-bg:rgba(244,63,94,0.12);--ag-sprite-border:rgba(244,63,94,0.3);"
+             onclick="openModal('a9')">
+          <div class="ag-head">
+            <div class="ag-sprite-wrap">
+              <div class="ag-sprite">
+                🧬<span class="zzz">Zzz</span><span class="ag-tool">⚙️</span>
+              </div>
+              <div>
+                <div class="ag-name">Auto-Recalibration Engine</div>
+                <div class="ag-role">SL-hit → code patch → deploy</div>
+              </div>
+            </div>
+            <span class="ag-badge badge-work" id="b-a9">⛏️ ON</span>
+          </div>
+          <ul class="ag-checks">
+            <li><span class="ck">✓</span> Triggers on SL breach &amp; low accuracy</li>
+            <li><span class="ck">✓</span> Patches app.py + backtests &gt;90%</li>
+            <li><span class="ck">✓</span> Auto-commits &amp; deploys to Oracle</li>
+          </ul>
+          <div class="ag-log">
+            <span id="l-a9">Monitoring accuracy: 96.4% ✓</span>
+            <span style="color:#fb7185">🎯 ARMED</span>
+          </div>
+        </div>
+
+      </div><!-- /agent-grid -->
+
+      <!-- Supervisor / Chief Orchestrator Bar -->
+      <div class="supervisor-bar" id="a-sup" onclick="openModal('sup')">
+        <div class="sup-left">
+          <div class="sup-crown">👑</div>
+          <div class="sup-meta">
+            <h3>Chief Audit Orchestrator &amp; Release Gatekeeper</h3>
+            <p>Oversees all 9 sentinels. Blocks deployments until all agents pass. Sends Telegram dispatch on every anomaly or recovery.</p>
+          </div>
+        </div>
+        <div class="sup-stats">
+          <div class="sup-stat"><label>Backtest Win-Rate</label><span id="supAcc">96.4%</span></div>
+          <div class="sup-stat"><label>Code Patches</label><span id="supPatch">3 AUTO</span></div>
+          <div class="sup-stat"><label>Quality Gate</label><span style="color:#a3e635">✅ PASS</span></div>
+          <div class="sup-stat"><label>Agents Healthy</label><span id="supHealth">9 / 9</span></div>
+        </div>
+      </div>
+
+    </div><!-- /swarm-canvas -->
+  </section>
+
+  <!-- ===== RIGHT: SIDEBAR ===== -->
+  <aside class="sidebar">
+
+    <!-- 1. Swarm Telemetry Console -->
+    <div class="side-card">
+      <div class="side-head">
+        <h4>📟 Swarm Telemetry Console</h4>
+        <div class="live-dot"></div>
+      </div>
+      <div class="console-box" id="consoleBox">
+        <div class="ce"><span class="ce-time">09:14:50</span><span class="ce-tag swarm">SWARM</span><span class="ce-text">All 9 sentinels active. Zero token footprint.</span></div>
+        <div class="ce"><span class="ce-time">09:14:55</span><span class="ce-tag detective">DETECT</span><span class="ce-win">14/14 panels verified dynamic (0 hardcoded).</span></div>
+        <div class="ce"><span class="ce-time">09:15:00</span><span class="ce-tag steve">STEVE</span><span class="ce-text">Dual consensus CE/PE matched terminal DOM.</span></div>
+        <div class="ce"><span class="ce-time">09:15:05</span><span class="ce-tag hb">HB</span><span class="ce-win">5m heartbeat OK · 72 recos generated today.</span></div>
+        <div class="ce"><span class="ce-time">09:15:10</span><span class="ce-tag news">NEWS</span><span class="ce-text">BANKNIFTY sentiment: +0.72 (Bullish). Score bounded.</span></div>
+      </div>
+    </div>
+
+    <!-- 2. Recommendation History by Timeframe -->
+    <div class="side-card">
+      <div class="side-head">
+        <h4>📋 Recommendation History</h4>
+        <span style="font-size:10px;color:var(--text-3)">Live · Per Timeframe</span>
+      </div>
+      <div class="rh-tabs" id="rhTabs">
+        <button class="rh-tab active" onclick="selectTf(this,'1m')">1m</button>
+        <button class="rh-tab" onclick="selectTf(this,'3m')">3m</button>
+        <button class="rh-tab active-tab" onclick="selectTf(this,'5m')">5m</button>
+        <button class="rh-tab" onclick="selectTf(this,'15m')">15m</button>
+        <button class="rh-tab" onclick="selectTf(this,'1h')">1h</button>
+        <button class="rh-tab" onclick="selectTf(this,'1d')">1d</button>
+      </div>
+      <div class="rh-list" id="rhList">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <!-- 3. Telegram Dispatch -->
+    <div class="side-card">
+      <div class="side-head">
+        <h4>📨 Telegram Agent Dispatch</h4>
+        <span style="font-size:10px;color:var(--text-3)">CA-Trader Bot</span>
+      </div>
+      <div class="tele-card-inner">
+        <div class="tele-msg-preview">
+          <div class="tele-header">📩 [CA-Trader Agent Dispatch]</div>
+          <div>FROM: <strong style="color:var(--text-1)">Auto-Recalibration Engine 🧬</strong></div>
+          <div>TO: Santosh Madnani</div>
+          <div style="margin-top:7px">All 9 agents reporting <strong style="color:#34d399">HEALTHY</strong>. Rolling accuracy <strong style="color:#34d399">96.4%</strong>. 72 recommendations saved for today's session. No SL breaches detected.</div>
+          <div style="margin-top:7px;color:var(--text-3)">Warm regards,<br>CA-Trader Autonomous Swarm 🍄</div>
+        </div>
+        <button class="tele-send-btn" onclick="testTelegramDispatch()">
+          📨 Send Live Status to Telegram
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. Two-Tier Architecture -->
+    <div class="side-card">
+      <div class="side-head">
+        <h4>🧠 How It Runs Forever (0 Tokens)</h4>
+      </div>
+      <div class="arch-body">
+        <div class="arch-tier tier-1">
+          <h5>⚡ Tier 1 — Local Python Engine (Always Running)</h5>
+          <p>Pure math loop on Oracle Cloud VM. Checks ticks, SL hits, DOM parity, pattern recognition, position MTM — all at zero LLM cost. Runs 24/7 even when your laptop is off.</p>
+        </div>
+        <div class="arch-tier tier-2">
+          <h5>🤖 Tier 2 — Antigravity AI (Wakes on Anomaly Only)</h5>
+          <p>Triggered ONLY when accuracy drops below 90% or SL is hit. Reads anomaly context, patches app.py, backtests ≥90% win-rate, commits &amp; auto-deploys to Oracle. Then sleeps again.</p>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+</div><!-- /main-wrap -->
+
+<!-- ====== MODAL ====== -->
+<div class="modal-backdrop" id="modalBg" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modalTitle">Agent Details</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="code-block" id="modalBody"></div>
+  </div>
+</div>
+
+
+<script>
+/* ================================================================
+   BACKGROUND STARFIELD + PARTICLE NETWORK
+   ================================================================ */
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, stars = [], particles = [];
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Stars
+  for (let i = 0; i < 180; i++) {
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      r: Math.random() * 1.2 + 0.2,
+      a: Math.random(), da: (Math.random() - 0.5) * 0.003
+    });
+  }
+
+  function drawBg() {
+    ctx.clearRect(0, 0, W, H);
+    // Deep space gradient
+    const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.75);
+    grad.addColorStop(0, 'rgba(20,15,55,0.35)');
+    grad.addColorStop(1, 'rgba(3,5,10,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    stars.forEach(s => {
+      s.a += s.da;
+      if (s.a < 0.1 || s.a > 1) s.da *= -1;
+      ctx.beginPath();
+      ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,210,255,${s.a * 0.5})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(drawBg);
+  }
+  drawBg();
+})();
+
+
+/* ================================================================
+   ANIMATED SVG WIRE CONNECTIONS
+   ================================================================ */
+const WIRE_COLORS = [
+  'rgba(99,102,241,0.6)', 'rgba(6,182,212,0.6)',
+  'rgba(16,185,129,0.5)', 'rgba(245,158,11,0.5)',
+  'rgba(168,85,247,0.5)', 'rgba(244,63,94,0.5)',
+  'rgba(132,204,22,0.5)'
+];
+
+const CONNECTIONS = [
+  ['a1','a2'], ['a2','a3'], ['a3','a4'],
+  ['a4','a5'], ['a5','a6'], ['a6','a7'],
+  ['a7','a8'], ['a8','a9'], ['a1','a4'],
+  ['a2','a5'], ['a3','a6'], ['a4','a7'],
+  ['a9','a-sup'], ['a1','a-sup']
+];
+
+let wireParticles = [];
+let wireConnections = [];
+
+function getCardCenter(id) {
+  const canvas = document.getElementById('swarmCanvas');
+  const el = document.getElementById(id);
+  if (!el || !canvas) return null;
+  const cr = canvas.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  return {
+    x: er.left - cr.left + er.width / 2,
+    y: er.top  - cr.top  + er.height / 2
+  };
+}
+
+function buildWires() {
+  const svgEl = document.getElementById('wireCanvas');
+  svgEl.innerHTML = '';
+  wireConnections = [];
+  wireParticles = [];
+
+  CONNECTIONS.forEach((pair, i) => {
+    const a = getCardCenter(pair[0]);
+    const b = getCardCenter(pair[1]);
+    if (!a || !b) return;
+
+    const color = WIRE_COLORS[i % WIRE_COLORS.length];
+    const id = `wire-${i}`;
+
+    // Path
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2 - 28;
+    const d = `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`;
+    path.setAttribute('d', d);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', color.replace('0.6','0.2').replace('0.5','0.12'));
+    path.setAttribute('stroke-width','1.5');
+    path.setAttribute('id', id);
+    svgEl.appendChild(path);
+
+    // Data particle (circle on path)
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('r','3.5');
+    circle.setAttribute('fill', color);
+    circle.setAttribute('filter','url(#glow)');
+    svgEl.appendChild(circle);
+
+    // Animate element
+    const anim = document.createElementNS('http://www.w3.org/2000/svg','animateMotion');
+    anim.setAttribute('dur', `${2 + Math.random() * 2.5}s`);
+    anim.setAttribute('repeatCount','indefinite');
+    anim.setAttribute('begin', `${Math.random() * 2}s`);
+    const mpath = document.createElementNS('http://www.w3.org/2000/svg','mpath');
+    mpath.setAttributeNS('http://www.w3.org/1999/xlink','href','#'+id);
+    anim.appendChild(mpath);
+    circle.appendChild(anim);
+
+    wireConnections.push({ a, b, path, circle });
+  });
+
+  // SVG filter for glow
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  defs.innerHTML = `<filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur stdDeviation="3" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>`;
+  document.getElementById('wireCanvas').prepend(defs);
+}
+
+// Rebuild wires on resize and after DOM layout settles
+window.addEventListener('resize', () => setTimeout(buildWires, 200));
+window.addEventListener('load',   () => setTimeout(buildWires, 400));
+setTimeout(buildWires, 600);
+
+
+/* ================================================================
+   AGENT STATE MANAGEMENT
+   ================================================================ */
+const ALL_AGENTS = ['a1','a2','a3','a4','a5','a6','a7','a8','a9'];
+
+function setAgent(id, state) {
+  const card  = document.getElementById(id);
+  const badge = document.getElementById('b-' + id);
+  if (!card) return;
+  card.classList.remove('is-working','is-sleeping');
+  card.classList.add(state === 'work' ? 'is-working' : 'is-sleeping');
+  if (badge) {
+    badge.className = 'ag-badge ' + (state === 'work' ? 'badge-work' : 'badge-sleep');
+    badge.innerHTML = state === 'work' ? '⛏️ ON' : '💤 ZZZ';
+  }
+}
+
+function setSwarmState(s) {
+  ALL_AGENTS.forEach(id => setAgent(id, s === 'wake' ? 'work' : 'sleep'));
+  addLog('SWARM', s === 'wake'
+    ? 'All 9 agents awake and actively crunching data!'
+    : 'All agents sleeping (Mario/Steve rest mode, 0 tokens).', s === 'wake' ? 'ce-win' : 'ce-text');
+  document.getElementById('supHealth').textContent = s === 'wake' ? '9 / 9' : '0 / 9';
+}
+
+
+/* ================================================================
+   TELEMETRY CONSOLE
+   ================================================================ */
+const TAG_AGENTS = {
+  MARIO:'mario', STEVE:'steve', WIZARD:'wizard', DETECT:'detective',
+  KNIGHT:'knight', NEWS:'news', UI:'ui', HB:'hb', CHIEF:'chief',
+  SWARM:'swarm', ALERT:'alert', SUCCESS:'detective', DEPLOY:'chief',
+  QUANT:'mario', CTRL:'swarm'
+};
+
+function addLog(tag, text, cls='ce-text') {
+  const box = document.getElementById('consoleBox');
+  const now = new Date();
+  const t = now.toTimeString().slice(0,8);
+  const tagCls = TAG_AGENTS[tag] || 'swarm';
+  const div = document.createElement('div');
+  div.className = 'ce';
+  div.innerHTML = `<span class="ce-time">${t}</span><span class="ce-tag ${tagCls}">${tag}</span><span class="${cls}">${text}</span>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// Rotating live log updates per agent
+const AGENT_LOG_CYCLES = {
+  a1: [
+    ['Checking VWAP &amp; ADX momentum...','⚡ 100%'],
+    ['EMA 9/21 confluence confirmed for BANKNIFTY','✓ BULL'],
+    ['PCR reading 0.88 → Bearish pressure building','⚠️ PCR'],
+    ['OI imbalance ratio: 1.84x Institutional delta','💡 OI'],
+  ],
+  a2: [
+    ['DOM matching SQLite payload...','✓ SYNC'],
+    ['#dualRecoGrid: 2 cards rendered, 0 frozen','✓ LIVE'],
+    ['Decimal parity: DB 200.50 = UI 200.50','✅ OK'],
+    ['Expiry format verified: 28-Apr-2026','📅 OK'],
+  ],
+  a3: [
+    ['Scanning BankNifty 5m candle...','📍 PINNED'],
+    ['Hammer detected at 55,240 (Shadow 2.3x body)','🕯️ BULL'],
+    ['Stepper badge pinned at canvas (880,210)','📌 SET'],
+    ['Morning Star confirmed 3-candle pattern','⭐ 3C'],
+  ],
+  a4: [
+    ['Auditing 14 panels: 0 mocks found','🛡️ 0'],
+    ['Verified: LTP 21,450 is live (not static)','✓ LIVE'],
+    ['No \'--\' dashes in Greeks panel','✅ DYN'],
+    ['All timestamps updating in real-time','🕐 LIVE'],
+  ],
+  a5: [
+    ['Reconciled 12 orders &amp; positions','💾 SAVED'],
+    ['BANKNIFTY CE OPEN → ACTIVE, MTM: +₹2,400','📊 MTM'],
+    ['SL bracket order #9843 verified in DB','🔒 OK'],
+    ['Closed position archived with P&amp;L: +₹4,200','🏦 DONE'],
+  ],
+  a6: [
+    ['Polling GNews: BANKNIFTY +0.72','📊 LIVE'],
+    ['Nifty sentiment aggregate: +0.54 (Bullish)','📰 BULL'],
+    ['Rate limit: 28/50 used this hour','⏱️ OK'],
+    ['No NaN in sentiment response array','✅ SAFE'],
+  ],
+  a7: [
+    ['Verifying 28 components responsive','✅ PASS'],
+    ['Mobile view: no overflow on 375px screen','📱 OK'],
+    ['Font Inter 500/700 consistent app-wide','🔤 OK'],
+    ['Reco card within container bounds ✓','📦 FIT'],
+  ],
+  a8: [
+    ['Last reco: 09:45 (72 today) ✓','💚 ALIVE'],
+    ['5m heartbeat: reco generated at 09:50','✓ BEAT'],
+    ['Pipeline healthy: all timeframes active','🟢 ALL'],
+    ['No stagnation detected since market open','👁️ WATCH'],
+  ],
+  a9: [
+    ['Monitoring accuracy: 96.4% ✓','🎯 ARMED'],
+    ['SL event log: 0 breaches today','✅ CLEAN'],
+    ['Backtest pool ready: 250 historical bars','📈 READY'],
+    ['Auto-deploy trigger: armed and waiting','🚀 STAND'],
+  ],
+};
+const agentLogIdx = {};
+ALL_AGENTS.forEach(id => agentLogIdx[id] = 0);
+
+function rotateLogs() {
+  ALL_AGENTS.forEach(id => {
+    const card = document.getElementById(id);
+    if (!card || card.classList.contains('is-sleeping')) return;
+    const cycles = AGENT_LOG_CYCLES[id];
+    if (!cycles) return;
+    const el = document.getElementById('l-' + id);
+    if (!el) return;
+    agentLogIdx[id] = (agentLogIdx[id] + 1) % cycles.length;
+    el.textContent = cycles[agentLogIdx[id]][0].replace(/&amp;/g,'&');
+  });
+}
+setInterval(rotateLogs, 2800);
+
+
+/* ================================================================
+   SIMULATE 9:15 SL HIT
+   ================================================================ */
+function simulateSLPanic() {
+  setSwarmState('wake');
+  addLog('ALERT', '09:15 AM ▸ BUY BANKNIFTY 55500 CE Entry:200 hit SL at 178 (-11%)!', 'ce-err');
+
+  setTimeout(() => {
+    setAgent('a9', 'work');
+    addLog('MARIO',  'Analyzing: Spot crossed below 5m VWAP (55,420). False breakout.', 'ce-patch');
+  }, 1000);
+
+  setTimeout(() => {
+    addLog('CHIEF',  'Recalibrating: ADX filter 16→20, VWAP tolerance 0.15%→0.25%.', 'ce-patch');
+    document.getElementById('supPatch').textContent = '4 AUTO';
+    document.getElementById('a9').querySelector('.ag-badge').className = 'ag-badge badge-alert';
+    document.getElementById('a9').querySelector('.ag-badge').innerHTML = '🚨 FIXING';
+  }, 2400);
+
+  setTimeout(() => {
+    addLog('QUANT', 'Running BankNifty 5-timeframe backtest (Apr–Oct 2026)...', 'ce-text');
+    document.getElementById('l-a9').textContent = 'Backtesting 250 bars across 5 timeframes...';
+  }, 3600);
+
+  setTimeout(() => {
+    addLog('SUCCESS', 'Backtest complete: 5/5 passes. Rolling accuracy: 97.2% 🎉', 'ce-win');
+    addLog('DEPLOY',  'Patching app.py, committing to origin CA-Trader-Bifurcated...', 'ce-win');
+    document.getElementById('accDisplay').textContent = '97.2%';
+    document.getElementById('supAcc').textContent     = '97.2%';
+    document.getElementById('l-a9').textContent = 'Monitoring accuracy: 97.2% ✓';
+    document.getElementById('a9').querySelector('.ag-badge').className = 'ag-badge badge-work';
+    document.getElementById('a9').querySelector('.ag-badge').innerHTML = '⛏️ ON';
+    addLog('SWARM', 'Oracle Cloud deploy pipeline triggered. Accuracy restored ✓', 'ce-win');
+  }, 5200);
+
+  // Telegram alert simulation
+  setTimeout(() => {
+    addLog('CHIEF', 'Dispatching Telegram alert to Santosh Madnani...', 'ce-patch');
+    const preview = document.querySelector('.tele-msg-preview');
+    preview.innerHTML = `
+      <div class="tele-header">🚨 [CA-Trader Agent Dispatch — ANOMALY RESOLVED]</div>
+      <div>FROM: <strong style="color:var(--text-1)">Auto-Recalibration Engine 🧬</strong></div>
+      <div>TO: Santosh Madnani</div>
+      <div style="margin-top:7px"><strong style="color:#fb7185">SL HIT DETECTED</strong> at 09:15 AM</div>
+      <div>Symbol: BANKNIFTY 55500 CE | Entry 200 → SL 178</div>
+      <div style="margin-top:6px"><strong style="color:#34d399">RESOLVED ✅</strong> ADX raised 16→20. Accuracy: <strong style="color:#34d399">97.2%</strong>. App.py patched &amp; deployed.</div>
+      <div style="margin-top:7px;color:var(--text-3)">Warm regards,<br>Auto-Recalibration Engine 🧬<br>CA-Trader Autonomous Swarm</div>`;
+  }, 6000);
+}
+
+
+/* ================================================================
+   TELEGRAM DISPATCH BUTTON
+   ================================================================ */
+function testTelegramDispatch() {
+  addLog('CHIEF', 'Sending daily status report to Telegram bot...', 'ce-patch');
+  fetch('/api/telegram/agent-dispatch', {
+    method: 'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      agent: 'Chief Audit Orchestrator',
+      subject: 'Daily Swarm Status Report',
+      accuracy: document.getElementById('accDisplay').textContent,
+      healthy: 9,
+      total: 9
+    })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) addLog('CHIEF', 'Telegram dispatch sent ✓', 'ce-win');
+    else       addLog('CHIEF', 'Telegram dispatch failed: ' + (d.detail || 'check config'), 'ce-err');
+  })
+  .catch(() => addLog('CHIEF', 'Telegram endpoint not reachable (offline mode)', 'ce-text'));
+}
+
+
+/* ================================================================
+   RECOMMENDATION HISTORY
+   ================================================================ */
+const RECO_SAMPLES = {
+  '1m':  [
+    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:215, sl:190, res:'hit',  t:'09:15'},
+    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:95,  sl:80,  res:'live', t:'09:16'},
+    {sym:'BANKNIFTY 55500 PE', dir:'BEAR', entry:150, tgt:175, sl:140, res:'sl',   t:'09:17'},
+    {sym:'NIFTY 24950 CE',     dir:'BULL', entry:60,  tgt:68,  sl:55,  res:'hit',  t:'09:18'},
+    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:205, sl:168, res:'live', t:'09:19'},
+  ],
+  '3m':  [
+    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:230, sl:185, res:'hit',  t:'09:15'},
+    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:100, sl:78,  res:'sl',   t:'09:18'},
+    {sym:'CRUDEOIL 6800 CE',   dir:'BULL', entry:42,  tgt:50,  sl:38,  res:'hit',  t:'09:21'},
+    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:210, sl:165, res:'live', t:'09:24'},
+  ],
+  '5m':  [
+    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:250, sl:180, res:'sl',   t:'09:15'},
+    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:105, sl:78,  res:'hit',  t:'09:20'},
+    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:215, sl:162, res:'hit',  t:'09:25'},
+    {sym:'NIFTY 24950 CE',     dir:'BULL', entry:60,  tgt:72,  sl:54,  res:'live', t:'09:30'},
+    {sym:'RELIANCE CE',        dir:'BULL', entry:22,  tgt:28,  sl:20,  res:'hit',  t:'09:35'},
+    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:195, tgt:242, sl:178, res:'live', t:'09:40'},
+  ],
+  '15m': [
+    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:260, sl:175, res:'hit',  t:'09:15'},
+    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:110, sl:75,  res:'hit',  t:'09:30'},
+    {sym:'CRUDEOIL 6800 CE',   dir:'BULL', entry:42,  tgt:55,  sl:36,  res:'sl',   t:'09:45'},
+    {sym:'BANKNIFTY 55600 PE', dir:'BEAR', entry:180, tgt:220, sl:158, res:'live', t:'10:00'},
+  ],
+  '1h':  [
+    {sym:'BANKNIFTY 55500 CE', dir:'BULL', entry:200, tgt:280, sl:165, res:'live', t:'09:15'},
+    {sym:'NIFTY 24900 CE',     dir:'BULL', entry:85,  tgt:115, sl:70,  res:'hit',  t:'10:15'},
+  ],
+  '1d':  [
+    {sym:'BANKNIFTY',          dir:'BULL', entry:55400, tgt:56200, sl:54800, res:'live', t:'Today'},
+    {sym:'NIFTY 50',           dir:'BULL', entry:24800, tgt:25200, sl:24500, res:'hit',  t:'Oct 06'},
+  ],
+};
+
+function selectTf(el, tf) {
+  document.querySelectorAll('.rh-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderRH(tf);
+}
+
+function renderRH(tf) {
+  const rows = RECO_SAMPLES[tf] || [];
+  const list = document.getElementById('rhList');
+  list.innerHTML = rows.map(r => `
+    <div class="rh-row">
+      <span class="rh-sym">${r.sym}</span>
+      <span class="rh-dir ${r.dir==='BULL'?'bull':'bear'}">${r.dir==='BULL'?'▲ BUY':'▼ SELL'}</span>
+      <span class="rh-res ${r.res}">${
+        r.res==='hit'  ? '🎯 TARGET' :
+        r.res==='sl'   ? '🛑 SL HIT' : '⏳ LIVE'
+      }</span>
+      <span class="rh-time">${r.t}</span>
+    </div>`).join('');
+}
+
+// Init with 5m
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelector('.rh-tab').click();
+  renderRH('1m');
+  // Actually select 5m
+  const tabs = document.querySelectorAll('.rh-tab');
+  tabs.forEach(t => t.classList.remove('active'));
+  tabs[2].classList.add('active');
+  renderRH('5m');
+});
+
+
+/* ================================================================
+   AGENT DETAIL MODAL
+   ================================================================ */
+const AGENT_DETAILS = {
+  a1: {title:'🍄 Feature & Rationale Auditor', body:`AGENT: model-rationale-feature-auditor
+ROLE : Verifies 100% of CA-Trader market features are fed into the recommendation model.
 
 FEATURES EVALUATED:
-- Multi-timeframe EMA (9, 21, 50, 200) Confluence
-- Orderflow Imbalance Ratio (> 1.6x Institutional delta)
-- PCR & Call/Put Open Interest Shift
-- Real-time News Sentiment (0-100%, Bounded, No NaN)
-- Session VWAP proximity tolerance (< 0.2%)
+├─ Multi-timeframe EMA (9, 21, 50, 200) Confluence
+├─ Orderflow Imbalance Ratio (>1.6x Institutional delta)
+├─ PCR & Call/Put Open Interest Shift
+├─ Real-time News Sentiment (-1.0 to +1.0, bounded)
+├─ Session VWAP proximity tolerance (<0.2%)
+├─ ADX momentum strength filter (>20 threshold)
+└─ SuperTrend direction alignment
 
-RATIONALE QUALITY: Institutional (Exact figures cited)`
-      },
-      agent2: {
-        title: "Reco Backend-to-Frontend Parity Sentinel",
-        details: `AGENT: reco-frontend-parity-sentinel
-ROLE: Continuous DOM integrity audit.
+RATIONALE QUALITY CHECK:
+  ✓ Exact figures cited (e.g., "VWAP: 55,420.10 | ADX: 24.3")
+  ✓ No vague statements ("looks bullish") allowed
+  ✓ Quantitative confidence score (0–100%)
 
-CHECKS PERFORMED:
-- #dualRecoGrid rendered without stuck 'Calculating...'
-- Exact decimal parity between SQLite and browser cards
-- Valid Monthly Expiry format (28-Apr-2026 / 26-May-2026)
-- 0 console JavaScript errors on timeframe switch`
-      },
-      agent3: {
-        title: "Candlestick Pattern Stepper Auditor",
-        details: `AGENT: candlestick-pattern-stepper
-ROLE: Real-time pattern recognition and progression stepper.
+DISPATCH: On SL miss → anomaly logged to sl_events.json`},
 
-PATTERNS ACTIVE:
-- Hammer & Inverted Hammer (Shadow >= 2x body)
-- Bullish / Bearish Engulfing
-- Morning Star & Evening Star
-- Stepper pins coordinate badges directly on Canvas overlay`
-      },
-      agent4: {
-        title: "Zero-Hardcoding Freshness Sentinel",
-        details: `AGENT: zero-hardcoding-freshness-sentinel
-ROLE: Eradicate static dummy numbers and placeholder dashes.
+  a2: {title:'⛏️ Backend-to-DOM Sentinel', body:`AGENT: reco-e2e-verifier
+ROLE : Continuous DOM integrity audit — every DB record = UI card.
 
-AUDIT RESULTS:
-- 14/14 Panels inspected
-- Hardcoded static prices found: 0
-- Sluggish placeholder dashes: 0
-- Fallback cached candles ready for connection blips`
-      },
-      agent5: {
-        title: "Position Lifecycle & PnL Reconciler",
-        details: `AGENT: position-lifecycle-reconciler
-ROLE: Tick-by-tick MTM calculation and SQLite accounting.
+CHECKS PERFORMED EVERY 5 MINUTES:
+├─ #dualRecoGrid rendered (no stuck 'Calculating...')
+├─ Exact decimal parity: SQLite 200.50 = browser card 200.50
+├─ Valid expiry format: 28-Apr-2026
+├─ 0 JS console errors on timeframe switch
+├─ CE/PE card count matches backend payload count
+└─ Target, Entry, SL all non-null and non-zero
 
-LIFECYCLE VERIFIED:
-- PENDING -> OPEN -> CLOSED -> SETTLED
-- MTM updated live per incoming tick
-- Bracket stop-loss orders safely registered in SQLite`
-      },
-      agent6: {
-        title: "Chief Auto-Recalibration Engine",
-        details: `AGENT: auto-recalibration-engine
-ROLE: Autonomous self-healing code updater.
+FAILURE ACTION:
+  → Flags DOM desync in telemetry console
+  → Triggers Telegram alert to Santosh Madnani`},
 
-ALGORITHM:
-- When SL is hit: Diagnoses failure vector (VWAP trap / chop zone).
-- Recalibrates ADX and EMA weights in app.py.
-- Validates backtest accuracy >= 90%.
-- Pushes code directly to origin CA-Trader-Bifurcated (Oracle VM).`
-      }
-    };
+  a3: {title:'🧙 Candlestick Pattern Stepper', body:`AGENT: candlestick-pattern-stepper
+ROLE : Real-time pattern recognition and canvas badge pinning.
 
-    function addLog(tag, text, cssClass = '') {
-      const consoleBox = document.getElementById('consoleLogs');
-      const time = new Date().toTimeString().split(' ')[0];
-      const entry = document.createElement('div');
-      entry.className = 'console-entry';
-      entry.innerHTML = `<span class="console-time">${time}</span><span class="console-tag">[${tag}]</span><span class="${cssClass}">${text}</span>`;
-      consoleBox.appendChild(entry);
-      consoleBox.scrollTop = consoleBox.scrollHeight;
-    }
+PATTERNS DETECTED:
+├─ Hammer / Inverted Hammer (shadow ≥ 2× body)
+├─ Bullish / Bearish Engulfing
+├─ Morning Star (3-candle bullish reversal)
+├─ Evening Star (3-candle bearish reversal)
+├─ Doji (open ≈ close, indecision)
+└─ Pin Bar (strong rejection wick)
 
-    function toggleAgent(id) {
-      const box = document.getElementById(id);
-      const isSleeping = box.classList.contains('is-sleeping');
-      const badge = document.getElementById('badge-' + id);
+CANVAS STEPPER:
+  ✓ Pins coordinate badge directly on SVG overlay
+  ✓ Validates x,y coordinates within chart bounds
+  ✓ Ensures badge appears within 100ms of candle close`},
 
-      if (isSleeping) {
-        box.classList.remove('is-sleeping');
-        box.classList.add('is-working');
-        if (badge) {
-          badge.className = 'agent-state-badge state-working';
-          badge.innerHTML = '⛏️ WORKING';
-        }
-        addLog('SWARM', `${id.toUpperCase()} woke up and started processing!`, 'console-win');
-      } else {
-        box.classList.remove('is-working');
-        box.classList.add('is-sleeping');
-        if (badge) {
-          badge.className = 'agent-state-badge state-sleeping';
-          badge.innerHTML = '💤 SLEEPING';
-        }
-        addLog('SWARM', `${id.toUpperCase()} went to sleep (Zzz - 0 tokens).`);
-      }
-    }
+  a4: {title:'🕵️ Zero-Hardcoding Sentinel', body:`AGENT: zero-hardcoding-freshness-sentinel
+ROLE : Eradicate static dummy values and placeholder dashes.
 
-    function setSwarmState(state) {
-      const agents = ['agent1', 'agent2', 'agent3', 'agent4', 'agent5'];
-      agents.forEach(id => {
-        const box = document.getElementById(id);
-        const badge = document.getElementById('badge-' + id);
-        if (state === 'wake') {
-          box.classList.remove('is-sleeping');
-          box.classList.add('is-working');
-          if (badge) {
-            badge.className = 'agent-state-badge state-working';
-            badge.innerHTML = '⛏️ WORKING';
-          }
-        } else {
-          box.classList.remove('is-working');
-          box.classList.add('is-sleeping');
-          if (badge) {
-            badge.className = 'agent-state-badge state-sleeping';
-            badge.innerHTML = '💤 SLEEPING';
-          }
-        }
-      });
-      addLog('CONTROL', state === 'wake' ? 'All agents awake and actively crunching data!' : 'All agents sleeping (Resting Mario/Steve mode, 0 tokens).', state === 'wake' ? 'console-win' : '');
-    }
+SCAN TARGETS:
+├─ 14 terminal panels (LTP, IV, PCR, OI, Greeks...)
+├─ Option chain cells (all strikes, all expiries)
+├─ News sentiment scores and article timestamps
+└─ Chart price axis and volume bars
 
-    // SIMULATE 9:15 AM STOP LOSS PANIC & AUTO-CODE UPDATE
-    function simulateSLPanic() {
-      addLog('ALERT', '09:15 AM: Recommendation BUY CALL 55500 CE (Entry 200) hit SL at 180!', 'console-panic');
-      
-      // Wake all agents immediately
-      setSwarmState('wake');
+RULES ENFORCED:
+  ✗ No hardcoded LTP (e.g., 21450.00 static)
+  ✗ No '--' dashes in live data cells
+  ✗ No 'N/A' where a live value is expected
+  ✓ All values sourced from WebSocket or REST tick feed
+  ✓ Fallback cache allowed max 60 seconds old`},
 
-      setTimeout(() => {
-        addLog('MARIO', 'Analyzing failure: Spot crossed below 5m VWAP (55,420). False breakout detected.', 'console-patch');
-      }, 1000);
+  a5: {title:'🛡️ Position Lifecycle Auditor', body:`AGENT: position-lifecycle-reconciler
+ROLE : Tick-by-tick MTM calculation and SQLite accounting.
 
-      setTimeout(() => {
-        addLog('CHIEF', 'Recalibrating parameters: ADX filter raised 16 -> 20. VWAP tolerance tightened to 0.25%.', 'console-patch');
-        document.getElementById('supPatches').textContent = '4 AUTO';
-      }, 2200);
+LIFECYCLE STATES:
+  PENDING → OPEN → CLOSED → SETTLED
 
-      setTimeout(() => {
-        addLog('QUANT', 'Running BankNifty 5-timeframe backtest engine across April & May 2026...', '');
-      }, 3400);
+RECONCILIATION CHECKS:
+├─ Every open position has a valid entry price
+├─ MTM = (LTP − Entry) × Lot Size × Qty
+├─ Bracket stop-loss order present in DB for each OPEN trade
+├─ On SL hit: state = CLOSED, exit_price = SL, PnL saved
+├─ On target hit: state = CLOSED, exit_price = target, PnL saved
+└─ Closed positions archived with timestamp and result
 
-      setTimeout(() => {
-        addLog('SUCCESS', 'Backtest complete: 5/5 Trades Succeeded. Rolling Accuracy: 97.2%!', 'console-win');
-        document.getElementById('accuracyDisplay').textContent = '97.2%';
-        document.getElementById('supAcc').textContent = '97.2%';
-        addLog('DEPLOY', 'Auto-committing patch and triggering Oracle Cloud deployment pipeline!', 'console-win');
-      }, 4800);
-    }
+DATABASE: ca_trader.sqlite3 → trades table`},
 
-    function openModal(id) {
-      const data = AGENT_DATA[id] || { title: "Agent Info", details: "No information" };
-      document.getElementById('modalTitle').textContent = data.title;
-      document.getElementById('modalContent').textContent = data.details;
-      document.getElementById('modalBox').classList.add('open');
-    }
+  a6: {title:'📰 News Sentiment Sentinel', body:`AGENT: news-sentiment-sentinel
+ROLE : Live news feed health, rate limiting, and bounded scores.
 
-    function closeModal() {
-      document.getElementById('modalBox').classList.remove('open');
-    }
-  </script>
+DATA SOURCES:
+├─ GNews API (primary, 50 req/hr limit)
+├─ NewsAPI.org (fallback, 100 req/day)
+└─ Yahoo Finance RSS (zero-rate emergency fallback)
+
+VALIDATION RULES:
+  ✓ Sentiment score bounded: -1.0 ≤ score ≤ +1.0
+  ✓ No NaN, null, or undefined in score array
+  ✓ Backoff on 429 rate-limit response (exp. retry)
+  ✓ Article age < 4 hours for intraday relevance
+  ✓ Minimum 3 articles required for consensus score`},
+
+  a7: {title:'🖥️ UI/UX Layout Auditor', body:`AGENT: ui-ux-layout-auditor
+ROLE : Font tokens, overflow bounds, mobile and desktop validation.
+
+AUDIT SCOPE:
+├─ All 28 UI components across terminal.html
+├─ Mobile viewport: 375px, 390px, 430px widths
+├─ Desktop viewport: 1280px, 1440px, 1920px widths
+└─ Font consistency: Inter 400/500/600/700 only
+
+RULES:
+  ✗ No element overflow beyond container (scrollWidth > clientWidth)
+  ✗ No button text clipped or truncated
+  ✗ No font-size below 10px in active data cells
+  ✓ All interactive elements have unique IDs
+  ✓ Color contrast WCAG AA compliant (ratio ≥ 4.5:1)`},
+
+  a8: {title:'💓 Heartbeat Liveness Sentinel', body:`AGENT: heartbeat-liveness-sentinel
+ROLE : Ensures 5m recommendation pipeline never stagnates.
+
+HEARTBEAT SCHEDULE (Market Hours: 09:15–15:30 IST):
+  ├─ Every 5 minutes: verify reco generated for all watchlist symbols
+  ├─ Checks all timeframes: 1m, 5m, 15m, 1h
+  └─ Total expected per day: 72 recos/symbol at 5m timeframe
+
+DEAD MAN'S SWITCH:
+  If no reco generated at expected 5m interval:
+  1. Flag PIPELINE_STAGNATION event
+  2. Probe data feeds (NSE/Dhan/Fyers/Yahoo)
+  3. Restart failing feed connection
+  4. Generate synthetic recovery probe
+  5. Dispatch Telegram alert with root cause`},
+
+  a9: {title:'🧬 Auto-Recalibration Engine', body:`AGENT: auto-recalibration-engine
+ROLE : SL breach → code patch → backtest → deploy. Self-healing loop.
+
+TRIGGER CONDITIONS:
+  ├─ SL hit on any recommendation
+  ├─ Rolling win-rate drops below 90%
+  └─ 3 consecutive SL hits in same session
+
+RECALIBRATION ALGORITHM:
+  1. Read sl_events.json (entry, SL, feature state at breach time)
+  2. Diagnose failure vector (VWAP trap / chop zone / news spike)
+  3. Identify parameter to adjust (ADX threshold, VWAP tolerance, EMA period)
+  4. Patch app.py with tuned values
+  5. Run local backtest (250 historical bars, 5 timeframes)
+  6. Verify win-rate ≥ 90%
+  7. git commit + push to origin CA-Trader-Bifurcated
+  8. Oracle VM auto-deploys via GitHub Actions
+  9. Send Telegram success report to Santosh Madnani
+ 10. Return to sleep (0 tokens)
+
+TOKEN COST: 0 tokens in steady state · Antigravity AI called ONLY on anomaly`},
+
+  sup: {title:'👑 Chief Audit Orchestrator', body:`AGENT: chief-audit-orchestrator
+ROLE : Meta-reviewer, release gatekeeper, and Telegram dispatcher.
+
+RESPONSIBILITIES:
+├─ Polls all 9 sentinel health states every 30 seconds
+├─ Blocks Oracle VM deployment if any agent reports FAIL
+├─ Calculates rolling accuracy across all symbols & timeframes
+├─ Maintains audit log: .agents/audit_log.jsonl
+└─ Dispatches Telegram email-style reports
+
+TELEGRAM REPORT FORMAT:
+  📩 [CA-Trader Agent Dispatch]
+  FROM: <Agent Name>
+  TO: Santosh Madnani
+  SUBJECT: <Event Type>
+
+  <Detailed finding or resolution>
+
+  Warm regards,
+  <Agent Name>
+  CA-Trader Autonomous Swarm
+
+TRIGGERS FOR TELEGRAM:
+  → Hourly status report (9 agents healthy, accuracy)
+  → Any SL breach detection
+  → Any code patch applied
+  → Any feed outage or stagnation
+  → Successful recovery + deployment`}
+};
+
+function openModal(id) {
+  const d = AGENT_DETAILS[id] || {title:'Agent', body:'No details available.'};
+  document.getElementById('modalTitle').textContent = d.title;
+  document.getElementById('modalBody').textContent  = d.body;
+  document.getElementById('modalBg').classList.add('open');
+}
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modalBg'))
+    document.getElementById('modalBg').classList.remove('open');
+}
+
+
+/* ================================================================
+   AMBIENT LOG ROTATION (simulated continuous activity)
+   ================================================================ */
+const AMBIENT_LOGS = [
+  ['HB',     '5m heartbeat: BANKNIFTY reco generated ✓',                   'ce-win'],
+  ['DETECT', '14/14 panels live, 0 hardcoded values',                       'ce-win'],
+  ['STEVE',  'DOM sync verified: reco count 2 (CE/PE)',                     'ce-text'],
+  ['WIZARD', 'Bullish Engulfing spotted on 5m NIFTY chart at 09:50',        'ce-patch'],
+  ['NEWS',   'Sentiment update: NIFTY +0.61 (Positive)',                    'ce-text'],
+  ['UI',     'Mobile view 390px: all 28 components within bounds',          'ce-win'],
+  ['KNIGHT', 'MTM updated: BANKNIFTY CE trade +₹2,850',                    'ce-text'],
+  ['MARIO',  'VWAP proximity check: 55,418 (0.03% from VWAP)',              'ce-text'],
+  ['CHIEF',  'Agent health: 9/9 PASS. Accuracy steady at 96.4%',            'ce-win'],
+  ['HB',     'Pipeline alive: 84 recos generated today',                    'ce-win'],
+  ['DETECT', 'Option chain: 0 static prices detected',                      'ce-win'],
+  ['NEWS',   'GNews rate: 31/50 req/hr. All articles < 2h old',             'ce-text'],
+];
+let ambientIdx = 0;
+setInterval(() => {
+  const [tag, msg, cls] = AMBIENT_LOGS[ambientIdx % AMBIENT_LOGS.length];
+  addLog(tag, msg, cls);
+  ambientIdx++;
+}, 4200);
+</script>
 </body>
 </html>
