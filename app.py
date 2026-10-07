@@ -8064,6 +8064,12 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
             }
         ]
 
+        reco_test_err = None
+        try:
+            await recommendation_history(request)
+        except Exception as e_test:
+            reco_test_err = traceback.format_exc()
+
         return {
             "status": "ok",
             "ist_time": now_ist.strftime("%H:%M:%S IST"),
@@ -8073,6 +8079,7 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
             "open_positions": open_pos_count,
             "agents_healthy": 9,
             "total_agents": 9,
+            "reco_test_err": reco_test_err,
             "events": events
         }
     except Exception as exc:
