@@ -8092,8 +8092,11 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
         except Exception as e_test:
             reco_test_err = traceback.format_exc()
 
-        tg_cfg = get_user_telegram_config(db_exec, 1)
-        tg_ready = bool(tg_cfg and tg_cfg.get("bot_token") and tg_cfg.get("chat_id"))
+        tg_row = db_exec(
+            "SELECT value_json FROM settings WHERE key='telegram_config' AND value_json LIKE '%bot_token%' LIMIT 1",
+            [], "one"
+        )
+        tg_ready = bool(tg_row and tg_row.get("value_json"))
 
         return {
             "status": "ok",
