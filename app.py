@@ -464,10 +464,10 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force
                 active_s["status"] = f"Target 1 Hit 🎯 Scalp Profit Booked (₹{pulse_val})"
             log.info("Stock Mantra price pulse received: %s -> %s = ₹%s", last_k, active_s['symbol'], pulse_val)
 
-        contract_re = re.search(r'\b(NIFTY|BANKNIFTY|BANK\s*NIFTY|FINNIFTY|FIN\s*NIFTY|SENSEX|BSESENSEX|MIDCPNIFTY|RELIANCE|TCS|CRUDEOIL|INFY)\s*(\d{4,6})\s*(CE|PE|CALL|PUT)\b', text, re.IGNORECASE)
+        contract_re = re.search(r'\b(NIFTY|BANKNIFTY|BANK\s*NIFTY|BN|FINNIFTY|FIN\s*NIFTY|SENSEX|BSESENSEX|MIDCPNIFTY|RELIANCE|TCS|CRUDEOIL|INFY)\s*(\d{4,6})\s*(CE|PE|CALL|PUT)\b', text, re.IGNORECASE)
         if contract_re:
             und_raw = contract_re.group(1).upper().replace(" ", "")
-            und = "BANKNIFTY" if "BANK" in und_raw else ("FINNIFTY" if "FIN" in und_raw else ("SENSEX" if "SENSEX" in und_raw else und_raw))
+            und = "BANKNIFTY" if any(b in und_raw for b in ("BANK", "BN")) else ("FINNIFTY" if "FIN" in und_raw else ("SENSEX" if "SENSEX" in und_raw else und_raw))
             strike = int(contract_re.group(2))
             opt_raw = contract_re.group(3).upper()
             opt_type = "CE" if opt_raw in ("CE", "CALL") else "PE"
@@ -18727,13 +18727,30 @@ async def stockmantra_banknifty_endpoint() -> dict[str, Any]:
             if "BANKNIFTY" in str(k).upper() or "BANK" in str(k).upper():
                 bn_setup = v
                 break
+    raw_snippets = []
+    try:
+        _bdir = Path(__file__).resolve().parent
+        for p in [Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json"), _bdir / "data" / "stockmantra_3months.json"]:
+            if p.exists():
+                msgs = json.loads(p.read_text(encoding="utf-8", errors="ignore"))
+                for m in reversed(msgs):
+                    txt = m.get("text", "")
+                    if any(w in txt.upper() for w in ("BANKNIFTY", "BANK NIFTY", "BN ")):
+                        raw_snippets.append({"date": m.get("date"), "text": txt[:140]})
+                        if len(raw_snippets) >= 4:
+                            break
+                break
+    except Exception as exc:
+        raw_snippets.append({"err": str(exc)})
+
     return {
         "ok": True,
         "underlying": "BANKNIFTY",
         "has_recommendation": bn_setup is not None,
         "setup": bn_setup,
         "all_live_count": len(LIVE_STOCKMANTRA_SETUPS),
-        "live_symbols": list(LIVE_STOCKMANTRA_SETUPS.keys())
+        "live_symbols": list(LIVE_STOCKMANTRA_SETUPS.keys()),
+        "raw_bank_snippets": raw_snippets
     }
 
 @app.post("/api/telegram/send-reco/{reco_id}")
