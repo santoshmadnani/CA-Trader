@@ -608,11 +608,12 @@ def _load_stockmantra_historical_cache() -> None:
     """Parses messages from stockmantra_3months.json or server disk cache so latest session setups are pre-loaded."""
     global LIVE_STOCKMANTRA_SETUPS, LIVE_STOCKMANTRA_MSGS
     try:
+        _bdir = Path(__file__).resolve().parent
         candidates = [
             Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json"),
             Path("/home/ubuntu/CA-Trader/stockmantra_3months.json"),
-            BASE_DIR / "data" / "stockmantra_3months.json",
-            BASE_DIR / "stockmantra_3months.json"
+            _bdir / "data" / "stockmantra_3months.json",
+            _bdir / "stockmantra_3months.json"
         ]
         found = next((p for p in candidates if p.exists()), None)
         if not found:
@@ -631,7 +632,10 @@ def _load_stockmantra_historical_cache() -> None:
     except Exception as exc:
         log.debug("Error loading stockmantra historical cache: %s", exc)
 
-_load_stockmantra_historical_cache()
+try:
+    _load_stockmantra_historical_cache()
+except Exception:
+    pass
 
 
 # ---------------------------------------------------------------------------
