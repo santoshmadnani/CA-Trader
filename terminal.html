@@ -21718,17 +21718,15 @@ async function refreshWatchlistQuotes() {
           }
         }
 
-        // 5. Check cached option chain
-        if (root && window.APP_CACHE && window.APP_CACHE.optionChain && window.APP_CACHE.optionChain[root]) {
-          const oc = window.APP_CACHE.optionChain[root];
-          if (oc.strikes && strike) {
-            const stkNum = parseFloat(strike);
-            const row = oc.strikes.find(r => Math.abs(parseFloat(r.strike) - stkNum) < 1);
-            if (row) {
-              const sideObj = isCe ? row.call : row.put;
-              if (sideObj && sideObj.ltp && Number(sideObj.ltp) > 0) {
-                return { symbol: sideObj.trading_symbol || optSym, ltp: Number(sideObj.ltp) };
-              }
+        // 5. Check all cached live option chains
+        const oc = window.__caOptionChainCache?.[root]?.chain || window.optionState?.chain || (window.APP_CACHE && window.APP_CACHE.optionChain && window.APP_CACHE.optionChain[root]) || window.APP_CACHE?.options;
+        if (oc && oc.strikes && strike) {
+          const stkNum = parseFloat(strike);
+          const row = (oc.strikes || []).find(r => Math.abs(parseFloat(r.strike) - stkNum) < 1);
+          if (row) {
+            const sideObj = isCe ? row.call : row.put;
+            if (sideObj && sideObj.ltp != null && Number(sideObj.ltp) > 0) {
+              return { symbol: sideObj.trading_symbol || sideObj.symbol || optSym, ltp: Number(sideObj.ltp), quote: sideObj };
             }
           }
         }
@@ -30996,7 +30994,21 @@ function makeUniversalDraggable(targetEl, handleEl) {
       let ceStrike = strike;
       let cleanCeSym = rawCe?.display || rawCe?.symbol || `${cleanRoot} ${cleanExpCe} ${ceStrike} CE`;
       const liveQCe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanCeSym, cleanRoot) : null;
-      let ltpCe = Number((liveQCe && liveQCe.ltp) || rawCe?.cmp || rawCe?.entry || rawCe?.ltp || 0);
+      let ltpCe = Number((liveQCe && liveQCe.ltp) || 0);
+      
+      // Look up real market LTP from preloaded or active option chain
+      if (ltpCe <= 0) {
+        const oc = window.__caOptionChainCache?.[cleanRoot]?.chain || window.optionState?.chain || (window.APP_CACHE && window.APP_CACHE.optionChain && window.APP_CACHE.optionChain[cleanRoot]);
+        if (oc && Array.isArray(oc.strikes)) {
+          const matchedRow = oc.strikes.find(r => Math.abs(Number(r.strike) - ceStrike) < 1);
+          if (matchedRow && matchedRow.call && matchedRow.call.ltp != null && Number(matchedRow.call.ltp) > 0) {
+            ltpCe = Number(matchedRow.call.ltp);
+          }
+        }
+      }
+      if (ltpCe <= 0) {
+        ltpCe = Number(rawCe?.cmp || rawCe?.entry || rawCe?.ltp || 0);
+      }
       if (ltpCe <= 0 && curLtp > 0) {
         const atmPct = cleanRoot.includes('CRUDE') ? 0.028 : (cleanRoot.includes('BANK') ? 0.012 : 0.009);
         ltpCe = Math.round(curLtp * atmPct * 100) / 100;
@@ -31006,7 +31018,14 @@ function makeUniversalDraggable(targetEl, handleEl) {
         const priceRatio = Math.max(0.12, maxAllowedEntry / ltpCe);
         const otmSteps = Math.min(10, Math.max(1, Math.ceil(-Math.log(priceRatio) / 0.35)));
         ceStrike = strike + (otmSteps * step);
-        ltpCe = Math.max(5.0, Math.round(maxAllowedEntry * 0.94 * 10) / 10);
+        // Look up shifted strike in real option chain as well
+        const oc = window.__caOptionChainCache?.[cleanRoot]?.chain || window.optionState?.chain;
+        const matchedRow = oc?.strikes?.find(r => Math.abs(Number(r.strike) - ceStrike) < 1);
+        if (matchedRow?.call?.ltp > 0) {
+          ltpCe = Number(matchedRow.call.ltp);
+        } else {
+          ltpCe = Math.max(5.0, Math.round(maxAllowedEntry * 0.94 * 10) / 10);
+        }
       }
       const ceDisplayName = `${cleanRoot} ${ceStrike} CE`;
 
@@ -31024,12 +31043,38 @@ function makeUniversalDraggable(targetEl, handleEl) {
       let peStrike = strike;
       let cleanPeSym = rawPe?.display || rawPe?.symbol || `${cleanRoot} ${cleanExpPe} ${peStrike} PE`;
       const liveQPe = typeof findLiveOptionQuote === 'function' ? findLiveOptionQuote(cleanPeSym, cleanRoot) : null;
-      let ltpPe = Number((liveQPe && liveQPe.ltp) || rawPe?.cmp || rawPe?.entry || rawPe?.ltp || 0);
+      let ltpPe = Number((liveQPe && liveQPe.ltp) || 0);
+      
+      // Look up real market LTP from preloaded or active option chain for PE
+      if (ltpPe <= 0) {
+        const oc = window.__caOptionChainCache?.[cleanRoot]?.chain || window.optionState?.chain || (window.APP_CACHE && window.APP_CACHE.optionChain && window.APP_CACHE.optionChain[cleanRoot]);
+        if (oc && Array.isArray(oc.strikes)) {
+          const matchedRow = oc.strikes.find(r => Math.abs(Number(r.strike) - peStrike) < 1);
+          if (matchedRow && matchedRow.put && matchedRow.put.ltp != null && Number(matchedRow.put.ltp) > 0) {
+            ltpPe = Number(matchedRow.put.ltp);
+          }
+        }
+      }
+      if (ltpPe <= 0) {
+        ltpPe = Number(rawPe?.cmp || rawPe?.entry || rawPe?.ltp || 0);
+      }
       if (ltpPe <= 0 && curLtp > 0) {
         const atmPct = cleanRoot.includes('CRUDE') ? 0.028 : (cleanRoot.includes('BANK') ? 0.012 : 0.009);
         ltpPe = Math.round(curLtp * atmPct * 100) / 100;
       }
       // Check affordability / max buyable price for PE: shift strike OTM if needed
+      if (maxAllowedEntry > 5 && ltpPe > maxAllowedEntry) {
+        const priceRatio = Math.max(0.12, maxAllowedEntry / ltpPe);
+        const otmSteps = Math.min(10, Math.max(1, Math.ceil(-Math.log(priceRatio) / 0.35)));
+        peStrike = strike - (otmSteps * step);
+        const oc = window.__caOptionChainCache?.[cleanRoot]?.chain || window.optionState?.chain;
+        const matchedRow = oc?.strikes?.find(r => Math.abs(Number(r.strike) - peStrike) < 1);
+        if (matchedRow?.put?.ltp > 0) {
+          ltpPe = Number(matchedRow.put.ltp);
+        } else {
+          ltpPe = Math.max(5.0, Math.round(maxAllowedEntry * 0.94 * 10) / 10);
+        }
+      }
       if (maxAllowedEntry > 5 && ltpPe > maxAllowedEntry) {
         const priceRatio = Math.max(0.12, maxAllowedEntry / ltpPe);
         const otmSteps = Math.min(10, Math.max(1, Math.ceil(-Math.log(priceRatio) / 0.35)));

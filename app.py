@@ -4006,9 +4006,17 @@ def resolve_option_for_future(future_sym: str, opt_bias: str = "BUY", user_id: i
     is_bull = str(opt_bias).upper() in {"BUY", "LONG", "ACCUMULATE", "BULLISH"}
     bias_tag = "CE" if is_bull else "PE"
 
-    # Step 1: Query live option chain engine FIRST for best ATM/near-OTM option
+    # Step 1: Query live option chain from UPSTOX first for real market strike LTPs
     try:
-        chain = generate_option_chain_engine(root)
+        chain = None
+        try:
+            up_chain = UPSTOX.option_chain(root)
+            if up_chain and isinstance(up_chain, dict) and up_chain.get("strikes"):
+                chain = up_chain
+        except Exception:
+            chain = None
+        if not chain or not chain.get("strikes"):
+            chain = generate_option_chain_engine(root)
         spot = float(chain.get("spot") or 0.0)
         step = float(chain.get("step") or 50.0)
         strikes = chain.get("strikes") or []
