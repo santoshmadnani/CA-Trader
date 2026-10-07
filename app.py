@@ -8013,9 +8013,14 @@ async def multi_agent_harness_page(request: Request) -> Response:
 
 
 @app.post("/api/telegram/agent-dispatch")
-async def telegram_agent_dispatch(payload: dict, user: dict[str, Any] = Depends(get_current_user_optional)) -> dict[str, Any]:
+async def telegram_agent_dispatch(payload: dict, request: Request) -> dict[str, Any]:
     """Dispatches an email-style Telegram status report from a named swarm agent."""
     try:
+        user = None
+        try:
+            user = current_user(request)
+        except Exception:
+            user = None
         uid = (user or {}).get("id", 1)
         cfg = get_user_telegram_config(db_exec, uid)
         if not cfg or not cfg.get("bot_token") or not cfg.get("chat_id"):
