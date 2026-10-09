@@ -1517,6 +1517,30 @@ def init_db() -> None:
         UNIQUE(symbol, trade_date, expiry_date, strike, option_type)
     );
     CREATE INDEX IF NOT EXISTS idx_hist_opt_sym ON historical_options(symbol, trade_date, expiry_date);
+
+    CREATE TABLE IF NOT EXISTS stockmantra_recommendations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT,
+        time TEXT,
+        symbol TEXT,
+        underlying TEXT,
+        strike REAL,
+        option_type TEXT,
+        signal TEXT,
+        entry REAL,
+        target_1 REAL,
+        target_2 REAL,
+        sl REAL,
+        exit REAL,
+        high_reached REAL,
+        gain_5m_pct REAL,
+        gain_day_pct REAL,
+        hit_5m INTEGER DEFAULT 0,
+        hit_runner INTEGER DEFAULT 0,
+        sl_hit INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_sm_reco_sym ON stockmantra_recommendations(symbol, underlying);
     """
     with _DB_LOCK:
         conn = db_conn()

@@ -303,9 +303,13 @@ def run_reconciliation():
         "source": "StockMantra_3Month_Reconciliation"
     }
 
-    if db_path and db_path.exists():
+    existing_dbs = list(set(p for p in db_candidates if p.exists()))
+    if not existing_dbs and db_path:
+        existing_dbs = [db_path]
+
+    for cur_db in existing_dbs:
         try:
-            with sqlite3.connect(str(db_path)) as conn:
+            with sqlite3.connect(str(cur_db)) as conn:
                 cur = conn.cursor()
                 cur.execute("UPDATE reco_calibration SET is_active=0")
                 for sym in ["DEFAULT", "NIFTY", "BANKNIFTY", "SENSEX", "CRUDEOIL", "FINNIFTY"]:
