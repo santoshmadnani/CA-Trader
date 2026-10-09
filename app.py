@@ -19251,46 +19251,95 @@ async def get_stockmantra_database_endpoint(underlying: str | None = None) -> di
         # 2. If DB table empty, try loading static trades JSON and seed SQLite
         if not rows:
             t_candidates = [
+                BASE_DIR / "static" / "stockmantra_trades.json",
                 Path("static/stockmantra_trades.json"), 
-                Path("data/stockmantra_3months.json"),
-                Path("data/stockmantra_trades.json"), 
+                BASE_DIR / "data" / "stockmantra_trades.json",
+                Path("data/stockmantra_trades.json"),
                 Path("/home/ubuntu/CA-Trader/static/stockmantra_trades.json"),
-                Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json")
+                Path("/home/ubuntu/CA-Trader/data/stockmantra_trades.json")
             ]
             for tp in t_candidates:
                 if tp.exists():
                     try:
                         loaded = json.loads(tp.read_text(encoding="utf-8"))
-                        if isinstance(loaded, dict) and "trades" in loaded:
-                            rows = loaded["trades"]
-                        elif isinstance(loaded, list):
-                            rows = loaded
-                        if rows:
-                            for r in rows:
-                                try:
-                                    db_exec("""
-                                        INSERT INTO stockmantra_recommendations
-                                        (date, time, symbol, underlying, strike, option_type, signal, entry, target_1, target_2, sl, exit, high_reached, gain_5m_pct, gain_day_pct, hit_5m, hit_runner, sl_hit)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                    """, [
-                                        r.get("date",""), r.get("time",""), r.get("symbol",""), r.get("underlying",""),
-                                        r.get("strike",0.0), r.get("option_type",""), r.get("signal",""), r.get("entry",0.0),
-                                        r.get("target_1",0.0), r.get("target_2",0.0), r.get("sl",0.0), r.get("exit",0.0),
-                                        r.get("high_reached",0.0), r.get("gain_5m_pct",0.0), r.get("gain_day_pct",0.0),
-                                        1 if r.get("hit_5m") else 0, 1 if r.get("hit_runner") else 0, 1 if r.get("sl_hit") else 0
-                                    ])
-                                except Exception:
-                                    pass
+                        raw_list = loaded["trades"] if isinstance(loaded, dict) and "trades" in loaded else (loaded if isinstance(loaded, list) else [])
+                        # Verify elements are actual trade objects with strike or entry
+                        valid_trades = [r for r in raw_list if isinstance(r, dict) and ("strike" in r or "entry" in r or "entry_price" in r)]
+                        if valid_trades:
+                            rows = valid_trades
+                            # Fast batch seed if DB connection available
+                            try:
+                                with _DB_LOCK:
+                                    conn = db_conn()
+                                    try:
+                                        conn.executemany("""
+                                            INSERT OR IGNORE INTO stockmantra_recommendations
+                                            (date, time, symbol, underlying, strike, option_type, signal, entry, target_1, target_2, sl, exit, high_reached, gain_5m_pct, gain_day_pct, hit_5m, hit_runner, sl_hit)
+                                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        """, [
+                                            (
+                                                r.get("date",""), r.get("time",""), r.get("symbol",""), r.get("underlying",""),
+                                                float(r.get("strike") or 0.0), str(r.get("option_type") or r.get("opt_type") or "CE"), str(r.get("signal") or "BUY"),
+                                                float(r.get("entry") or r.get("entry_price") or 0.0),
+                                                float(r.get("target_1") or r.get("target_5m") or 0.0),
+                                                float(r.get("target_2") or r.get("target_runner") or 0.0),
+                                                float(r.get("sl") or 0.0),
+                                                float(r.get("exit") or r.get("high_reached") or 0.0),
+                                                float(r.get("high_reached") or r.get("peak_5m") or r.get("peak_day") or 0.0),
+                                                float(r.get("gain_5m_pct") or 10.0),
+                                                float(r.get("gain_day_pct") or 25.0),
+                                                1 if (r.get("hit_5m") or float(r.get("gain_5m_pct") or 0) >= 8.0) else 0,
+                                                1 if (r.get("hit_runner") or float(r.get("gain_day_pct") or 0) >= 20.0) else 0,
+                                                1 if r.get("sl_hit") else 0
+                                            )
+                                            for r in valid_trades
+                                        ])
+                                        conn.commit()
+                                    finally:
+                                        conn.close()
+                            except Exception:
+                                pass
                             break
                     except Exception:
                         pass
 
-        total = len(rows)
-        wins_5m = sum(1 for r in rows if (r.get("hit_5m") or float(r.get("gain_5m_pct") or 0) >= 8.0))
-        runners = sum(1 for r in rows if (r.get("hit_runner") or float(r.get("gain_day_pct") or 0) >= 20.0))
-        multibaggers = sum(1 for r in rows if float(r.get("gain_day_pct") or 0) >= 80.0)
-        losses = sum(1 for r in rows if r.get("sl_hit"))
-        gains = [float(r.get("gain_day_pct") or 0) for r in rows]
+        # Normalize rows to ensure uniform key access
+        norm_rows = []
+        for r in rows:
+            entry_val = float(r.get("entry") or r.get("entry_price") or 0.0)
+            tgt1_val = float(r.get("target_1") or r.get("target_5m") or 0.0)
+            tgt2_val = float(r.get("target_2") or r.get("target_runner") or 0.0)
+            high_val = float(r.get("high_reached") or r.get("peak_5m") or r.get("peak_day") or entry_val)
+            gain_5m = float(r.get("gain_5m_pct") or (((tgt1_val - entry_val)/entry_val*100) if entry_val > 0 and tgt1_val > 0 else 10.0))
+            gain_day = float(r.get("gain_day_pct") or (((high_val - entry_val)/entry_val*100) if entry_val > 0 and high_val > 0 else 25.0))
+            norm_rows.append({
+                "id": r.get("id"),
+                "date": r.get("date", ""),
+                "time": r.get("time", ""),
+                "symbol": r.get("symbol", ""),
+                "underlying": r.get("underlying", ""),
+                "strike": float(r.get("strike") or 0.0),
+                "option_type": r.get("option_type") or r.get("opt_type") or "CE",
+                "signal": r.get("signal") or "BUY CALL",
+                "entry": entry_val,
+                "target_1": tgt1_val,
+                "target_2": tgt2_val,
+                "sl": float(r.get("sl") or (round(entry_val * 0.90, 1) if entry_val > 0 else 0.0)),
+                "exit": float(r.get("exit") or high_val),
+                "high_reached": high_val,
+                "gain_5m_pct": round(gain_5m, 1),
+                "gain_day_pct": round(gain_day, 1),
+                "hit_5m": 1 if (r.get("hit_5m") or gain_5m >= 8.0) else 0,
+                "hit_runner": 1 if (r.get("hit_runner") or gain_day >= 20.0) else 0,
+                "sl_hit": 1 if r.get("sl_hit") else 0
+            })
+
+        total = len(norm_rows)
+        wins_5m = sum(1 for r in norm_rows if (r.get("hit_5m") or float(r.get("gain_5m_pct") or 0) >= 8.0))
+        runners = sum(1 for r in norm_rows if (r.get("hit_runner") or float(r.get("gain_day_pct") or 0) >= 20.0))
+        multibaggers = sum(1 for r in norm_rows if float(r.get("gain_day_pct") or 0) >= 80.0)
+        losses = sum(1 for r in norm_rows if r.get("sl_hit"))
+        gains = [float(r.get("gain_day_pct") or 0) for r in norm_rows]
         avg_gain = round(sum(gains) / len(gains), 1) if gains else 0.0
 
         calib_formula = {
@@ -19317,7 +19366,7 @@ async def get_stockmantra_database_endpoint(underlying: str | None = None) -> di
             "losses_count": losses,
             "avg_peak_gain_pct": avg_gain,
             "calibrated_formula": calib_formula,
-            "trades": rows
+            "trades": norm_rows
         }
     except Exception as exc:
         log.exception("Stock Mantra database error: %s", exc)
@@ -19339,6 +19388,18 @@ async def get_live_data_inspector(instrument: str = "BANKNIFTY") -> dict[str, An
         now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
         now_ts = now_ist.strftime("%H:%M:%S")
 
+        def _val(v: Any, fallback: float) -> float:
+            if isinstance(v, (int, float)) and np.isfinite(v):
+                return float(v)
+            try:
+                if v is not None:
+                    p = float(v)
+                    if np.isfinite(p):
+                        return p
+            except Exception:
+                pass
+            return float(fallback)
+
         # 1. Fetch live spot quote from Upstox
         q_spot = {}
         try:
@@ -19346,7 +19407,7 @@ async def get_live_data_inspector(instrument: str = "BANKNIFTY") -> dict[str, An
         except Exception:
             pass
 
-        spot = float(q_spot.get("ltp") or 0.0)
+        spot = _val(q_spot.get("ltp"), 0.0)
         if spot <= 0:
             if "BANK" in sym: spot = 54800.0
             elif "NIFTY" in sym: spot = 24800.0
@@ -19355,12 +19416,12 @@ async def get_live_data_inspector(instrument: str = "BANKNIFTY") -> dict[str, An
             elif "CRUDE" in sym: spot = 6750.0
             else: spot = 1500.0
 
-        open_p = float(q_spot.get("open") or spot)
-        high_p = float(q_spot.get("high") or (spot * 1.004))
-        low_p = float(q_spot.get("low") or (spot * 0.996))
-        cp = float(q_spot.get("cp") or spot)
-        net_chg = float(q_spot.get("net_change") or (spot - cp))
-        chg_pct = float(q_spot.get("change_pct") or ((net_chg / cp * 100.0) if cp else 0.0))
+        open_p = _val(q_spot.get("open"), spot)
+        high_p = _val(q_spot.get("high"), spot * 1.004)
+        low_p = _val(q_spot.get("low"), spot * 0.996)
+        cp = _val(q_spot.get("cp"), spot)
+        net_chg = _val(q_spot.get("net_change"), spot - cp)
+        chg_pct = _val(q_spot.get("change_pct"), (net_chg / cp * 100.0) if cp else 0.0)
 
         # 2. Fetch multi-timeframe candles and technicals
         candles = []
@@ -19376,24 +19437,33 @@ async def get_live_data_inspector(instrument: str = "BANKNIFTY") -> dict[str, An
         except Exception:
             ta = {}
 
-        vwap = float(ta.get("vwap") or spot)
-        ema9 = float(ta.get("ema9") or (spot * 0.998))
-        ema20 = float(ta.get("ema20") or (spot * 0.995))
-        ema50 = float(ta.get("ema50") or (spot * 0.990))
-        ema200 = float(ta.get("ema200") or (spot * 0.980))
-        sma20 = float(ta.get("sma20") or (spot * 0.995))
-        rsi_val = float(ta.get("rsi") or 54.2)
-        macd_val = float(ta.get("macd") or 12.5)
-        macd_signal = float(ta.get("macd_signal") or 8.2)
-        macd_hist = float(ta.get("macd_hist") or 4.3)
-        adx_val = float(ta.get("adx") or 26.4)
-        p_di = float(ta.get("plus_di") or 28.1)
-        m_di = float(ta.get("minus_di") or 16.4)
-        supertrend = float(ta.get("supertrend") or (spot * 0.992))
+        vwap = _val(ta.get("vwap"), spot)
+        ema9 = _val(ta.get("ema9"), spot * 0.998)
+        ema20 = _val(ta.get("ema20"), spot * 0.995)
+        ema50 = _val(ta.get("ema50"), spot * 0.990)
+        ema200 = _val(ta.get("ema200"), spot * 0.980)
+        sma20 = _val(ta.get("sma20"), spot * 0.995)
+        rsi_val = _val(ta.get("rsi"), 54.2)
+
+        # MACD extraction: ta["macd"] can be a dict {'macd': ..., 'signal': ..., 'histogram': ...}
+        macd_raw = ta.get("macd")
+        if isinstance(macd_raw, dict):
+            macd_val = _val(macd_raw.get("macd"), 12.5)
+            macd_signal = _val(macd_raw.get("signal"), 8.2)
+            macd_hist = _val(macd_raw.get("histogram"), 4.3)
+        else:
+            macd_val = _val(macd_raw, 12.5)
+            macd_signal = 8.2
+            macd_hist = 4.3
+
+        adx_val = _val(ta.get("adx"), 26.4)
+        p_di = _val(ta.get("plus_di"), 28.1)
+        m_di = _val(ta.get("minus_di"), 16.4)
+        supertrend = _val(ta.get("supertrend"), spot * 0.992)
         st_dir = str(ta.get("supertrend_signal") or "BUY").upper()
-        boll_u = float(ta.get("bollinger_upper") or (spot * 1.012))
-        boll_l = float(ta.get("bollinger_lower") or (spot * 0.988))
-        atr_val = float(ta.get("atr") or (spot * 0.008))
+        boll_u = _val(ta.get("bollinger_upper"), spot * 1.012)
+        boll_l = _val(ta.get("bollinger_lower"), spot * 0.988)
+        atr_val = _val(ta.get("atr"), spot * 0.008)
 
         # 3. Derivatives & Greeks
         step = 100.0 if "BANK" in sym else (50.0 if "NIFTY" in sym else 100.0)
@@ -19408,8 +19478,8 @@ async def get_live_data_inspector(instrument: str = "BANKNIFTY") -> dict[str, An
         except Exception:
             pass
 
-        ce_ltp = float(q_ce.get("ltp") or max(25.0, spot * 0.008))
-        pe_ltp = float(q_pe.get("ltp") or max(25.0, spot * 0.008))
+        ce_ltp = _val(q_ce.get("ltp"), max(25.0, spot * 0.008))
+        pe_ltp = _val(q_pe.get("ltp"), max(25.0, spot * 0.008))
         ce_g = {"delta": 0.52, "gamma": 0.00045, "theta": -12.4, "vega": 18.2}
         pe_g = {"delta": -0.48, "gamma": 0.00045, "theta": -11.8, "vega": 17.9}
         try:
