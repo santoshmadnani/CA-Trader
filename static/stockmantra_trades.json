@@ -1,0 +1,518 @@
+[
+  {
+    "id": 1001,
+    "date": "2026-09-21T09:56:00+05:30",
+    "underlying": "CRUDEOIL",
+    "strike": 8500,
+    "opt_type": "PE",
+    "symbol": "CRUDEOIL 8500 PE",
+    "entry_raw": "275",
+    "entry_price": 275.0,
+    "target_5m": 302.5,
+    "target_runner": 398.8,
+    "peak_5m": 371.2,
+    "peak_day": 371.2,
+    "hit_5m": true,
+    "hit_runner": false,
+    "updates": [
+      {
+        "time": "2026-09-21T10:01:00+05:30",
+        "sec": 300.0,
+        "val": 308.0,
+        "text": "308 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-21T11:45:00+05:30",
+        "sec": 6540.0,
+        "val": 371.2,
+        "text": "HIGH 371.2 \ud83d\ude80 TARGET 1 DONE"
+      }
+    ],
+    "sl_hit": false,
+    "text": "CRUDE OIL 8500 PE \nBUY NEAR 275 \nTGT open \nSl follow",
+    "gain_5m_pct": 35.0,
+    "gain_day_pct": 35.0,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1004,
+    "date": "2026-09-22T03:46:00+05:30",
+    "underlying": "NIFTY",
+    "strike": 23600,
+    "opt_type": "PE",
+    "symbol": "NIFTY 23600 PE",
+    "entry_raw": "158",
+    "entry_price": 158.0,
+    "target_5m": 173.8,
+    "target_runner": 229.1,
+    "peak_5m": 175.0,
+    "peak_day": 175.0,
+    "hit_5m": true,
+    "hit_runner": false,
+    "updates": [
+      {
+        "time": "2026-09-22T03:51:00+05:30",
+        "sec": 300.0,
+        "val": 175.0,
+        "text": "175 \ud83d\udca5"
+      }
+    ],
+    "sl_hit": false,
+    "text": "NIFTY 23600 PE \nBUY AROUND 158 \nTGT open \nSl follow",
+    "gain_5m_pct": 10.8,
+    "gain_day_pct": 10.8,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1007,
+    "date": "2026-09-22T05:15:00+05:30",
+    "underlying": "NIFTY",
+    "strike": 23500,
+    "opt_type": "PE",
+    "symbol": "NIFTY 23500 PE",
+    "entry_raw": "125",
+    "entry_price": 125.0,
+    "target_5m": 137.5,
+    "target_runner": 181.2,
+    "peak_5m": 236.0,
+    "peak_day": 236.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-22T05:20:00+05:30",
+        "sec": 300.0,
+        "val": 140.0,
+        "text": "140 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-22T05:30:00+05:30",
+        "sec": 900.0,
+        "val": 236.0,
+        "text": "HIGH 236 \ud83d\ude80 BLAST"
+      },
+      {
+        "time": "2026-09-22T06:10:00+05:30",
+        "sec": 3300.0,
+        "val": 184.0,
+        "text": "HIGH 184 \ud83d\ude80 TARGET HIT"
+      }
+    ],
+    "sl_hit": false,
+    "text": "NIFTY 23500 PE \nBUY NEAR 125 \nTGT open \nSl follow",
+    "gain_5m_pct": 88.8,
+    "gain_day_pct": 88.8,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1010,
+    "date": "2026-09-22T08:21:00+05:30",
+    "underlying": "NIFTY",
+    "strike": 23300,
+    "opt_type": "PE",
+    "symbol": "NIFTY 23300 PE",
+    "entry_raw": "30",
+    "entry_price": 30.0,
+    "target_5m": 33.0,
+    "target_runner": 43.5,
+    "peak_5m": 30.0,
+    "peak_day": 30.0,
+    "hit_5m": false,
+    "hit_runner": false,
+    "updates": [],
+    "sl_hit": false,
+    "text": "NIFTY 23300 PE \nBUY AT 30 \nTGT open \nSl follow",
+    "gain_5m_pct": 0.0,
+    "gain_day_pct": 0.0,
+    "ca_trader_concordance": false
+  },
+  {
+    "id": 1013,
+    "date": "2026-09-22T08:46:00+05:30",
+    "underlying": "NIFTY",
+    "strike": 23400,
+    "opt_type": "CE",
+    "symbol": "NIFTY 23400 CE",
+    "entry_raw": "28",
+    "entry_price": 28.0,
+    "target_5m": 30.8,
+    "target_runner": 40.6,
+    "peak_5m": 57.0,
+    "peak_day": 57.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-22T09:10:00+05:30",
+        "sec": 1440.0,
+        "val": 57.0,
+        "text": "HIGH 57 \ud83d\ude80 JACKPOT BLAST"
+      }
+    ],
+    "sl_hit": false,
+    "text": "NIFTY 23400 CE \nBUY NEAR 28 \nTGT open \nSl follow",
+    "gain_5m_pct": 103.6,
+    "gain_day_pct": 103.6,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1015,
+    "date": "2026-09-22T09:29:00+05:30",
+    "underlying": "NIFTY",
+    "strike": 23350,
+    "opt_type": "PE",
+    "symbol": "NIFTY 23350 PE",
+    "entry_raw": "30",
+    "entry_price": 30.0,
+    "target_5m": 33.0,
+    "target_runner": 43.5,
+    "peak_5m": 51.0,
+    "peak_day": 51.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-22T09:34:00+05:30",
+        "sec": 300.0,
+        "val": 34.0,
+        "text": "34 \ud83d\udc4d"
+      },
+      {
+        "time": "2026-09-22T10:15:00+05:30",
+        "sec": 2760.0,
+        "val": 51.0,
+        "text": "HIGH 51 \ud83d\ude80 TGT 1 DONE"
+      }
+    ],
+    "sl_hit": false,
+    "text": "NIFTY 23350 PE \nBUY NEAR 30 \nTGT open \nSl follow",
+    "gain_5m_pct": 70.0,
+    "gain_day_pct": 70.0,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1018,
+    "date": "2026-09-22T10:56:00+05:30",
+    "underlying": "CRUDEOIL",
+    "strike": 8000,
+    "opt_type": "PE",
+    "symbol": "CRUDEOIL 8000 PE",
+    "entry_raw": "262",
+    "entry_price": 262.0,
+    "target_5m": 288.2,
+    "target_runner": 379.9,
+    "peak_5m": 353.7,
+    "peak_day": 353.7,
+    "hit_5m": true,
+    "hit_runner": false,
+    "updates": [
+      {
+        "time": "2026-09-22T11:01:00+05:30",
+        "sec": 300.0,
+        "val": 293.4,
+        "text": "293.4 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-22T11:45:00+05:30",
+        "sec": 2940.0,
+        "val": 353.7,
+        "text": "HIGH 353.7 \ud83d\ude80 BLAST"
+      }
+    ],
+    "sl_hit": false,
+    "text": "CRUDE OIL 8000 PE \nBUY AROUND 262 \nTGT open \nSl follow",
+    "gain_5m_pct": 35.0,
+    "gain_day_pct": 35.0,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1021,
+    "date": "2026-09-22T12:22:00+05:30",
+    "underlying": "CRUDEOIL",
+    "strike": 8100,
+    "opt_type": "PE",
+    "symbol": "CRUDEOIL 8100 PE",
+    "entry_raw": "240",
+    "entry_price": 240.0,
+    "target_5m": 264.0,
+    "target_runner": 348.0,
+    "peak_5m": 324.0,
+    "peak_day": 324.0,
+    "hit_5m": true,
+    "hit_runner": false,
+    "updates": [
+      {
+        "time": "2026-09-22T12:27:00+05:30",
+        "sec": 300.0,
+        "val": 268.8,
+        "text": "268.8 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-22T13:30:00+05:30",
+        "sec": 4080.0,
+        "val": 324.0,
+        "text": "HIGH 324 \ud83d\ude80 TGT DONE"
+      }
+    ],
+    "sl_hit": false,
+    "text": "CRUDE OIL 8100 PE \nBUY NEAR 240 \nTGT open \nSl follow",
+    "gain_5m_pct": 35.0,
+    "gain_day_pct": 35.0,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1024,
+    "date": "2026-09-23T04:30:36+05:30",
+    "underlying": "BANKNIFTY",
+    "strike": 56400,
+    "opt_type": "CE",
+    "symbol": "BANKNIFTY 56400 CE",
+    "entry_raw": "435",
+    "entry_price": 435.0,
+    "target_5m": 478.5,
+    "target_runner": 630.8,
+    "peak_5m": 480.0,
+    "peak_day": 480.0,
+    "hit_5m": true,
+    "hit_runner": false,
+    "updates": [
+      {
+        "time": "2026-09-23T04:35:00+05:30",
+        "sec": 264.0,
+        "val": 480.0,
+        "text": "480 \ud83d\udd25"
+      }
+    ],
+    "sl_hit": false,
+    "text": "BANK NIFTY 56400 CE \nABOVE 435 \nTGT open \nSl follow",
+    "gain_5m_pct": 10.3,
+    "gain_day_pct": 10.3,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1027,
+    "date": "2026-09-24T03:49:00+05:30",
+    "underlying": "SENSEX",
+    "strike": 74400,
+    "opt_type": "PE",
+    "symbol": "SENSEX 74400 PE",
+    "entry_raw": "262",
+    "entry_price": 262.0,
+    "target_5m": 288.2,
+    "target_runner": 379.9,
+    "peak_5m": 380.0,
+    "peak_day": 380.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-24T03:54:00+05:30",
+        "sec": 300.0,
+        "val": 309.0,
+        "text": "309 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-24T05:20:00+05:30",
+        "sec": 5460.0,
+        "val": 380.0,
+        "text": "HIGH 380 \ud83d\ude80 TARGET DONE"
+      }
+    ],
+    "sl_hit": false,
+    "text": "SENSEX 74400 PE \nBUY NEAR 262 \nTGT open \nSl follow",
+    "gain_5m_pct": 45.0,
+    "gain_day_pct": 45.0,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1030,
+    "date": "2026-09-24T06:23:00+05:30",
+    "underlying": "SENSEX",
+    "strike": 74200,
+    "opt_type": "PE",
+    "symbol": "SENSEX 74200 PE",
+    "entry_raw": "205",
+    "entry_price": 205.0,
+    "target_5m": 225.5,
+    "target_runner": 297.2,
+    "peak_5m": 314.0,
+    "peak_day": 314.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-24T06:28:00+05:30",
+        "sec": 300.0,
+        "val": 250.0,
+        "text": "250 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-24T07:15:00+05:30",
+        "sec": 3120.0,
+        "val": 314.0,
+        "text": "HIGH 314 \ud83d\ude80 BLAST"
+      }
+    ],
+    "sl_hit": false,
+    "text": "SENSEX 74200 PE \nBUY NEAR 205 \nTGT open \nSl follow",
+    "gain_5m_pct": 53.2,
+    "gain_day_pct": 53.2,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1033,
+    "date": "2026-09-24T07:15:00+05:30",
+    "underlying": "SENSEX",
+    "strike": 73700,
+    "opt_type": "PE",
+    "symbol": "SENSEX 73700 PE",
+    "entry_raw": "55",
+    "entry_price": 55.0,
+    "target_5m": 60.5,
+    "target_runner": 79.8,
+    "peak_5m": 213.0,
+    "peak_day": 213.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-24T07:20:00+05:30",
+        "sec": 300.0,
+        "val": 66.0,
+        "text": "66 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-24T09:40:00+05:30",
+        "sec": 8700.0,
+        "val": 213.0,
+        "text": "HIGH 213 \ud83d\ude80 MULTIBAGGER JACKPOT"
+      }
+    ],
+    "sl_hit": false,
+    "text": "SENSEX 73700 PE \nBUY NEAR 55 \nTGT open \nSl follow",
+    "gain_5m_pct": 287.3,
+    "gain_day_pct": 287.3,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1036,
+    "date": "2026-09-24T10:55:00+05:30",
+    "underlying": "NIFTY",
+    "strike": 23350,
+    "opt_type": "PE",
+    "symbol": "NIFTY 23350 PE",
+    "entry_raw": "2.5",
+    "entry_price": 2.5,
+    "target_5m": 2.8,
+    "target_runner": 3.6,
+    "peak_5m": 2.5,
+    "peak_day": 2.5,
+    "hit_5m": false,
+    "hit_runner": false,
+    "updates": [],
+    "sl_hit": false,
+    "text": "NIFTY 23350 PE \nBUY NEAR 2.5 \nTGT open \nSl follow",
+    "gain_5m_pct": 0.0,
+    "gain_day_pct": 0.0,
+    "ca_trader_concordance": false
+  },
+  {
+    "id": 1039,
+    "date": "2026-09-25T04:07:47+05:30",
+    "underlying": "BANKNIFTY",
+    "strike": 55700,
+    "opt_type": "PE",
+    "symbol": "BANKNIFTY 55700 PE",
+    "entry_raw": "320",
+    "entry_price": 320.0,
+    "target_5m": 352.0,
+    "target_runner": 464.0,
+    "peak_5m": 430.0,
+    "peak_day": 430.0,
+    "hit_5m": true,
+    "hit_runner": false,
+    "updates": [
+      {
+        "time": "2026-09-25T04:12:00+05:30",
+        "sec": 253.0,
+        "val": 378.0,
+        "text": "378 \ud83d\udd25"
+      },
+      {
+        "time": "2026-09-25T05:30:00+05:30",
+        "sec": 4933.0,
+        "val": 430.0,
+        "text": "HIGH 430 \ud83d\ude80 TARGET DONE 110 POINTS"
+      }
+    ],
+    "sl_hit": false,
+    "text": "BANK NIFTY 55700 PE \nAbove 320 \nTGT open \nSl follow",
+    "gain_5m_pct": 34.4,
+    "gain_day_pct": 34.4,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1042,
+    "date": "2026-09-25T05:44:00+05:30",
+    "underlying": "NIFTY",
+    "strike": 23050,
+    "opt_type": "CE",
+    "symbol": "NIFTY 23050 CE",
+    "entry_raw": "152",
+    "entry_price": 152.0,
+    "target_5m": 167.2,
+    "target_runner": 220.4,
+    "peak_5m": 238.0,
+    "peak_day": 238.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-25T05:49:00+05:30",
+        "sec": 300.0,
+        "val": 162.0,
+        "text": "162 \ud83d\udc4d"
+      },
+      {
+        "time": "2026-09-25T07:15:00+05:30",
+        "sec": 5460.0,
+        "val": 238.0,
+        "text": "HIGH 238 \ud83d\ude80 BLAST"
+      }
+    ],
+    "sl_hit": false,
+    "text": "NIFTY 23050 CE \nBUY NEAR 152 \nTGT open \nSl follow",
+    "gain_5m_pct": 56.6,
+    "gain_day_pct": 56.6,
+    "ca_trader_concordance": true
+  },
+  {
+    "id": 1045,
+    "date": "2026-09-25T09:44:00+05:30",
+    "underlying": "CRUDEOIL",
+    "strike": 8300,
+    "opt_type": "PE",
+    "symbol": "CRUDEOIL 8300 PE",
+    "entry_raw": "235",
+    "entry_price": 235.0,
+    "target_5m": 258.5,
+    "target_runner": 340.8,
+    "peak_5m": 380.0,
+    "peak_day": 380.0,
+    "hit_5m": true,
+    "hit_runner": true,
+    "updates": [
+      {
+        "time": "2026-09-25T11:00:00+05:30",
+        "sec": 4560.0,
+        "val": 380.0,
+        "text": "HIGH 380 \ud83d\ude80 TARGET 1 DONE"
+      }
+    ],
+    "sl_hit": false,
+    "text": "CRUDE OIL 8300 PE \nBUY NEAR 235 \nTGT open \nSl follow",
+    "gain_5m_pct": 61.7,
+    "gain_day_pct": 61.7,
+    "ca_trader_concordance": true
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "analysis_period": "2026-09-21 to 2026-09-25",
+  "total_messages": 47,
+  "total_calls": 16,
+  "concordance_accuracy": 100.0,
+  "five_min_achieved_rate": 87.5,
+  "runner_achieved_rate": 75.0,
+  "multibaggers": 3,
+  "avg_5m_gain": 57.9,
+  "avg_day_gain": 57.9,
+  "max_gain": 287.3,
+  "by_asset": {
+    "CRUDEOIL": {
+      "total": 4,
+      "wins_5m": 4,
+      "wins_day": 4,
+      "multibaggers": 0,
+      "gains": [
+        34.98181818181818,
+        35.0,
+        35.0,
+        61.702127659574465
+      ]
+    },
+    "NIFTY": {
+      "total": 7,
+      "wins_5m": 5,
+      "wins_day": 4,
+      "multibaggers": 2,
+      "gains": [
+        10.759493670886076,
+        88.8,
+        0.0,
+        103.57142857142858,
+        70.0,
+        0.0,
+        56.57894736842105
+      ]
+    },
+    "BANKNIFTY": {
+      "total": 2,
+      "wins_5m": 2,
+      "wins_day": 1,
+      "multibaggers": 0,
+      "gains": [
+        10.344827586206897,
+        34.375
+      ]
+    },
+    "SENSEX": {
+      "total": 3,
+      "wins_5m": 3,
+      "wins_day": 3,
+      "multibaggers": 1,
+      "gains": [
+        45.038167938931295,
+        53.170731707317074,
+        287.27272727272725
+      ]
+    }
+  },
+  "calibrated_params": {
+    "target_atr_multiplier": 1.05,
+    "sl_atr_multiplier": 1.25,
+    "scalp_gain_pct": 0.08,
+    "runner_gain_pct": 0.4,
+    "trailing_breakeven_pct": 0.15,
+    "rsi_buy_min": 48.0,
+    "rsi_sell_max": 52.0,
+    "adx_min_strength": 16.0,
+    "strike_selection_mode": "ATM_STRICT",
+    "atm_delta_target": 0.5,
+    "calibrated_accuracy_pct": 100.0,
+    "source": "StockMantra_3Month_Reconciliation"
+  }
+}

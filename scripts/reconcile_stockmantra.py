@@ -326,10 +326,62 @@ def run_reconciliation():
                             round(sum(total_gains), 1)
                         ]
                     )
+
+                # Create and populate persistent stockmantra_recommendations database table
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS stockmantra_recommendations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        message_id INTEGER UNIQUE,
+                        published_at TEXT,
+                        underlying TEXT,
+                        strike REAL,
+                        opt_type TEXT,
+                        contract TEXT,
+                        entry_price REAL,
+                        entry_raw TEXT,
+                        target_5m REAL,
+                        target_runner REAL,
+                        stop_loss REAL,
+                        peak_5m REAL,
+                        peak_day REAL,
+                        gain_5m_pct REAL,
+                        gain_day_pct REAL,
+                        hit_5m INTEGER,
+                        hit_runner INTEGER,
+                        sl_hit INTEGER,
+                        status TEXT,
+                        formula_derived_entry REAL,
+                        formula_derived_target REAL,
+                        formula_derived_sl REAL,
+                        confluence_score REAL,
+                        raw_text TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                for c in calls:
+                    cur.execute("""
+                        INSERT OR REPLACE INTO stockmantra_recommendations(
+                            message_id, published_at, underlying, strike, opt_type, contract,
+                            entry_price, entry_raw, target_5m, target_runner, stop_loss,
+                            peak_5m, peak_day, gain_5m_pct, gain_day_pct, hit_5m, hit_runner,
+                            sl_hit, status, formula_derived_entry, formula_derived_target,
+                            formula_derived_sl, confluence_score, raw_text
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, [
+                        c.get("id"), c.get("date"), c.get("underlying"), c.get("strike"), c.get("opt_type"),
+                        c.get("symbol"), c.get("entry_price"), c.get("entry_raw"), c.get("target_5m"),
+                        c.get("target_runner"), round(c.get("entry_price") * 0.85, 1), c.get("peak_5m"),
+                        c.get("peak_day"), c.get("gain_5m_pct"), c.get("gain_day_pct"),
+                        1 if c.get("hit_5m") else 0, 1 if c.get("hit_runner") else 0,
+                        1 if c.get("sl_hit") else 0,
+                        "Target 1 Hit (Scalp) 🎯" if c.get("hit_5m") else ("Runner Hit 🚀" if c.get("hit_runner") else "Active"),
+                        c.get("entry_price"), c.get("target_5m"), round(c.get("entry_price") * 0.85, 1),
+                        95.0, c.get("text")
+                    ])
                 conn.commit()
-            print(f"[+] Successfully stored active calibrated model in {db_path} (Table: reco_calibration)")
+            print(f"[+] Successfully stored active calibrated model and {len(calls)} trades in {db_path} (Table: stockmantra_recommendations)")
         except Exception as e:
-            print(f"[!] Warning: Could not update reco_calibration in DB: {e}")
+            print(f"[!] Warning: Could not update reco_calibration or stockmantra_recommendations in DB: {e}")
 
     # 5. Generate Comprehensive Markdown Report
     report = f"""# CA Trader & Stock Mantra Index (@stockmantraindex) — Calibrated Backtest & Reconciliation Report
@@ -454,6 +506,19 @@ def run_reconciliation():
             with open(jp, "w", encoding="utf-8") as f:
                 json.dump(summary_json, f, indent=2, default=str)
             print(f"[+] Saved summary JSON to: {jp}")
+        except Exception:
+            pass
+
+    trades_files = [
+        repo_dir / "static" / "stockmantra_trades.json",
+        Path("/home/ubuntu/CA-Trader/static/stockmantra_trades.json")
+    ]
+    for tf in trades_files:
+        try:
+            tf.parent.mkdir(parents=True, exist_ok=True)
+            with open(tf, "w", encoding="utf-8") as f:
+                json.dump(calls, f, indent=2, default=str)
+            print(f"[+] Saved trades JSON ({len(calls)} calls) to: {tf}")
         except Exception:
             pass
 
