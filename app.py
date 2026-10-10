@@ -1540,12 +1540,18 @@ def init_db() -> None:
         sl_hit INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
-    CREATE INDEX IF NOT EXISTS idx_sm_reco_sym ON stockmantra_recommendations(symbol, underlying);
     """
     with _DB_LOCK:
         conn = db_conn()
         try:
             conn.executescript(schema)
+            try:
+                sm_cols = {row[1] for row in conn.execute("PRAGMA table_info(stockmantra_recommendations)").fetchall()}
+                if "symbol" not in sm_cols:
+                    conn.execute("ALTER TABLE stockmantra_recommendations ADD COLUMN symbol TEXT")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_sm_reco_sym ON stockmantra_recommendations(symbol, underlying)")
+            except Exception:
+                pass
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS saved_chart_views (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
