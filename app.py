@@ -7491,8 +7491,8 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         signal_action = "BUY CALL" if opt_type_detected == "CE" else "BUY PUT"
         reco_action = signal_action
     else:
-        signal_action = "BUY" if side == "BUY" else "SELL"
-        reco_action = side
+        signal_action = side if side in ("BUY", "SELL") else "NO_TRADE"
+        reco_action = signal_action
 
     # Ensure BOTH Call and Put options are always available in payload
     pri_opt = evidence.get("options")
@@ -15539,10 +15539,17 @@ async def _auto_recommendation_recorder_loop() -> None:
                 uid = int(u.get("id") or 1)
                 watch = user_watchlist_symbols(uid) or []
                 symbols_to_scan = [str(s).upper().strip() for s in watch if str(s).strip()]
-                if not symbols_to_scan:
-                    symbols_to_scan = ["NIFTY", "BANKNIFTY", "RELIANCE", "CRUDEOIL"]
-                
+                now_chk = datetime.now(IST)
+                pre_open_window = now_chk.weekday() < 5 and (now_chk.hour, now_chk.minute) >= (8, 45) and (now_chk.hour, now_chk.minute) < (9, 15)
+
                 for sym in symbols_to_scan[:25]:
+                    # Only spend CPU on instruments whose market is open (plus the NSE pre-open window).
+                    try:
+                        seg = get_symbol_segment(sym)
+                        if not market_session(seg).get("active") and not (pre_open_window and not seg.startswith("MCX")):
+                            continue
+                    except Exception:
+                        pass
                     try:
                         rec = await asyncio.wait_for(
                             asyncio.to_thread(
@@ -15554,7 +15561,8 @@ async def _auto_recommendation_recorder_loop() -> None:
                             timeout=8.0
                         )
                         act = str(rec.get("recommendation") or rec.get("signal") or "").upper()
-                        if act in ("BUY", "SELL"):
+                        model_dec = str((rec.get("signal_model") or {}).get("decision") or "")
+                        if act in ("BUY", "SELL") and model_dec in ("BUY", "SELL"):
                             ti = rec.get("instrument") or {}
                             trade_sym = str(ti.get("display") or ti.get("symbol") or sym)
                             score = float(rec.get("confidence") or rec.get("score") or 0.0)
