@@ -1,0 +1,127 @@
+{
+ "version": "2026-10-11-stockmantra-v1",
+ "generated": "2026-10-11",
+ "source": "Fitted on 109 Stock Mantra Index calls (11 Sep - 9 Oct 2026) replayed on Upstox 1-minute candles; weights = logistic regression of factor scores on his call direction, trained on the first 80% of calls",
+ "weights": {
+  "trend": 0.05,
+  "vwap": 0.277,
+  "momentum": 0.335,
+  "price_action": 0.236,
+  "day_change": 0.102,
+  "option_flow": 0.0
+ },
+ "gate": 30.0,
+ "min_agree": 3,
+ "buckets": [
+  {
+   "lo": 0,
+   "hi": 10,
+   "n": 17,
+   "hit": 10
+  },
+  {
+   "lo": 10,
+   "hi": 20,
+   "n": 17,
+   "hit": 9
+  },
+  {
+   "lo": 20,
+   "hi": 30,
+   "n": 19,
+   "hit": 8
+  },
+  {
+   "lo": 30,
+   "hi": 40,
+   "n": 19,
+   "hit": 13
+  },
+  {
+   "lo": 40,
+   "hi": 55,
+   "n": 40,
+   "hit": 15
+  },
+  {
+   "lo": 55,
+   "hi": 70,
+   "n": 34,
+   "hit": 22
+  },
+  {
+   "lo": 70,
+   "hi": 101,
+   "n": 100,
+   "hit": 61
+  }
+ ],
+ "bucket_definition": "Share of real moments (Stock Mantra call times + 240 random control times) where the underlying moved 0.3% in the score's direction before moving 0.3% against it, within 2 hours",
+ "validation": {
+  "all": {
+   "calls": 109,
+   "fired": 82,
+   "agree_with_mantra": 71,
+   "resolved": 55,
+   "model_right": 29,
+   "mantra_resolved": 72,
+   "mantra_right": 46
+  },
+  "test": {
+   "calls": 22,
+   "fired": 19,
+   "agree_with_mantra": 16,
+   "resolved": 14,
+   "model_right": 10,
+   "mantra_resolved": 16,
+   "mantra_right": 12
+  },
+  "train_period": [
+   "2026-09-11",
+   "2026-10-06"
+  ],
+  "test_period": [
+   "2026-10-06",
+   "2026-10-09"
+  ]
+ },
+ "stock_mantra_accuracy_by_underlying": {
+  "NIFTY": [
+   11,
+   14
+  ],
+  "SENSEX": [
+   13,
+   18
+  ],
+  "BANKNIFTY": [
+   4,
+   5
+  ],
+  "CRUDEOIL": [
+   18,
+   35
+  ]
+ },
+ "logistic": {
+  "coef": {
+   "trend": 0.121,
+   "vwap": 0.666,
+   "momentum": 0.806,
+   "price_action": 0.568,
+   "day_change": 0.244
+  },
+  "intercept": -0.327,
+  "train_n": 87,
+  "test_n": 22,
+  "train_acc": 80.5,
+  "test_acc": 77.3,
+  "weights": {
+   "trend": 0.05,
+   "vwap": 0.277,
+   "momentum": 0.335,
+   "price_action": 0.236,
+   "day_change": 0.102
+  }
+ }
+}

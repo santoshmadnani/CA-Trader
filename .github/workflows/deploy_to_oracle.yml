@@ -23,59 +23,18 @@ jobs:
             git fetch origin CA-Trader-Bifurcated
             git reset --hard origin/CA-Trader-Bifurcated
 
-            # --- ARRANGE SERVER DIRECTORY IN CLEAN GITHUB-ALIGNED STRUCTURE ---
-            echo "[*] Organizing server directory structure..."
-            mkdir -p data static scripts backups logs docs
-
-            # Clean cache and temporary build artifacts
+            mkdir -p data backups logs
             find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-            find . -name "*.pyc" -delete 2>/dev/null || true
-            rm -f backcovers.html backend/routers/backcovers_router.py fitness.html 2>/dev/null || true
 
-            # Organize stray data files into data/
-            if [ -f "stockmantra_3months.json" ]; then
-              cp -u stockmantra_3months.json data/ 2>/dev/null || true
-            fi
-            if [ -f "stockmantra_telegram_raw.json" ]; then
-              mv -f stockmantra_telegram_raw.json data/ 2>/dev/null || true
-            fi
-
-            # Automated safety backup and arrangement of SQLite database
-            if [ -f "ca_trader.sqlite3" ] && [ ! -L "ca_trader.sqlite3" ]; then
-              cp ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3" 2>/dev/null || true
-              cp -u ca_trader.sqlite3 data/ca_trader.sqlite3 2>/dev/null || true
-              ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +8 | xargs -r rm -- 2>/dev/null || true
-            elif [ -f "data/ca_trader.sqlite3" ]; then
-              cp data/ca_trader.sqlite3 "backups/ca_trader_$(date +%Y%m%d_%H%M%S).sqlite3" 2>/dev/null || true
-              ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +8 | xargs -r rm -- 2>/dev/null || true
-            fi
-
-            # Clean any symlink so ca_trader.sqlite3 is a clean regular file everywhere
-            if [ -L "ca_trader.sqlite3" ]; then
-              rm -f ca_trader.sqlite3
-              if [ -f "data/ca_trader.sqlite3" ]; then
-                cp -f data/ca_trader.sqlite3 ca_trader.sqlite3 2>/dev/null || true
-              fi
-            fi
-            if [ -f "ca_trader.sqlite3" ] && [ ! -f "data/ca_trader.sqlite3" ]; then
-              cp -f ca_trader.sqlite3 data/ca_trader.sqlite3 2>/dev/null || true
-            elif [ -f "data/ca_trader.sqlite3" ] && [ ! -f "ca_trader.sqlite3" ]; then
-              cp -f data/ca_trader.sqlite3 ca_trader.sqlite3 2>/dev/null || true
+            # One consistent backup per day (SQLite online-backup API, safe while the app is writing); keep the newest 2.
+            # The live database is ./ca_trader.sqlite3; it is never copied over or moved by deploys.
+            TODAY_BACKUP="backups/ca_trader_$(date +%Y%m%d).sqlite3"
+            if [ -f ca_trader.sqlite3 ] && [ ! -f "$TODAY_BACKUP" ]; then
+              /home/ubuntu/venv/bin/python3 -c "import sqlite3,sys; s=sqlite3.connect('ca_trader.sqlite3'); d=sqlite3.connect(sys.argv[1]); s.backup(d); d.close(); s.close()" "$TODAY_BACKUP" || rm -f "$TODAY_BACKUP"
+              ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +3 | xargs -r rm -- 2>/dev/null || true
             fi
 
             /home/ubuntu/venv/bin/pip install -r requirements.txt --quiet
-
-            # Run calibrated scripts safely (non-blocking)
-            if [ -f "scripts/run_banknifty_backtest.py" ]; then
-              echo ">>> EXECUTING BANKNIFTY 5-TIMEFRAME REAL-DATA BACKTEST <<<"
-              /home/ubuntu/venv/bin/python3 scripts/run_banknifty_backtest.py || true
-            fi
-            if [ -f "scripts/reconcile_stockmantra.py" ]; then
-              echo ">>> EXECUTING CALIBRATED STOCKMANTRA RECONCILIATION <<<"
-              echo "=========================================================="
-              /home/ubuntu/venv/bin/python3 scripts/reconcile_stockmantra.py || true
-              echo "=========================================================="
-            fi
 
             sudo systemctl daemon-reload 2>/dev/null || true
             sudo systemctl restart catrader

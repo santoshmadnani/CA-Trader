@@ -20,5 +20,9 @@ server_host/backups/
 dist/
 build/
 .desktop_cache/
+# Broker exports and Telegram sessions (personal data)
+data/tradebook-*
+*.session
+*.session-journal
 
 

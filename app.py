@@ -78,7 +78,7 @@ import collections
 from collections import defaultdict, deque
 # defaultdict prevents crashes by returning empty/blank data structures when a new symbol is selected before its data arrives. deque maintains a fixed-size rolling buffer for incoming live ticks/candles, discarding old ones so RAM doesn't fill up over long trading sessions.
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 # Handles calendar dates, timestamps, market session open/close boundaries, and time offsets.
 
 from pathlib import Path
@@ -150,6 +150,7 @@ except Exception as exc:  # pragma: no cover
     uvicorn = None
 # Lightning-fast ASGI production web server engine that runs FastAPI.
 
+from backend.services import signal_model as SIGNAL_MODEL
 from backend.services.telegram_service import (
     mask_token,
     send_telegram_msg,
@@ -169,6 +170,9 @@ try:
     import yfinance as yf
 except Exception:
     yf = None
+
+# Market data comes from Upstox only. Set ALLOW_NON_UPSTOX_FALLBACK=1 to let Yahoo Finance fill NSE/BSE gaps (never MCX).
+ALLOW_NON_UPSTOX_FALLBACK = os.getenv("ALLOW_NON_UPSTOX_FALLBACK", "0").strip().lower() in {"1", "true", "yes"}
 
 def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
     # Backup quote engine: fetches spot quotes from Yahoo Finance and calculates options pricing when Upstox is down.
@@ -293,6 +297,11 @@ def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
                     clean_root = sym.split()[0].replace(".NS", "").replace(".BO", "")
                     yf_sym = f"{clean_root}.NS"
         
+        # Non-Upstox quotes are off unless explicitly enabled; MCX contracts never map to foreign futures (WTI/COMEX differ in price and unit).
+        if yf_sym and not ALLOW_NON_UPSTOX_FALLBACK:
+            return None
+        if yf_sym and yf_sym.endswith("=F"):
+            return None
         if yf_sym:
             t = yf.Ticker(yf_sym)
             fi = getattr(t, "fast_info", None)
@@ -300,18 +309,11 @@ def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
                 lp = float(fi.get("last_price") or fi.get("lastPrice") or 0.0)
                 pc = float(fi.get("previous_close") or fi.get("previousClose") or lp or 0.0)
                 if lp > 0:
-                    if sym == "CRUDEOIL" and lp < 500:
-                        lp = round(lp * 84.0, 2)
-                        pc = round(pc * 84.0, 2)
                     net_chg = round(lp - pc, 2)
                     pct = round((net_chg / pc * 100.0) if pc else 0.0, 2)
                     open_p = float(fi.get("open") or lp)
                     high_p = float(fi.get("day_high") or fi.get("dayHigh") or lp)
                     low_p = float(fi.get("day_low") or fi.get("dayLow") or lp)
-                    if sym == "CRUDEOIL" and open_p < 500:
-                        open_p = round(open_p * 84.0, 2)
-                        high_p = round(high_p * 84.0, 2)
-                        low_p = round(low_p * 84.0, 2)
                     return {
                         "instrument": sym,
                         "ltp": lp,
@@ -331,7 +333,9 @@ def get_live_fallback_quote(instrument: str) -> dict[str, Any] | None:
 
 def get_live_fallback_candles(instrument: str, timeframe: str = "5", days: int = 5) -> list[dict[str, Any]]:
     # Backup multi-timeframe candles: downloads OHLCV historical candlestick data via Yahoo Finance when broker endpoints throttle.
-    """Fetch multi-timeframe candles via yfinance when primary provider is rate-limited."""
+    """Fetch multi-timeframe candles via yfinance when primary provider is rate-limited (NSE/BSE only, opt-in)."""
+    if not ALLOW_NON_UPSTOX_FALLBACK:
+        return []
     try:
         import yfinance as yf
         sym = str(instrument).upper().strip()
@@ -349,11 +353,8 @@ def get_live_fallback_candles(instrument: str, timeframe: str = "5", days: int =
             "NATURALGAS": "NG=F",
             "COPPER": "HG=F",
         }
-        if "CRUDE" in sym: yf_sym = "CL=F"
-        elif "GOLD" in sym: yf_sym = "GC=F"
-        elif "SILVER" in sym: yf_sym = "SI=F"
-        elif "NATURALGAS" in sym: yf_sym = "NG=F"
-        elif "COPPER" in sym: yf_sym = "HG=F"
+        if any(m in sym for m in ("CRUDE", "GOLD", "SILVER", "NATURALGAS", "COPPER")):
+            return []  # MCX prices differ from foreign futures; never substitute them
         elif sym in yf_map: yf_sym = yf_map[sym]
         elif sym.startswith("MCX_FO|") or sym.startswith("NSE_FO|") or "_CE" in sym or "_PE" in sym or sym.endswith("CE") or sym.endswith("PE"):
             return []  # Options cannot be queried directly from yfinance via .NS
@@ -379,13 +380,12 @@ def get_live_fallback_candles(instrument: str, timeframe: str = "5", days: int =
                     c_high = float(row["High"].iloc[0] if hasattr(row["High"], "iloc") else row["High"])
                     c_low = float(row["Low"].iloc[0] if hasattr(row["Low"], "iloc") else row["Low"])
                     c_close = float(row["Close"].iloc[0] if hasattr(row["Close"], "iloc") else row["Close"])
-                    mult = 84.0 if sym == "CRUDEOIL" and c_close < 500 else 1.0
                     c = {
                         "timestamp": dt.isoformat(),
-                        "open": round(c_open * mult, 2),
-                        "high": round(c_high * mult, 2),
-                        "low": round(c_low * mult, 2),
-                        "close": round(c_close * mult, 2),
+                        "open": round(c_open, 2),
+                        "high": round(c_high, 2),
+                        "low": round(c_low, 2),
+                        "close": round(c_close, 2),
                         "volume": float(row["Volume"].iloc[0] if hasattr(row["Volume"], "iloc") else row["Volume"])
                     }
                     candles.append(c)
@@ -620,32 +620,37 @@ def _trigger_operator_mimic_agent(setup_obj: dict[str, Any], silent: bool = Fals
         strike = float(setup_obj.get("strike") or 0.0)
         opt_type = str(setup_obj.get("option_type") or "CE")
         entry = float(setup_obj.get("entry") or 0.0)
-        raw_cmp = float(setup_obj.get("cmp") or entry)
+        raw_cmp = float(setup_obj.get("cmp") or 0.0)
 
-        # Option LTP Sentinel validation: Verify option CMP against live spot and intrinsic floor
-        val_res = validate_and_correct_option_ltp(sym, und, strike, opt_type, raw_cmp)
-        verified_cmp = val_res["corrected_cmp"]
-        setup_obj["cmp"] = verified_cmp
-        if val_res["is_discrepancy"]:
-            setup_obj["ltp_audit_note"] = val_res["details"]
+        # Option LTP Sentinel validation: only when Upstox actually supplied an option price
+        val_res = {"spot_ltp": setup_obj.get("spot_ltp"), "is_discrepancy": False}
+        verified_cmp = None
+        if raw_cmp > 0:
+            val_res = validate_and_correct_option_ltp(sym, und, strike, opt_type, raw_cmp)
+            verified_cmp = val_res["corrected_cmp"]
+            setup_obj["cmp"] = verified_cmp
+            if val_res["is_discrepancy"]:
+                setup_obj["ltp_audit_note"] = val_res["details"]
 
-        tgt = float(setup_obj.get("target_1") or (round(entry * 1.20, 2) if entry > 0 else 0.0))
-        sl = float(setup_obj.get("stop_loss") or (round(entry * 0.90, 2) if entry > 0 else 0.0))
-        
-        rr_ratio = round((tgt - entry) / max(entry - sl, 0.01), 2) if (entry > 0 and entry > sl) else 1.8
+        tgt = float(setup_obj.get("target_1") or 0.0) or None
+        sl = float(setup_obj.get("stop_loss") or 0.0) or None
+        rr_ratio = round((tgt - entry) / (entry - sl), 2) if (tgt and sl and entry > sl) else None
         now_time = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S IST")
-        
+
         # Calculate real dynamic accuracy from database trades (No hardcoded 97.4%)
         acc_data = get_verified_empirical_accuracy()
         dynamic_acc_str = f"{acc_data['win_rate_pct']}%"
-        
+
         OPERATOR_MIMIC_STATE["last_symbol"] = sym
         OPERATOR_MIMIC_STATE["accuracy_concordance"] = dynamic_acc_str
-        OPERATOR_MIMIC_STATE["last_updated"] = f"Calibrated for {sym} at {now_time}"
-        OPERATOR_MIMIC_STATE["mimic_weights"]["target_multiplier"] = round(tgt / max(entry, 1.0), 3) if entry > 0 else 1.25
-        OPERATOR_MIMIC_STATE["mimic_weights"]["sl_buffer_pct"] = round((entry - sl) / max(entry, 1.0), 3) if entry > 0 else 0.08
-        
-        event_msg = f"Reverse-engineered {sym} · Calibrated entry ₹{entry:.2f}, CMP ₹{verified_cmp:.2f}, TGT ₹{tgt:.2f}, SL ₹{sl:.2f} (R:R 1:{rr_ratio})"
+        OPERATOR_MIMIC_STATE["last_updated"] = f"Received {sym} at {now_time}"
+        if tgt and entry > 0:
+            OPERATOR_MIMIC_STATE["mimic_weights"]["target_multiplier"] = round(tgt / entry, 3)
+        if sl and entry > 0:
+            OPERATOR_MIMIC_STATE["mimic_weights"]["sl_buffer_pct"] = round((entry - sl) / entry, 3)
+
+        fmt_lvl = lambda v: f"₹{v:,.2f}" if v else "not stated"
+        event_msg = f"Stock Mantra {sym} · entry ₹{entry:.2f}, CMP {fmt_lvl(verified_cmp)}, target {('₹%.2f' % tgt) if tgt else 'open'}, SL {fmt_lvl(sl)}"
         OPERATOR_MIMIC_STATE["recent_events"].insert(0, {"time": now_time, "msg": event_msg})
         OPERATOR_MIMIC_STATE["recent_events"] = OPERATOR_MIMIC_STATE["recent_events"][:8]
         
@@ -657,13 +662,13 @@ def _trigger_operator_mimic_agent(setup_obj: dict[str, Any], silent: bool = Fals
         is_repeat_spam = False
         if last_disp:
             elapsed_sec = now_ts - last_disp[0]
-            price_diff_pct = abs(verified_cmp - last_disp[1]) / max(last_disp[1], 1.0) * 100.0
+            price_diff_pct = abs((verified_cmp or entry) - last_disp[1]) / max(last_disp[1], 1.0) * 100.0
             if elapsed_sec < 2700 and price_diff_pct < 5.0:
                 is_repeat_spam = True
                 log.info("[OperatorMimic] Suppressing duplicate Telegram alert for %s (sent %ds ago, move %.1f%%)", sym, int(elapsed_sec), price_diff_pct)
 
         if not silent and not is_repeat_spam:
-            _MIMIC_DISPATCH_CACHE[sym] = (now_ts, verified_cmp)
+            _MIMIC_DISPATCH_CACHE[sym] = (now_ts, verified_cmp or entry)
             async def _async_tg_notify():
                 try:
                     tg_row = db_exec(
@@ -685,20 +690,13 @@ def _trigger_operator_mimic_agent(setup_obj: dict[str, Any], silent: bool = Fals
                             cfg = {"bot_token": env_tok, "chat_id": env_cid}
 
                     if cfg and cfg.get("bot_token") and cfg.get("chat_id"):
-                        discrepancy_badge = " · ⚠️ Intrinsic Floor Corrected" if val_res.get("is_discrepancy") else ""
                         tg_text = (
-                            f"⚡ <b>[Operator Mimic Engine · Live Calibration]</b>\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"<b>Stock Mantra Index Signal Ingested</b> 🎯\n"
-                            f"• <b>Instrument:</b> {sym} ({setup_obj.get('option_type', 'CALL')})\n"
-                            f"• <b>Underlying:</b> {und} (Spot ₹{val_res.get('spot_ltp', 0):,.2f})\n"
-                            f"• <b>Current CMP:</b> ₹{verified_cmp:,.2f} (Floor ₹{val_res.get('intrinsic_floor', 0):,.2f}{discrepancy_badge})\n"
-                            f"• <b>Entry:</b> ₹{entry:,.2f} | <b>Target:</b> ₹{tgt:,.2f} | <b>SL:</b> ₹{sl:,.2f}\n"
-                            f"• <b>Risk:Reward:</b> 1:{rr_ratio}\n"
-                            f"• <b>Autonomous Action:</b> Formula thresholds updated in app so CA-Trader predicts this setup independently!\n"
-                            f"• <b>Verified Model Accuracy:</b> {dynamic_acc_str} ({acc_data['wins']}/{acc_data['total_trades']} closed setups)\n"
-                            f"• <b>Option LTP Sentinel:</b> PARITY VERIFIED ✓\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            f"📡 <b>Stock Mantra call received</b>\n"
+                            f"• <b>Contract:</b> {sym}\n"
+                            f"• <b>Underlying:</b> {und} (Upstox spot {fmt_lvl(val_res.get('spot_ltp'))})\n"
+                            f"• <b>Entry:</b> ₹{entry:,.2f} | <b>Target:</b> {('₹%.2f' % tgt) if tgt else 'open'} | <b>SL:</b> {fmt_lvl(sl)}\n"
+                            f"• <b>Option CMP (Upstox):</b> {fmt_lvl(verified_cmp)}"
+                            + (f"\n• <b>Risk:Reward:</b> 1:{rr_ratio}" if rr_ratio else "")
                         )
                         await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], tg_text)
                 except Exception as e_tg:
@@ -724,8 +722,8 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force
             time_str = dt.strftime("%I:%M %p IST")
             date_str = dt.strftime("%d-%b-%Y")
         except Exception:
-            time_str = "09:18 AM IST"
-            date_str = "30-Sep-2026"
+            log.debug("Stock Mantra message %s has an unreadable date %r; skipped", msg_id, dt_str)
+            return
 
         LIVE_STOCKMANTRA_MSGS.insert(0, {"id": msg_id, "text": text, "date": date_str, "time": time_str, "raw_date": dt_str})
         LIVE_STOCKMANTRA_MSGS = LIVE_STOCKMANTRA_MSGS[:100]
@@ -737,12 +735,13 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force
             # Update latest active setup's CMP
             last_k = list(LIVE_STOCKMANTRA_SETUPS.keys())[-1]
             active_s = LIVE_STOCKMANTRA_SETUPS[last_k]
-            active_s["cmp"] = pulse_val
-            if pulse_val >= active_s["target_1"]:
-                active_s["status"] = f"Target 1 Hit 🎯 Scalp Profit Booked (₹{pulse_val})"
+            active_s["last_reported"] = pulse_val
+            active_s["peak_reported"] = max(pulse_val, float(active_s.get("peak_reported") or 0))
+            if active_s.get("target_1") and pulse_val >= active_s["target_1"]:
+                active_s["status"] = f"Target 1 Hit 🎯 (reported ₹{pulse_val})"
             log.info("Stock Mantra price pulse received: %s -> %s = ₹%s", last_k, active_s['symbol'], pulse_val)
 
-        contract_re = re.search(r'\b(NIFTY|BANKNIFTY|BANK\s*NIFTY|BN|FINNIFTY|FIN\s*NIFTY|SENSEX|BSESENSEX|MIDCPNIFTY|RELIANCE|TCS|CRUDEOIL|INFY)\s*(\d{4,6})\s*(CE|PE|CALL|PUT)\b', text, re.IGNORECASE)
+        contract_re = re.search(r'\b(NIFTY|BANKNIFTY|BANK\s*NIFTY|BN|FINNIFTY|FIN\s*NIFTY|SENSEX|BSESENSEX|MIDCPNIFTY|RELIANCE|TCS|CRUDE\s*OIL|NATURAL\s*GAS|INFY)\s*(\d{3,6})\s*(CE|PE|CALL|PUT)\b', text.replace("*", ""), re.IGNORECASE)
         if contract_re:
             und_raw = contract_re.group(1).upper().replace(" ", "")
             und = "BANKNIFTY" if any(b in und_raw for b in ("BANK", "BN")) else ("FINNIFTY" if "FIN" in und_raw else ("SENSEX" if "SENSEX" in und_raw else und_raw))
@@ -752,7 +751,9 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force
             sym_str = f"{und} {strike} {opt_type}"
 
             entry_re = re.search(r'(?:NEAR|ABOVE|AT|@|CMP|BUY\s+(?:AROUND|NEAR|AT|ABOVE)?)\s*(\d+(?:[-–/]\d+)?(?:\.\d+)?)', text, re.IGNORECASE)
-            entry_val = 100.0
+            if not entry_re:
+                return  # a call without an entry price is not a tradable setup
+            entry_val = 0.0
             if entry_re:
                 raw_e = entry_re.group(1)
                 if any(s in raw_e for s in ('-', '–', '/')):
@@ -765,25 +766,27 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force
 
             sl_re = re.search(r'\b(?:SL|STOP|STOPLOSS)\s*[:=]?\s*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
             tgt_re = re.search(r'\b(?:TGT|TARGET|TARGETS)\s*[:=]?\s*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
-            sl_val = float(sl_re.group(1)) if sl_re else round(entry_val * 0.85, 2)
-            t1_val = float(tgt_re.group(1)) if tgt_re else round(entry_val * 1.15, 2)
-            t2_val = round(entry_val * 1.35, 2)
+            if entry_val <= 0:
+                return
+            # Stock Mantra usually posts "TGT open / SL follow": keep missing levels empty instead of inventing them
+            sl_val = float(sl_re.group(1)) if sl_re else None
+            t1_val = float(tgt_re.group(1)) if tgt_re else None
+            t2_val = None
 
             q_opt = get_live_fallback_quote(sym_str)
             raw_opt_ltp = float(q_opt.get("ltp") or 0.0) if q_opt else 0.0
-            if raw_opt_ltp <= 0.0:
-                raw_opt_ltp = round(entry_val, 2)
             sp_data = get_live_fallback_quote(und) or {}
             sp_ltp = float(sp_data.get("ltp") or 0.0)
+            opt_ltp = None
+            if raw_opt_ltp > 0:
+                # Option LTP Sentinel: Enforce intrinsic floor & correct pricing anomalies (e.g. BANKNIFTY 55600 CE at 600+, not 285)
+                val_info = validate_and_correct_option_ltp(sym_str, und, strike, opt_type, raw_opt_ltp)
+                opt_ltp = val_info["corrected_cmp"]
+                sp_ltp = val_info["spot_ltp"] or sp_ltp
 
-            # Option LTP Sentinel: Enforce intrinsic floor & correct pricing anomalies (e.g. BANKNIFTY 55600 CE at 600+, not 285)
-            val_info = validate_and_correct_option_ltp(sym_str, und, strike, opt_type, raw_opt_ltp)
-            opt_ltp = val_info["corrected_cmp"]
-            sp_ltp = val_info["spot_ltp"]
-
-            status = "Active 🟢 In Range / Scalp Accumulation"
-            if opt_ltp <= sl_val: status = "Stop Loss Hit 🛑 Cut Position"
-            elif opt_ltp >= t1_val: status = "Target 1 Hit 🎯 Scalp Profit Booked"
+            status = "Active 🟢 In Range" if opt_ltp else "Active · waiting for Upstox option quote"
+            if opt_ltp and sl_val and opt_ltp <= sl_val: status = "Stop Loss Hit 🛑 Cut Position"
+            elif opt_ltp and t1_val and opt_ltp >= t1_val: status = "Target 1 Hit 🎯"
 
             now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
             is_today = bool(dt and dt.date() == now_ist.date())
@@ -796,21 +799,20 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force
                 "option_type": opt_type,
                 "signal": "BUY",
                 "spot_ltp": sp_ltp,
-                "cmp": round(opt_ltp, 2),
+                "cmp": round(opt_ltp, 2) if opt_ltp else None,
                 "entry": round(entry_val, 2),
-                "stop_loss": round(sl_val, 2),
-                "target_1": round(t1_val, 2),
-                "target_2": round(t2_val, 2),
+                "stop_loss": round(sl_val, 2) if sl_val else None,
+                "target_1": round(t1_val, 2) if t1_val else None,
+                "target_2": t2_val,
                 "status": status,
-                "accuracy": "95.0%",
-                "confluence_weight": 50,
                 "channel": "@stockmantraindex",
                 "date": date_str,
                 "time": time_str,
                 "published_at": f"{date_str} {time_str}",
                 "raw_text": text,
                 "is_live_stream": True,
-                "rationale": f"Stock Mantra Live Telegram Stream ({date_str} {time_str}): {sym_str} BUY. Entry ₹{entry_val:.2f}, Scalp T1 ₹{t1_val:.2f}, SL ₹{sl_val:.2f}. {text[:80]}..."
+                "rationale": (f"Stock Mantra ({date_str} {time_str}): {sym_str} BUY near ₹{entry_val:.2f}. "
+                              f"Target {('₹%.2f' % t1_val) if t1_val else 'open'}, SL {('₹%.2f' % sl_val) if sl_val else 'not stated'}.")
             }
             now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
             is_today = bool(dt and dt.date() == now_ist.date())
@@ -829,10 +831,13 @@ def _process_incoming_stockmantra_msg(text: str, dt_str: str, msg_id: int, force
 
 async def _stockmantra_live_telethon_loop():
     """Continuous background listener using user API session (my.telegram.org) to stream @stockmantraindex in real-time."""
-    sess_path = "/home/ubuntu/CA-Trader/catrader_telegram"
-    api_id = 35187375
-    api_hash = "a94a1e22202bbc844585ece9d19e802c"
-    channel_name = "stockmantraindex"
+    sess_path = os.getenv("TELEGRAM_SESSION_PATH", str(BASE_DIR / "catrader_telegram"))
+    api_id = int(os.getenv("TELEGRAM_API_ID", "0") or 0)
+    api_hash = os.getenv("TELEGRAM_API_HASH", "").strip()
+    channel_name = os.getenv("STOCKMANTRA_CHANNEL", "stockmantraindex")
+    if not api_id or not api_hash:
+        log.warning("TELEGRAM_API_ID / TELEGRAM_API_HASH not set; Stock Mantra listener disabled")
+        return
 
     while True:
         try:
@@ -1794,58 +1799,6 @@ def fitness_allowlisted(user: dict[str, Any] | None) -> bool:
 def selected_terminal(request: Request) -> str | None:
     return "trading"
 
-def fitness_today() -> str:
-    return datetime.now(FITNESS_TIMEZONE).date().isoformat()
-
-def fitness_profile_row(user_id: int) -> dict[str, Any] | None:
-    return db_exec("SELECT * FROM fitness_profiles WHERE user_id=?", [user_id], "one")
-
-def fitness_profile_payload(row: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not row: return None
-    out=dict(row); out["completed"]=bool(out.get("completed")); return out
-
-def fitness_parse_sets(raw: Any) -> list[dict[str, float]]:
-    sets=[]
-    for x in raw if isinstance(raw,list) else []:
-        try:
-            w=float(x.get("weight",0)); r=int(x.get("reps",0))
-            if w>0 and r>0: sets.append({"weight":w,"reps":r})
-        except Exception:
-            pass
-    return sets
-
-def fitness_e1rm(weight: float, reps: int) -> float:
-    # Epley estimate; capped to avoid silly high-rep distortion.
-    return weight * (1 + min(reps, 15) / 30.0)
-
-def fitness_food_normalize(name: str, calories: float = 0, protein: float = 0, carbs: float = 0, fat: float = 0, fiber: float = 0,
-                            serving: str = "100 g", source: str = "internet", ai_estimated: bool = False,
-                            confidence: str = "verified", food_id: str | None = None, serving_grams: float | None = None,
-                            micros: dict[str,Any] | None = None) -> dict[str, Any]:
-    micros=micros or {}
-    return {"name": str(name).strip(), "calories": round(float(calories or 0),1), "protein": round(float(protein or 0),1),
-            "carbs": round(float(carbs or 0),1), "fat": round(float(fat or 0),1), "fiber": round(float(fiber or 0),1),
-            "serving": serving, "serving_grams": serving_grams, "source": source, "ai_estimated": bool(ai_estimated), "confidence": confidence,
-            "food_id": food_id, "micros": micros}
-
-# Canonical items keep common searches such as "egg" from returning packaged products with wildly different labels.
-FITNESS_CANONICAL_FOODS = {
-    "egg": {"name":"Egg, whole, large", "aliases":["eggs","whole egg","chicken egg"], "calories":72, "protein":6.3, "carbs":0.4, "fat":4.8, "fiber":0, "serving":"1 large egg (50 g)", "serving_grams":50, "source":"USDA FoodData Central"},
-    "egg white": {"name":"Egg white, raw, fresh", "aliases":["egg whites","egg white"], "calories":52, "protein":10.9, "carbs":0.7, "fat":0.2, "fiber":0, "serving":"100 g", "serving_grams":100, "source":"USDA FoodData Central"},
-    "chicken breast": {"name":"Chicken breast, meat only, raw", "aliases":["chicken","chicken breast","raw chicken"], "calories":120, "protein":22.5, "carbs":0, "fat":2.6, "fiber":0, "serving":"100 g", "serving_grams":100, "source":"USDA FoodData Central"},
-    "rice": {"name":"Rice, white, long-grain, regular, raw", "aliases":["white rice","rice"], "calories":365, "protein":7.1, "carbs":80.0, "fat":0.7, "fiber":1.3, "serving":"100 g", "source":"USDA FoodData Central"},
-    "roti": {"name":"Roti / chapati, whole wheat, plain", "aliases":["chapati","roti","atta roti"], "calories":297, "protein":11.0, "carbs":46.0, "fat":7.5, "fiber":7.0, "serving":"100 g", "serving_grams":100, "source":"Indian food composition estimate", "confidence":"verified-range"},
-    "paneer": {"name":"Paneer, Indian cottage cheese", "aliases":["paneer","cottage cheese indian"], "calories":265, "protein":18.3, "carbs":1.2, "fat":20.8, "fiber":0, "serving":"100 g", "serving_grams":100, "source":"Indian food composition estimate", "confidence":"verified-range"},
-    "dal": {"name":"Dal, cooked, lentils", "aliases":["dal","lentils","dal fry"], "calories":116, "protein":9.0, "carbs":20.1, "fat":0.4, "fiber":7.9, "serving":"100 g", "serving_grams":100, "source":"USDA FoodData Central", "confidence":"verified-range"},
-    "banana": {"name":"Banana, raw", "aliases":["banana"], "calories":89, "protein":1.1, "carbs":22.8, "fat":0.3, "fiber":2.6, "serving":"1 medium (118 g)", "serving_grams":118, "source":"USDA FoodData Central"},
-    "oats": {"name":"Oats, whole grain, dry", "aliases":["oats","rolled oats","oatmeal"], "calories":389, "protein":16.9, "carbs":66.3, "fat":6.9, "fiber":10.6, "serving":"40 g", "serving_grams":40, "source":"USDA FoodData Central"},
-    "milk": {"name":"Milk, whole", "aliases":["milk","whole milk"], "calories":61, "protein":3.2, "carbs":4.8, "fat":3.3, "fiber":0, "serving":"100 ml", "serving_grams":103, "source":"USDA FoodData Central"},
-    "curd": {"name":"Yogurt, plain, whole milk", "aliases":["curd","dahi","yogurt"], "calories":61, "protein":3.5, "carbs":4.7, "fat":3.3, "fiber":0, "serving":"100 g", "serving_grams":100, "source":"USDA FoodData Central"},
-    "potato": {"name":"Potato, flesh and skin, raw", "aliases":["potato","aloo"], "calories":77, "protein":2.0, "carbs":17.5, "fat":0.1, "fiber":2.2, "serving":"1 medium (173 g)", "serving_grams":173, "source":"USDA FoodData Central"},
-    "almonds": {"name":"Almonds, raw", "aliases":["almonds","badam"], "calories":579, "protein":21.2, "carbs":21.6, "fat":49.9, "fiber":12.5, "serving":"28 g", "serving_grams":28, "source":"USDA FoodData Central"},
-    "whey": {"name":"Whey protein powder, generic", "aliases":["whey protein","whey"], "calories":400, "protein":80, "carbs":8, "fat":6, "fiber":0, "serving":"30 g", "serving_grams":30, "source":"Generic composition; verify product label", "confidence":"reference"},
-}
-
 def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] | None = None) -> dict[str, Any]:
     if not GEMINI_API_KEY:
         return {"available": False, "reason": "Gemini API key is not configured"}
@@ -1889,256 +1842,6 @@ def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] 
 
 def _ai_complete(prompt: str, model: str = "gemini-3.8-flash-high") -> dict[str, Any]:
     return gemini_text(prompt)
-
-def fitness_ai_food(query: str) -> list[dict[str, Any]]:
-    prompt=("You are a nutrition database assistant. Return ONLY a JSON array of up to 5 likely food entries for the query. "
-            "Prefer Indian dishes and common grocery foods. Nutrition should be per 100 g unless a serving is clearly more useful. "
-            "Never invent branded product data. For dishes, state it is an estimate. Include serving_grams whenever a normal serving size is known. Keys: name, calories, protein, carbs, fat, fiber, serving, serving_grams, micros. Query: "+query)
-    r=gemini_text(prompt, 9000)
-    if not r.get("available"): return []
-    try:
-        m=re.search(r"\[.*\]", r.get("text", ""), re.S); data=json.loads(m.group(0)) if m else []
-    except Exception:
-        data=[]
-    return [fitness_food_normalize(str(x.get("name") or query),x.get("calories"),x.get("protein"),x.get("carbs"),x.get("fat"),x.get("fiber"),str(x.get("serving") or "100 g"),"Gemini",True,"estimated",None,float(x.get("serving_grams")) if x.get("serving_grams") else None,x.get("micros") if isinstance(x.get("micros"),dict) else {}) for x in data if isinstance(x,dict)]
-
-def _fitness_food_quality_ok(x: dict[str, Any]) -> bool:
-    # Reject obviously bad/label-per-serving values from generic searches.
-    cal, p, c, f = map(lambda k: float(x.get(k) or 0), ("calories","protein","carbs","fat"))
-    return 0 <= cal <= 850 and 0 <= p <= 100 and 0 <= c <= 100 and 0 <= f <= 100
-
-def _fitness_canonical_for(query: str) -> list[dict[str, Any]]:
-    q=re.sub(r"\s+"," ",query.lower().replace(")"," ").replace("("," ")).strip()
-    hits=[]
-    for key,item in FITNESS_CANONICAL_FOODS.items():
-        aliases=[key]+item.get("aliases",[])
-        score=max((100 if q==a else 85 if a.startswith(q) else 80 if q.startswith(a) else 65 if q in a else 0) for a in aliases)
-        if score:
-            hits.append((score,item))
-    hits.sort(key=lambda x:-x[0])
-    out=[]
-    for _,item in hits[:6]:
-        out.append(fitness_food_normalize(item["name"],item["calories"],item["protein"],item["carbs"],item["fat"],item["fiber"],item["serving"],item["source"],False,item.get("confidence","verified"),None,item.get("serving_grams"),{}))
-    return out
-
-def fitness_food_suggestions(query: str) -> list[str]:
-    q=query.strip().lower()
-    if not q: return []
-    out=[]
-    for key,item in FITNESS_CANONICAL_FOODS.items():
-        for a in [item["name"]]+item.get("aliases",[]):
-            if a.lower().startswith(q) or q in a.lower():
-                if a.lower() not in [x.lower() for x in out]: out.append(a)
-    return out[:8]
-
-def fitness_fetch_foods(query: str) -> list[dict[str, Any]]:
-    query=query.strip()
-    key=hashlib.sha256(query.lower().encode()).hexdigest()[:32]
-    cached=db_exec("SELECT * FROM fitness_food_cache WHERE cache_key=? AND expires_at>?", [key, now_iso()], "one")
-    if cached:
-        try: return json.loads(cached["data_json"])
-        except Exception: pass
-
-    results=_fitness_canonical_for(query)
-    # Exact common-food searches should not be polluted by packaged/variant results.
-    qnorm=re.sub(r"\s+"," ",query.lower()).strip()
-    if qnorm in {"egg","eggs","whole egg","chicken egg"} and results:
-        results=results[:1]
-    # USDA first for generic foods: best source for canonical, unbranded nutrition.
-    try:
-        rr=requests.get("https://api.nal.usda.gov/fdc/v1/foods/search", params={"api_key":USDA_API_KEY,"query":query,"pageSize":20,"dataType":"Foundation,SR Legacy"}, timeout=8)
-        if rr.ok:
-            for x in rr.json().get("foods",[]):
-                n=str(x.get("description") or "").strip()
-                vals={q.get("nutrientName"):q.get("value") for q in x.get("foodNutrients",[]) if isinstance(q,dict)}
-                if not n: continue
-                micros={"sodium_mg":vals.get("Sodium"),"potassium_mg":vals.get("Potassium"),"calcium_mg":vals.get("Calcium"),"iron_mg":vals.get("Iron"),"vitamin_d_mcg":vals.get("Vitamin D (D2 + D3)"),"vitamin_b12_mcg":vals.get("Vitamin B-12"),"cholesterol_mg":vals.get("Cholesterol"),"sugar":vals.get("Sugars, total including NLEA")}
-                serving_grams=x.get("servingSize") if x.get("servingSizeUnit") and str(x.get("servingSizeUnit")).lower() in {"g","gram","grams"} else None
-                serving=f"{serving_grams:g} g" if serving_grams else "100 g"
-                item=fitness_food_normalize(n, vals.get("Energy"), vals.get("Protein"), vals.get("Carbohydrate, by difference"), vals.get("Total lipid (fat)"), vals.get("Fiber, total dietary"), serving, "USDA FoodData Central", False, "verified", str(x.get("fdcId") or ""), serving_grams, micros)
-                if _fitness_food_quality_ok(item): results.append(item)
-    except Exception as exc:
-        record_error("fitness_food_search","USDA: "+safe_text(exc))
-
-    # OpenFoodFacts is kept as a secondary source for actual packaged products, not first-ranked generic foods.
-    try:
-        rr=requests.get("https://world.openfoodfacts.org/cgi/search.pl", params={"search_terms":query,"search_simple":1,"action":"process","json":1,"page_size":20}, headers={"User-Agent":"CA-Trader-Fitness/1.0"}, timeout=8)
-        if rr.ok:
-            for x in rr.json().get("products",[]):
-                n=str(x.get("product_name") or x.get("product_name_en") or "").strip(); ns=x.get("nutriments") or {}
-                if not n: continue
-                item=fitness_food_normalize(n,ns.get("energy-kcal_100g"),ns.get("proteins_100g"),ns.get("carbohydrates_100g"),ns.get("fat_100g"),ns.get("fiber_100g"),"100 g","OpenFoodFacts",False,"verified",str(x.get("code") or ""))
-                if _fitness_food_quality_ok(item): results.append(item)
-    except Exception as exc:
-        record_error("fitness_food_search","OpenFoodFacts: "+safe_text(exc))
-
-    # Rank exact/near exact generic items before products; then dedupe by normalized name + calories.
-    qwords=set(re.findall(r"[a-z0-9]+",query.lower()))
-    def rank(x):
-        n=x["name"].lower(); exact=1 if n==query.lower() else 0; word=sum(1 for w in qwords if w in n)
-        source_bonus=2 if x["source"]=="USDA FoodData Central" else 0
-        ai_penalty=20 if x.get("ai_estimated") else 0
-        return exact*100+word*10+source_bonus-ai_penalty
-    results.sort(key=rank, reverse=True)
-    dedup=[]; seen=set()
-    for x in results:
-        k=(re.sub(r"[^a-z0-9]+"," ",x["name"].lower()).strip(), round(float(x.get("calories") or 0)))
-        if k in seen: continue
-        seen.add(k); dedup.append(x)
-    # AI fills the tail only when verified sources are insufficient.
-    if len(dedup)<4:
-        dedup.extend(fitness_ai_food(query))
-    final=[]; seen_names=set()
-    for x in dedup:
-        k=re.sub(r"[^a-z0-9]+"," ",x["name"].lower()).strip()
-        if k in seen_names: continue
-        seen_names.add(k); final.append(x)
-    final=final[:12]
-    try:
-        expires=(datetime.now(timezone.utc)+timedelta(hours=FOOD_SEARCH_CACHE_HOURS)).isoformat()
-        db_exec("INSERT INTO fitness_food_cache(cache_key,query,data_json,created_at,expires_at) VALUES(?,?,?,?,?) ON CONFLICT(cache_key) DO UPDATE SET data_json=excluded.data_json,expires_at=excluded.expires_at,created_at=excluded.created_at",[key,query,json.dumps(final),now_iso(),expires])
-    except Exception: pass
-    return final
-
-
-def fitness_estimate_targets(height_cm: float, weight_kg: float, workout_frequency: float, goal: str = "Muscle gain",
-                             age_years: float | None = None, sex: str | None = None) -> dict[str, Any]:
-    h=float(height_cm); w=float(weight_kg); f=max(0.0,min(7.0,float(workout_frequency or 0))); g=str(goal or "Muscle gain")
-    # Prefer Mifflin-St Jeor when age/sex are present; otherwise use a transparent weight-based TDEE heuristic.
-    if age_years and sex in {"male","female"}:
-        bmr=10*w+6.25*h-5*float(age_years)+(5 if sex=="male" else -161)
-        activity=1.20 if f<=1 else 1.35 if f<=3 else 1.50 if f<=5 else 1.65
-        maintenance=bmr*activity
-        method="Mifflin-St Jeor + activity multiplier"
-    else:
-        maintenance=w*(28+1.3*f)
-        bmr=None
-        method="weight-based TDEE estimate; add age/sex for a more personalized estimate"
-    if g.lower() in {"fat loss","cut","weight loss"}: calories=maintenance*0.90
-    elif g.lower() in {"maintenance"}: calories=maintenance
-    elif g.lower() in {"strength"}: calories=maintenance*1.05
-    else: calories=maintenance*1.08
-    protein_factor=2.0 if g.lower() in {"fat loss","cut","weight loss"} else 1.8 if g.lower() in {"muscle gain","strength"} else 1.6
-    protein=w*protein_factor
-    fat=calories*0.25/9
-    carbs=max(0,(calories-protein*4-fat*9)/4)
-    return {"calories":round(calories),"protein":round(protein),"fat":round(fat),"carbs":round(carbs),"maintenance_calories":round(maintenance),"bmr":round(bmr) if bmr else None,"method":method}
-
-
-def fitness_parse_natural_workout(text: str) -> dict[str, Any] | None:
-    t=text.replace("–","-").replace("—","-").strip()
-    if not re.search(r"(?:sets?|bench|press|fly|pushdown|curl|squat|deadlift|row|workout|session)",t,re.I): return None
-    # Prefer numbered exercise blocks such as `1. 4 sets of bench press (...)`.
-    name_m=re.search(r"^\s*([^\n:]+?)\s+day\s*:",t,re.I)
-    name=name_m.group(1).strip().title() if name_m else "Workout"
-    if name.lower().replace("trieceps","triceps") in {"chest & triceps","chest and triceps"}: name="Chest & Triceps"
-    exercises=[]
-    block_pattern=re.compile(r"(?:^|\s)(\d+)\.\s*(?:\d+\s+sets?\s+of\s+)?([A-Za-z][A-Za-z0-9 &'\-/]{2,80}?)\s*\(([^)]{2,1500})\)",re.I)
-    for m in block_pattern.finditer(t):
-        ex_name=re.sub(r"^\s*sets?\s+of\s+","",m.group(2)).strip(" .,:-")
-        pairs=re.findall(r"(\d+(?:\.\d+)?)\s*kg\s*x\s*(\d+)\s*(?:reps?)?",m.group(3),re.I)
-        if pairs and any(k in ex_name.lower() for k in ("bench","press","fly","pushdown","squat","curl","row","deadlift","pulldown","raise","extension")):
-            exercises.append({"exercise":ex_name,"sets":[{"weight":float(w),"reps":int(r)} for w,r in pairs]})
-    # Fallback for line-based/manual input.
-    if not exercises:
-        for line in re.split(r"\n+",t):
-            em=re.match(r"(?:\d+\.\s*)?(?:\d+\s+sets?\s+of\s+)?([A-Za-z][A-Za-z0-9 &'\-/]{2,80}?)(?:\s*[:(])",line.strip(),re.I)
-            if not em: continue
-            ex_name=em.group(1).strip(" .,:-")
-            pairs=re.findall(r"(\d+(?:\.\d+)?)\s*kg\s*x\s*(\d+)",line,re.I)
-            if pairs and any(k in ex_name.lower() for k in ("bench","press","fly","pushdown","squat","curl","row","deadlift","pulldown","raise","extension")):
-                exercises.append({"exercise":ex_name,"sets":[{"weight":float(w),"reps":int(r)} for w,r in pairs]})
-    if not exercises:return None
-    return {"date":fitness_today(),"name":name or "Workout","notes":"Imported from Mike Mentzer.AI conversation","exercises":exercises}
-
-
-def fitness_ai_action_extract(text: str) -> dict[str, Any]:
-    """Extract explicit log/add requests from the AI chat into safe structured actions.
-
-    This is intentionally separate from the coaching response: the response can be
-    conversational, while writes to the diet/workout log must be machine-readable.
-    """
-    t=str(text or '').strip()
-    if not t or not re.search(r"\b(add|log|track|record|ate|eaten|had|include|put|did|completed|finished|performed)\b", t, re.I):
-        return {"actions": []}
-    prompt=(
-        "You are the action parser for a bodybuilding tracker. Extract ONLY explicit user requests "
-        "to ADD/LOG/RECORD something to their diet or workout. Do not treat questions, plans, "
-        "suggestions, or hypothetical examples as logged actions. Return ONLY valid JSON, no markdown, "
-        "with this shape: {\"actions\":[...]}. Each action is either "
-        "{\"type\":\"diet\",\"food\":string,\"quantity\":string,\"meal_type\":string,"
-        "\"meal_time\":string,\"calories\":number,\"protein\":number,\"carbs\":number,"
-        "\"fat\":number,\"fiber\":number,\"source\":\"Gemini estimate\"} or "
-        "{\"type\":\"workout\",\"date\":string,\"name\":string,\"notes\":string,"
-        "\"exercises\":[{\"exercise\":string,\"sets\":[{\"weight\":number,\"reps\":integer}]}]}. "
-        "For diet, estimate nutrition for the exact quantity/serving the user gave. If exact nutrition "
-        "cannot be known, make a reasonable clearly estimated value; never invent a branded label. "
-        "Use today's date for workout date when none is given. Use meal type Lunch/Breakfast/Dinner/etc. "
-        "when explicitly stated; otherwise Other. If there is no explicit log/add action, return {\"actions\":[]}. "
-        "USER MESSAGE:\n"+t[:5000]
-    )
-    r=gemini_text(prompt,12000)
-    if not r.get("available"):
-        return {"actions": [], "reason": r.get("reason")}
-    raw=str(r.get("text") or "").strip()
-    try:
-        m=re.search(r"\{.*\}",raw,re.S)
-        data=json.loads(m.group(0)) if m else {"actions":[]}
-        return data if isinstance(data,dict) and isinstance(data.get("actions"),list) else {"actions":[]}
-    except Exception as exc:
-        record_error("fitness_action_parse",safe_text(exc),"gemini")
-        return {"actions":[]}
-
-
-def fitness_store_diet(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-    date=str(payload.get("date") or fitness_today())
-    food=str(payload.get("food") or "").strip()
-    if not food:
-        raise HTTPException(422,"Food is required")
-    quantity=str(payload.get("quantity") or "").strip()
-    meal_type=str(payload.get("meal_type") or "Other").strip()
-    meal_time=str(payload.get("meal_time") or "").strip()
-    calories=float(payload.get("calories") or 0); protein=float(payload.get("protein") or 0)
-    carbs=float(payload.get("carbs") or 0); fat=float(payload.get("fat") or 0); fiber=float(payload.get("fiber") or 0)
-    # Idempotency: the AI can be retried by the browser/network. Do not duplicate the
-    # exact same food/quantity/meal/nutrition payload within the same day.
-    existing=db_exec("SELECT * FROM fitness_diet_entries WHERE user_id=? AND date=? ORDER BY created_at DESC LIMIT 100",[user_id,date],"all")
-    for old in existing:
-        if (str(old.get("food") or "").strip().lower()==food.lower() and str(old.get("quantity") or "").strip().lower()==quantity.lower()
-            and str(old.get("meal_type") or "Other").lower()==meal_type.lower()
-            and abs(float(old.get("calories") or 0)-calories)<0.05 and abs(float(old.get("protein") or 0)-protein)<0.05
-            and abs(float(old.get("carbs") or 0)-carbs)<0.05 and abs(float(old.get("fat") or 0)-fat)<0.05):
-            return {"ok":True,"item":old,"already_logged":True}
-    row={"id":secrets.token_hex(12),"user_id":user_id,"date":date,"food":food,"quantity":quantity,
-         "calories":calories,"protein":protein,"carbs":carbs,"fat":fat,"fiber":fiber,"meal_type":meal_type,"meal_time":meal_time,
-         "sugar":float(payload.get("sugar") or 0),"sodium_mg":float(payload.get("sodium_mg") or 0),
-         "cholesterol_mg":float(payload.get("cholesterol_mg") or 0),"calcium_mg":float(payload.get("calcium_mg") or 0),
-         "iron_mg":float(payload.get("iron_mg") or 0),"potassium_mg":float(payload.get("potassium_mg") or 0),
-         "vitamin_d_mcg":float(payload.get("vitamin_d_mcg") or 0),"vitamin_b12_mcg":float(payload.get("vitamin_b12_mcg") or 0),
-         "source":str(payload.get("source") or "user"),"created_at":now_iso()}
-    db_exec("INSERT INTO fitness_diet_entries(id,user_id,date,food,quantity,calories,protein,carbs,fat,fiber,meal_type,meal_time,sugar,sodium_mg,cholesterol_mg,calcium_mg,iron_mg,potassium_mg,vitamin_d_mcg,vitamin_b12_mcg,source,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",list(row.values()))
-    return {"ok":True,"item":row,"already_logged":False}
-
-
-def fitness_chicken_price() -> tuple[float,str]:
-    cached=CACHE.get("fitness_chicken_price")
-    if cached: return cached
-    price=180.0; source="fallback estimate"
-    # Best-effort public web search; this is deliberately soft-fail because retailer pages vary.
-    try:
-        q=quote("chicken 1 kg price India INR today", safe="")
-        rr=requests.get("https://html.duckduckgo.com/html/?q="+q, headers={"User-Agent":"Mozilla/5.0"}, timeout=8)
-        text=re.sub(r"\s+"," ",rr.text)
-        vals=[]
-        for m in re.finditer(r"(?:₹|Rs\.?|INR\s*)\s*(\d{2,4})",text,re.I):
-            v=float(m.group(1));
-            if 120<=v<=350: vals.append(v)
-        if vals:
-            price=statistics.median(vals[:12]); source="public web search"
-    except Exception:
-        pass
-    CACHE.set("fitness_chicken_price",(price,source),21600)
-    return price,source
 
 # ---------------------------------------------------------------------------
 # Cache, dedupe, rate limiting, provider health, events
@@ -2233,7 +1936,7 @@ def prune_transient_cache(max_age_days: int = 3) -> dict[str, int]:
 # Item 12: Admin API Passbook & Resource Usage Ledgers
 UPSTOX_USAGE_LOG = {
     "minute_calls": collections.deque(),
-    "today_calls": 1420,
+    "today_calls": 0,
     "last_reset_day": datetime.now(timezone.utc).date(),
     "history": collections.deque(maxlen=100)
 }
@@ -3326,6 +3029,7 @@ def normalize_quote(key: str, identifier: str, meta: dict[str, Any], raw: dict[s
         "low": ohlc.get("low"),
         "close": ohlc.get("close"),
         "volume": raw.get("volume") or raw.get("volume_traded"),
+        "oi": raw.get("oi"),
         "average_price": raw.get("average_price"),
         "net_change": net_change,
         "change_pct": change_pct,
@@ -3934,51 +3638,20 @@ def parse_option_contract(sym: str) -> dict[str, Any] | None:
     return None
 
 def synthesize_option_candles(instrument: str, opt_info: dict[str, Any], underlying_candles: list[dict[str, Any]], opt_ltp: float | None = None) -> list[dict[str, Any]]:
-    if not underlying_candles:
-        return []
-    strike = float(opt_info.get("strike") or 50000.0)
-    opt_type = str(opt_info.get("option_type") or "CE").upper()
-    last_spot = float(underlying_candles[-1].get("close") or strike)
-    if not opt_ltp or opt_ltp <= 0:
-        q_real = get_live_fallback_quote(instrument)
-        if q_real and q_real.get("ltp"):
-            opt_ltp = float(q_real["ltp"])
-        else:
-            opt_ltp = max(0.05, round((last_spot - strike) if opt_type == "CE" else (strike - last_spot), 2))
-
-    moneyness = last_spot / strike if strike else 1.0
-    if opt_type == "CE":
-        delta = max(0.1, min(0.9, 0.5 + (moneyness - 1.0) * 4.0))
-    else:
-        delta = -max(0.1, min(0.9, 0.5 - (moneyness - 1.0) * 4.0))
-
-    synth_candles: list[dict[str, Any]] = []
-    for c in underlying_candles:
-        s_o = float(c.get("open") or last_spot)
-        s_h = float(c.get("high") or last_spot)
-        s_l = float(c.get("low") or last_spot)
-        s_c = float(c.get("close") or last_spot)
-        c_o = max(0.05, round(opt_ltp + delta * (s_o - last_spot), 2))
-        c_c = max(0.05, round(opt_ltp + delta * (s_c - last_spot), 2))
-        if delta > 0:
-            c_h = max(0.05, round(opt_ltp + delta * (s_h - last_spot), 2), c_o, c_c)
-            c_l = max(0.05, min(round(opt_ltp + delta * (s_l - last_spot), 2), c_o, c_c))
-        else:
-            c_h = max(0.05, round(opt_ltp + delta * (s_l - last_spot), 2), c_o, c_c)
-            c_l = max(0.05, min(round(opt_ltp + delta * (s_h - last_spot), 2), c_o, c_c))
-        vol = max(10, int(float(c.get("volume") or 100) * 0.35))
-        synth_candles.append({
-            "timestamp": c.get("timestamp"),
-            "open": c_o,
-            "high": c_h,
-            "low": c_l,
-            "close": c_c,
-            "volume": vol
-        })
-    return synth_candles
+    """Option candles must come from Upstox. Synthesizing them from the underlying is disabled; callers treat [] as 'no data'."""
+    return []
 
 def resolve_lot_size(sym: str, default: int = 1) -> int:
     s = str(sym or "").upper().strip()
+    # Upstox instrument master is the source of truth; the table below is only a last resort when Upstox has no row.
+    for ident in (s, f"{extract_root_symbol(s)} FUT"):
+        try:
+            _, meta = UPSTOX.resolve_instrument(ident)
+            lot = int(float((meta or {}).get("lot_size") or 0))
+            if lot > 0:
+                return lot
+        except Exception:
+            continue
     # MCX Commodities
     if "CRUDEOILM" in s: return 10
     if "CRUDE" in s: return 100
@@ -3996,13 +3669,13 @@ def resolve_lot_size(sym: str, default: int = 1) -> int:
     if "LEAD" in s: return 5000
     if "ALUMINIUM" in s: return 5000
 
-    # Major Indices
-    if "NIFTY BANK" in s or "BANKNIFTY" in s: return 15
-    if "FINNIFTY" in s: return 65
+    # Major Indices (fallback only)
+    if "NIFTY BANK" in s or "BANKNIFTY" in s: return 30
+    if "FINNIFTY" in s: return 60
     if "MIDCPNIFTY" in s: return 120
-    if "NIFTY" in s: return 75
-    if "SENSEX" in s: return 10
-    if "BANKEX" in s: return 15
+    if "NIFTY" in s: return 65
+    if "SENSEX" in s: return 20
+    if "BANKEX" in s: return 30
 
     # Top F&O Stocks
     stock_lots = {
@@ -4315,11 +3988,12 @@ def fallback_recommendation_quick(instrument: str, user_id: int | None = None, d
     sm_fb = get_stock_mantra_setup(instrument) or get_stock_mantra_setup(root)
     if sm_fb:
         fb_sym = sm_fb.get("symbol", str(instrument))
-        fb_ent = float(sm_fb.get("entry") or ltp or 100.0)
-        fb_sl = float(sm_fb.get("stop_loss") or round(fb_ent * 0.85, 2))
-        fb_t1 = float(sm_fb.get("target_1") or round(fb_ent * 1.15, 2))
-        fb_t2 = float(sm_fb.get("target_2") or round(fb_ent * 1.35, 2))
-        fb_rr = round(abs(fb_t1 - fb_ent) / max(0.01, abs(fb_ent - fb_sl)), 2)
+        # Our own engine has no data here, so this is a relay of Stock Mantra's posted levels (missing levels stay empty).
+        fb_ent = float(sm_fb.get("entry") or 0.0) or None
+        fb_sl = sm_fb.get("stop_loss")
+        fb_t1 = sm_fb.get("target_1")
+        fb_t2 = sm_fb.get("target_2")
+        fb_rr = round(abs(fb_t1 - fb_ent) / abs(fb_ent - fb_sl), 2) if (fb_ent and fb_sl and fb_t1 and fb_ent != fb_sl) else None
         fb_action = "BUY CALL" if sm_fb.get("option_type") == "CE" else ("BUY PUT" if sm_fb.get("option_type") == "PE" else "BUY")
         return {
             "qualifies": True,
@@ -4333,10 +4007,12 @@ def fallback_recommendation_quick(instrument: str, user_id: int | None = None, d
             "symbol": fb_sym,
             "display_symbol": fb_sym,
             "underlying": str(underlying_sym),
-            "confidence": 94.2,
-            "accuracy": "94.2%",
+            "confidence": None,
+            "confidence_basis": "Relayed Stock Mantra call; CA Trader's own model had no Upstox data for this instrument",
+            "accuracy": "Not measured",
+            "source": "stock_mantra_relay",
             "status": sm_fb.get("status", "ACTIVE"),
-            "status_tag": "ACTIVE 🟢 In Range / Scalp Accumulation",
+            "status_tag": "Stock Mantra call (relayed)",
             "stock_mantra_confluence": True,
             "stock_mantra_setup": sm_fb,
             "entry": fb_ent,
@@ -4345,7 +4021,9 @@ def fallback_recommendation_quick(instrument: str, user_id: int | None = None, d
             "target": fb_t1,
             "risk_reward": fb_rr,
             "instrument": {"kind": "OPTION" if is_opt or "CE" in fb_sym or "PE" in fb_sym else "EQUITY", "symbol": fb_sym, "display": fb_sym, "underlying": underlying_sym, "entry": fb_ent, "lot_size": lot},
-            "rationale": f"Institutional Confluence (94.2% Accuracy): Stock Mantra (@stockmantraindex) confirms {fb_action} on {fb_sym}. Spot: ₹{sm_fb.get('spot_ltp', ltp):,.2f}. Scalp T1: ₹{fb_t1:,.2f}, Runner T2: ₹{fb_t2:,.2f}, SL: ₹{fb_sl:,.2f}.",
+            "rationale": (f"Stock Mantra (@stockmantraindex) posted {fb_action} {fb_sym} near ₹{(fb_ent or 0):,.2f}; "
+                          f"target {('₹%.2f' % fb_t1) if fb_t1 else 'open'}, SL {('₹%.2f' % fb_sl) if fb_sl else 'not stated'}. "
+                          f"CA Trader's own model has no Upstox data for this instrument right now."),
             "provider": "stock_mantra_telegram_stream",
             "timestamp": now_iso()
         }
@@ -4388,14 +4066,17 @@ def normalize_option_chain(underlying: str, key: str, meta: dict[str, Any], payl
             return None
         md = node.get("market_data") or node.get("marketData") or {}
         greeks = node.get("option_greeks") or node.get("optionGreeks") or {}
+        oi_now = md.get("oi") if md.get("oi") is not None else md.get("open_interest")
+        prev_oi = md.get("prev_oi")
         return {
             "instrument_key": node.get("instrument_key") or node.get("instrumentKey"),
             "ltp": md.get("ltp") if md.get("ltp") is not None else node.get("ltp"),
             "close": md.get("close_price") if md.get("close_price") is not None else md.get("close"),
             "bid": md.get("bid_price") if md.get("bid_price") is not None else md.get("bid"),
             "ask": md.get("ask_price") if md.get("ask_price") is not None else md.get("ask"),
-            "oi": md.get("oi") if md.get("oi") is not None else md.get("open_interest"),
-            "change_oi": md.get("prev_oi"),
+            "oi": oi_now,
+            "prev_oi": prev_oi,
+            "change_oi": (float(oi_now) - float(prev_oi)) if (oi_now is not None and prev_oi is not None) else None,
             "volume": md.get("volume"),
             "iv": greeks.get("iv"),
             "delta": greeks.get("delta"),
@@ -7113,8 +6794,7 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
 
     if opt_info:
         key, meta = UPSTOX.resolve_instrument(symbol)
-        lot = int(meta.get("lot_size") or (15 if "BANK" in symbol.upper() else 65 if "NIFTY" in symbol.upper() else 1))
-        lot = int(meta.get("lot_size") or (30 if "BANK" in symbol.upper() else 65 if "NIFTY" in symbol.upper() else 1))
+        lot = int(meta.get("lot_size") or resolve_lot_size(symbol, 1))
         opt_type = opt_info["option_type"]
         opt_strike = opt_info["strike"]
         try:
@@ -7327,20 +7007,20 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "cmp": opt_entry,
             "lot_size": lot,
             "from_watchlist": True,
-            "score": 92.0,
             "greeks": greeks,
             "perfect_entry_details": opt_perf,
             "is_expiry_scalp": expiry_scalp
         }
+        try:
+            opt_model = SIGNAL_MODEL.evaluate(candles)
+        except Exception as exc:
+            opt_model = {"available": False, "reason": safe_text(exc)}
+        opt_measured = (opt_model.get("confidence") or {}) if opt_model.get("available") else {}
+        reco_accuracy = opt_measured.get("label") or "Not measured yet"
         sm_setup = get_stock_mantra_setup(opt_info["underlying"] if opt_info else root)
+        rationale_prefix = (f"Signal score {opt_model['score']:+.1f} (gate ±{opt_model['gate']:.0f}). " if opt_model.get("available") else "")
         if sm_setup and sm_setup.get("signal") == opt_action:
-            confidence = max(confidence, 93.5)
-            reco_accuracy = "94.2%"
-            rationale_prefix = f"Institutional Confluence ({reco_accuracy} Concordance): Stock Mantra Advisory confirms {opt_action} on {symbol} (5m scalp velocity active). "
-        else:
-            confidence = max(confidence, 91.0)
-            reco_accuracy = "92.0%"
-            rationale_prefix = f"Algorithmic Consensus ({reco_accuracy} Concordance): Multi-Timeframe Alignment confirmed. "
+            rationale_prefix += f"Stock Mantra also posted {sm_setup.get('symbol')} near ₹{float(sm_setup.get('entry') or 0):,.2f}. "
 
         trade_status = "ACTIVE"
         if opt_entry > 0 and opt_sl > 0 and opt_entry <= opt_sl:
@@ -7357,7 +7037,9 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "accuracy": reco_accuracy,
             "stock_mantra_confluence": True if sm_setup else False,
             "timeframe": timeframe,
-            "confidence": round(min(99, max(50, confidence)), 1),
+            "confidence": opt_measured.get("pct"),
+            "confidence_basis": reco_accuracy,
+            "signal_model": opt_model,
             "entry": entry_to_use,
             "cmp": opt_entry,
             "stop_loss": opt_sl,
@@ -7375,7 +7057,6 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
             "timestamp": now_iso(),
             **next_day_info
         }
-        CACHE.set(cache_key, res_opt, 20)
         CACHE.set(cache_key, res_opt, 15)
         return res_opt
 
@@ -7870,11 +7551,21 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         pe_opt["recommendation"] = "BUY"
         pe_opt["is_primary"] = (und_sig == "SELL")
 
-    # Institutional Stock Mantra Telegram Confluence & Dynamic Hit Tracking
+    # Transparent signal model: weighted factor score from Upstox data; confidence = measured hit-rate for similar scores.
+    sig_chain = None
+    if root in {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"} and not candles_override:
+        try:
+            sig_chain = UPSTOX.option_chain(root)
+        except Exception:
+            sig_chain = None
+    try:
+        signal_model = SIGNAL_MODEL.evaluate(candles, sig_chain)
+    except Exception as exc:
+        signal_model = {"available": False, "reason": safe_text(exc)}
     sm_setup = get_stock_mantra_setup(symbol) or get_stock_mantra_setup(root)
-    reco_accuracy = "94.2%" if sm_setup else "92.5%"
-    base_conf = float(confidence or 85.0) + (5.0 if instrument.get('kind') == 'OPTION' else 3.0)
-    overall_conf = max(base_conf, 93.8 if sm_setup else 91.5)
+    measured = (signal_model.get("confidence") or {}) if signal_model.get("available") else {}
+    reco_accuracy = measured.get("label") or "Not measured yet"
+    overall_conf = measured.get("pct")
 
     trade_status = "ACTIVE"
     status_label = "ACTIVE 🟢 In Range / Scalp Accumulation"
@@ -7910,16 +7601,16 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
                 trade_status = "TARGET_1_HIT"
                 status_label = f"TARGET 1 HIT 🎯 Achieved ₹{tgt_lvl:,.2f}"
 
+    model_lead = (f"Signal score {signal_model['score']:+.1f} (trade gate ±{signal_model['gate']:.0f}, "
+                  f"{signal_model['agreeing']}/{signal_model['factors_used']} factors agree) → {signal_model['decision']}. ") if signal_model.get("available") else ""
     if sm_setup:
-        sm_chan = sm_setup.get("channel", "@stockmantraindex")
-        sm_t1 = sm_setup.get("target_1", tgt_lvl)
-        sm_t2 = sm_setup.get("target_2", round(tgt_lvl * 1.08, 2) if tgt_lvl else 0)
-        sm_sl_val = sm_setup.get("stop_loss", sl_lvl)
-        sm_dt = sm_setup.get("date", "30-Sep-2026")
-        sm_tm = sm_setup.get("time", "09:18 AM IST")
-        sm_lead = f"Institutional Confluence ({reco_accuracy} Accuracy): Stock Mantra ({sm_chan} broadcast {sm_dt} {sm_tm}) recommends {sm_setup.get('symbol', reco_symbol)} ({sm_setup.get('signal', reco_action)}). Spot: ₹{last_price:,.2f}. Scalp T1: ₹{sm_t1:,.2f}, Runner T2: ₹{sm_t2:,.2f}, SL: ₹{sm_sl_val:,.2f}. "
+        sm_t1 = sm_setup.get("target_1")
+        sm_sl_val = sm_setup.get("stop_loss")
+        sm_lead = (f"{model_lead}Stock Mantra ({sm_setup.get('channel', '@stockmantraindex')}, {sm_setup.get('date', '')} {sm_setup.get('time', '')}) "
+                   f"posted {sm_setup.get('symbol', reco_symbol)} near ₹{float(sm_setup.get('entry') or 0):,.2f}; "
+                   f"target {('₹%.2f' % sm_t1) if sm_t1 else 'open'}, SL {('₹%.2f' % sm_sl_val) if sm_sl_val else 'not stated'}. ")
     else:
-        sm_lead = f"Algorithmic Institutional Consensus ({reco_accuracy} Accuracy): Multi-Timeframe Alignment confirmed on {reco_symbol}. "
+        sm_lead = model_lead
 
     if trade_status == "STOP_LOSS_HIT":
         sm_lead = f"🛑 RISK ALERT: Stop loss reached at ₹{sl_lvl:,.2f}. Capital protection triggered. " + sm_lead
@@ -7932,7 +7623,7 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
     underlying_rec["status"] = trade_status
     underlying_rec["status_tag"] = status_label
     underlying_rec["accuracy"] = reco_accuracy
-    underlying_rec["confidence"] = round(min(98.5, max(91.0, overall_conf - 1.0)), 1)
+    underlying_rec["confidence"] = overall_conf
     underlying_rec["stock_mantra_confluence"] = True if sm_setup else False
     underlying_rec["rationale"] = f"{sm_lead}Algorithmic {und_sig} setup on {symbol}. Pullback Entry ₹{und_entry:,.2f}, Target ₹{und_tgt:,.2f}, SL ₹{und_sl:,.2f} (R:R 1:{und_rr:.2f})."
 
@@ -7949,7 +7640,9 @@ def overall_recommendation(symbol: str, timeframe: str, desired_profit: float | 
         "display_symbol": reco_display,
         "underlying": symbol,
         "underlying_recommendation": underlying_rec,
-        "confidence": round(min(98.5, max(92.5, overall_conf)), 1),
+        "confidence": overall_conf,
+        "confidence_basis": measured.get("label") or "Not measured yet",
+        "signal_model": signal_model,
         "status": trade_status,
         "status_tag": status_label,
         "accuracy": reco_accuracy,
@@ -8035,7 +7728,6 @@ def ai_analyze(evidence: dict[str, Any]) -> dict[str, Any]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{quote(model, safe='-_.')}:generateContent"
         try:
             resp = requests.post(url, headers=headers, json=body, timeout=12)
-            resp = requests.post(url, headers=headers, json=body, timeout=3.5)
             if resp.status_code == 429 or resp.status_code >= 500:
                 log.warning(f"Model {model} returned HTTP {resp.status_code}. Cascading to next model...")
                 continue
@@ -8595,14 +8287,6 @@ async def post_login_page(request: Request) -> Response:
 async def auth_select_terminal(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "terminal": "trading"}
 
-@app.get("/fitness", response_class=HTMLResponse)
-async def fitness_page(request: Request) -> Response:
-    return RedirectResponse("/terminal", status_code=302)
-
-@app.get("/backcovers", response_class=HTMLResponse)
-async def backcovers_page(request: Request) -> Response:
-    return RedirectResponse("/terminal", status_code=302)
-
 @app.get("/guide", response_class=HTMLResponse)
 @app.get("/tutorial", response_class=HTMLResponse)
 async def guide_page(request: Request) -> Response:
@@ -9108,15 +8792,27 @@ def get_cached_terminal_html() -> str:
     except Exception:
         return HTML_PATH.read_text(encoding="utf-8")
 
+TRADE_HTML_PATH = BASE_DIR / "trade.html"
+
+
 @app.get("/terminal", response_class=HTMLResponse)
 async def terminal_page(request: Request) -> Response:
+    """New trading screen. The previous terminal stays available at /terminal/classic."""
+    user=current_user(request)
+    if AUTH_ENABLED and not user:
+        return RedirectResponse("/login", status_code=302)
+    if TRADE_HTML_PATH.exists():
+        return HTMLResponse(TRADE_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+    return await classic_terminal_page(request)
+
+
+@app.get("/terminal/classic", response_class=HTMLResponse)
+async def classic_terminal_page(request: Request) -> Response:
     user=current_user(request)
     if AUTH_ENABLED and not user:
         return RedirectResponse("/login", status_code=302)
     if is_admin(user) and selected_terminal(request)=="video":
         return RedirectResponse("/video", status_code=302)
-    if fitness_allowlisted(user) and selected_terminal(request)=="fitness":
-        return RedirectResponse("/fitness", status_code=302)
     if not HTML_PATH.exists():
         return error_json("UI_NOT_FOUND", f"HTML file not found: {HTML_PATH}", 500)
     html = get_cached_terminal_html()
@@ -11030,181 +10726,81 @@ async def analysis_overall(
 # Real-Time Option Chain Matrix: Assembles full strike ladders with LTP, Open Interest (OI), Volume,
 # and live Black-Scholes Greeks (Delta, Theta, Gamma, IV) for NIFTY, BANKNIFTY, FINNIFTY, and SENSEX.
 def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> dict[str, Any]:
+    """Option chain built from real Upstox contracts and quotes (used for MCX and whenever /option/chain is empty).
+    Prices, OI and volume come only from Upstox quotes; strikes without a quote show null. Nothing is synthesized."""
     parsed = parse_option_contract(underlying)
     if parsed:
         underlying = parsed["underlying"]
     root = extract_root_symbol(underlying).upper()
-    commodity_configs = {
-        "CRUDEOIL": {"spot": 6250.0, "step": 50.0, "lot": 100, "iv": 34.0, "default_exp": get_sebi_compliant_expiry("CRUDEOIL")},
-        "NATURALGAS": {"spot": 245.0, "step": 5.0, "lot": 1250, "iv": 48.0, "default_exp": get_sebi_compliant_expiry("NATURALGAS")},
-        "GOLD": {"spot": 74500.0, "step": 200.0, "lot": 100, "iv": 14.0, "default_exp": get_sebi_compliant_expiry("GOLD")},
-        "SILVER": {"spot": 88200.0, "step": 500.0, "lot": 30, "iv": 22.0, "default_exp": get_sebi_compliant_expiry("SILVER")},
-        "COPPER": {"spot": 820.0, "step": 5.0, "lot": 2500, "iv": 18.0, "default_exp": get_sebi_compliant_expiry("COPPER")},
-        "ZINC": {"spot": 270.0, "step": 2.5, "lot": 5000, "iv": 20.0, "default_exp": get_sebi_compliant_expiry("ZINC")},
-        "BANKNIFTY": {"spot": 54450.0, "step": 100.0, "lot": 15, "iv": 15.8, "default_exp": get_sebi_compliant_expiry("BANKNIFTY")},
-        "NIFTY": {"spot": 24500.0, "step": 50.0, "lot": 75, "iv": 13.0, "default_exp": get_sebi_compliant_expiry("NIFTY")},
-    }
-    
-    # Try fetching live quote for accurate spot
+    is_mcx = root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "LEAD", "ALUMINIUM"}
+    empty = {"underlying": root, "spot": None, "atm_strike": None, "expiry": expiry, "strikes": [], "provider": "upstox", "timestamp": now_iso()}
     spot = None
     try:
-        clean_und = underlying.strip().upper()
-        if not any(clean_und.endswith(x) for x in (" CE", " PE", "CE", "PE")):
-            q = UPSTOX.quote(underlying)
-            if q and q.get("ltp"):
-                spot = float(q["ltp"])
-        if spot is None or spot <= 0:
-            q2 = UPSTOX.quote(root)
-            if q2 and q2.get("ltp"):
-                spot = float(q2["ltp"])
+        q = UPSTOX.quote(root)
+        spot = float(q.get("ltp") or 0.0) or None
     except Exception:
-        pass
-
-    if spot is None or (root in commodity_configs and spot < commodity_configs[root]["spot"] * 0.25):
-        index_map = {
-            "BANKNIFTY": "NSE_INDEX|Nifty Bank",
-            "NIFTY": "NSE_INDEX|Nifty 50",
-            "FINNIFTY": "NSE_INDEX|Nifty Fin Service",
-            "MIDCPNIFTY": "NSE_INDEX|NIFTY MID SELECT"
-        }
-        try:
-            # STRICTLY match UNDERLYING only, NEVER option contracts (which have CE/PE and low option prices like 93 or 532)!
-            row = db_exec(
-                "SELECT ltp FROM watchlist_members WHERE (UPPER(symbol) = ? OR UPPER(display_name) = ? OR UPPER(instrument_key) = ?) "
-                "AND UPPER(symbol) NOT LIKE '%CE%' AND UPPER(symbol) NOT LIKE '%PE%' AND ltp > 1000 ORDER BY id DESC",
-                [root, root, index_map.get(root, root)],
-                "one"
-            )
-            if row and row.get("ltp"):
-                spot = float(row["ltp"])
-        except Exception:
-            pass
-    
-    if root in commodity_configs:
-        cfg = commodity_configs[root]
-        min_expected = cfg["spot"] * 0.30
-        if spot is None or spot < min_expected:
-            spot = cfg["spot"]
-        step = cfg["step"]
-        lot = cfg["lot"]
-        iv = cfg["iv"]
-        default_exp = cfg.get("default_exp") or get_sebi_compliant_expiry(root)
-    else:
-        # Stock equity configuration (RELIANCE, TCS, INFY, HDFCBANK, etc.)
-        if spot is None: spot = 1250.0
-        if spot > 5000: step = 100.0
-        elif spot > 2500: step = 50.0
-        elif spot > 1000: step = 20.0
-        elif spot > 500: step = 10.0
-        elif spot > 250: step = 5.0
-        else: step = 2.5
-        lot = 250 if spot > 1000 else 500
-        iv = 22.0
-        default_exp = get_sebi_compliant_expiry(root)
-
-    atm_strike = round(spot / step) * step
-    exp_str = expiry or default_exp
-    days_to_exp = 25.0 if "BANK" in root else 12.0
+        spot = None
     try:
-        now_d = datetime.now(IST).date()
-        clean_exp = exp_str.replace("-", " ").strip()
-        parsed_d = None
-        for fmt in ("%d %b %Y", "%d %B %Y", "%Y %m %d", "%d %m %Y"):
+        found = UPSTOX.search_instruments(root, exchanges="MCX" if is_mcx else "NSE,BSE", segments="ALL").get("data") or []
+    except Exception as exc:
+        return {**empty, "error": f"Upstox contract search failed: {safe_text(exc)}"}
+    contracts = [r for r in found if str(r.get("instrument_type") or "").upper() in {"CE", "PE"}
+                 and str(r.get("underlying_symbol") or r.get("name") or root).upper().replace(" ", "").startswith(root)]
+    today = datetime.now(IST).date().isoformat()
+    exps = sorted({str(r.get("expiry"))[:10] for r in contracts if str(r.get("expiry") or "")[:10] >= today})
+    if not contracts or not exps:
+        return {**empty, "error": f"Upstox returned no live {root} option contracts"}
+    want = None
+    if expiry:
+        for fmt in ("%Y-%m-%d", "%d %b %Y", "%d %B %Y", "%d-%b-%Y"):
             try:
-                parsed_d = datetime.strptime(clean_exp, fmt).date()
-                break
+                want = datetime.strptime(str(expiry).strip().title(), fmt).date().isoformat(); break
             except Exception:
-                pass
-        if parsed_d:
-            days_diff = (parsed_d - now_d).days
-            days_to_exp = max(0.5, float(days_diff))
-    except Exception:
-        pass
-    t_years = days_to_exp / 365.0
-    sigma = iv / 100.0
-
-    strikes_list = []
-    is_mcx = root in {"CRUDEOIL","GOLD","SILVER","NATURALGAS","COPPER","ZINC","LEAD","ALUMINIUM"}
-    for i in range(-25, 26):
-        stk = round(atm_strike + i * step, 2)
-        c_sym = f"{root} {int(stk)} CE"
-        p_sym = f"{root} {int(stk)} PE"
-        q_c = get_live_fallback_quote(c_sym)
-        q_p = get_live_fallback_quote(p_sym)
-        call_p = float(q_c.get("ltp") or 0.0) if q_c else 0.0
-        put_p = float(q_p.get("ltp") or 0.0) if q_p else 0.0
-        if call_p <= 0:
-            call_p = max(0.05, round(spot - stk, 2)) if spot > stk else 0.05
-        if put_p <= 0:
-            put_p = max(0.05, round(stk - spot, 2)) if stk > spot else 0.05
-        cg = bs_greeks(spot, stk, t_years=t_years, sigma=sigma, opt_type="CE")
-        pg = bs_greeks(spot, stk, t_years=t_years, sigma=sigma, opt_type="PE")
-
-        dist = abs(stk - spot)
-        if is_mcx:
-            # Calibrate realistic MCX Commodity contracts (Crude Oil, Natural Gas, Gold, Silver)
-            oi_base = max(450, int(12500 - dist * 4))
-            vol_base = max(200, int(8500 - dist * 3))
-        else:
-            oi_base = max(1200, int(45000 - dist * 15))
-            vol_base = max(450, int(22000 - dist * 8))
-
-        c_token = f"MCX_FO|{root}_{int(stk)}_CE" if is_mcx else f"NSE_FO|{root}_{int(stk)}_CE"
-        p_token = f"MCX_FO|{root}_{int(stk)}_PE" if is_mcx else f"NSE_FO|{root}_{int(stk)}_PE"
-        c_sym = f"{root} {int(stk)} CE"
-        p_sym = f"{root} {int(stk)} PE"
-
-        strikes_list.append({
-            "strike": stk,
-            "call": {
-                "instrument_key": c_token,
-                "trading_symbol": c_sym,
-                "symbol": c_sym,
-                "display_symbol": c_sym,
-                "ltp": call_p,
-                "close": call_p,
-                "bid": round(max(0.05, call_p * 0.995), 2),
-                "ask": round(call_p * 1.005, 2),
-                "oi": oi_base,
-                "change_oi": int(oi_base * 0.08),
-                "volume": vol_base,
-                "iv": iv,
-                "delta": cg["delta"],
-                "gamma": cg["gamma"],
-                "theta": cg["theta"],
-                "vega": cg["vega"],
-            },
-            "put": {
-                "instrument_key": p_token,
-                "trading_symbol": p_sym,
-                "symbol": p_sym,
-                "display_symbol": p_sym,
-                "ltp": put_p,
-                "close": put_p,
-                "bid": round(max(0.05, put_p * 0.995), 2),
-                "ask": round(put_p * 1.005, 2),
-                "oi": int(oi_base * 0.92),
-                "change_oi": int(oi_base * 0.06),
-                "volume": int(vol_base * 0.95),
-                "iv": iv,
-                "delta": pg["delta"],
-                "gamma": pg["gamma"],
-                "theta": pg["theta"],
-                "vega": pg["vega"],
-            }
-        })
-
+                continue
+    exp_iso = want if want in exps else exps[0]
+    rows = [r for r in contracts if str(r.get("expiry"))[:10] == exp_iso]
+    strikes_all = sorted({float(r.get("strike_price") or 0) for r in rows if r.get("strike_price") is not None})
+    if spot is None and strikes_all:
+        return {**empty, "expiry": exp_iso, "error": f"No Upstox quote for {root}; cannot centre the chain"}
+    atm = min(strikes_all, key=lambda s: abs(s - spot)) if strikes_all else None
+    idx = strikes_all.index(atm) if atm is not None else 0
+    window = set(strikes_all[max(0, idx - 15): idx + 16])
+    rows = [r for r in rows if float(r.get("strike_price") or 0) in window]
+    quotes_by_key: dict[str, dict[str, Any]] = {}
+    try:
+        for qrow in UPSTOX.quotes([r["instrument_key"] for r in rows if r.get("instrument_key")]):
+            quotes_by_key[str(qrow.get("instrument_key"))] = qrow
+    except Exception as exc:
+        log.warning("Option chain quotes failed for %s: %s", root, safe_text(exc))
+    by_strike: dict[float, dict[str, Any]] = {}
+    for r in rows:
+        stk = float(r.get("strike_price") or 0)
+        side = "call" if str(r.get("instrument_type")).upper() == "CE" else "put"
+        qd = quotes_by_key.get(str(r.get("instrument_key"))) or {}
+        node = by_strike.setdefault(stk, {"strike": stk, "call": None, "put": None})
+        node[side] = {
+            "instrument_key": r.get("instrument_key"),
+            "trading_symbol": r.get("trading_symbol"),
+            "symbol": r.get("trading_symbol"),
+            "display_symbol": r.get("trading_symbol"),
+            "ltp": qd.get("ltp"),
+            "close": qd.get("cp"),
+            "oi": qd.get("oi"),
+            "change_oi": None,
+            "volume": qd.get("volume"),
+            "lot_size": r.get("lot_size"),
+            "expiry": exp_iso,
+            "provider": "upstox" if qd else "upstox_contract_only",
+        }
     return {
         "underlying": root,
-        "instrument_key": f"MCX_COMM|{root}" if is_mcx else root,
         "spot": spot,
-        "atm_strike": atm_strike,
-        "expiry": exp_str,
-        "strikes": strikes_list,
-        "provider": "upstox+ca_options_engine",
-        "timestamp": now_iso()
+        "atm_strike": atm,
+        "expiry": exp_iso,
+        "strikes": [by_strike[k] for k in sorted(by_strike)],
+        "provider": "upstox_contracts+quotes",
+        "timestamp": now_iso(),
     }
-
 
 def generate_commodity_option_chain(underlying: str, expiry: str | None = None) -> dict[str, Any]:
     return generate_option_chain_engine(underlying, expiry)
@@ -11222,7 +10818,7 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
     data = None
     if not is_mcx:
         try:
-            raw = await asyncio.wait_for(asyncio.to_thread(UPSTOX.option_chain, root, expiry), timeout=2.0)
+            raw = await asyncio.wait_for(asyncio.to_thread(UPSTOX.option_chain, root, expiry), timeout=6.0)
             if raw and isinstance(raw, dict) and raw.get("strikes"):
                 data = raw
         except Exception:
@@ -11231,35 +10827,6 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
     if not data or not (data.get("strikes") or []):
         data = generate_option_chain_engine(underlying, expiry)
 
-    # Real contract overlay for MCX commodities (CRUDEOIL, etc.)
-    if is_mcx and data and data.get("strikes"):
-        # Dynamic MCX instrument search without hardcoded expiry (Release 47 - Item 17)
-        try:
-            p_mcx = await asyncio.wait_for(asyncio.to_thread(UPSTOX.search_instruments, f"{root}", exchanges="MCX", segments="ALL"), timeout=1.8)
-            mcx_rows = p_mcx.get("data") or []
-            if mcx_rows:
-                exp_tag = (data.get("expiry") or "OCT 2026").split()[0] or "OCT"
-                contract_map = {}
-                for cr in mcx_rows:
-                    stk_val = cr.get("strike_price")
-                    itype = str(cr.get("instrument_type") or "").upper()
-                    if stk_val is not None and itype in {"CE", "PE"}:
-                        contract_map[(round(float(stk_val)), itype)] = cr
-                for s_item in data.get("strikes", []):
-                    stk = round(float(s_item.get("strike") or 0))
-                    for side in ("call", "put"):
-                        side_type = "CE" if side == "call" else "PE"
-                        if (stk, side_type) in contract_map:
-                            real_c = contract_map[(stk, side_type)]
-                            s_item[side]["instrument_key"] = real_c.get("instrument_key") or s_item[side].get("instrument_key")
-                            s_item[side]["trading_symbol"] = real_c.get("trading_symbol") or f"{root} {stk} {side_type} {exp_tag} 26"
-                            s_item[side]["symbol"] = f"{root} {exp_tag} {stk} {side_type}"
-                            s_item[side]["display_symbol"] = f"{root} {exp_tag} {stk} {side_type}"
-                data["is_mock"] = False
-                data["provider"] = "upstox_mcx"
-                data["expiry"] = f"{exp_tag} 2026"
-        except Exception as err:
-            log.warning("MCX real option overlay error for %s: %s", root, safe_text(err))
         
     CACHE.set(key, data, 120)
     return data
@@ -11277,28 +10844,16 @@ async def option_expiries(underlying: str, user: dict[str, Any] = Depends(requir
     is_mcx = root in {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "LEAD", "ALUMINIUM"}
     
     if is_mcx:
-        # Dynamically calculate future MCX expiries so past dates are never served
-        now_d = datetime.now(IST).date()
-        target_day = {"CRUDEOIL": 19, "NATURALGAS": 25, "GOLD": 26, "SILVER": 25}.get(root, 28)
-        dyn = []
-        cy = now_d.year
-        cm = now_d.month
-        for _ in range(6):
-            try:
-                c_date = datetime(cy, cm, min(target_day, 28)).date()
-            except ValueError:
-                c_date = last_weekday_of_month(cy, cm, 4).date()
-            if c_date.weekday() == 5:
-                c_date -= timedelta(days=1)
-            elif c_date.weekday() == 6:
-                c_date -= timedelta(days=2)
-            if c_date >= now_d:
-                dyn.append(c_date.strftime("%d %b %Y").upper())
-            cm += 1
-            if cm > 12:
-                cm = 1
-                cy += 1
-        expiries = dyn[:4]
+        # MCX option expiries straight from the Upstox instrument search (no calendar guessing)
+        try:
+            found = await asyncio.wait_for(asyncio.to_thread(UPSTOX.search_instruments, root, "MCX", "ALL"), timeout=4.0)
+            today_iso = datetime.now(IST).date().isoformat()
+            exps = sorted({str(r.get("expiry"))[:10] for r in (found.get("data") or [])
+                           if str(r.get("instrument_type") or "").upper() in {"CE", "PE"} and str(r.get("expiry") or "")[:10] >= today_iso})
+            expiries = [datetime.strptime(x, "%Y-%m-%d").strftime("%d %b %Y").upper() for x in exps[:4]]
+        except Exception as exc:
+            log.warning("MCX expiry lookup failed for %s: %s", root, safe_text(exc))
+            expiries = []
     else:
         try:
             payload = await asyncio.wait_for(asyncio.to_thread(UPSTOX.option_contracts, root), timeout=3.0)
@@ -11389,197 +10944,75 @@ def fetch_global_market_quotes() -> dict[str, Any]:
 
 @app.get("/api/market/macro-factors")
 async def market_macro_factors(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """Dynamic multi-factor macro driver model with genuine live feeds:
-    GIFT Nifty, India VIX, US Markets (Dow Jones, S&P 500, Nasdaq), Brent Crude, US 10Y Yield, DXY Dollar Index."""
-    cache_key = "market:macro_factors_v46"
+    """Macro context. India VIX and NIFTY from Upstox; US indices, Brent, US 10Y and DXY from Yahoo Finance
+    (Upstox does not carry them). Anything a feed does not return is shown as unavailable, never as a placeholder."""
+    cache_key = "market:macro_factors_v47"
     cached = CACHE.get(cache_key)
     if cached:
         return cached
-
-    now = datetime.now(timezone.utc)
-    now_ist = now.astimezone(timezone(timedelta(hours=5, minutes=30)))
-
-    # Fetch live quotes
-    nifty_quote = None
-    vix_quote = None
-    crude_quote = None
+    nifty_quote, vix_quote = {}, {}
     try: nifty_quote = UPSTOX.quote("NIFTY")
     except Exception: pass
-    try: vix_quote = UPSTOX.quote("INDIA VIX")
+    try: vix_quote = UPSTOX.quote("NSE_INDEX|India VIX")
     except Exception: pass
-    try: crude_quote = UPSTOX.quote("CRUDEOIL")
-    except Exception: pass
-
-    # Fetch global quotes via Yahoo Finance live feeds
     g_quotes = {}
     try:
         g_quotes = await asyncio.to_thread(fetch_global_market_quotes)
     except Exception:
         pass
 
-    # Dynamic GIFT Nifty & Domestic Nifty
-    n_ltp = float(nifty_quote.get("ltp") or (g_quotes.get("^NSEI") or {}).get("price") or 23217.60)
-    n_prev = float(nifty_quote.get("close") or (g_quotes.get("^NSEI") or {}).get("prev_close") or (n_ltp - 99.0))
-    n_chg = round(n_ltp - n_prev, 2)
-    n_pct = round((n_chg / n_prev * 100.0), 2) if n_prev else 0.43
+    vix_level = float(vix_quote.get("ltp") or 0) or None
+    india_vix = {"symbol": "INDIA VIX", "available": vix_level is not None, "source": "Upstox"}
+    if vix_level:
+        india_vix.update({
+            "level": vix_level, "pct": vix_quote.get("change_pct"),
+            "regime": "LOW (<12)" if vix_level < 12 else "NORMAL (12-16)" if vix_level <= 16 else "ELEVATED (16-22)" if vix_level <= 22 else "HIGH (>22)",
+        })
+    nifty = {"symbol": "NIFTY 50", "available": bool(nifty_quote.get("ltp")), "level": nifty_quote.get("ltp"),
+             "change": nifty_quote.get("net_change"), "pct": nifty_quote.get("change_pct"), "source": "Upstox"}
 
-    gift_chg = round(n_chg + 18.5, 2)
-    gift_level = round(n_ltp + 18.5, 2)
-    gift_pct = round((gift_chg / n_prev * 100.0), 2) if n_prev else 0.51
-    gift_sentiment = "BULLISH" if gift_pct > 0.1 else ("BEARISH" if gift_pct < -0.1 else "NEUTRAL")
-
-    gift_nifty = {
-        "symbol": "GIFT NIFTY",
-        "level": gift_level,
-        "open": round(n_prev + 10.0, 2),
-        "prev_close": n_prev,
-        "change": gift_chg,
-        "pct": gift_pct,
-        "sentiment": gift_sentiment,
-        "signal": "Positive global momentum handover" if gift_pct > 0 else "Subdued international handover",
-        "weight": "HIGH",
-        "data_state": "LIVE",
-        "source": "NSE IFSC / Yahoo Global Live"
-    }
-
-    # Dynamic India VIX
-    vix_level = float(vix_quote.get("ltp") or 13.25) if vix_quote else 13.25
-    vix_chg_pct = float(vix_quote.get("change_pct") or -3.98) if vix_quote else -3.98
-    vix_prev = round(vix_level - (vix_chg_pct * vix_level / 100.0), 2)
-    vix_regime = "EXTREME COMPLACENCY (<12)" if vix_level < 12 else "LOW VOLATILITY (NORMAL 12-16)" if vix_level <= 16 else "ELEVATED RISK (16-22)" if vix_level <= 22 else "HIGH VOLATILITY CRISIS (>22)"
-    vix_sentiment = "BULLISH" if vix_level <= 16 else ("NEUTRAL" if vix_level <= 20 else "BEARISH")
-
-    india_vix = {
-        "symbol": "INDIA VIX",
-        "level": vix_level,
-        "prev_close": vix_prev,
-        "change": round(vix_level - vix_prev, 2),
-        "pct": vix_chg_pct,
-        "regime": vix_regime,
-        "sentiment": vix_sentiment,
-        "signal": "Subdued volatility; favorable for call buyers on intraday dips" if vix_level <= 16 else "Defensive hedging advised",
-        "weight": "HIGH",
-        "data_state": "LIVE",
-        "source": "NSE India"
-    }
-
-    # Real Live US Markets
-    g_dow = g_quotes.get("^DJI") or {"price": 52093.11, "prev_close": 52573.29, "change": -480.18, "pct": -0.91, "status": "RED"}
-    g_sp = g_quotes.get("^GSPC") or {"price": 7585.73, "prev_close": 7656.98, "change": -71.25, "pct": -0.93, "status": "RED"}
-    g_nas = g_quotes.get("^IXIC") or {"price": 25981.57, "prev_close": 26333.04, "change": -351.47, "pct": -1.33, "status": "RED"}
-
-    us_sentiment = "BULLISH" if g_sp["pct"] > 0.2 and g_dow["pct"] > 0.2 else ("BEARISH" if g_sp["pct"] < -0.2 and g_dow["pct"] < -0.2 else "MIXED")
-    us_markets = {
-        "sp500": {"name": "S&P 500", "level": g_sp["price"], "prev_close": g_sp["prev_close"], "change": g_sp["change"], "pct": g_sp["pct"], "status": g_sp["status"]},
-        "nasdaq": {"name": "Nasdaq Composite", "level": g_nas["price"], "prev_close": g_nas["prev_close"], "change": g_nas["change"], "pct": g_nas["pct"], "status": g_nas["status"]},
-        "dow": {"name": "Dow Jones", "level": g_dow["price"], "prev_close": g_dow["prev_close"], "change": g_dow["change"], "pct": g_dow["pct"], "status": g_dow["status"]},
-        "overall_sentiment": us_sentiment,
-        "source": "Yahoo Finance (Live Global Feeds)"
-    }
-
-    # Commodity & Rates (Live Brent Crude, US 10Y, DXY)
-    g_crude = g_quotes.get("BZ=F") or {"price": 107.63, "prev_close": 108.75, "change": -1.12, "pct": -1.03}
-    g_10y = g_quotes.get("^TNX") or {"price": 5.00, "prev_close": 4.96, "change": 0.04, "pct": 0.71}
-    g_dxy = g_quotes.get("DX-Y.NYB") or {"price": 99.66, "prev_close": 99.65, "change": 0.01, "pct": 0.01}
-
-    crude_lvl = g_crude["price"]
-    crude_chg = g_crude["pct"]
-    crude_impact = "POSITIVE" if crude_chg <= 0 else "NEGATIVE"
-
-    macro_drivers = [
-        {"factor": "Brent Crude", "level": f"${crude_lvl:.2f} / bbl", "prev_close": f"${g_crude['prev_close']:.2f}", "change": f"{crude_chg:+.2f}%", "impact": crude_impact, "rationale": "Crude trends impact Indian import bill & corporate operating margins", "source": "ICE / Yahoo Finance"},
-        {"factor": "US 10-Yr Yield", "level": f"{g_10y['price']:.2f}%", "prev_close": f"{g_10y['prev_close']:.2f}%", "change": f"{g_10y['change']:+.2f} bps", "impact": "POSITIVE" if g_10y['change'] <= 0 else "NEUTRAL", "rationale": "US Treasury yield curve shifts affect emerging market risk appetite", "source": "CBOE / Yahoo Finance"},
-        {"factor": "Dollar Index (DXY)", "level": f"{g_dxy['price']:.2f}", "prev_close": f"{g_dxy['prev_close']:.2f}", "change": f"{g_dxy['pct']:+.2f}%", "impact": "POSITIVE" if g_dxy['pct'] <= 0 else "NEUTRAL", "rationale": "Dollar index stability encourages sustained foreign portfolio capital flows", "source": "NYBOT / Yahoo Finance"}
-    ]
-
-    # Weighted Multi-Factor Score:
-    score_gift = 85 if gift_pct > 0.2 else (65 if gift_pct >= 0 else 35)
-    score_us = 80 if g_sp["pct"] >= 0 else 40
-    score_vix = 80 if vix_level <= 16 else (50 if vix_level <= 20 else 25)
-    score_crude = 75 if crude_chg <= 0 else 45
-    score_dxy = 75 if g_dxy["pct"] <= 0.1 else 45
-
-    net_score = round(score_gift * 0.30 + score_us * 0.25 + score_vix * 0.20 + score_crude * 0.15 + score_dxy * 0.10)
-    net_bias = "BULLISH" if net_score >= 58 else ("BEARISH" if net_score <= 42 else "NEUTRAL")
-
+    def g(sym: str, name: str) -> dict[str, Any]:
+        q = g_quotes.get(sym)
+        if not q:
+            return {"name": name, "available": False, "source": "Yahoo Finance"}
+        return {"name": name, "available": True, "level": q.get("price"), "prev_close": q.get("prev_close"),
+                "change": q.get("change"), "pct": q.get("pct"), "status": q.get("status"), "source": "Yahoo Finance"}
+    us = {"sp500": g("^GSPC", "S&P 500"), "nasdaq": g("^IXIC", "Nasdaq Composite"), "dow": g("^DJI", "Dow Jones")}
+    drivers = [g("BZ=F", "Brent Crude ($/bbl)"), g("^TNX", "US 10-Yr Yield (%)"), g("DX-Y.NYB", "Dollar Index (DXY)")]
+    sp = us["sp500"].get("pct")
+    us["overall_sentiment"] = None if sp is None else ("BULLISH" if sp > 0.2 else "BEARISH" if sp < -0.2 else "MIXED")
     payload = {
         "timestamp": now_iso(),
-        "gift_nifty": gift_nifty,
+        "nifty": nifty,
+        "gift_nifty": {"symbol": "GIFT NIFTY", "available": False, "reason": "Not available from Upstox"},
         "india_vix": india_vix,
-        "us_markets": us_markets,
-        "macro_drivers": macro_drivers,
-        "net_score": net_score,
-        "net_bias": net_bias,
-        "summary": f"Live Global Feeds: Dow {g_dow['price']:,} ({g_dow['pct']:+.2f}%), S&P 500 {g_sp['price']:,} ({g_sp['pct']:+.2f}%), Gift Nifty {gift_level:,} ({gift_pct:+.2f}%), India VIX {vix_level:.2f}.",
-        "data_state": "LIVE",
-        "freshness_seconds": 10,
-        "version": "Release 46 Live Global API"
+        "us_markets": us,
+        "macro_drivers": drivers,
+        "summary": " · ".join(x for x in [
+            f"NIFTY {nifty['level']:,.2f} ({(nifty['pct'] or 0):+.2f}%)" if nifty["available"] else "",
+            f"India VIX {vix_level:.2f}" if vix_level else "",
+            f"S&P 500 {us['sp500']['pct']:+.2f}%" if us["sp500"].get("available") else "",
+        ] if x),
+        "data_state": "LIVE" if (nifty["available"] or vix_level) else "UNAVAILABLE",
     }
     CACHE.set(cache_key, payload, 25)
     return payload
 
-
 @app.get("/api/market/influences")
 async def market_influences(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """Provides live/latest global macro influences and key index gauges."""
-    nifty_quote = get_cached_quote("NIFTY") or {}
-    nifty_ltp = float(nifty_quote.get("ltp") or 23520.0)
-    gift_nifty_ltp = round(nifty_ltp + 28.5, 2)
-    gift_nifty_chg = 0.35
-
-    return {
-        "ok": True,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "items": [
-            {
-                "name": "SGX / GIFT Nifty",
-                "symbol": "GIFT_NIFTY",
-                "value": f"{gift_nifty_ltp:,.2f}",
-                "change_pct": gift_nifty_chg,
-                "is_positive": gift_nifty_chg >= 0
-            },
-            {
-                "name": "India VIX",
-                "symbol": "INDIAVIX",
-                "value": "13.42",
-                "change": "-0.38",
-                "change_pct": -2.75,
-                "is_positive": False
-            },
-            {
-                "name": "Dow Jones",
-                "symbol": "DJI",
-                "value": "39,127.14",
-                "change": "+260.88",
-                "change_pct": 0.67,
-                "is_positive": True
-            },
-            {
-                "name": "S&P 500",
-                "symbol": "SPX",
-                "value": "5,477.90",
-                "change": "+18.25",
-                "change_pct": 0.33,
-                "is_positive": True
-            },
-            {
-                "name": "Nasdaq",
-                "symbol": "IXIC",
-                "value": "17,732.60",
-                "change": "+98.40",
-                "change_pct": 0.56,
-                "is_positive": True
-            },
-            {
-                "name": "US 10Y Yield",
-                "symbol": "US10Y",
-                "value": "4.28%",
-                "change": "-0.04",
-                "change_pct": -0.92,
-                "is_positive": False
-            }
-        ]
-    }
+    """Key index gauges from Upstox quotes. Global indices and GIFT Nifty are not available from Upstox, so they are not shown."""
+    gauges = [("NIFTY 50", "NIFTY"), ("NIFTY BANK", "BANKNIFTY"), ("SENSEX", "SENSEX"), ("India VIX", "NSE_INDEX|India VIX"), ("NIFTY IT", "NSE_INDEX|Nifty IT")]
+    qs = await asyncio.to_thread(UPSTOX.quotes, [g[1] for g in gauges])
+    by_ident = {str(q.get("instrument") or ""): q for q in qs}
+    items = []
+    for name, ident in gauges:
+        q = by_ident.get(ident) or {}
+        if q.get("ltp") is None:
+            continue
+        chg = float(q.get("net_change") or 0.0); pct = float(q.get("change_pct") or 0.0)
+        items.append({"name": name, "symbol": ident, "value": f"{float(q['ltp']):,.2f}", "change": f"{chg:+,.2f}",
+                      "change_pct": round(pct, 2), "is_positive": chg >= 0, "source": "upstox"})
+    return {"ok": True, "updated_at": datetime.now(timezone.utc).isoformat(), "items": items}
 
 
 
@@ -12004,7 +11437,7 @@ async def recommendation_on_demand(payload: RecommendationIn, request: Request, 
     ti = rec.get("instrument") or {}
     trade_symbol = str(ti.get("display") or ti.get("symbol") or payload.symbol)
     underlying = str(payload.symbol).upper()
-    score = float(rec.get("confidence") or rec.get("score") or 75.0)
+    score = float(rec.get("confidence") or rec.get("score") or 0.0)
     opt_info = (rec.get("evidence") or {}).get("options") or {}
 
     # Requirement 9: When market is closed, edit the existing recommendation with an audit trail
@@ -12243,7 +11676,7 @@ async def recommendation_history(
 
             # If no persisted recommendations exist for that date, run zero-lookahead reconstruction!
             if len(rows) < 3:
-                rec_res = get_recommendations_for_date_engine(clean_date, root_filter or "BANKNIFTY", "5m", uid, req_limit)
+                rec_res = replay_signals_for_day(root_filter or "BANKNIFTY", _parse_day(clean_date), req_limit)
                 rows = rec_res.get("recommendations", [])
         else:
             try:
@@ -12510,57 +11943,8 @@ def resample_candles_to_3m(candles_1m: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def generate_fallback_replay_candles(instrument: str, timeframe: str = "5m", days: int = 90) -> list[dict[str, Any]]:
-    """Item 18: Generate realistic replay candles when upstream provider is temporarily unavailable (at least 3 months)."""
-    base_price = 23400.0
-    sym = str(instrument).upper()
-    if "BANK" in sym: base_price = 50500.0
-    elif "CRUDE" in sym: base_price = 6200.0
-    elif "RELIANCE" in sym: base_price = 1307.0
-    else:
-        try:
-            q = UPSTOX.quote(instrument)
-            if q and float(q.get("ltp") or 0) > 0:
-                base_price = float(q["ltp"])
-        except Exception:
-            pass
-
-    mins = 5
-    if timeframe.endswith("m"):
-        try: mins = int(timeframe[:-1])
-        except Exception: mins = 5
-    elif timeframe == "1D":
-        mins = 375
-    elif timeframe.endswith("h"):
-        try: mins = int(timeframe[:-1]) * 60
-        except Exception: mins = 60
-
-    candles = []
-    now_dt = datetime.now(timezone.utc)
-    current_price = base_price
-    rng = random.Random(abs(hash(instrument)) + int(now_dt.timestamp() // 3600))
-    total_candles = min(7500, max(120, days * max(1, 375 // mins if mins < 375 else 1)))
-
-    for i in range(total_candles):
-        c_time = now_dt - timedelta(minutes=(total_candles - i) * mins)
-        if c_time.weekday() >= 5 and "CRUDE" not in sym:
-            continue
-        volatility = current_price * 0.0018
-        change = (rng.random() - 0.49) * volatility
-        o = round(current_price, 2)
-        c = round(o + change, 2)
-        h = round(max(o, c) + rng.random() * volatility * 0.5, 2)
-        l = round(min(o, c) - rng.random() * volatility * 0.5, 2)
-        vol = round(rng.uniform(5000, 25000) * (base_price / 1000))
-        current_price = c
-        candles.append({
-            "timestamp": c_time.isoformat(),
-            "open": o,
-            "high": h,
-            "low": l,
-            "close": c,
-            "volume": vol
-        })
-    return candles
+    """Random-walk replay candles are disabled: charts and backtests show 'no data' instead of invented prices."""
+    return []
 
 
 @app.get("/api/backtest/candles/{instrument}")
@@ -12696,32 +12080,6 @@ async def backtest_evaluate(
 # ---------------------------------------------------------------------------
 # Dynamic Recommendation Calibration Engine (5m trades / 6-hour market hours)
 # ---------------------------------------------------------------------------
-
-def generate_demo_calibration_candles(symbol: str, count: int = 72) -> list[dict[str, Any]]:
-    """Generate realistic 5m intraday market candles (6 hours = 72 candles)
-    when live historical data is off-market or unavailable.
-    """
-    root = extract_root_symbol(symbol).upper()
-    base_price = 9650.0 if "CRUDE" in root else (24500.0 if "NIFTY" in root else (52000.0 if "BANK" in root else 1500.0))
-    now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    start_dt = now.replace(hour=9, minute=15, second=0, microsecond=0)
-    candles = []
-    p = base_price
-    rng = random.Random(42 + hash(root) % 1000)
-    for i in range(count):
-        ts = (start_dt + timedelta(minutes=5 * i)).strftime("%Y-%m-%d %H:%M:%S")
-        # Realistic commodity/equity random walk with trend pulses
-        drift = (0.35 if (i // 12) % 2 == 0 else -0.30) * (p * 0.0004)
-        noise = (rng.random() - 0.5) * (p * 0.0035)
-        o = round(p, 2)
-        c = round(max(1.0, o + drift + noise), 2)
-        h = round(max(o, c) + rng.random() * (p * 0.002), 2)
-        l = round(min(o, c) - rng.random() * (p * 0.002), 2)
-        vol = int(rng.randint(800, 15000))
-        candles.append({"timestamp": ts, "open": o, "high": h, "low": l, "close": c, "volume": vol})
-        p = c
-    return candles
-
 
 def precompute_calibration_bars(candles: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Precompute technical indicators once per bar so calibration optimization runs in <0.05 seconds."""
@@ -12944,7 +12302,8 @@ def run_reco_model_calibration(symbol: str, target_accuracy: float = 90.0, hours
     except Exception:
         candles = []
     if not candles or len(candles) < 25:
-        candles = generate_demo_calibration_candles(root, count=78)
+        return {"ok": False, "symbol": root, "error": "NOT_ENOUGH_UPSTOX_DATA",
+                "message": f"Upstox returned {len(candles or [])} 5m candles for {root}; at least 25 real candles are needed to calibrate."}
 
     # Precompute bar indicators once for lightning-fast calibration search
     bars = precompute_calibration_bars(candles)
@@ -13428,47 +12787,9 @@ async def get_historical_options_api(
     query += " ORDER BY strike ASC, option_type ASC"
     rows = db_exec(query, params, "all") or []
     
-    # If no stored rows in DB, dynamically synthesize historical chain using spot and BSM
     if not rows:
-        try:
-            d_obj = datetime.strptime(trade_date, "%Y-%m-%d").date()
-            c_rows = UPSTOX.candles_between(root, "day", "days", d_obj, d_obj)
-            spot_close = float(c_rows[0].get("close", 49000.0)) if c_rows else (49000.0 if "BANK" in root else 23500.0)
-        except Exception:
-            spot_close = 49000.0 if "BANK" in root else 23500.0
-            
-        step = 100.0 if "BANK" in root else 50.0
-        atm = round(spot_close / step) * step
-        vix = 14.5
-        synthetic_rows = []
-        for i in range(-5, 6):
-            stk = atm + (i * step)
-            for ot in ("CE", "PE"):
-                intrinsic = (spot_close - stk) if ot == "CE" else (stk - spot_close)
-                p = max(2.0, round(intrinsic, 2)) if intrinsic > 0 else max(1.0, round(max(0.01, spot_close * 0.003 - abs(stk - spot_close) * 0.02), 2))
-                synthetic_rows.append({
-                    "symbol": root,
-                    "trade_date": trade_date,
-                    "expiry_date": expiry_date or trade_date,
-                    "strike": stk,
-                    "option_type": ot,
-                    "open_price": round(p * 0.98, 2),
-                    "high_price": round(p * 1.35, 2),
-                    "low_price": round(p * 0.82, 2),
-                    "close_price": p,
-                    "settle_price": p,
-                    "volume": 25000,
-                    "open_interest": 120000,
-                    "source": "SYNTHETIC_BSM"
-                })
-        return {
-            "symbol": root,
-            "trade_date": trade_date,
-            "expiry_date": expiry_date,
-            "count": len(synthetic_rows),
-            "data": synthetic_rows,
-            "source": "SYNTHETIC_BSM"
-        }
+        return {"symbol": root, "trade_date": trade_date, "expiry_date": expiry_date, "count": 0, "data": [], "source": "none",
+                "message": "No stored option prices for this date. Historical option data is only shown when it was recorded from Upstox."}
         
     return {
         "symbol": root,
@@ -13529,245 +12850,163 @@ async def admin_clear_cache(user: dict[str, Any] = Depends(require_user)) -> dic
 # ---------------------------------------------------------------------------
 # Other Factors & Comprehensive Quantitative Analytics Suite (Release 33)
 # ---------------------------------------------------------------------------
+SECTOR_INDEX_KEYS = {
+    "NIFTY BANK": "NSE_INDEX|Nifty Bank", "NIFTY IT": "NSE_INDEX|Nifty IT", "NIFTY AUTO": "NSE_INDEX|Nifty Auto",
+    "NIFTY PHARMA": "NSE_INDEX|Nifty Pharma", "NIFTY METAL": "NSE_INDEX|Nifty Metal", "NIFTY ENERGY": "NSE_INDEX|Nifty Energy",
+    "NIFTY FMCG": "NSE_INDEX|Nifty FMCG", "NIFTY REALTY": "NSE_INDEX|Nifty Realty", "NIFTY FIN SERVICE": "NSE_INDEX|Nifty Fin Service",
+    "NIFTY PSU BANK": "NSE_INDEX|Nifty PSU Bank",
+}
+
+
+def _daily_returns(identifier: str) -> dict[str, float | None]:
+    """1/5/20-session returns and 20-day realised volatility from Upstox daily candles."""
+    today = datetime.now(IST).date()
+    try:
+        cs = UPSTOX.candles_between(identifier, "day", "days", today - timedelta(days=45), today)
+    except Exception:
+        cs = []
+    closes = [float(c["close"]) for c in cs if c.get("close")]
+    def ret(n):
+        return round((closes[-1] / closes[-1 - n] - 1) * 100, 2) if len(closes) > n else None
+    hv = None
+    if len(closes) > 21:
+        rets = [math.log(closes[i] / closes[i - 1]) for i in range(len(closes) - 20, len(closes))]
+        hv = round(statistics.pstdev(rets) * math.sqrt(252) * 100, 2)
+    return {"ret_1d": ret(1), "ret_5d": ret(5), "ret_20d": ret(20), "hv_20": hv}
+
+
 @app.get("/api/market/other-factors")
 async def market_other_factors(symbol: str = "NIFTY", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """Provides the complete 7-module analytical intelligence suite:
-    1. Market Breadth Engine
-    2. Sector Rotation & Relative Strength Matrix
-    3. Quantitative Market Regime Classifier
-    4. Options Volatility Surface & IV Skew
-    5. Open Interest Matrix & Dealer Gamma Flip
-    6. Portfolio Risk, Position Sizing & Capital Protection
-    7. Market Microstructure & Order Flow Imbalance
-    """
+    """Market context from Upstox only: NIFTY 50 breadth, sector rotation, regime from the signal model,
+    option-chain OI/IV, and order-book imbalance. Sections without data say so instead of showing placeholders."""
     sym = (symbol or "NIFTY").upper().strip()
     cache_key = f"market:other_factors:{sym}"
     cached = CACHE.get(cache_key)
     if cached:
         return cached
+    now_ist = datetime.now(IST)
 
-    now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+    def _breadth() -> dict[str, Any]:
+        qs = UPSTOX.quotes(list(NIFTY50_SYMBOLS))
+        chg = [float(q["change_pct"]) for q in qs if q.get("change_pct") is not None]
+        if not chg:
+            return {"available": False, "reason": "No NIFTY 50 quotes from Upstox"}
+        adv = sum(1 for c in chg if c > 0); dec = sum(1 for c in chg if c < 0); unc = len(chg) - adv - dec
+        up_vol = sum(float(q.get("volume") or 0) for q in qs if (q.get("change_pct") or 0) > 0)
+        dn_vol = sum(float(q.get("volume") or 0) for q in qs if (q.get("change_pct") or 0) < 0)
+        tot_vol = up_vol + dn_vol
+        sig = "BULLISH" if adv > dec * 1.5 else "BEARISH" if dec > adv * 1.5 else "NEUTRAL"
+        return {"available": True, "advances": adv, "declines": dec, "unchanged": unc, "ad_ratio": round(adv / max(1, dec), 2),
+                "up_volume_pct": round(up_vol / tot_vol * 100, 1) if tot_vol else None,
+                "down_volume_pct": round(dn_vol / tot_vol * 100, 1) if tot_vol else None,
+                "signal": sig, "constituents": len(chg), "source": "Upstox quotes for NIFTY 50 constituents"}
 
-    # Determine underlying market directional bias
-    is_bull = True
-    try:
-        q = UPSTOX.quote(sym)
-        ltp = float(q.get("ltp") or q.get("last_price") or 0.0)
-        net_chg = float(q.get("net_change") or q.get("session_change") or 0.0)
-        chg_pct = float(q.get("change_pct") or q.get("session_change_pct") or 0.0)
-        candles = UPSTOX.candles(sym, "5", "minutes", days=2)
-        if candles:
-            ta = technical_analysis(candles)
-            trend = ta.get("trend")
-            supertrend_sig = ta.get("supertrend_signal")
-            ema20 = float(ta.get("ema20") or ltp)
-            if trend == "SELL" or (supertrend_sig == "SELL" and ltp < ema20) or net_chg < 0:
-                is_bull = False
-        elif net_chg < 0 or chg_pct < 0:
-            is_bull = False
-    except Exception:
-        pass
+    def _sectors() -> dict[str, Any]:
+        nifty = _daily_returns("NIFTY")
+        items = []
+        for name, key in SECTOR_INDEX_KEYS.items():
+            r = _daily_returns(key)
+            if r["ret_1d"] is None:
+                continue
+            rs5 = round(r["ret_5d"] - nifty["ret_5d"], 2) if (r["ret_5d"] is not None and nifty["ret_5d"] is not None) else None
+            rs20 = round(r["ret_20d"] - nifty["ret_20d"], 2) if (r["ret_20d"] is not None and nifty["ret_20d"] is not None) else None
+            quad = None
+            if rs5 is not None and rs20 is not None:
+                quad = "LEADING" if rs20 >= 0 and rs5 >= 0 else "WEAKENING" if rs20 >= 0 else "IMPROVING" if rs5 >= 0 else "LAGGING"
+            items.append({"sector": name, "ret_1d": r["ret_1d"], "ret_5d": r["ret_5d"], "ret_20d": r["ret_20d"], "rs_vs_nifty": rs5,
+                          "quadrant": quad, "bias": "BULLISH" if (rs5 or 0) > 0.25 else "BEARISH" if (rs5 or 0) < -0.25 else "NEUTRAL"})
+        if not items:
+            return {"available": False, "reason": "No sector index candles from Upstox", "items": []}
+        items.sort(key=lambda x: x["ret_1d"], reverse=True)
+        return {"available": True, "leader": f"{items[0]['sector']} ({items[0]['ret_1d']:+.2f}%)",
+                "drag": f"{items[-1]['sector']} ({items[-1]['ret_1d']:+.2f}%)", "items": items,
+                "source": "Upstox daily candles; RS = 5-session return minus NIFTY's"}
 
-    # 1. Market Breadth Engine
-    if is_bull:
-        market_breadth = {
-            "advances": 36,
-            "declines": 14,
-            "unchanged": 0,
-            "ad_ratio": 2.57,
-            "above_20_ema_pct": 72.0,
-            "above_50_ema_pct": 68.0,
-            "above_200_ema_pct": 74.0,
-            "breadth_thrust_score": 71.4,
-            "highs_52w": 28,
-            "lows_52w": 2,
-            "up_volume_pct": 76.5,
-            "down_volume_pct": 23.5,
-            "status": "STRONG ACCUMULATION BREADTH",
-            "signal": "BULLISH",
-            "breadth_quality": "Broad-based institutional participation across large and midcap constituents."
-        }
-    else:
-        market_breadth = {
-            "advances": 14,
-            "declines": 36,
-            "unchanged": 0,
-            "ad_ratio": 0.39,
-            "above_20_ema_pct": 28.0,
-            "above_50_ema_pct": 32.0,
-            "above_200_ema_pct": 38.0,
-            "breadth_thrust_score": 24.5,
-            "highs_52w": 3,
-            "lows_52w": 24,
-            "up_volume_pct": 23.5,
-            "down_volume_pct": 76.5,
-            "status": "DISTRIBUTION / INSTITUTIONAL PROFIT BOOKING",
-            "signal": "BEARISH",
-            "breadth_quality": "Widespread distribution pressure; decliners outnumber advances with heavy down-volume."
-        }
+    def _regime_and_vol() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        try:
+            candles = UPSTOX.candles(sym, "5", "minutes", days=5)
+        except Exception:
+            candles = []
+        model = SIGNAL_MODEL.evaluate(candles) if candles else {"available": False, "reason": "No 5m candles"}
+        ta = technical_analysis(candles) if candles else {}
+        regime = {"available": bool(model.get("available"))}
+        if model.get("available"):
+            regime.update({"current_regime": "BULL_TREND" if model["decision"] == "BUY" else "BEAR_TREND" if model["decision"] == "SELL" else "RANGE",
+                           "score": model["score"], "gate": model["gate"], "adx": ta.get("adx"),
+                           "summary": f"Signal score {model['score']:+.1f} vs gate ±{model['gate']:.0f}; ADX {ta.get('adx') or 'n/a'}"})
+        daily = _daily_returns(sym)
+        vix_q = {}
+        try:
+            vix_q = UPSTOX.quote("NSE_INDEX|India VIX")
+        except Exception:
+            pass
+        chain = {}
+        if sym in {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"}:
+            try:
+                chain = UPSTOX.option_chain(sym)
+            except Exception:
+                chain = {}
+        strikes = chain.get("strikes") or []
+        spot = float(chain.get("spot") or 0) or None
+        vol = {"available": bool(strikes or vix_q.get("ltp")), "india_vix": vix_q.get("ltp"), "india_vix_change_pct": vix_q.get("change_pct"),
+               "hv_20": daily["hv_20"]}
+        oi = {"available": False, "reason": "Option chain not available for this instrument"}
+        if strikes and spot:
+            atm = min(strikes, key=lambda s: abs(float(s["strike"]) - spot))
+            civ = (atm.get("call") or {}).get("iv"); piv = (atm.get("put") or {}).get("iv")
+            vol.update({"atm_iv": round((float(civ) + float(piv)) / 2, 2) if civ and piv else civ or piv,
+                        "skew_put_minus_call": round(float(piv) - float(civ), 2) if civ and piv else None,
+                        "hv_iv_spread": round(daily["hv_20"] - ((float(civ) + float(piv)) / 2), 2) if (civ and piv and daily["hv_20"]) else None})
+            coi = sum(float((s.get("call") or {}).get("oi") or 0) for s in strikes); poi = sum(float((s.get("put") or {}).get("oi") or 0) for s in strikes)
+            cvol = sum(float((s.get("call") or {}).get("volume") or 0) for s in strikes); pvol = sum(float((s.get("put") or {}).get("volume") or 0) for s in strikes)
+            def pain(k):
+                return sum(max(0.0, k - float(s["strike"])) * float((s.get("call") or {}).get("oi") or 0) +
+                           max(0.0, float(s["strike"]) - k) * float((s.get("put") or {}).get("oi") or 0) for s in strikes)
+            max_pain = min((float(s["strike"]) for s in strikes), key=pain)
+            moves = []
+            for s in strikes:
+                for side, lbl in (("call", "CE"), ("put", "PE")):
+                    n = s.get(side) or {}
+                    if n.get("change_oi") is not None:
+                        moves.append({"strike": f"{int(float(s['strike']))} {lbl}", "oi_change": n["change_oi"], "oi": n.get("oi"), "ltp": n.get("ltp")})
+            moves.sort(key=lambda m: abs(float(m["oi_change"])), reverse=True)
+            oi = {"available": True, "expiry": chain.get("expiry"), "pcr_oi": round(poi / coi, 2) if coi else None,
+                  "pcr_volume": round(pvol / cvol, 2) if cvol else None, "max_pain_strike": max_pain,
+                  "buildup_highlights": moves[:6], "source": "Upstox option chain (nearest expiry)"}
+        return regime, vol, oi
 
-    # 2. Sector Rotation & Relative Strength Matrix
-    if is_bull:
-        sectors = [
-            {"sector": "NIFTY BANK", "ret_1d": +1.14, "ret_5d": +2.85, "ret_20d": +5.40, "rs_vs_nifty": +0.59, "quadrant": "LEADING", "bias": "BULLISH", "weight": "33.5%"},
-            {"sector": "NIFTY IT", "ret_1d": +0.82, "ret_5d": +1.95, "ret_20d": +4.10, "rs_vs_nifty": +0.27, "quadrant": "LEADING", "bias": "BULLISH", "weight": "14.2%"},
-            {"sector": "NIFTY AUTO", "ret_1d": +0.65, "ret_5d": +1.40, "ret_20d": +3.20, "rs_vs_nifty": +0.10, "quadrant": "IMPROVING", "bias": "BULLISH", "weight": "6.8%"},
-            {"sector": "NIFTY PHARMA", "ret_1d": +0.45, "ret_5d": +0.90, "ret_20d": +2.10, "rs_vs_nifty": -0.10, "quadrant": "IMPROVING", "bias": "NEUTRAL", "weight": "4.5%"},
-            {"sector": "NIFTY METAL", "ret_1d": +0.35, "ret_5d": -0.40, "ret_20d": +1.80, "rs_vs_nifty": -0.20, "quadrant": "WEAKENING", "bias": "NEUTRAL", "weight": "3.8%"},
-            {"sector": "NIFTY ENERGY", "ret_1d": +0.20, "ret_5d": -0.80, "ret_20d": +0.90, "rs_vs_nifty": -0.35, "quadrant": "WEAKENING", "bias": "NEUTRAL", "weight": "11.5%"},
-            {"sector": "NIFTY FMCG", "ret_1d": -0.15, "ret_5d": -1.20, "ret_20d": -0.40, "rs_vs_nifty": -0.70, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "8.5%"},
-            {"sector": "NIFTY REALTY", "ret_1d": -0.40, "ret_5d": -1.85, "ret_20d": -1.20, "rs_vs_nifty": -0.95, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "1.2%"}
-        ]
-        sector_rotation = {
-            "leader": "NIFTY BANK (+1.14%)",
-            "drag": "NIFTY REALTY (-0.40%)",
-            "items": sectors,
-            "summary": "High-beta Financials and IT leading the expansion cycle; defensives and real estate lagging."
-        }
-    else:
-        sectors = [
-            {"sector": "NIFTY FMCG", "ret_1d": +0.45, "ret_5d": +1.10, "ret_20d": +2.40, "rs_vs_nifty": +1.20, "quadrant": "LEADING", "bias": "NEUTRAL", "weight": "8.5%"},
-            {"sector": "NIFTY PHARMA", "ret_1d": +0.20, "ret_5d": +0.50, "ret_20d": +1.10, "rs_vs_nifty": +0.80, "quadrant": "IMPROVING", "bias": "NEUTRAL", "weight": "4.5%"},
-            {"sector": "NIFTY IT", "ret_1d": -0.65, "ret_5d": -1.40, "ret_20d": -2.80, "rs_vs_nifty": -0.15, "quadrant": "WEAKENING", "bias": "BEARISH", "weight": "14.2%"},
-            {"sector": "NIFTY AUTO", "ret_1d": -0.80, "ret_5d": -2.10, "ret_20d": -3.50, "rs_vs_nifty": -0.30, "quadrant": "WEAKENING", "bias": "BEARISH", "weight": "6.8%"},
-            {"sector": "NIFTY METAL", "ret_1d": -1.10, "ret_5d": -3.20, "ret_20d": -4.80, "rs_vs_nifty": -0.60, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "3.8%"},
-            {"sector": "NIFTY ENERGY", "ret_1d": -1.25, "ret_5d": -2.90, "ret_20d": -3.80, "rs_vs_nifty": -0.75, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "11.5%"},
-            {"sector": "NIFTY REALTY", "ret_1d": -1.60, "ret_5d": -4.10, "ret_20d": -5.60, "rs_vs_nifty": -1.10, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "1.2%"},
-            {"sector": "NIFTY BANK", "ret_1d": -1.45, "ret_5d": -3.80, "ret_20d": -4.90, "rs_vs_nifty": -0.95, "quadrant": "LAGGING", "bias": "BEARISH", "weight": "33.5%"}
-        ]
-        sector_rotation = {
-            "leader": "NIFTY FMCG (+0.45% Defensive)",
-            "drag": "NIFTY BANK (-1.45% Bellwether Drag)",
-            "items": sectors,
-            "summary": "Risk-off rotation into defensives while high-beta Financials, Metals, and Tech witness aggressive unwinding."
-        }
+    def _micro() -> dict[str, Any]:
+        try:
+            d = UPSTOX.depth(sym) or {}
+        except Exception:
+            d = {}
+        if not (d.get("bids") or d.get("asks")):
+            return {"available": False, "reason": "No market depth from Upstox (indices have no order book)"}
+        bids = sum(float(x.get("quantity") or 0) for x in (d.get("bids") or [])); asks = sum(float(x.get("quantity") or 0) for x in (d.get("asks") or []))
+        if bids + asks <= 0:
+            return {"available": False, "reason": "Empty order book"}
+        b0 = (d.get("bids") or [{}])[0].get("price"); a0 = (d.get("asks") or [{}])[0].get("price")
+        spread = round((float(a0) - float(b0)) / float(b0) * 100, 3) if (a0 and b0) else None
+        return {"available": True, "bid_qty_pct": round(bids / (bids + asks) * 100, 1), "ask_qty_pct": round(asks / (bids + asks) * 100, 1),
+                "imbalance_ratio": round(bids / max(1.0, asks), 2), "effective_spread_pct": spread, "source": "Upstox market depth (top 5)"}
 
-    # 3. Quantitative Market Regime Classifier
-    if is_bull:
-        regime = {
-            "current_regime": "BULL_TREND",
-            "p_bullish": 74,
-            "p_bearish": 16,
-            "p_rangebound": 10,
-            "strategy_archetype": "Momentum ATM Call Buying on Pullbacks",
-            "volatility_state": "Low Volatility Expansion",
-            "adx_trend_state": "Strong Trending Momentum (ADX 28.5)",
-            "summary": "Higher highs and higher lows price structure sustained above 20 & 50 EMA with constructive breadth."
-        }
-    else:
-        regime = {
-            "current_regime": "BEAR_TREND",
-            "p_bullish": 16,
-            "p_bearish": 74,
-            "p_rangebound": 10,
-            "strategy_archetype": "Momentum ATM Put Buying on Breakdowns",
-            "volatility_state": "Elevated Volatility Expansion",
-            "adx_trend_state": "Strong Downside Momentum (ADX 31.0)",
-            "summary": "Lower highs and lower lows price breakdown operating below 20 EMA and VWAP with distribution breadth."
-        }
-
-    # 4. Options Volatility Surface & IV Skew
-    volatility_surface = {
-        "atm_iv": 15.2 if not is_bull else 13.4,
-        "put_25d_iv": 17.6 if not is_bull else 14.8,
-        "call_25d_iv": 13.1 if not is_bull else 12.6,
-        "skew": round((17.6 - 13.1) if not is_bull else (14.8 - 12.6), 2),
-        "iv_rank": 48.0 if not is_bull else 32.5,
-        "iv_percentile": 52.0 if not is_bull else 38.0,
-        "hv_20": 14.5 if not is_bull else 11.8,
-        "hv_iv_spread": -0.7 if not is_bull else -1.6,
-        "pricing_environment": "HIGH DOWNSIDE VOLATILITY / PUT PREMIUM EXPANSION" if not is_bull else "FAIR / BUYER FRIENDLY",
-        "verdict": "Elevated put skew signals institutional downside hedging; favors buying high-delta Put runners." if not is_bull else "Subdued IV percentile makes outright option buying cost-effective with low theta compression risk."
-    }
-
-    # 5. Open Interest Matrix & Dealer Gamma Flip (Dynamically Scaled to Symbol)
-    base_step = 100 if "BANK" in sym else (50 if "NIFTY" in sym else (50 if "CRUDE" in sym else 10))
-    base_ref = ltp if (ltp and ltp > 0) else (57600.0 if "BANK" in sym else (24400.0 if "NIFTY" in sym else 3000.0))
-    dyn_atm = int(round(base_ref / base_step) * base_step)
-
-    if is_bull:
-        oi_matrix = {
-            "pcr_oi": 1.24,
-            "pcr_volume": 1.18,
-            "max_pain_strike": dyn_atm,
-            "dealer_gamma_flip": dyn_atm - base_step,
-            "gamma_regime": f"POSITIVE DEALER GAMMA (Mean-Reverting Stability Above {dyn_atm - base_step:,})",
-            "buildup_highlights": [
-                {"strike": f"{dyn_atm} CE", "type": "Short Covering", "oi_change": "-14.8%", "price_change": "+18.2%", "bias": "BULLISH"},
-                {"strike": f"{dyn_atm} PE", "type": "Long Buildup / Writing", "oi_change": "+28.4%", "price_change": "-12.5%", "bias": "BULLISH"},
-                {"strike": f"{dyn_atm + base_step} CE", "type": "Long Buildup", "oi_change": "+34.2%", "price_change": "+24.6%", "bias": "BULLISH"},
-                {"strike": f"{dyn_atm - base_step} PE", "type": "Put Writing Support", "oi_change": "+42.1%", "price_change": "-18.0%", "bias": "BULLISH"}
-            ],
-            "summary": f"Heavy Put writing at {dyn_atm - base_step:,} and {dyn_atm:,} provides strong floor; Call short-covering accelerating upside."
-        }
-    else:
-        oi_matrix = {
-            "pcr_oi": 0.74,
-            "pcr_volume": 0.68,
-            "max_pain_strike": dyn_atm,
-            "dealer_gamma_flip": dyn_atm + base_step,
-            "gamma_regime": f"NEGATIVE DEALER GAMMA (Downside Acceleration Below {dyn_atm:,})",
-            "buildup_highlights": [
-                {"strike": f"{dyn_atm + base_step} CE", "type": "Aggressive Call Writing", "oi_change": "+45.2%", "price_change": "-28.4%", "bias": "BEARISH"},
-                {"strike": f"{dyn_atm} CE", "type": "Short Addition", "oi_change": "+38.6%", "price_change": "-22.1%", "bias": "BEARISH"},
-                {"strike": f"{dyn_atm - base_step} PE", "type": "Long Buildup / Buying", "oi_change": "+29.4%", "price_change": "+34.5%", "bias": "BEARISH"},
-                {"strike": f"{dyn_atm + base_step} PE", "type": "Put Unwinding / Panic", "oi_change": "-32.1%", "price_change": "+65.0%", "bias": "BEARISH"}
-            ],
-            "summary": f"Aggressive Call writing at {dyn_atm + base_step:,} creating overhead ceiling; Put unwinding confirms downside cascade."
-        }
-
-    # 6. Portfolio Risk, Position Sizing & Capital Protection
-    portfolio_risk = {
-        "recommended_position_sizing": "1 to 2 Lots (Risk budgeted at 1.5% capital)",
-        "max_risk_amount": "₹2,500 per setup",
-        "mathematical_expectancy": "+₹645 per trade after execution costs & slippage",
-        "win_rate_assumed": "68.5%",
-        "var_95_1day": "₹1,850 (95% Confidence 1-Day VaR)",
-        "kill_switch": {
-            "daily_loss_limit": "3.0% (-₹3,000)",
-            "max_drawdown_limit": "6.0% (-₹6,000)",
-            "data_quality_guard": "Spread < 1.5% (ACTIVE)",
-            "status": "ARMED & PROTECTED"
-        }
-    }
-
-    # 7. Market Microstructure & Order Flow Imbalance
-    if is_bull:
-        microstructure = {
-            "bid_qty_pct": 63.4,
-            "ask_qty_pct": 36.6,
-            "imbalance_ratio": 1.73,
-            "effective_spread_pct": 0.04,
-            "estimated_slippage": "₹0.15 to ₹0.30 per lot",
-            "institutional_velocity": "HIGH BUYING PRESSURE",
-            "summary": "Aggressive market buy orders absorbing resting limit ask liquidity at dynamic VWAP."
-        }
-    else:
-        microstructure = {
-            "bid_qty_pct": 34.2,
-            "ask_qty_pct": 65.8,
-            "imbalance_ratio": 0.52,
-            "effective_spread_pct": 0.05,
-            "estimated_slippage": "₹0.20 to ₹0.35 per lot",
-            "institutional_velocity": "HIGH SELLING PRESSURE",
-            "summary": "Heavy aggressive market sell orders hitting bids with institutional block liquidation."
-        }
-
+    breadth, sectors, (regime, vol, oi), micro = await asyncio.gather(
+        asyncio.to_thread(_breadth), asyncio.to_thread(_sectors), asyncio.to_thread(_regime_and_vol), asyncio.to_thread(_micro))
     result = {
         "symbol": sym,
         "timestamp": now_ist.strftime("%H:%M:%S IST"),
         "updated_at": now_ist.strftime("%d %b, %H:%M IST"),
-        "market_breadth": market_breadth,
-        "sector_rotation": sector_rotation,
+        "market_breadth": breadth,
+        "sector_rotation": sectors,
         "regime": regime,
-        "volatility_surface": volatility_surface,
-        "oi_matrix": oi_matrix,
-        "portfolio_risk": portfolio_risk,
-        "microstructure": microstructure,
+        "volatility_surface": vol,
+        "oi_matrix": oi,
+        "portfolio_risk": {"available": False, "reason": "Shown in Portfolio from your own funds and positions"},
+        "microstructure": micro,
         "data_state": "LIVE",
-        "freshness_seconds": 6
+        "provider": "upstox",
     }
-    CACHE.set(cache_key, result, 20)
+    CACHE.set(cache_key, result, 30)
     return result
 
 
@@ -14544,7 +13783,7 @@ async def save_recommendation_to_history_api(payload: dict[str, Any], user: dict
     tgt = float(payload.get("target") or 0.0)
     tf = str(payload.get("timeframe") or "5m")
     rat = str(payload.get("rationale") or payload.get("reason") or "Institutional trade setup manually saved by trader.")
-    conf = float(payload.get("confidence") or 82.0)
+    conf = float(payload.get("confidence") or 0.0)
     ev = payload.get("evidence") or {}
     source_val = str(payload.get("source") or ("backtest" if payload.get("is_backtest") else "on-demand")).strip().lower()
     created_val = str(payload.get("timestamp") or payload.get("created_at") or now)
@@ -15253,29 +14492,7 @@ async def backtest_session(symbol: str = "NIFTY", date: str | None = None, timef
                 pass
     
     if not candles:
-        base_price = 23400.0 if "NIFTY" in root else 56500.0 if "BANK" in root else 6150.0 if "CRUDE" in root else 1250.0
-        cur_date_str = date or datetime.now(IST).strftime("%Y-%m-%d")
-        t_cur = datetime.strptime(f"{cur_date_str} 09:15:00", "%Y-%m-%d %H:%M:%S")
-        candles = []
-        p = base_price
-        for i in range(75):
-            chg = (hash(f"{sym}:{cur_date_str}:{i}") % 100 - 48) * (0.0012 * base_price)
-            op = p
-            cl = p + chg
-            hi = max(op, cl) + abs(chg) * 0.4
-            lo = min(op, cl) - abs(chg) * 0.4
-            vol = 15000 + abs(int(chg * 100))
-            candles.append({
-                "time": t_cur.isoformat(),
-                "timestamp": int(t_cur.timestamp() * 1000),
-                "open": round(op, 2),
-                "high": round(hi, 2),
-                "low": round(lo, 2),
-                "close": round(cl, 2),
-                "volume": vol
-            })
-            p = cl
-            t_cur += timedelta(minutes=5 if "5" in tf else 15 if "15" in tf else 1)
+        return {"ok": False, "symbol": sym, "date": date, "candles": [], "error": "Upstox returned no candles for this symbol and date"}
     
     if date:
         date_candles = [c for c in candles if str(c.get("timestamp","") or c.get("time","")).startswith(date)]
@@ -16277,6 +15494,22 @@ async def _monitor_pending_paper_orders_once() -> None:
                     f"{side} {o.get('quantity')} {sym} filled @ ₹{fill_price:,.2f} (LTP touched entered level ₹{limit_p:,.2f})",
                     f"order-fill:{o['id']}"
                 )
+            except HTTPException as exc:
+                # Business rejections (e.g. 422 insufficient funds) will never succeed on retry: reject once instead of looping every 2s.
+                if 400 <= int(exc.status_code) < 500:
+                    db_exec(
+                        "UPDATE orders SET status='REJECTED', execution_state='REJECTED', updated_at=? WHERE id=?",
+                        [now_str, o["id"]]
+                    )
+                    await add_notification(
+                        uid, "order_rejected", "error", 90,
+                        f"Order Rejected · {sym}",
+                        f"{side} {o.get('quantity')} {sym} could not be filled: {exc.detail}",
+                        f"order-reject:{o['id']}"
+                    )
+                    log.warning("Pending order %s rejected: %s", o.get("id"), exc.detail)
+                else:
+                    log.warning("Pending order fill failed for order %s: %s", o.get("id"), safe_text(exc))
             except Exception as exc:
                 log.warning("Pending order fill failed for order %s: %s", o.get("id"), safe_text(exc))
 
@@ -16324,7 +15557,7 @@ async def _auto_recommendation_recorder_loop() -> None:
                         if act in ("BUY", "SELL"):
                             ti = rec.get("instrument") or {}
                             trade_sym = str(ti.get("display") or ti.get("symbol") or sym)
-                            score = float(rec.get("confidence") or rec.get("score") or 78.0)
+                            score = float(rec.get("confidence") or rec.get("score") or 0.0)
                             entry = float(rec.get("entry") or 0.0)
                             sl = float(rec.get("stop_loss") or 0.0)
                             tgt = float(rec.get("target") or 0.0)
@@ -17221,324 +16454,54 @@ async def news_unified(symbol: str = Query("NIFTY"), limit: int = Query(150, ge=
 
 @app.get("/api/ai/dashboard")
 async def ai_dashboard(symbol: str = Query("NIFTY"), force: int = Query(0), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Trade setups straight from the recommendation engine. Each driver is a signal-model factor with its live input,
+    points and weight. Symbols where the model says NO_TRADE are listed as such; no setup is invented."""
     sym = (symbol or "NIFTY").upper().strip()
     cache_key = f"ca_ai_dashboard:{sym}:{user['id']}"
     if not force:
         cached = CACHE.get(cache_key)
         if cached is not None:
             return cached
+    symbols = list(dict.fromkeys([sym] + user_watchlist_symbols(user["id"])[:3]))[:4]
 
-    # Determine symbols: priority to active symbol, followed by top market leaders
-    base_symbols = [sym]
-    for s in ["NIFTY", "BANKNIFTY", "RELIANCE", "TCS"]:
-        if s not in base_symbols:
-            base_symbols.append(s)
-
-    setups = []
-    for s in base_symbols[:4]:
+    def one(s: str) -> dict[str, Any]:
         try:
-            is_index = s in ("NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "MIDCPNIFTY")
-            try:
-                q = UPSTOX.quote(s)
-            except Exception:
-                q = {}
-            fallback_ltp = 23873.45 if s=="NIFTY" else (57380.6 if s=="BANKNIFTY" else (1322.0 if s=="RELIANCE" else 3980.0))
-            ltp = float(q.get("ltp") or q.get("last_price") or fallback_ltp)
-            try:
-                rec = overall_recommendation(s, "5m")
-            except Exception:
-                rec = {"recommendation": "BUY", "score": 84.0}
-            sig = rec.get("recommendation") or "BUY"
-            if sig == "NO_TRADE":
-                sig = "BUY"
-            score = float(rec.get("score") or 82.0)
-
-            # Retrieve real news catalyst for evidence
-            news_rows = db_exec(
-                "SELECT headline, source, matched_keyword, sentiment, published_at FROM persisted_news_events WHERE target=? OR target='GLOBAL' ORDER BY published_at DESC LIMIT 2",
-                [s], "all"
-            )
-            top_news = news_rows[0] if news_rows else {}
-            news_text = top_news.get("headline") or f"Bullish institutional block trades and macroeconomic accumulation observed in {s}."
-            news_kw = top_news.get("matched_keyword") or ("Macro Index" if is_index else "Earnings Momentum")
-
-            if is_index:
-                # -------------------------------------------------------------
-                # INDEX SETUP: Pure Options Contract (CE / PE)
-                # -------------------------------------------------------------
-                lot_size = 15 if s == "BANKNIFTY" else 65
-                step = 100 if s == "BANKNIFTY" else 50
-                atm_strike = int(round(ltp / step) * step)
-                side = "CE" if sig == "BUY" else "PE"
-                contract_name = f"{s} {atm_strike} {side}"
-                
-                # Option premium calculations designed for >= Rs 500 profit
-                opt_entry = round(max(45.0, ltp * (0.0055 if s == "NIFTY" else 0.007)), 1)
-                pts_to_500 = round(550.0 / lot_size, 1) # e.g. 22 pts for Nifty
-                opt_target = round(opt_entry + pts_to_500, 1)
-                opt_sl = round(opt_entry - max(12.0, pts_to_500 * 0.55), 1)
-                est_gain = round((opt_target - opt_entry) * lot_size, 2)
-                rr = round((opt_target - opt_entry) / max(1.0, (opt_entry - opt_sl)), 2)
-
-                sl_underlying = round(ltp - (40 if s=="NIFTY" else 120) if sig=="BUY" else ltp + (40 if s=="NIFTY" else 120), 1)
-                tgt_underlying = round(ltp + (85 if s=="NIFTY" else 240) if sig=="BUY" else ltp - (85 if s=="NIFTY" else 240), 1)
-
-                index_drivers = [
-                    {
-                        "rank": 1,
-                        "title": "Multi-Timeframe Trend Alignment",
-                        "detail": f"Supertrend {sig} on 5m and 15m · Index price (₹{ltp:,.2f}) trading above 20 EMA and 50 EMA ribbon.",
-                        "impact": "Bullish Trend" if sig == "BUY" else "Bearish Trend",
-                        "app_target": "charts",
-                        "action_label": "View in Charts"
-                    },
-                    {
-                        "rank": 2,
-                        "title": "Momentum & RSI Impulse",
-                        "detail": f"14-period RSI at 62.4 indicating strong upward expansion with ADX > 25 confirming trend velocity.",
-                        "impact": "High Momentum",
-                        "app_target": "charts",
-                        "action_label": "Check RSI & ADX"
-                    },
-                    {
-                        "rank": 3,
-                        "title": "Market Structure & Candlestick Pattern",
-                        "detail": f"Higher-low structure defended with dynamic support base at ₹{sl_underlying:,.1f}.",
-                        "impact": "Structural Edge",
-                        "app_target": "charts",
-                        "action_label": "Inspect Pattern"
-                    },
-                    {
-                        "rank": 4,
-                        "title": "Material News Catalyst",
-                        "detail": f"{news_text} (Trigger: {news_kw}). Institutional orderflow accumulation detected.",
-                        "impact": "News Catalyst",
-                        "app_target": "news",
-                        "action_label": "Read News Wires"
-                    },
-                    {
-                        "rank": 5,
-                        "title": "Option Contract Liquidity",
-                        "detail": f"{contract_name} selected for top open interest depth, narrow bid-ask spread and immediate fills.",
-                        "impact": "Optimal Liquidity",
-                        "app_target": "options",
-                        "action_label": "Open Option Chain"
-                    },
-                    {
-                        "rank": 6,
-                        "title": "Option Greeks & Delta Skew",
-                        "detail": f"Delta {'+0.52' if side=='CE' else '-0.50'}, Gamma 0.0028, IV 13.4% providing high sensitivity with low theta decay.",
-                        "impact": "Greeks Edge",
-                        "app_target": "options",
-                        "action_label": "Analyze Greeks"
-                    },
-                    {
-                        "rank": 7,
-                        "title": "PCR & Institutional Open Interest Defense",
-                        "detail": f"PCR 1.22 with heavy Put writing at {atm_strike} strike creating a robust floor for directional expansion.",
-                        "impact": "Institutional Defense",
-                        "app_target": "options",
-                        "action_label": "View PCR & OI"
-                    },
-                    {
-                        "rank": 8,
-                        "title": "Asymmetric Risk-to-Reward Geometry",
-                        "detail": f"R:R 1:{rr} · Stop loss placed at ₹{opt_sl:,.1f}; target set at ₹{opt_target:,.1f}.",
-                        "impact": "Defined Risk",
-                        "app_target": "orders",
-                        "action_label": "View Risk Levels"
-                    },
-                    {
-                        "rank": 9,
-                        "title": "Mandatory Profit Hurdle (≥ ₹500 Gain)",
-                        "detail": f"Projected net profit of +₹{est_gain:,.2f} per lot exceeds the mandatory ₹500 profit target threshold.",
-                        "impact": "High Expectancy",
-                        "app_target": "auto",
-                        "action_label": "Review Trade Logic"
-                    }
-                ]
-
-                setups.append({
-                    "symbol": s,
-                    "instrument_type": "INDEX_OPTION",
-                    "contract": f"{contract_name} [Weekly Expiry]",
-                    "underlying_ltp": ltp,
-                    "direction": sig,
-                    "action": sig,
-                    "option_side": side,
-                    "strike": atm_strike,
-                    "lots": 1,
-                    "lot_size": lot_size,
-                    "entry": opt_entry,
-                    "stop_loss": opt_sl,
-                    "target": opt_target,
-                    "target_profit": 550.0,
-                    "expected_profit": est_gain,
-                    "est_gain": est_gain,
-                    "conviction": round(min(96.0, max(72.0, score)), 1),
-                    "risk_reward": f"1:{rr}",
-                    "sl_rationale": f"Underlying index {s} invalidating below {sl_underlying} (15m 50 EMA & swing structure).",
-                    "target_rationale": f"Underlying target at {tgt_underlying} delivers +{pts_to_500} premium pts via Delta expansion.",
-                    "decision_drivers": index_drivers,
-                    "pillar_technical": f"Supertrend {sig} on 5m/15m · Price Action breaking consolidation above 20 EMA · RSI 62.4.",
-                    "pillar_news": f"Catalyst: {news_text} (Trigger: {news_kw})",
-                    "pillar_greeks": f"ATM Delta {'+0.52' if side=='CE' else '-0.50'} · IV 13.4% · PCR 1.22 indicating institutional Put writing support.",
-                    "pillar_risk": f"R:R 1:{rr} · Strict max loss limited to ₹{round((opt_entry-opt_sl)*lot_size)} with target gain ≥ ₹500."
-                })
-            else:
-                # -------------------------------------------------------------
-                # STOCK SETUP: Dual (Cash Equity + Stock Option)
-                # -------------------------------------------------------------
-                eq_entry = round(ltp, 2)
-                eq_sl = round(ltp * (0.988 if sig=="BUY" else 1.012), 2)
-                eq_tgt = round(ltp * (1.025 if sig=="BUY" else 0.975), 2)
-                eq_shares = int(max(5, round(550.0 / max(5.0, abs(eq_tgt - eq_entry)))))
-                eq_est_gain = round(abs(eq_tgt - eq_entry) * eq_shares, 2)
-
-                # Option contract setup for stock
-                step = 20 if ltp > 1000 else 10
-                opt_strike = int(round(ltp / step) * step)
-                side = "CE" if sig == "BUY" else "PE"
-                opt_entry = round(max(8.0, ltp * 0.015), 2)
-                opt_tgt = round(opt_entry * 1.25, 2)
-                opt_sl = round(opt_entry * 0.85, 2)
-
-                stock_drivers = [
-                    {
-                        "rank": 1,
-                        "title": "Cash Equity & Moving Average Breakout",
-                        "detail": f"Breakout above 50 EMA on rising volume · Price ₹{eq_entry:,.2f} with Daily MACD bullish crossover.",
-                        "impact": "Bullish Breakout" if sig == "BUY" else "Bearish Breakdown",
-                        "app_target": "charts",
-                        "action_label": "View in Charts"
-                    },
-                    {
-                        "rank": 2,
-                        "title": "Volume Surge vs 20-Day Average",
-                        "detail": f"Volume +38% above 20-day moving average confirming institutional participation.",
-                        "impact": "Volume Expansion",
-                        "app_target": "charts",
-                        "action_label": "Check Volume"
-                    },
-                    {
-                        "rank": 3,
-                        "title": "Support & Invalidation Base",
-                        "detail": f"Key stop loss invalidation at ₹{eq_sl:,.2f} protected by daily 200 EMA and swing base.",
-                        "impact": "Defined Invalidation",
-                        "app_target": "charts",
-                        "action_label": "Inspect Support"
-                    },
-                    {
-                        "rank": 4,
-                        "title": "Corporate & Sector News Catalyst",
-                        "detail": f"{news_text} (Keyword Trigger: {news_kw}). Strong operational tailwinds.",
-                        "impact": "Corporate Catalyst",
-                        "app_target": "news",
-                        "action_label": "Read News"
-                    },
-                    {
-                        "rank": 5,
-                        "title": "Fundamental Health Score & Margins",
-                        "detail": f"Robust fundamental health score with steady operating margins and favorable debt ratios.",
-                        "impact": "Fundamental Score",
-                        "app_target": "fundamentals",
-                        "action_label": "View Fundamentals"
-                    },
-                    {
-                        "rank": 6,
-                        "title": "Stock Option Strike Selection",
-                        "detail": f"Selected strike {opt_strike} {side} captures sweet spot for high gamma expansion with controlled premium cost.",
-                        "impact": "Optimal Strike",
-                        "app_target": "options",
-                        "action_label": "Open Option Chain"
-                    },
-                    {
-                        "rank": 7,
-                        "title": "Option Greeks & Open Interest Skew",
-                        "detail": f"Option Delta +0.46 with heavy Call OI addition at ₹{opt_strike}, indicating strong directional consensus.",
-                        "impact": "Greeks Favorable",
-                        "app_target": "options",
-                        "action_label": "Analyze Greeks"
-                    },
-                    {
-                        "rank": 8,
-                        "title": "Dual-Leg Risk Mitigation (Cash + Option)",
-                        "detail": f"Cash equity risk strictly capped at ₹{round(abs(eq_entry-eq_sl)*eq_shares):,} with 1:2.3 risk-to-reward ratio.",
-                        "impact": "Risk Geometry",
-                        "app_target": "orders",
-                        "action_label": "Check Risk Levels"
-                    },
-                    {
-                        "rank": 9,
-                        "title": "Mandatory Profit Target (≥ ₹500 Net)",
-                        "detail": f"Target price ₹{eq_tgt:,.2f} yields +₹{eq_est_gain:,.2f} gain for cash equity, clearing the ₹500 target hurdle.",
-                        "impact": "High Expectancy",
-                        "app_target": "auto",
-                        "action_label": "Review Trade Logic"
-                    }
-                ]
-
-                setups.append({
-                    "symbol": s,
-                    "instrument_type": "STOCK_DUAL",
-                    "contract": f"{s} Equity & {opt_strike} {side} Option",
-                    "underlying_ltp": ltp,
-                    "direction": sig,
-                    "action": sig,
-                    "option_side": side,
-                    "strike": opt_strike,
-                    "lots": 1,
-                    "lot_size": eq_shares,
-                    "entry": eq_entry,
-                    "stop_loss": eq_sl,
-                    "target": eq_tgt,
-                    "target_profit": 550.0,
-                    "expected_profit": eq_est_gain,
-                    "est_gain": eq_est_gain,
-                    "conviction": round(min(95.0, max(70.0, score)), 1),
-                    "risk_reward": "1:2.3",
-                    "sl_rationale": f"Below daily 200 EMA & recent double-bottom swing base at ₹{eq_sl}.",
-                    "target_rationale": f"Testing overhead supply zone at ₹{eq_tgt} (Projected gain: +₹{eq_est_gain}).",
-                    "decision_drivers": stock_drivers,
-                    "equity_setup": {
-                        "mode": "Cash Intraday/Swing",
-                        "entry": eq_entry,
-                        "stop_loss": eq_sl,
-                        "target": eq_tgt,
-                        "shares": eq_shares,
-                        "est_gain": eq_est_gain
-                    },
-                    "option_setup": {
-                        "contract": f"{s} {opt_strike} {side}",
-                        "entry": opt_entry,
-                        "stop_loss": opt_sl,
-                        "target": opt_tgt,
-                        "lot_size": 250,
-                        "est_gain": round((opt_tgt - opt_entry) * 250, 2)
-                    },
-                    "pillar_technical": f"Breakout above 50 EMA on rising volume · Daily MACD bullish crossover · Volume +38% above 20-day avg.",
-                    "pillar_news": f"Corporate & Sector Catalyst: {news_text} (Trigger: {news_kw})",
-                    "pillar_greeks": f"Option Delta +0.46 · IV Skew favorable with heavy Call OI addition at ₹{opt_strike}.",
-                    "pillar_risk": f"Dual setup: Equity risk capped at ₹{round(abs(eq_entry-eq_sl)*eq_shares)}, targeting ≥ ₹500 gain."
-                })
+            rec = overall_recommendation(s, "5m", user_id=user["id"])
         except Exception as exc:
-            log.warning("CA AI Dashboard setup error for %s: %s", s, exc)
-            continue
+            return {"symbol": s, "available": False, "reason": safe_text(exc)}
+        model = rec.get("signal_model") or {}
+        opt = rec.get("recommended_option") or {}
+        return {
+            "symbol": s,
+            "available": True,
+            "signal": rec.get("recommendation"),
+            "direction": rec.get("direction"),
+            "contract": opt.get("symbol") or rec.get("display_symbol") or s,
+            "entry": rec.get("entry"), "stop_loss": rec.get("stop_loss"), "target": rec.get("target"),
+            "risk_reward": rec.get("risk_reward"),
+            "lot_size": (rec.get("instrument") or {}).get("lot_size"),
+            "confidence": rec.get("confidence"), "confidence_basis": rec.get("confidence_basis"),
+            "score": model.get("score"), "gate": model.get("gate"), "decision": model.get("decision"),
+            "decision_drivers": [{"rank": i + 1, "title": r["name"], "detail": r["input"], "points": r["points"],
+                                  "weight_pct": r["weight_pct"], "contribution": r["contribution"], "source": r["source"]}
+                                 for i, r in enumerate(model.get("rows") or [])],
+            "stock_mantra_setup": rec.get("stock_mantra_setup"),
+            "rationale": rec.get("rationale"),
+        }
 
+    setups = await asyncio.gather(*[asyncio.to_thread(one, s) for s in symbols])
+    closed = db_exec("SELECT success FROM recommendations WHERE user_id=? AND success IS NOT NULL AND outcome NOT IN ('ACTIVE','Active Signal')", [user["id"]], "all") or []
+    wins = sum(1 for r in closed if int(r.get("success") or 0) == 1)
     result = {
         "symbol": sym,
-        "minimum_profit_target": 500.0,
-        "model": AVAILABLE_AI_MODELS[0] if AVAILABLE_AI_MODELS else "gemini-2.5-flash",
-        "win_rate": 86.4,
-        "net_profit": 38450,
-        "trade_stats": {"wins": 45, "total": 52},
-        "setups": combined_setups,
-        "timestamp": now_iso()
+        "setups": setups,
+        "trade_stats": {"wins": wins, "total": len(closed)},
+        "win_rate": round(wins / len(closed) * 100, 1) if closed else None,
+        "calibration": SIGNAL_MODEL.load_calibration().get("version"),
+        "timestamp": now_iso(),
     }
-    CACHE.set(cache_key, result, 180)
+    CACHE.set(cache_key, result, 30)
     return result
-
-
 
 def _ca_ai_quantitative_chat(symbol: str, message: str, current_setup: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
     """Generates authoritative institutional trader analysis with setup updates when AI API is unavailable."""
@@ -18249,51 +17212,6 @@ async def quiz_questions(category: str | None = None) -> dict[str, Any]:
     }
 
 
-@app.post("/api/news/discuss")
-async def news_discuss(
-    payload: dict[str, Any],
-    user: dict[str, Any] = Depends(require_user)
-) -> dict[str, Any]:
-    """Interactive CA AI discussion & counter-questioning on financial news."""
-    headline = str(payload.get("headline") or "")
-    source = str(payload.get("source") or "Market News")
-    symbol = str(payload.get("symbol") or "NIFTY").upper()
-    user_q = str(payload.get("question") or "").strip()
-
-    analysis_context = f"""
-Article Headline: {headline}
-Source: {source}
-Focus Symbol: {symbol}
-User Query: {user_q}
-"""
-    prompt = f"""
-You are CA AI, the chief quantitative institutional strategist at CA Trader.
-A trader is inspecting the following news story and asking a specific question:
-
-{analysis_context}
-
-Provide a concise, direct, and institutional answer addressing:
-1. Direct Impact on {symbol}: Whether this is bullish, bearish, or neutral, and the immediate price reaction likelihood.
-2. Key Levels to Watch: Support, resistance, or pivot points relevant to this catalyst.
-3. Tactical Trade Recommendation: Suggested execution stance (e.g. Accumulate on dips, sell call spreads, hold breakout).
-4. Direct Answer: Answer the user's specific question precisely. Keep tone authoritative, objective, and institutional.
-"""
-    ai_resp = await asyncio.to_thread(_ai_complete, prompt, "gemini-3.8-flash-high")
-    reply = ai_resp.get("text") or f"CA AI Assessment: The headline '{headline}' suggests structural sector repositioning. For {symbol}, maintain disciplined risk management around established key swing pivot zones."
-
-    return {
-        "symbol": symbol,
-        "headline": headline,
-        "question": user_q,
-        "analysis": reply,
-        "timestamp": now_iso()
-    }
-
-
-# ---------------------------------------------------------------------------
-# Documentation endpoints
-# ---------------------------------------------------------------------------
-
 API_CATALOG = {
     "auth": ["POST /api/auth/login", "POST /api/auth/signup", "POST /api/auth/logout", "GET /api/auth/me", "POST /api/auth/password-reset/request", "POST /api/auth/password-reset/confirm", "GET /api/auth/google/start", "GET /api/auth/google/callback"],
     "market": ["GET /api/market/quote/{instrument}", "GET /api/market/ltp/{instrument}", "GET /api/market/candles/{instrument}", "GET /api/market/depth/{instrument}", "GET /api/market/movers", "GET /api/market/session", "GET /api/market/status/{exchange}"],
@@ -18782,7 +17700,6 @@ async def list_external_positions(user: dict[str, Any] = Depends(require_user)) 
     return {"ok": True, "positions": res}
 
 @app.post("/api/portfolio/external-positions")
-@app.post("/api/portfolio/external-position")
 async def add_external_position(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     uid = user["id"]
     body = await request.json()
@@ -18953,220 +17870,36 @@ async def test_telegram_api(request: Request, user: dict[str, Any] = Depends(req
 
 @app.get("/api/telegram/stock-mantra-feed")
 async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """
-    Pulls live recommendations from Stock Mantra (Telegram API stream)
-    across all stocks (NIFTY, BANKNIFTY, FINNIFTY, leading equities)
-    with a minimum 50% confluence weighting, live spot calibration, and real-time PnL/SL tracking.
-    """
+    """Stock Mantra calls actually received from @stockmantraindex via the Telethon listener, with live Upstox prices.
+    Levels the channel did not post (usually target and SL) are returned as null, never invented."""
     now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    time_str = now_ist.strftime("%I:%M %p IST")
-    date_str = now_ist.strftime("%d-%b-%Y")
-    
-    spots = {}
-    for sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE", "TCS", "HDFCBANK", "CRUDEOIL", "INFY"]:
+    seen, setups = set(), []
+    for setup in list(LIVE_STOCKMANTRA_SETUPS.values()):
+        if setup.get("id") in seen:
+            continue
+        seen.add(setup.get("id"))
+        row = dict(setup)
         try:
-            q = UPSTOX.quote(sym)
-            lp = float(q.get("ltp") or 0.0)
-            if lp > 0:
-                spots[sym] = {"ltp": lp, "net_change": float(q.get("net_change") or 0.0), "change_pct": float(q.get("change_pct") or 0.0)}
+            q = UPSTOX.quote(row["symbol"])
+            ltp = float(q.get("ltp") or 0.0)
+            if ltp > 0:
+                row["cmp"] = round(ltp, 2)
+                row["cmp_source"] = "upstox"
+                row["pnl_pct_from_entry"] = round((ltp - float(row["entry"])) / float(row["entry"]) * 100, 1) if row.get("entry") else None
         except Exception:
-            pass
-        if sym not in spots:
-            fb = get_live_fallback_quote(sym)
-            if fb and fb.get("ltp"):
-                spots[sym] = {"ltp": float(fb["ltp"]), "net_change": float(fb.get("net_change") or 0.0), "change_pct": float(fb.get("change_pct") or 0.0)}
-
-    if "NIFTY" not in spots: spots["NIFTY"] = {"ltp": 22776.0, "net_change": 60.0, "change_pct": 0.26}
-    if "BANKNIFTY" not in spots: spots["BANKNIFTY"] = {"ltp": 55024.0, "net_change": 764.0, "change_pct": 1.41}
-    if "FINNIFTY" not in spots: spots["FINNIFTY"] = {"ltp": 24810.0, "net_change": 161.0, "change_pct": 0.65}
-    if "RELIANCE" not in spots: spots["RELIANCE"] = {"ltp": 1192.0, "net_change": 10.0, "change_pct": 0.85}
-    if "TCS" not in spots: spots["TCS"] = {"ltp": 2070.0, "net_change": 38.0, "change_pct": 1.87}
-    if "CRUDEOIL" not in spots: spots["CRUDEOIL"] = {"ltp": 7520.0, "net_change": -45.0, "change_pct": -0.60}
-    if "INFY" not in spots: spots["INFY"] = {"ltp": 1490.0, "net_change": 14.0, "change_pct": 0.95}
-
-    if "SENSEX" not in spots: spots["SENSEX"] = {"ltp": 72850.0, "net_change": -320.0, "change_pct": -0.44}
-
-    configs = [
-        {"id": "sm_sensex_02", "underlying": "SENSEX", "fixed_strike": 72700, "step": 100, "bias": "PE", "time": "02:15 PM IST", "channel": "@stockmantraindex", "desc": "Sensex 72,700 PE Hero-Zero Put Scalp: Invalidation above swing resistance, target open."},
-        {"id": "sm_sensex_01", "underlying": "SENSEX", "fixed_strike": 73000, "step": 100, "bias": "PE", "time": "01:43 PM IST", "channel": "@stockmantraindex", "desc": "Sensex 73,000 PE Near 310 Scalp: Target open, SL follow."},
-        {"id": "sm_nifty_01", "underlying": "NIFTY", "fixed_strike": 22750, "step": 50, "bias": "PE", "time": "09:18 AM IST", "channel": "@stockmantraindex", "desc": "Nifty Opening Breakdown / Put Scalp: First recommendation broadcast in channel. Invalidation above 22,810 resistance."},
-        {"id": "sm_bn_01", "underlying": "BANKNIFTY", "fixed_strike": 55100, "step": 100, "bias": "CE", "time": "09:35 AM IST", "channel": "@stockmantraindex", "desc": "Bank Nifty Institutional Gamma Pop: Outperforming private bank momentum above 55,000 threshold."},
-        {"id": "sm_fin_01", "underlying": "FINNIFTY", "fixed_strike": 24800, "step": 50, "bias": "CE", "time": "09:42 AM IST", "channel": "@stockmantraindex", "desc": "FinNifty Momentum Scalp: NBFC liquidity expansion with Bajaj Finance & SBI Life leadership."}
-    ]
-
-    setups = []
-    for c in configs:
-        und = c["underlying"]
-        sp_data = spots.get(und, {"ltp": 1000.0, "net_change": 0.0, "change_pct": 0.0})
-        sp_ltp = sp_data["ltp"]
-        step = c["step"]
-        opt_type = c["bias"]
-        atm_strike = int(c.get("fixed_strike") or round(sp_ltp / step) * step)
-        sym_str = f"{und} {atm_strike} {opt_type}"
-        
-        opt_ltp = 0.0
-        try:
-            oq = UPSTOX.quote(sym_str)
-            opt_ltp = float(oq.get("ltp") or 0.0)
-        except Exception:
-            pass
-        if opt_ltp <= 0:
-            fb_q = get_live_fallback_quote(sym_str)
-            if fb_q and fb_q.get("ltp"):
-                opt_ltp = float(fb_q["ltp"])
-        if opt_ltp <= 0 and sp_ltp > 0:
-            opt_ltp = max(0.05, round((sp_ltp - atm_strike) if opt_type == "CE" else (atm_strike - sp_ltp), 2))
-        
-        entry_price = round(opt_ltp * 0.94, 2)
-        sl_price = round(entry_price * 0.85, 2)
-        t1_price = round(entry_price * 1.12, 2)
-        t2_price = round(entry_price * 1.35, 2)
-        t3_price = round(entry_price * 1.70, 2)
-
-        if opt_ltp <= sl_price:
-            status = "Stop Loss Hit 🛑 Cut Trade (-15%)"
-        elif opt_ltp >= t2_price:
-            status = f"Target 2 Hit 🚀 Runner Protected (+{round((opt_ltp - entry_price)/entry_price*100)}%)"
-        elif opt_ltp >= t1_price:
-            status = f"Target 1 Hit 🎯 Scalp Booked (SL at Cost) (+{round((opt_ltp - entry_price)/entry_price*100)}%)"
-        else:
-            status = "Active 🟢 In Range / Scalp Accumulation"
-
-        setups.append({
-            "id": c["id"],
-            "symbol": sym_str,
-            "underlying": und,
-            "instrument": "OPT",
-            "option_type": opt_type,
-            "signal": "BUY",
-            "spot_ltp": sp_ltp,
-            "cmp": opt_ltp,
-            "entry": entry_price,
-            "stop_loss": sl_price,
-            "target_1": t1_price,
-            "target_2": t2_price,
-            "target_3": t3_price,
-            "status": status,
-            "confluence_weight": 50,
-            "accuracy": "94.2%",
-            "time": c.get("time") or time_str,
-            "date": date_str,
-            "published_at": f"{date_str} {c.get('time') or time_str}",
-            "description": c.get("desc", ""),
-            "rationale": f"Stock Mantra Institutional Setup: {c['desc']} Spot: ₹{sp_ltp:,.2f} ({sp_data['net_change']:+,.2f}). Entry: ₹{entry_price:.2f}, Scalp T1: ₹{t1_price:.2f}, Runner T2: ₹{t2_price:.2f}.",
-            "channel": c["channel"]
-        })
-
-    try:
-        token = os.environ.get("ANTIGRAVITY_TELEGRAM_TOKEN", "").strip() or "8709030451:AAEvA_6wr80L0pH9VH88aZPtBWeu4MVvUB4"
-        if token and ":" in token:
-            raw_upd = _sync_fetch_telegram_updates(token, 0, 5)
-            for u in raw_upd:
-                msg = u.get("message") or u.get("channel_post") or {}
-                txt = msg.get("text", "")
-                if txt and ("CE" in txt.upper() or "PE" in txt.upper() or "BUY" in txt.upper()):
-                    contract_m = re.search(r'\b(NIFTY|BANKNIFTY|FINNIFTY|SENSEX|CRUDEOIL)\s*(\d{4,6})\s*(CE|PE)\b', txt, re.I)
-                    if contract_m:
-                        c_und = contract_m.group(1).upper()
-                        c_stk = float(contract_m.group(2))
-                        c_typ = contract_m.group(3).upper()
-                        setups.insert(0, {
-                            "id": f"sm_tg_{u.get('update_id')}",
-                            "symbol": f"{c_und} {int(c_stk)} {c_typ}",
-                            "underlying": c_und,
-                            "instrument": "OPT",
-                            "option_type": c_typ,
-                            "signal": "BUY",
-                            "entry": 100.0,
-                            "stop_loss": 85.0,
-                            "target_1": 115.0,
-                            "target_2": 140.0,
-                            "status": "Active ⚡ Real-Time Telegram Stream",
-                            "confluence_weight": 50,
-                            "accuracy": "95.0%",
-                            "time": time_str,
-                            "date": date_str,
-                            "rationale": f"Live Telegram Inbound Advisory: {txt[:120]}...",
-                            "channel": "@StockMantraOfficial"
-                        })
-    except Exception as e:
-        log.debug("Telegram inbound stream parse error: %s", e)
-
-    # Scan server disk & database for Telegram user API files / 1008 messages dataset
-    detected_files = []
-    session_files = []
-    db_tables = []
-    try:
-        search_dirs = [Path("."), Path("data"), Path("/home/ubuntu"), Path("/home/ubuntu/CA-Trader"), Path("/home/ubuntu/CA-Trader/data")]
-        for d in search_dirs:
-            if d.exists():
-                for f in d.glob("*stockmantra*"):
-                    detected_files.append(str(f))
-                for f in d.glob("*.session"):
-                    session_files.append(str(f))
-        tbl_rows = db_exec("SELECT name FROM sqlite_master WHERE type='table'", [], "all")
-        db_tables = [r.get("name") for r in tbl_rows] if tbl_rows else []
-    except Exception as exc:
-        log.debug("Disk scan error: %s", exc)
-
-    # If real parsed setups exist from yesterday/today, use them exclusively (Zero-Mock compliance)
-    live_list = list(LIVE_STOCKMANTRA_SETUPS.values())
-    if live_list:
-        combined_setups = live_list
-    else:
-        combined_setups = setups
-
-    def _get_setup_sort_key(s: dict[str, Any]) -> float:
-        try:
-            pub = str(s.get("published_at") or "").replace("IST", "").strip()
-            for fmt in ("%d-%b-%Y %I:%M %p", "%d-%b-%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %I:%M %p"):
-                try:
-                    return datetime.strptime(pub, fmt).timestamp()
-                except Exception:
-                    pass
-            d_str = str(s.get("date") or "").strip()
-            t_str = str(s.get("time") or "").replace("IST", "").strip()
-            combined = f"{d_str} {t_str}".strip()
-            for fmt in ("%d-%b-%Y %I:%M %p", "%d-%b-%Y %H:%M", "%Y-%m-%d %H:%M:%S"):
-                try:
-                    return datetime.strptime(combined, fmt).timestamp()
-                except Exception:
-                    pass
-            if t_str:
-                dt_t = datetime.strptime(t_str, "%I:%M %p")
-                now = datetime.now()
-                return now.replace(hour=dt_t.hour, minute=dt_t.minute, second=0).timestamp()
-        except Exception:
-            pass
-        return 0.0
-
-    combined_setups.sort(key=_get_setup_sort_key, reverse=True)
-
+            row.setdefault("cmp_source", "unavailable")
+        setups.append(row)
+    setups.sort(key=lambda r: str(r.get("published_at") or ""), reverse=True)
     return {
         "ok": True,
-        "source": "Stock Mantra Live Telegram Stream & Quantitative Reconciliation",
-        "weightage": "50% Multiplier in Overall Consensus",
-        "synced_at": time_str,
-        "count": len(combined_setups),
-        "server_telethon_sessions": session_files,
-        "live_stream_active": len(LIVE_STOCKMANTRA_SETUPS) > 0,
-        "live_stream_setups_count": len(LIVE_STOCKMANTRA_SETUPS),
+        "source": "@stockmantraindex via Telegram user session; prices from Upstox",
+        "synced_at": now_ist.strftime("%I:%M %p IST"),
+        "count": len(setups),
+        "live_stream_active": bool(os.getenv("TELEGRAM_API_ID")) and len(LIVE_STOCKMANTRA_MSGS) > 0,
+        "live_stream_setups_count": len(setups),
         "live_stream_recent_messages": LIVE_STOCKMANTRA_MSGS[:15],
-        "server_stockmantra_files": detected_files,
-        "server_db_tables": [t for t in db_tables if any(k in t.lower() for k in ("tele", "reco", "mantra", "msg", "calib"))],
-        "fetch_script_snippet": (Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").read_text(encoding="utf-8", errors="ignore")[:1000] if Path("/home/ubuntu/CA-Trader/fetch_stockmantra.py").exists() else ""),
-        "latest_json_msgs": (
-            json.loads((Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json") if Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json").exists() else Path("/home/ubuntu/CA-Trader/stockmantra_3months.json")).read_text(encoding="utf-8", errors="ignore"))[-3:]
-            if (Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json").exists() or Path("/home/ubuntu/CA-Trader/stockmantra_3months.json").exists())
-            else (
-                json.loads((BASE_DIR / "data" / "stockmantra_3months.json" if (BASE_DIR / "data" / "stockmantra_3months.json").exists() else BASE_DIR / "stockmantra_3months.json").read_text(encoding="utf-8", errors="ignore"))[-3:]
-                if ((BASE_DIR / "data" / "stockmantra_3months.json").exists() or (BASE_DIR / "stockmantra_3months.json").exists())
-                else []
-            )
-        ),
-        "setups": combined_setups
+        "setups": setups,
     }
-
 
 @app.get("/api/telegram/stockmantra-banknifty")
 async def stockmantra_banknifty_endpoint() -> dict[str, Any]:
@@ -19206,415 +17939,112 @@ async def stockmantra_banknifty_endpoint() -> dict[str, Any]:
 # ==============================================================================
 # 🎯 STOCK MANTRA INDEX DATABASE & FORMULA CALIBRATION API
 # ==============================================================================
+STOCKMANTRA_COMPARISON_PATH = BASE_DIR / "data" / "stockmantra_comparison.json"
+
+
 @app.get("/api/stockmantra/database")
 @app.get("/api/stockmantra/trades")
-async def get_stockmantra_database_endpoint(underlying: str | None = None) -> dict[str, Any]:
-    """Returns database of all Stock Mantra index trade recommendations extracted,
-    calibrated concordance win-rate, and the derived real-data formula."""
+async def get_stockmantra_database_endpoint(underlying: str | None = None, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Every Stock Mantra Index call (from the channel history) next to what CA Trader's engines said at that minute and
+    what the market actually did. Produced by replaying Upstox candles; see `method` in the response."""
     try:
-        # 1. Ensure table exists
-        try:
-            db_exec("""
-                CREATE TABLE IF NOT EXISTS stockmantra_recommendations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT,
-                    time TEXT,
-                    symbol TEXT,
-                    underlying TEXT,
-                    strike REAL,
-                    option_type TEXT,
-                    signal TEXT,
-                    entry REAL,
-                    target_1 REAL,
-                    target_2 REAL,
-                    sl REAL,
-                    exit REAL,
-                    high_reached REAL,
-                    gain_5m_pct REAL,
-                    gain_day_pct REAL,
-                    hit_5m INTEGER DEFAULT 0,
-                    hit_runner INTEGER DEFAULT 0,
-                    sl_hit INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-        except Exception:
-            pass
-
-        query = "SELECT * FROM stockmantra_recommendations"
-        params = []
-        if underlying:
-            query += " WHERE UPPER(underlying) = ?"
-            params.append(underlying.upper().strip())
-        query += " ORDER BY id ASC"
-        
-        rows = []
-        try:
-            rows = db_exec(query, params, "all") or []
-        except Exception:
-            rows = []
-        
-        # 2. If DB table empty, try loading static trades JSON and seed SQLite
-        if not rows:
-            t_candidates = [
-                BASE_DIR / "static" / "stockmantra_trades.json",
-                Path("static/stockmantra_trades.json"), 
-                BASE_DIR / "data" / "stockmantra_trades.json",
-                Path("data/stockmantra_trades.json"),
-                Path("/home/ubuntu/CA-Trader/static/stockmantra_trades.json"),
-                Path("/home/ubuntu/CA-Trader/data/stockmantra_trades.json")
-            ]
-            for tp in t_candidates:
-                if tp.exists():
-                    try:
-                        loaded = json.loads(tp.read_text(encoding="utf-8"))
-                        raw_list = loaded["trades"] if isinstance(loaded, dict) and "trades" in loaded else (loaded if isinstance(loaded, list) else [])
-                        # Verify elements are actual trade objects with strike or entry
-                        valid_trades = [r for r in raw_list if isinstance(r, dict) and ("strike" in r or "entry" in r or "entry_price" in r)]
-                        if valid_trades:
-                            rows = valid_trades
-                            # Fast batch seed if DB connection available
-                            try:
-                                with _DB_LOCK:
-                                    conn = db_conn()
-                                    try:
-                                        conn.executemany("""
-                                            INSERT OR IGNORE INTO stockmantra_recommendations
-                                            (date, time, symbol, underlying, strike, option_type, signal, entry, target_1, target_2, sl, exit, high_reached, gain_5m_pct, gain_day_pct, hit_5m, hit_runner, sl_hit)
-                                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                        """, [
-                                            (
-                                                r.get("date",""), r.get("time",""), r.get("symbol",""), r.get("underlying",""),
-                                                float(r.get("strike") or 0.0), str(r.get("option_type") or r.get("opt_type") or "CE"), str(r.get("signal") or "BUY"),
-                                                float(r.get("entry") or r.get("entry_price") or 0.0),
-                                                float(r.get("target_1") or r.get("target_5m") or 0.0),
-                                                float(r.get("target_2") or r.get("target_runner") or 0.0),
-                                                float(r.get("sl") or 0.0),
-                                                float(r.get("exit") or r.get("high_reached") or 0.0),
-                                                float(r.get("high_reached") or r.get("peak_5m") or r.get("peak_day") or 0.0),
-                                                float(r.get("gain_5m_pct") or 10.0),
-                                                float(r.get("gain_day_pct") or 25.0),
-                                                1 if (r.get("hit_5m") or float(r.get("gain_5m_pct") or 0) >= 8.0) else 0,
-                                                1 if (r.get("hit_runner") or float(r.get("gain_day_pct") or 0) >= 20.0) else 0,
-                                                1 if r.get("sl_hit") else 0
-                                            )
-                                            for r in valid_trades
-                                        ])
-                                        conn.commit()
-                                    finally:
-                                        conn.close()
-                            except Exception:
-                                pass
-                            break
-                    except Exception:
-                        pass
-
-        # Normalize rows to ensure uniform key access
-        norm_rows = []
-        for r in rows:
-            entry_val = float(r.get("entry") or r.get("entry_price") or 0.0)
-            tgt1_val = float(r.get("target_1") or r.get("target_5m") or 0.0)
-            tgt2_val = float(r.get("target_2") or r.get("target_runner") or 0.0)
-            high_val = float(r.get("high_reached") or r.get("peak_5m") or r.get("peak_day") or entry_val)
-            gain_5m = float(r.get("gain_5m_pct") or (((tgt1_val - entry_val)/entry_val*100) if entry_val > 0 and tgt1_val > 0 else 10.0))
-            gain_day = float(r.get("gain_day_pct") or (((high_val - entry_val)/entry_val*100) if entry_val > 0 and high_val > 0 else 25.0))
-            norm_rows.append({
-                "id": r.get("id"),
-                "date": r.get("date", ""),
-                "time": r.get("time", ""),
-                "symbol": r.get("symbol", ""),
-                "underlying": r.get("underlying", ""),
-                "strike": float(r.get("strike") or 0.0),
-                "option_type": r.get("option_type") or r.get("opt_type") or "CE",
-                "signal": r.get("signal") or "BUY CALL",
-                "entry": entry_val,
-                "target_1": tgt1_val,
-                "target_2": tgt2_val,
-                "sl": float(r.get("sl") or (round(entry_val * 0.90, 1) if entry_val > 0 else 0.0)),
-                "exit": float(r.get("exit") or high_val),
-                "high_reached": high_val,
-                "gain_5m_pct": round(gain_5m, 1),
-                "gain_day_pct": round(gain_day, 1),
-                "hit_5m": 1 if (r.get("hit_5m") or gain_5m >= 8.0) else 0,
-                "hit_runner": 1 if (r.get("hit_runner") or gain_day >= 20.0) else 0,
-                "sl_hit": 1 if r.get("sl_hit") else 0
-            })
-
-        total = len(norm_rows)
-        wins_5m = sum(1 for r in norm_rows if (r.get("hit_5m") or float(r.get("gain_5m_pct") or 0) >= 8.0))
-        runners = sum(1 for r in norm_rows if (r.get("hit_runner") or float(r.get("gain_day_pct") or 0) >= 20.0))
-        multibaggers = sum(1 for r in norm_rows if float(r.get("gain_day_pct") or 0) >= 80.0)
-        losses = sum(1 for r in norm_rows if r.get("sl_hit"))
-        gains = [float(r.get("gain_day_pct") or 0) for r in norm_rows]
-        avg_gain = round(sum(gains) / len(gains), 1) if gains else 0.0
-
-        calib_formula = {
-            "name": "CA Trader & Stock Mantra Calibrated Index Scalp Formula",
-            "confluence_score_formula": "Score = 20% VWAP_Distance + 15% EMA_9_20 + 15% RSI_14 + 10% (ADX + Supertrend) + 15% (PCR + OI_Imbalance) + 10% Greeks(Delta, Gamma, IV) + 10% Candlestick_Patterns + 5% StockMantra_Alignment",
-            "direction_gate": "BUY CALL if Score >= +50.0 and Spot >= VWAP; BUY PUT if Score <= -50.0 and Spot <= VWAP; NO_TRADE if -50 < Score < +50 (Zero-Chop Filter)",
-            "strike_rule": "Strict At-The-Money (ATM, Delta ~0.50): target_strike = round(spot / step) * step",
-            "entry_formula": "Entry = LTP_Option - min(0.04 * LTP_Option, Delta * (0.12 * |Spot - VWAP| + 0.08 * ATR_5m) * (1 - 0.4 * |Score|/100))",
-            "stop_loss_formula": "SL = Entry - max(Delta * Spot_Invalidation_Distance, 1.15 * Option_ATR_5m) * (IV / 15.0)^0.5 [Capped at max 12% Risk Budget]",
-            "target_1_scalp_formula": "Target_1 = Entry + Delta * min(TargetDistance_OI, 0.65 * Spot_ATR_14) + 0.5 * Gamma * (Spot_Expansion)^2 - |Theta| * dt [Real Data ATR & Delta, NOT Risk-Reward!]",
-            "target_2_runner_formula": "Target_2 = Entry + Delta * (Macro_OI_Wall_Distance) [Trailing SL moved to Cost/Breakeven upon Target_1 achievement!]",
-            "concordance_accuracy_pct": round((wins_5m / total * 100.0), 1) if total else 100.0,
-            "sample_size": total
-        }
-
-        return {
-            "ok": True,
-            "total_trades": total,
-            "wins_5m_scalp": wins_5m,
-            "scalp_5m_reach_rate_pct": round((wins_5m / total * 100.0), 1) if total else 0.0,
-            "intraday_runners_count": runners,
-            "runner_reach_rate_pct": round((runners / total * 100.0), 1) if total else 0.0,
-            "multibaggers_count": multibaggers,
-            "losses_count": losses,
-            "avg_peak_gain_pct": avg_gain,
-            "calibrated_formula": calib_formula,
-            "trades": norm_rows
-        }
+        data = json.loads(STOCKMANTRA_COMPARISON_PATH.read_text(encoding="utf-8"))
     except Exception as exc:
-        log.exception("Stock Mantra database error: %s", exc)
-        return {"ok": False, "error": str(exc), "total_trades": 0, "trades": []}
+        return {"ok": False, "error": f"Comparison file not available: {safe_text(exc)}", "calls": []}
+    calls = data.get("calls") or []
+    if underlying:
+        u = extract_root_symbol(underlying).upper()
+        calls = [c for c in calls if c.get("underlying") == u]
+    return {"ok": True, **{k: v for k, v in data.items() if k != "calls"}, "count": len(calls), "calls": calls,
+            "calibration": SIGNAL_MODEL.load_calibration()}
 
-# ==============================================================================
-# 📊 LIVE DATA INSPECTOR & MULTI-SOURCE AUDIT MATRIX API
-# ==============================================================================
 @app.get("/api/market/data-inspector")
 @app.get("/api/market/live-audit-matrix/{instrument}")
-async def get_live_data_inspector(instrument: str = "BANKNIFTY") -> dict[str, Any]:
-    """Exhaustive inspector listing every single data point fetched or computed by the app:
-    Spot fundamentals, 9/20/50/200 EMAs, RSI, MACD, ADX, Supertrend, Bollinger Bands, ATR,
-    ATM Strike, Greeks (Delta, Gamma, Theta, Vega, IV), Call/Put OI, PCR, Max Pain, VIX, Sentiment.
-    Includes last 3 historical values in 5-5-5 minute gaps to verify live updating,
-    and cross-verifies with 3-4 real market sources."""
-    try:
-        sym = extract_root_symbol(instrument).upper()
-        now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
-        now_ts = now_ist.strftime("%H:%M:%S")
+async def get_live_data_inspector(instrument: str = "BANKNIFTY", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Every input the signal model uses, with its value now and 5/10/15 minutes ago.
+    Past values are recomputed from Upstox 5-minute candles as they stood at that time; nothing is extrapolated."""
+    sym = extract_root_symbol(instrument).upper()
+    now_ist = datetime.now(IST)
 
-        def _val(v: Any, fallback: float) -> float:
-            if isinstance(v, (int, float)) and np.isfinite(v):
-                return float(v)
-            try:
-                if v is not None:
-                    p = float(v)
-                    if np.isfinite(p):
-                        return p
-            except Exception:
-                pass
-            return float(fallback)
-
-        # 1. Fetch live spot quote from Upstox
-        q_spot = {}
+    def build() -> dict[str, Any]:
+        quote = {}
         try:
-            q_spot = get_live_fallback_quote(sym) or {}
-        except Exception:
-            pass
-
-        spot = _val(q_spot.get("ltp"), 0.0)
-        if spot <= 0:
-            if "BANK" in sym: spot = 54800.0
-            elif "NIFTY" in sym: spot = 24800.0
-            elif "FIN" in sym: spot = 25200.0
-            elif "SENSEX" in sym: spot = 81200.0
-            elif "CRUDE" in sym: spot = 6750.0
-            else: spot = 1500.0
-
-        open_p = _val(q_spot.get("open"), spot)
-        high_p = _val(q_spot.get("high"), spot * 1.004)
-        low_p = _val(q_spot.get("low"), spot * 0.996)
-        cp = _val(q_spot.get("cp"), spot)
-        net_chg = _val(q_spot.get("net_change"), spot - cp)
-        chg_pct = _val(q_spot.get("change_pct"), (net_chg / cp * 100.0) if cp else 0.0)
-
-        # 2. Fetch multi-timeframe candles and technicals
-        candles = []
+            quote = UPSTOX.quote(sym)
+        except Exception as exc:
+            return {"ok": False, "instrument": sym, "error": f"Upstox quote failed: {safe_text(exc)}", "items": []}
         try:
-            candles = get_live_fallback_candles(sym, timeframe="5", days=2) or []
+            candles = UPSTOX.candles(sym, "5", "minutes", days=5)
         except Exception:
             candles = []
-
-        ta = {}
-        try:
-            if candles:
-                ta = technical_analysis(candles) or {}
-        except Exception:
-            ta = {}
-
-        vwap = _val(ta.get("vwap"), spot)
-        ema9 = _val(ta.get("ema9"), spot * 0.998)
-        ema20 = _val(ta.get("ema20"), spot * 0.995)
-        ema50 = _val(ta.get("ema50"), spot * 0.990)
-        ema200 = _val(ta.get("ema200"), spot * 0.980)
-        sma20 = _val(ta.get("sma20"), spot * 0.995)
-        rsi_val = _val(ta.get("rsi"), 54.2)
-
-        # MACD extraction: ta["macd"] can be a dict {'macd': ..., 'signal': ..., 'histogram': ...}
-        macd_raw = ta.get("macd")
-        if isinstance(macd_raw, dict):
-            macd_val = _val(macd_raw.get("macd"), 12.5)
-            macd_signal = _val(macd_raw.get("signal"), 8.2)
-            macd_hist = _val(macd_raw.get("histogram"), 4.3)
-        else:
-            macd_val = _val(macd_raw, 12.5)
-            macd_signal = 8.2
-            macd_hist = 4.3
-
-        adx_val = _val(ta.get("adx"), 26.4)
-        p_di = _val(ta.get("plus_di"), 28.1)
-        m_di = _val(ta.get("minus_di"), 16.4)
-        supertrend = _val(ta.get("supertrend"), spot * 0.992)
-        st_dir = str(ta.get("supertrend_signal") or "BUY").upper()
-        boll_u = _val(ta.get("bollinger_upper"), spot * 1.012)
-        boll_l = _val(ta.get("bollinger_lower"), spot * 0.988)
-        atr_val = _val(ta.get("atr"), spot * 0.008)
-
-        # 3. Derivatives & Greeks
-        step = 100.0 if "BANK" in sym else (50.0 if "NIFTY" in sym else 100.0)
-        atm_strike = round(spot / step) * step if spot > 0 else 55000.0
-        ce_sym = f"{sym} {int(atm_strike)} CE"
-        pe_sym = f"{sym} {int(atm_strike)} PE"
-        q_ce = {}
-        q_pe = {}
-        try:
-            q_ce = get_live_fallback_quote(ce_sym) or {}
-            q_pe = get_live_fallback_quote(pe_sym) or {}
-        except Exception:
-            pass
-
-        ce_ltp = _val(q_ce.get("ltp"), max(25.0, spot * 0.008))
-        pe_ltp = _val(q_pe.get("ltp"), max(25.0, spot * 0.008))
-        ce_g = {"delta": 0.52, "gamma": 0.00045, "theta": -12.4, "vega": 18.2}
-        pe_g = {"delta": -0.48, "gamma": 0.00045, "theta": -11.8, "vega": 17.9}
-        try:
-            ce_g = bs_greeks(spot, atm_strike, t_years=2.0/365.0, sigma=0.155, opt_type="CE")
-            pe_g = bs_greeks(spot, atm_strike, t_years=2.0/365.0, sigma=0.155, opt_type="PE")
-        except Exception:
-            pass
-
-        # 4. Open Interest & Environmental Factors
-        pcr = 1.18 if "BANK" in sym else 1.05
-        max_pain = atm_strike
-        call_wall = atm_strike + step * 3
-        put_wall = atm_strike - step * 3
-        vix = 13.65
-        news_sentiment = 0.62
-        sm_setup = {}
-        try:
-            sm_setup = LIVE_STOCKMANTRA_SETUPS.get(sym) or LIVE_STOCKMANTRA_SETUPS.get("BANKNIFTY") or {}
-        except Exception:
-            pass
-        sm_signal = str(sm_setup.get("signal") or "BUY CALL").upper()
-
-        # Calculate 5-5-5m historical drift
-        c_len = len(candles)
-        c0 = candles[-1] if c_len >= 1 else {}
-        c1 = candles[-2] if c_len >= 2 else c0
-        c2 = candles[-3] if c_len >= 3 else c1
-        c3 = candles[-4] if c_len >= 4 else c2
-
-        s0 = spot
-        s1 = float(c1.get("close") or (s0 * 0.9985))
-        s2 = float(c2.get("close") or (s0 * 0.9972))
-        s3 = float(c3.get("close") or (s0 * 0.9958))
-
-        raw_metrics = [
-            # Category 1: Spot Price Action & Fundamentals
-            {"name": "Spot Last Traded Price (LTP)", "cat": "Spot Fundamentals", "unit": "₹", "val": s0, "v5": s1, "v10": s2, "v15": s3, "src": "Upstox Live REST & WebSocket"},
-            {"name": "Session Open", "cat": "Spot Fundamentals", "unit": "₹", "val": open_p, "v5": open_p, "v10": open_p, "v15": open_p, "src": "Upstox Live Feed"},
-            {"name": "Day High", "cat": "Spot Fundamentals", "unit": "₹", "val": high_p, "v5": max(high_p, s1), "v10": max(high_p, s2), "v15": high_p, "src": "Upstox Live Feed"},
-            {"name": "Day Low", "cat": "Spot Fundamentals", "unit": "₹", "val": low_p, "v5": min(low_p, s1), "v10": min(low_p, s2), "v15": low_p, "src": "Upstox Live Feed"},
-            {"name": "Previous Close", "cat": "Spot Fundamentals", "unit": "₹", "val": cp, "v5": cp, "v10": cp, "v15": cp, "src": "NSE Official Close"},
-            {"name": "Net Session Change", "cat": "Spot Fundamentals", "unit": "pts", "val": net_chg, "v5": round(s1 - cp, 2), "v10": round(s2 - cp, 2), "v15": round(s3 - cp, 2), "src": "Upstox Live Feed"},
-            {"name": "Percentage Change", "cat": "Spot Fundamentals", "unit": "%", "val": chg_pct, "v5": round((s1 - cp)/cp*100, 2) if cp else 0, "v10": round((s2 - cp)/cp*100, 2) if cp else 0, "v15": round((s3 - cp)/cp*100, 2) if cp else 0, "src": "Upstox Live Feed"},
-            {"name": "Volume Weighted Average Price (VWAP)", "cat": "Spot Fundamentals", "unit": "₹", "val": vwap, "v5": round(vwap * 0.9995, 2), "v10": round(vwap * 0.9990, 2), "v15": round(vwap * 0.9985, 2), "src": "Calculated Live from Ticks"},
-
-            # Category 2: Technical Trend & Moving Averages
-            {"name": "9-Period Exponential Moving Average (EMA 9)", "cat": "Trend & Moving Averages", "unit": "₹", "val": ema9, "v5": round(ema9 * 0.999, 2), "v10": round(ema9 * 0.998, 2), "v15": round(ema9 * 0.997, 2), "src": "Technical Engine (5m Candles)"},
-            {"name": "20-Period Exponential Moving Average (EMA 20)", "cat": "Trend & Moving Averages", "unit": "₹", "val": ema20, "v5": round(ema20 * 0.9992, 2), "v10": round(ema20 * 0.9985, 2), "v15": round(ema20 * 0.9978, 2), "src": "Technical Engine (5m Candles)"},
-            {"name": "50-Period Exponential Moving Average (EMA 50)", "cat": "Trend & Moving Averages", "unit": "₹", "val": ema50, "v5": round(ema50 * 0.9995, 2), "v10": round(ema50 * 0.9990, 2), "v15": round(ema50 * 0.9985, 2), "src": "Technical Engine (5m Candles)"},
-            {"name": "200-Period Exponential Moving Average (EMA 200)", "cat": "Trend & Moving Averages", "unit": "₹", "val": ema200, "v5": round(ema200 * 0.9998, 2), "v10": round(ema200 * 0.9996, 2), "v15": round(ema200 * 0.9994, 2), "src": "Technical Engine (5m Candles)"},
-            {"name": "20-Period Simple Moving Average (SMA 20)", "cat": "Trend & Moving Averages", "unit": "₹", "val": sma20, "v5": round(sma20 * 0.9993, 2), "v10": round(sma20 * 0.9986, 2), "v15": round(sma20 * 0.9980, 2), "src": "Technical Engine (5m Candles)"},
-
-            # Category 3: Momentum & Volatility Indicators
-            {"name": "Relative Strength Index (RSI 14)", "cat": "Momentum & Volatility", "unit": "index", "val": rsi_val, "v5": round(rsi_val - 1.2, 1), "v10": round(rsi_val - 2.1, 1), "v15": round(rsi_val - 3.4, 1), "src": "Technical Engine (RSI 14)"},
-            {"name": "MACD Line", "cat": "Momentum & Volatility", "unit": "pts", "val": macd_val, "v5": round(macd_val - 0.8, 2), "v10": round(macd_val - 1.5, 2), "v15": round(macd_val - 2.2, 2), "src": "12/26 EMA Difference"},
-            {"name": "MACD Signal Line", "cat": "Momentum & Volatility", "unit": "pts", "val": macd_signal, "v5": round(macd_signal - 0.4, 2), "v10": round(macd_signal - 0.9, 2), "v15": round(macd_signal - 1.3, 2), "src": "9 EMA of MACD Line"},
-            {"name": "MACD Histogram", "cat": "Momentum & Volatility", "unit": "pts", "val": macd_hist, "v5": round(macd_hist - 0.4, 2), "v10": round(macd_hist - 0.6, 2), "v15": round(macd_hist - 0.9, 2), "src": "MACD - Signal Delta"},
-            {"name": "Average Directional Index (ADX 14)", "cat": "Momentum & Volatility", "unit": "strength", "val": adx_val, "v5": round(adx_val - 0.6, 1), "v10": round(adx_val - 1.1, 1), "v15": round(adx_val - 1.7, 1), "src": "Trend Strength Engine"},
-            {"name": "+DI Positive Directional Movement", "cat": "Momentum & Volatility", "unit": "index", "val": p_di, "v5": round(p_di - 0.8, 1), "v10": round(p_di - 1.4, 1), "v15": round(p_di - 2.0, 1), "src": "Directional Movement System"},
-            {"name": "-DI Negative Directional Movement", "cat": "Momentum & Volatility", "unit": "index", "val": m_di, "v5": round(m_di + 0.4, 1), "v10": round(m_di + 0.9, 1), "v15": round(m_di + 1.2, 1), "src": "Directional Movement System"},
-            {"name": "Supertrend Indicator (10, 3)", "cat": "Momentum & Volatility", "unit": "₹", "val": supertrend, "v5": round(supertrend * 0.999, 2), "v10": round(supertrend * 0.998, 2), "v15": round(supertrend * 0.997, 2), "src": "ATR Trailing Stop Band"},
-            {"name": "Bollinger Bands Upper Band (+2σ)", "cat": "Momentum & Volatility", "unit": "₹", "val": boll_u, "v5": round(boll_u * 0.9992, 2), "v10": round(boll_u * 0.9985, 2), "v15": round(boll_u * 0.9978, 2), "src": "20 SMA + 2 StdDev"},
-            {"name": "Bollinger Bands Lower Band (-2σ)", "cat": "Momentum & Volatility", "unit": "₹", "val": boll_l, "v5": round(boll_l * 0.9994, 2), "v10": round(boll_l * 0.9988, 2), "v15": round(boll_l * 0.9982, 2), "src": "20 SMA - 2 StdDev"},
-            {"name": "Average True Range (ATR 14)", "cat": "Momentum & Volatility", "unit": "pts", "val": atr_val, "v5": round(atr_val * 0.995, 2), "v10": round(atr_val * 0.992, 2), "v15": round(atr_val * 0.988, 2), "src": "Wilder True Range Volatility"},
-
-            # Category 4: Derivatives, Option Chain & Greeks
-            {"name": "At-The-Money (ATM) Strike", "cat": "Derivatives & Greeks", "unit": "strike", "val": atm_strike, "v5": atm_strike, "v10": atm_strike, "v15": atm_strike, "src": "Upstox Option Chain Matrix"},
-            {"name": f"ATM Call ({ce_sym}) Live LTP", "cat": "Derivatives & Greeks", "unit": "₹", "val": ce_ltp, "v5": round(max(5.0, ce_ltp - 14.5), 2), "v10": round(max(5.0, ce_ltp - 28.0), 2), "v15": round(max(5.0, ce_ltp - 42.0), 2), "src": "Upstox API Live Option Quote"},
-            {"name": f"ATM Put ({pe_sym}) Live LTP", "cat": "Derivatives & Greeks", "unit": "₹", "val": pe_ltp, "v5": round(max(5.0, pe_ltp + 11.2), 2), "v10": round(max(5.0, pe_ltp + 22.4), 2), "v15": round(max(5.0, pe_ltp + 33.6), 2), "src": "Upstox API Live Option Quote"},
-            {"name": "ATM Call Delta (Δ)", "cat": "Derivatives & Greeks", "unit": "delta", "val": ce_g.get("delta", 0.52), "v5": round(float(ce_g.get("delta", 0.52)) - 0.02, 3), "v10": round(float(ce_g.get("delta", 0.52)) - 0.04, 3), "v15": round(float(ce_g.get("delta", 0.52)) - 0.05, 3), "src": "Upstox Live Greeks Engine"},
-            {"name": "ATM Put Delta (Δ)", "cat": "Derivatives & Greeks", "unit": "delta", "val": pe_g.get("delta", -0.48), "v5": round(float(pe_g.get("delta", -0.48)) + 0.02, 3), "v10": round(float(pe_g.get("delta", -0.48)) + 0.04, 3), "v15": round(float(pe_g.get("delta", -0.48)) + 0.05, 3), "src": "Upstox Live Greeks Engine"},
-            {"name": "ATM Gamma (Γ)", "cat": "Derivatives & Greeks", "unit": "gamma", "val": ce_g.get("gamma", 0.0004), "v5": ce_g.get("gamma", 0.0004), "v10": ce_g.get("gamma", 0.0004), "v15": ce_g.get("gamma", 0.0004), "src": "Upstox Live Greeks Engine"},
-            {"name": "ATM Daily Theta Decay (Θ)", "cat": "Derivatives & Greeks", "unit": "₹/day", "val": ce_g.get("theta", -12.0), "v5": round(float(ce_g.get("theta", -12.0)) * 0.98, 2), "v10": round(float(ce_g.get("theta", -12.0)) * 0.96, 2), "v15": round(float(ce_g.get("theta", -12.0)) * 0.94, 2), "src": "Upstox Live Greeks Engine"},
-            {"name": "ATM Vega Volatility Sensitivity", "cat": "Derivatives & Greeks", "unit": "₹/1% IV", "val": ce_g.get("vega", 18.0), "v5": ce_g.get("vega", 18.0), "v10": ce_g.get("vega", 18.0), "v15": ce_g.get("vega", 18.0), "src": "Upstox Live Greeks Engine"},
-            {"name": "Implied Volatility (IV)", "cat": "Derivatives & Greeks", "unit": "%", "val": 15.5, "v5": 15.6, "v10": 15.7, "v15": 15.8, "src": "Upstox Live Option Chain"},
-            {"name": "Put-Call Ratio (PCR)", "cat": "Derivatives & Greeks", "unit": "ratio", "val": pcr, "v5": round(pcr - 0.04, 2), "v10": round(pcr - 0.07, 2), "v15": round(pcr - 0.11, 2), "src": "Option Chain Total OI Ratio"},
-            {"name": "Max Pain Strike", "cat": "Derivatives & Greeks", "unit": "strike", "val": max_pain, "v5": max_pain, "v10": max_pain, "v15": max_pain, "src": "Option Chain Open Interest Distribution"},
-            {"name": "Major Call Resistance Wall Strike", "cat": "Derivatives & Greeks", "unit": "strike", "val": call_wall, "v5": call_wall, "v10": call_wall, "v15": call_wall, "src": "Highest Cumulative Call OI Strike"},
-            {"name": "Major Put Support Wall Strike", "cat": "Derivatives & Greeks", "unit": "strike", "val": put_wall, "v5": put_wall, "v10": put_wall, "v15": put_wall, "src": "Highest Cumulative Put OI Strike"},
-
-            # Category 5: Macro & Market Environment Factors
-            {"name": "India VIX Volatility Benchmark", "cat": "Macro & Sentiment", "unit": "%", "val": vix, "v5": 13.72, "v10": 13.80, "v15": 13.88, "src": "NSE VIX Real-Time Index"},
-            {"name": "Financial News Sentiment Score", "cat": "Macro & Sentiment", "unit": "score", "val": news_sentiment, "v5": 0.58, "v10": 0.52, "v15": 0.45, "src": "GNews & Top Headlines Multi-Feed"},
-            {"name": "Stock Mantra Live Directional Bias", "cat": "Macro & Sentiment", "unit": "signal", "val": sm_signal, "v5": sm_signal, "v10": sm_signal, "v15": sm_signal, "src": "Telegram @stockmantraindex Stream"},
-            {"name": "Unified Confluence Conviction Score", "cat": "Macro & Sentiment", "unit": "score", "val": 78.4, "v5": 72.0, "v10": 65.5, "v15": 58.0, "src": "Calibrated Recommendation Model"}
+        snaps = []
+        for back in range(4):  # now, -5m, -10m, -15m
+            cs = candles[: len(candles) - back] if back else candles
+            ta = technical_analysis(cs) if len(cs) >= 30 else {}
+            model = SIGNAL_MODEL.evaluate(cs) if len(cs) >= 60 else {"available": False}
+            snaps.append({"ta": ta, "model": model, "close": float(cs[-1]["close"]) if cs else None,
+                          "time": str(cs[-1].get("timestamp")) if cs else None})
+        macd = lambda t, k: (t.get("macd") or {}).get(k) if isinstance(t.get("macd"), dict) else (t.get("macd") if k == "macd" else None)
+        rows = [
+            ("Last traded price", "Spot", "₹", lambda s: s["close"], "Upstox 5m candle close"),
+            ("VWAP", "Spot", "₹", lambda s: s["ta"].get("vwap"), "Computed from Upstox 5m candles"),
+            ("EMA 9", "Trend", "₹", lambda s: s["ta"].get("ema9"), "Computed from Upstox 5m candles"),
+            ("EMA 20", "Trend", "₹", lambda s: s["ta"].get("ema20"), "Computed from Upstox 5m candles"),
+            ("EMA 50", "Trend", "₹", lambda s: s["ta"].get("ema50"), "Computed from Upstox 5m candles"),
+            ("RSI 14", "Momentum", "index", lambda s: s["ta"].get("rsi"), "Computed from Upstox 5m candles"),
+            ("MACD line", "Momentum", "pts", lambda s: macd(s["ta"], "macd"), "Computed from Upstox 5m candles"),
+            ("MACD histogram", "Momentum", "pts", lambda s: macd(s["ta"], "histogram"), "Computed from Upstox 5m candles"),
+            ("ADX 14", "Momentum", "strength", lambda s: s["ta"].get("adx"), "Computed from Upstox 5m candles"),
+            ("ATR 14", "Volatility", "pts", lambda s: s["ta"].get("atr"), "Computed from Upstox 5m candles"),
+            ("Signal score", "Model", "score", lambda s: s["model"].get("score"), "CA Trader signal model (weighted factors)"),
         ]
-
+        factor_keys = list(SIGNAL_MODEL.FACTOR_INFO)
+        for fk in factor_keys:
+            name = SIGNAL_MODEL.FACTOR_INFO[fk][0]
+            rows.append((f"Factor · {name}", "Model", "points",
+                         (lambda key: (lambda s: next((r["points"] for r in (s["model"].get("rows") or []) if r["key"] == key), None)))(fk),
+                         "CA Trader signal model"))
         items = []
-        for m in raw_metrics:
-            v_now = m["val"]
-            v_5m = m["v5"]
-            v_10m = m["v10"]
-            v_15m = m["v15"]
-            delta_5m = round(float(v_now) - float(v_5m), 2) if isinstance(v_now, (int, float)) and isinstance(v_5m, (int, float)) else 0.0
-            is_updating = bool(v_now != v_5m or v_5m != v_10m or v_10m != v_15m or isinstance(v_now, (int, float)))
-            
-            items.append({
-                "name": m["name"],
-                "category": m["cat"],
-                "unit": m["unit"],
-                "val_now": v_now,
-                "val_5m": v_5m,
-                "val_10m": v_10m,
-                "val_15m": v_15m,
-                "delta_5m": delta_5m,
-                "is_updating": is_updating,
-                "pulse_status": "LIVE · ACTIVE 🟢" if is_updating else "STABLE ⚪",
-                "primary_source": m["src"],
-                "third_party_sources": ["Upstox REST API", "Upstox WebSocket Feed", "Yahoo Finance Live", "NSE India Official Feed"],
-                "verification_status": "VERIFIED CONCORDANT ✓",
-                "verified_by_agent": "a4 (Zero-Mock Guard) & a16 (Data Inspector)",
-                "updated_at": now_ts
-            })
+        for name, cat, unit, fn, src in rows:
+            vals = []
+            for sn in snaps:
+                try:
+                    v = fn(sn)
+                    vals.append(round(float(v), 4) if v is not None else None)
+                except Exception:
+                    vals.append(None)
+            items.append({"name": name, "category": cat, "unit": unit, "val_now": vals[0], "val_5m": vals[1], "val_10m": vals[2], "val_15m": vals[3],
+                          "delta_5m": round(vals[0] - vals[1], 4) if (vals[0] is not None and vals[1] is not None) else None,
+                          "primary_source": src, "as_of": [sn["time"] for sn in snaps]})
+        # Live-only values (no history kept): quote fields, India VIX, option chain aggregates
+        live = [("Previous close", "Spot", "₹", quote.get("cp"), "Upstox quote"), ("Day high", "Spot", "₹", quote.get("high"), "Upstox quote"),
+                ("Day low", "Spot", "₹", quote.get("low"), "Upstox quote"), ("Change %", "Spot", "%", quote.get("change_pct"), "Upstox quote")]
+        try:
+            vq = UPSTOX.quote("NSE_INDEX|India VIX")
+            live.append(("India VIX", "Volatility", "index", vq.get("ltp"), "Upstox quote"))
+        except Exception:
+            pass
+        if sym in {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"}:
+            try:
+                ch = UPSTOX.option_chain(sym)
+                st = ch.get("strikes") or []
+                spot = float(ch.get("spot") or 0)
+                if st and spot:
+                    atm = min(st, key=lambda r: abs(float(r["strike"]) - spot))
+                    coi = sum(float((r.get("call") or {}).get("oi") or 0) for r in st); poi = sum(float((r.get("put") or {}).get("oi") or 0) for r in st)
+                    for label, val in (("ATM strike", atm["strike"]), ("ATM call LTP", (atm.get("call") or {}).get("ltp")), ("ATM put LTP", (atm.get("put") or {}).get("ltp")),
+                                       ("ATM call IV", (atm.get("call") or {}).get("iv")), ("ATM put IV", (atm.get("put") or {}).get("iv")),
+                                       ("ATM call delta", (atm.get("call") or {}).get("delta")), ("PCR (OI)", round(poi / coi, 3) if coi else None)):
+                        live.append((label, "Options", "", val, f"Upstox option chain · expiry {ch.get('expiry')}"))
+            except Exception:
+                pass
+        for name, cat, unit, val, src in live:
+            items.append({"name": name, "category": cat, "unit": unit, "val_now": val, "val_5m": None, "val_10m": None, "val_15m": None,
+                          "delta_5m": None, "primary_source": src, "as_of": [now_ist.isoformat()]})
+        missing = sum(1 for it in items if it["val_now"] is None)
+        return {"ok": True, "instrument": sym, "timestamp": now_ist.strftime("%d %b %Y %H:%M:%S IST"), "total_items_monitored": len(items),
+                "values_missing": missing, "candles_used": len(candles), "items": items}
 
-        return {
-            "ok": True,
-            "instrument": sym,
-            "timestamp": now_ist.strftime("%d %b %Y %H:%M:%S IST"),
-            "total_items_monitored": len(items),
-            "upstox_live_status": "100% LIVE FEED CONNECTED",
-            "hardcoding_detected": 0,
-            "black_scholes_synthetic_ltp": 0,
-            "third_party_sources_verified": 4,
-            "overall_verification": "100% PARITY & CONCORDANCE VERIFIED",
-            "items": items
-        }
-    except Exception as exc:
-        log.exception("get_live_data_inspector error: %s", exc)
-        return {"ok": False, "error": str(exc), "total_items_monitored": 0, "items": []}
+    return await asyncio.to_thread(build)
 
 # ==============================================================================
 # 🤖 MULTI-AGENT UI SENTINEL AUDIT & TELEGRAM DISPATCH API
@@ -19763,790 +18193,157 @@ def get_historical_candle_for_date(symbol: str, target_date_str: str) -> dict[st
 
 class BacktestRequest(BaseModel):
     symbol: str = "BANKNIFTY"
-    date: str = "2026-08-21"
+    date: str = ""
+
+
+MCX_ROOTS = {"CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "COPPER", "ZINC", "LEAD", "ALUMINIUM"}
+
+
+def replay_signals_for_day(symbol: str, day: date, max_signals: int = 10, step_minutes: int = 5) -> dict[str, Any]:
+    """Point-in-time replay on real Upstox 1-minute candles.
+
+    Every `step_minutes` the signal model is run on 5m candles built only from data up to that minute. A signal is
+    recorded when the decision turns BUY or SELL. Levels are set on the underlying (SL = 1 ATR, target = 1.5 ATR) and
+    the outcome is read from the candles that follow: target first, stop first, or exit at session end."""
+    root = extract_root_symbol(symbol).upper()
+    try:
+        c1 = UPSTOX.candles_between(root, "1", "minutes", day - timedelta(days=6), day)
+    except Exception as exc:
+        return {"ok": False, "symbol": root, "date": day.isoformat(), "error": f"Upstox candles unavailable: {safe_text(exc)}", "items": []}
+    def ts(c):
+        return datetime.fromisoformat(str(c["timestamp"])).astimezone(IST)
+    day_rows = [c for c in c1 if ts(c).date() == day]
+    if len(day_rows) < 30:
+        return {"ok": False, "symbol": root, "date": day.isoformat(), "error": "Upstox has no intraday candles for this date (holiday, weekend or too old)", "items": []}
+    start = ts(day_rows[0]) + timedelta(minutes=15)
+    end = ts(day_rows[-1]) - timedelta(minutes=10)
+    items, prev, t = [], "NO_TRADE", start
+    while t <= end and len(items) < max_signals:
+        upto = [c for c in c1 if ts(c) <= t]
+        model = SIGNAL_MODEL.evaluate(resample_candles_to_tf(upto, 5))
+        dec = model.get("decision") if model.get("available") else "NO_TRADE"
+        if dec in {"BUY", "SELL"} and dec != prev:
+            entry = float(upto[-1]["close"]); atr = float(model["raw"]["atr"])
+            sgn = 1 if dec == "BUY" else -1
+            sl, tgt = entry - sgn * atr, entry + sgn * 1.5 * atr
+            outcome, exit_px, exit_t = "Exit at session end", float(day_rows[-1]["close"]), ts(day_rows[-1])
+            for c in day_rows:
+                if ts(c) <= t:
+                    continue
+                hi, lo = float(c["high"]), float(c["low"])
+                hit_t = (hi >= tgt) if sgn > 0 else (lo <= tgt)
+                hit_s = (lo <= sl) if sgn > 0 else (hi >= sl)
+                if hit_s:
+                    outcome, exit_px, exit_t = "SL Hit", sl, ts(c); break
+                if hit_t:
+                    outcome, exit_px, exit_t = "Target Achieved", tgt, ts(c); break
+            pts = round((exit_px - entry) * sgn, 2)
+            items.append({
+                "id": f"bt_{root}_{day.isoformat()}_{t.strftime('%H%M')}",
+                "time": t.strftime("%H:%M"), "date": day.isoformat(), "symbol": root, "underlying": root,
+                "recommendation": dec, "entry": round(entry, 2), "target": round(tgt, 2), "target2": None, "stop_loss": round(sl, 2),
+                "outcome": outcome, "exit_time": exit_t.strftime("%H:%M"), "final_pnl": pts, "pnl_unit": "underlying points",
+                "success": 1 if pts > 0 else 0, "score": model["score"],
+                "basis": {"time": t.strftime("%H:%M"), "no_lookahead": f"Model saw Upstox candles up to {t.strftime('%H:%M')} IST only",
+                          "score": model["score"], "gate": model["gate"], "factors": model["rows"]},
+            })
+        prev = dec
+        t += timedelta(minutes=step_minutes)
+    wins = sum(i["success"] for i in items)
+    return {"ok": True, "symbol": root, "date": day.isoformat(), "count": len(items), "items": items, "recommendations": items,
+            "summary": {"total_trades": len(items), "wins": wins, "win_rate": round(wins / len(items) * 100, 1) if items else None,
+                        "total_points": round(sum(i["final_pnl"] for i in items), 2)},
+            "method": "Signal model replayed every %d minutes on Upstox 1m candles; SL 1×ATR, target 1.5×ATR on the underlying" % step_minutes,
+            "calibration": SIGNAL_MODEL.load_calibration().get("version")}
+
+
+def _store_backtest_items(user_id: int, items: list[dict[str, Any]]) -> None:
+    for it in items:
+        try:
+            db_exec(
+                "INSERT OR REPLACE INTO recommendations(id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, score, outcome, final_pnl, success, status, created_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                [it["id"], user_id, "backtest", it["symbol"], it["underlying"], it["recommendation"], "5m", it["entry"], it["target"], it["stop_loss"],
+                 f"Replay {it['date']} {it['time']}: score {it['score']:+.1f} → {it['recommendation']}; {it['outcome']} at {it['exit_time']} ({it['final_pnl']:+.2f} pts)",
+                 json.dumps(it["basis"], default=str), it["score"], it["outcome"], it["final_pnl"], it["success"], "COMPLETED", f"{it['date']}T{it['time']}:00"]
+            )
+        except Exception as exc:
+            log.debug("backtest store failed for %s: %s", it.get("id"), safe_text(exc))
+
+
+def _parse_day(s: str | None) -> date:
+    """Requested date, or the most recent weekday before today when none is given."""
+    if s and str(s).strip().lower() not in {"none", "null", ""}:
+        try:
+            return datetime.strptime(normalize_date_str(str(s).strip()), "%Y-%m-%d").date()
+        except Exception:
+            pass
+    d = datetime.now(IST).date() - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
 
 @app.post("/api/recommendations/backtest")
 async def generate_backtest_recommendations(payload: BacktestRequest, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    raw_sym = str(payload.symbol or "BANKNIFTY").upper().strip()
-    root = raw_sym.replace("FUT", "").replace("EXP", "").strip() or "BANKNIFTY"
-    date_str = str(payload.date or "2026-08-21").strip()
-    
-    setups_spec = [
-        {"time": "09:25", "desc": "Morning Opening Range Breakout / Pullback Confirmation", "bias": "BUY_CALL"},
-        {"time": "10:30", "desc": "Post-Open Liquidity Expansion & Institutional VWAP Retest", "bias": "BUY_CALL"},
-        {"time": "12:15", "desc": "Midday Consolidation / Mean-Reversion Pivot", "bias": "BUY_CALL"},
-        {"time": "13:40", "desc": "European Cues & Institutional Volume Build-up", "bias": "BUY_CALL"},
-        {"time": "14:50", "desc": "Closing Session Squeeze & Institutional MOC Flow", "bias": "BUY_CALL"}
-    ]
-    
-    hist_candle = get_historical_candle_for_date(root, date_str)
-    if hist_candle:
-        base_spot = float(hist_candle["close"] or hist_candle["open"] or 57550.0)
-    else:
-        base_spot = 57550.0 if "BANK" in root else (24450.0 if "NIFTY" in root else (6300.0 if "CRUDE" in root else 1450.0))
-    step = 100 if "BANK" in root else (50 if "NIFTY" in root else (50 if "CRUDE" in root else 10))
-    lot_size = 15 if "BANK" in root else (25 if "NIFTY" in root else (100 if "CRUDE" in root else 250))
-    atm_strike = int(round(base_spot / step) * step)
-    
-    generated = []
-    for idx, s in enumerate(setups_spec):
-        t = s["time"]
-        is_ce = s["bias"] == "BUY_CALL"
-        strike = atm_strike + ((idx - 2) * step)
-        opt_type = "CE" if is_ce else "PE"
-        opt_sym = f"{root} {strike} {opt_type}"
-        
-        base_prem = round(320.0 + (idx * 25.0), 2) if "BANK" in root else round(145.0 + (idx * 12.0), 2)
-        entry = round(base_prem * 0.96, 2)
-        sl = round(entry * 0.85, 2)
-        tgt1 = round(entry + 1.8 * (entry - sl), 2)
-        tgt2 = round(entry + 3.2 * (entry - sl), 2)
-        
-        if idx in (0, 3):
-            outcome_val = "Target Hit"
-            pnl_val = round((tgt1 - entry) * lot_size, 2)
-            success_val = 1
-        elif idx == 1:
-            outcome_val = "Trailing SL"
-            pnl_val = round((entry * 1.05 - entry) * lot_size, 2)
-            success_val = 1
-        else:
-            outcome_val = "Active Trailing"
-            pnl_val = round((entry * 1.02 - entry) * lot_size, 2)
-            success_val = 1
-            
-        reco_id = f"bt_{secrets.token_hex(8)}"
-        created_dt = f"{date_str}T{t}:00"
-        
-        basis_info = {
-            "time": t,
-            "technicals": "VWAP holding above pivot. RSI 58.4 indicating bullish momentum. 20-EMA slope positive on 5m chart.",
-            "global_factors": "US futures trading +0.35% higher. Asian benchmarks constructive with crude oil stabilizing.",
-            "prior_day_ohlc": "Previous day produced higher-high higher-low structure. Close was near day's upper quartile.",
-            "candle_patterns": "Bullish hammer followed by clean confirmation candle on 5m timeframe.",
-            "news_basis": f"RBI liquidity report and strong advance tax receipts (+22.4% YoY) supporting institutional banking demand.",
-            "no_lookahead": f"Evaluated strictly using data available up to {t} IST without seeing subsequent price movement.",
-            "outcome_result": f"{outcome_val} (P&L: ₹{pnl_val:,.2f})"
-        }
-        
-        rationale_text = f"[{date_str} {t} IST - No Lookahead Bias] {s['desc']}. Tech: VWAP bounce & EMA confirmation. News: Banking tax inflows. Pattern: Bullish continuation."
-        
-        db_exec("""
-            INSERT INTO recommendations(id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, score, outcome, final_pnl, success, instrument_kind, option_side, option_strike, status, created_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, [
-            reco_id, user["id"], "backtest", opt_sym, root, "BUY", "5m", entry, tgt1, sl,
-            rationale_text, json.dumps(basis_info), 86.5, outcome_val, pnl_val, success_val,
-            "OPTION", opt_type, strike, "COMPLETED", created_dt
-        ])
-        
-        generated.append({
-            "id": reco_id,
-            "time": t,
-            "date": date_str,
-            "symbol": opt_sym,
-            "underlying": root,
-            "recommendation": "BUY",
-            "entry": entry,
-            "target": tgt1,
-            "target2": tgt2,
-            "stop_loss": sl,
-            "outcome": outcome_val,
-            "final_pnl": pnl_val,
-            "success": success_val,
-            "basis": basis_info
-        })
-        
-    return {"ok": True, "count": len(generated), "symbol": root, "date": date_str, "items": generated, "recommendations": generated}
-
-
-# ===========================================================================
-# 🚀 100-Trade Recommendation Backtest & Performance Audit Engine
-# ===========================================================================
-
-def generate_100_trade_recommendation_backtest(
-    symbol: str = "BANKNIFTY",
-    timeframe: str = "5m",
-    count: int = 100,
-    user_id: int = 1
-) -> dict[str, Any]:
-    raw_sym = str(symbol or "BANKNIFTY").upper().strip()
-    root = raw_sym.replace("FUT", "").replace("EXP", "").strip() or "BANKNIFTY"
-    count = max(10, min(200, int(count or 100)))
-
-    if "BANK" in root:
-        base_spot = 54450.0
-        step = 100
-        lot_size = 15
-        base_prem_range = (280.0, 460.0)
-    elif "CRUDE" in root:
-        base_spot = 6300.0
-        step = 50
-        lot_size = 100
-        base_prem_range = (80.0, 140.0)
-    elif "NIFTY" in root:
-        base_spot = 24500.0
-        step = 50
-        lot_size = 25
-        base_prem_range = (110.0, 210.0)
-    elif "RELIANCE" in root:
-        base_spot = 2950.0
-        step = 20
-        lot_size = 250
-        base_prem_range = (45.0, 95.0)
-    elif "TCS" in root:
-        base_spot = 4200.0
-        step = 50
-        lot_size = 175
-        base_prem_range = (65.0, 130.0)
-    else:
-        base_spot = 1200.0
-        step = 20
-        lot_size = 100
-        base_prem_range = (25.0, 60.0)
-
-    setups_patterns = [
-        ("Morning Opening Range Breakout (ORB)", "09:25", "BUY_CALL", "Price broke 15m initial balance high with 2.8x volume expansion and positive order flow delta.", 15),
-        ("Institutional VWAP Retest & Hold", "10:15", "BUY_CALL", "Price successfully held rising VWAP and 20-EMA dynamic support node; Call writing unwinding.", 20),
-        ("Midday Mean-Reversion Squeeze", "11:40", "BUY_CALL", "RSI divergence above 45 pivot on 15m; absorption of aggressive market sell orders at support.", 25),
-        ("European Cues Trend Continuation", "13:15", "BUY_CALL", "European indices opened positive (+0.6%); banking heavyweights triggered multi-candle surge.", 15),
-        ("Closing Session MOC Institutional Sweep", "14:40", "BUY_CALL", "Market-on-Close institutional block buying; strong delivery absorption into the bell.", 30),
-        ("Key Resistance Rejection Breakdown", "10:50", "BUY_PUT", "Failed breakout at session high with long upper wick; RSI rolled under 50 with heavy Call writing.", 15),
-        ("Bearish Trend Continuation / Breakdown", "12:30", "BUY_PUT", "Broke under 50-EMA support node; aggressive Put buying with expanding IV.", 20),
-        ("Afternoon Liquidity Hunt Reversal", "14:10", "BUY_CALL", "Brief stop hunt below morning low followed by immediate institutional engulfing green candle.", 20),
-    ]
-
-    now = datetime.now(IST)
-    trading_days = []
-    curr = now.date()
-    while len(trading_days) < 24:
-        curr -= timedelta(days=1)
-        if curr.weekday() < 5:
-            trading_days.append(curr.isoformat())
-
-    trades = []
-    cum_pnl = 0.0
-    wins = 0
-    losses = 0
-    gross_profit = 0.0
-    gross_loss = 0.0
-    peak_pnl = 0.0
-    max_drawdown = 0.0
-    equity_curve = []
-    target_counts = {"target_1": 0, "target_2": 0, "target_3_runner": 0, "stop_loss": 0}
-
-    try:
-        db_exec("DELETE FROM recommendations WHERE user_id=? AND source='backtest_100' AND underlying=?", [user_id, root])
-    except Exception:
-        pass
-
-    for i in range(1, count + 1):
-        day_idx = (i - 1) // 5
-        slot_idx = (i - 1) % 5
-        date_str = trading_days[min(day_idx, len(trading_days) - 1)]
-
-        pat_idx = (i * 3 + slot_idx) % len(setups_patterns)
-        name, t_str, bias, rationale_desc, duration = setups_patterns[pat_idx]
-
-        is_buy = (bias == "BUY_CALL")
-        side = "BUY" if is_buy else "SELL"
-
-        drift = ((i % 7) - 3) * (step * 0.4)
-        spot_price = round(base_spot + drift, 2)
-        entry_price = spot_price
-
-        # Underlying points ATR and risk calculation
-        atr_val = round(max(30.0, base_spot * 0.0035), 1)
-        risk_pts = round(atr_val * 0.65, 1)
-
-        if side == "BUY":
-            sl_price = round(entry_price - risk_pts, 2)
-            tgt1 = round(entry_price + (risk_pts * 1.5), 2)
-            tgt2 = round(entry_price + (risk_pts * 2.5), 2)
-            tgt3 = round(entry_price + (risk_pts * 4.0), 2)
-        else:
-            sl_price = round(entry_price + risk_pts, 2)
-            tgt1 = round(entry_price - (risk_pts * 1.5), 2)
-            tgt2 = round(entry_price - (risk_pts * 2.5), 2)
-            tgt3 = round(entry_price - (risk_pts * 4.0), 2)
-
-        is_loss = (i in (11, 23, 37, 49, 58, 69, 78, 86, 95))
-
-        if is_loss:
-            outcome = "Stop Loss Hit"
-            exit_price = sl_price
-            pts = -risk_pts
-            pnl = round(pts * lot_size, 2)
-            losses += 1
-            gross_loss += abs(pnl)
-            target_counts["stop_loss"] += 1
-            success = 0
-            exit_reason = f"Volatility wick swept support by {round(risk_pts * 0.15, 1)} pts before stabilizing."
-        else:
-            wins += 1
-            success = 1
-            outcome_tier = (i % 10)
-            if outcome_tier in (1, 4):
-                outcome = "Target 3 (Runner Hit)"
-                exit_price = tgt3
-                pts = round((exit_price - entry_price) if side == "BUY" else (entry_price - exit_price), 2)
-                target_counts["target_3_runner"] += 1
-            elif outcome_tier in (2, 5, 8):
-                outcome = "Target 2 Hit"
-                exit_price = tgt2
-                pts = round((exit_price - entry_price) if side == "BUY" else (entry_price - exit_price), 2)
-                target_counts["target_2"] += 1
-            else:
-                outcome = "Target 1 Hit"
-                exit_price = tgt1
-                pts = round((exit_price - entry_price) if side == "BUY" else (entry_price - exit_price), 2)
-                target_counts["target_1"] += 1
-
-            pnl = round(pts * lot_size, 2)
-            gross_profit += pnl
-            exit_reason = f"Institutional momentum expanded directly through target within {duration} minutes."
-
-        cum_pnl = round(cum_pnl + pnl, 2)
-        if cum_pnl > peak_pnl:
-            peak_pnl = cum_pnl
-        drawdown = round(peak_pnl - cum_pnl, 2)
-        if drawdown > max_drawdown:
-            max_drawdown = drawdown
-
-        reco_id = f"bt100_{root}_{i:03d}_{secrets.token_hex(4)}"
-        created_at = f"{date_str}T{t_str}:00"
-        dur_hrs = duration // 60
-        dur_mins = duration % 60
-        exit_dt = f"{date_str}T{t_str}"
-
-        tech_basis = {
-            "setup_name": name,
-            "underlying": root,
-            "side": side,
-            "spot_at_entry": spot_price,
-            "entry_time": t_str,
-            "duration_mins": duration,
-            "indicators": {
-                "vwap_confluence": "Price trading above VWAP" if is_buy else "Price rejected below VWAP",
-                "ema_structure": "20-EMA > 50-EMA Bullish Stack" if is_buy else "20-EMA < 50-EMA Bearish Stack",
-                "rsi_14": 58.5 if is_buy else 42.1,
-                "atr_14": round(risk_pts * 0.8, 2),
-                "supertrend": "GREEN (Bullish)" if is_buy else "RED (Bearish)"
-            },
-            "order_flow": {
-                "institutional_bias": "Positive Cumulative Delta" if is_buy else "Institutional Selling Delta",
-                "pcr_ratio": 1.18 if is_buy else 0.82
-            },
-            "rationale": rationale_desc,
-            "exit_reason": exit_reason
-        }
-
-        trade_item = {
-            "trade_num": i,
-            "id": reco_id,
-            "date": date_str,
-            "time": t_str,
-            "created_at": created_at,
-            "exit_at": exit_dt,
-            "symbol": root,
-            "underlying": root,
-            "contract": root,
-            "side": side,
-            "entry": entry_price,
-            "exit_price": exit_price,
-            "target": tgt1,
-            "target2": tgt2,
-            "target3": tgt3,
-            "stop_loss": sl_price,
-            "risk_reward": "1:2.0",
-            "outcome": outcome,
-            "points": pts,
-            "pnl": pnl,
-            "cumulative_pnl": cum_pnl,
-            "success": success,
-            "duration": f"{duration}m",
-            "setup": name,
-            "basis": tech_basis
-        }
-        trades.append(trade_item)
-        equity_curve.append({
-            "trade": i,
-            "pnl": pnl,
-            "cumulative_pnl": cum_pnl,
-            "win": bool(success == 1),
-            "date": date_str
-        })
-
-        try:
-            db_exec("""
-                INSERT INTO recommendations(id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, score, outcome, final_pnl, success, instrument_kind, option_side, option_strike, status, created_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, [
-                reco_id, user_id, "backtest_100", root, root, side, timeframe, entry_price, tgt1, sl_price,
-                f"[{date_str} {t_str} IST - 100-Trade Backtest] {name}. {rationale_desc}",
-                json.dumps(tech_basis), 91.5, outcome, pnl, success, "INDEX", side, None, "COMPLETED", created_at
-            ])
-        except Exception:
-            pass
-
-    win_rate = round((wins / count) * 100, 1)
-    profit_factor = round(gross_profit / max(1.0, gross_loss), 2)
-    avg_win = round(gross_profit / max(1, wins), 2)
-    avg_loss = round(gross_loss / max(1, losses), 2)
-    max_dd_pct = round((max_drawdown / max(1.0, peak_pnl)) * 100, 1) if peak_pnl > 0 else 0.0
-    expectancy = round(cum_pnl / count, 2)
-
-    summary = {
-        "symbol": root,
-        "timeframe": timeframe,
-        "total_trades": count,
-        "wins": wins,
-        "losses": losses,
-        "win_rate": win_rate,
-        "total_pnl": cum_pnl,
-        "gross_profit": round(gross_profit, 2),
-        "gross_loss": round(gross_loss, 2),
-        "profit_factor": profit_factor,
-        "max_drawdown": max_drawdown,
-        "max_drawdown_pct": max_dd_pct,
-        "avg_win": avg_win,
-        "avg_loss": avg_loss,
-        "risk_reward": "1:2.0",
-        "expectancy": expectancy,
-        "target_breakdown": target_counts,
-        "date_range": f"{trading_days[-1]} to {trading_days[0]}",
-        "lot_size": lot_size
-    }
-
-    return {
-        "ok": True,
-        "symbol": root,
-        "timeframe": timeframe,
-        "summary": summary,
-        "trades": trades,
-        "equity_curve": equity_curve
-    }
-
-
-class Backtest100Request(BaseModel):
-    symbol: str = "BANKNIFTY"
-    timeframe: str = "5m"
-    count: int = 100
+    day = _parse_day(payload.date)
+    res = await asyncio.to_thread(replay_signals_for_day, payload.symbol or "BANKNIFTY", day)
+    if res.get("items"):
+        await asyncio.to_thread(_store_backtest_items, user["id"], res["items"])
+    return res
 
 
 @app.get("/api/backtest/100-trades")
 @app.post("/api/backtest/100-trades")
-async def api_backtest_100_trades(
-    request: Request,
-    symbol: str | None = None,
-    timeframe: str | None = None,
-    count: int | None = None,
-    user: dict[str, Any] = Depends(require_user)
-) -> dict[str, Any]:
-    req_body = {}
+async def api_backtest_100_trades(request: Request, symbol: str | None = None, timeframe: str | None = None, count: int | None = None,
+                                  user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Replays recent sessions (newest first) until `count` signals are collected or 25 sessions are scanned."""
+    body = {}
     if request.method == "POST":
         try:
-            req_body = await request.json()
+            body = await request.json()
         except Exception:
-            req_body = {}
-    sym = symbol or req_body.get("symbol") or request.query_params.get("symbol") or "BANKNIFTY"
-    tf = timeframe or req_body.get("timeframe") or request.query_params.get("timeframe") or "5m"
-    cnt = count or req_body.get("count") or request.query_params.get("count") or 100
-    uid = user.get("id", 1) if isinstance(user, dict) else 1
+            body = {}
+    sym = symbol or body.get("symbol") or request.query_params.get("symbol") or "BANKNIFTY"
+    want = int(count or body.get("count") or request.query_params.get("count") or 100)
 
-    result = await asyncio.to_thread(generate_100_trade_recommendation_backtest, sym, tf, cnt, uid)
-    return result
-
-
-# ===========================================================================
-# 📅 Recommendations for Particular Date Engine (ChatGPT & MCP Integration)
-# ===========================================================================
-
-def get_recommendations_for_date_engine(
-    date_str: str,
-    symbol: str = "BANKNIFTY",
-    timeframe: str = "5m",
-    user_id: int = 1,
-    limit: int = 10
-) -> dict[str, Any]:
-    raw_sym = str(symbol or "BANKNIFTY").upper().strip()
-    root = raw_sym.replace("FUT", "").replace("EXP", "").strip() or "BANKNIFTY"
-    clean_date = normalize_date_str(date_str)
-    
-    # 1. Fetch real historical market data for root and date
-    hist_candle = get_historical_candle_for_date(root, clean_date)
-    if hist_candle:
-        open_p = float(hist_candle.get("open") or 57560.3)
-        high_p = float(hist_candle.get("high") or (open_p + 205.9))
-        low_p = float(hist_candle.get("low") or (open_p - 400.0))
-        close_p = float(hist_candle.get("close") or open_p)
-    else:
-        open_p = 57560.3 if "BANK" in root else (24500.0 if "NIFTY" in root else 6300.0)
-        high_p = open_p + (205.95 if "BANK" in root else 95.0)
-        low_p = open_p - (409.6 if "BANK" in root else 120.0)
-        close_p = open_p - (150.7 if "BANK" in root else 30.0)
-
-    step = 100 if "BANK" in root else (50 if "NIFTY" in root else 50)
-    lot_size = 15 if "BANK" in root else (25 if "NIFTY" in root else 100)
-    atm_strike = int(round(open_p / step) * step)
-
-    # 2. Check if we already have point-in-time rows for this exact date in SQLite
-    existing = []
-    try:
-        rows = db_exec(
-            "SELECT id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, score, outcome, final_pnl, success, exit_reason, created_at, status "
-            "FROM recommendations WHERE (underlying=? OR symbol LIKE ?) AND created_at LIKE ? ORDER BY created_at ASC",
-            [root, f"%{root}%", f"{clean_date}%"],
-            "all"
-        ) or []
-        for r in rows:
-            basis_val = r.get("technical_basis")
-            if isinstance(basis_val, str) and basis_val.startswith("{"):
-                try:
-                    r["recommendation_before_outcome"] = json.loads(basis_val)
-                except Exception:
-                    pass
-            created_t = str(r.get("created_at") or "")
-            t_str = created_t.split("T")[-1][:5] if "T" in created_t else "09:20"
-            r["time"] = f"{t_str} IST"
-            if not r.get("outcome_after_execution"):
-                r["outcome_after_execution"] = {
-                    "status": str(r.get("status") or "COMPLETED"),
-                    "outcome": str(r.get("outcome") or "Target Achieved"),
-                    "final_pnl": float(r.get("final_pnl") or 0.0),
-                    "success": int(r.get("success") or 0),
-                    "exit_reason": str(r.get("exit_reason") or r.get("outcome") or "Target achieved")
-                }
-            existing.append(r)
-    except Exception:
-        existing = []
-
-    # If already generated and persisted with high fidelity, return clean sliced structure
-    if len(existing) >= 5:
-        total_p = sum(float(r.get("final_pnl") or 0.0) for r in existing)
-        wins_c = sum(1 for r in existing if int(r.get("success") or 0) == 1)
-        sliced = existing[:limit]
-        pos_found = next((x for x in existing if "pos_" in str(x.get("id")) or "31 July" in str(x.get("rationale")) or "1D" in str(x.get("timeframe"))), existing[0] if existing else None)
-        five_best = [x for x in existing if not ("pos_" in str(x.get("id")) or "1D" in str(x.get("timeframe")))]
-        morning_setup = next((x for x in existing if "09:16" in str(x.get("created_at")) or "09:16" in str(x.get("time"))), five_best[0] if five_best else (existing[0] if existing else None))
-        return {
-            "ok": True,
-            "source": "database_persisted",
-            "symbol": root,
-            "date": clean_date,
-            "timeframe": timeframe,
-            "spot_candle": {"open": open_p, "high": high_p, "low": low_p, "close": close_p},
-            "positional_prediction_31_july": pos_found,
-            "morning_0900_recommendation": morning_setup,
-            "five_best_recommendations_for_day": (five_best[:5] if five_best else sliced[:5]),
-            "count": len(sliced),
-            "recommendations": sliced,
-            "summary": {
-                "total_trades": len(sliced),
-                "wins": sum(1 for x in sliced if int(x.get("success") or 0) == 1),
-                "win_rate": round(wins_c / max(1, len(existing)) * 100, 1),
-                "total_pnl": round(total_p, 2)
-            }
-        }
-
-    # 3. Generate point-in-time setups calibrated to real market movement
-    # Reference prior candle (e.g. July 31 reference if date is 1 September 2026)
-    july31_candle = get_historical_candle_for_date(root, "2026-07-31")
-    july31_close = float(july31_candle.get("close") or 57264.85) if july31_candle else 57264.85
-
-    # Positional prediction as of 31 July 2026 for September expiry
-    pos_reco_id = f"reco_{clean_date.replace('-', '')}_pos_july31"
-    pos_sym = f"{root} {atm_strike} CE"
-    pos_entry = 415.0
-    pos_tgt1 = 580.0
-    pos_tgt2 = 720.0
-    pos_sl = 310.0
-    pos_pts = 305.0
-    pos_pnl = round(pos_pts * lot_size, 2)
-    pos_reason = f"BankNifty closed at {july31_close:,.1f} on 31 July holding 50-EMA support. On 1 September, it opened at {open_p:,.1f} and reached {high_p:,.1f}. Target 1 & 2 Achieved."
-
-    positional_trade = {
-        "id": pos_reco_id,
-        "date": clean_date,
-        "prediction_horizon": "Monthly Positional Swing (Predicted 31 July 2026)",
-        "predicted_at": "2026-07-31 15:15 IST",
-        "symbol": pos_sym,
-        "underlying": root,
-        "recommendation": "BUY",
-        "recommendation_before_outcome": {
-            "symbol": pos_sym,
-            "action": "BUY",
-            "predicted_at": "2026-07-31 15:15 IST",
-            "timeframe": "1D / Positional Swing",
-            "entry_price": pos_entry,
-            "target_1": pos_tgt1,
-            "target_2": pos_tgt2,
-            "stop_loss": pos_sl,
-            "risk_reward": "1:2.9",
-            "setup_name": "Monthly Institutional Positional Breakout Setup",
-            "rationale": f"July month close at {july31_close:,.1f} confirmed bullish consolidation above 50-EMA with high delivery volume.",
-            "technical_indicators": "Daily RSI: 61.2 | 50-EMA: 56,820 | PCR: 1.28 Bullish Accumulation",
-            "zero_lookahead": "Generated strictly on 31 July 2026 before August/September price discovery."
-        },
-        "outcome_after_execution": {
-            "status": "COMPLETED",
-            "outcome": "Target 1 & 2 Achieved",
-            "exit_price": pos_tgt2,
-            "points": pos_pts,
-            "final_pnl": pos_pnl,
-            "success": 1,
-            "exit_reason": pos_reason
-        }
-    }
-
-    # 5 Intraday Setups across the day on clean_date
-    intraday_slots = [
-        {
-            "time": "09:16",
-            "name": "Morning Pre-Market Opening Bell Gap Momentum Setup",
-            "type": "CE",
-            "strike_offset": 0,
-            "entry": 385.0,
-            "sl": 338.0,
-            "tgt1": 445.0,
-            "tgt2": 490.0,
-            "tgt3": 560.0,
-            "exit_p": 492.0,
-            "pts": 107.0,
-            "outcome": "Target 2 Achieved",
-            "rationale": f"Gap-up open at {open_p:,.1f} sustaining above 5m VWAP. Heavy ATM put writing (+18,200 contracts) and positive morning opening delta.",
-            "tech": "5m VWAP: 57,510 | RSI: 59.2 | 20-EMA: Positive Slope (+14.2) | Supertrend: BULLISH",
-            "exit_reason": f"BankNifty rallied from open {open_p:,.1f} to high of day {high_p:,.1f} at 10:14 AM. Target 2 reached."
-        },
-        {
-            "time": "09:25",
-            "name": "15-Minute Opening Range High Breakout (ORB)",
-            "type": "CE",
-            "strike_offset": step,
-            "entry": 335.0,
-            "sl": 295.0,
-            "tgt1": 405.0,
-            "tgt2": 450.0,
-            "tgt3": 510.0,
-            "exit_p": 405.0,
-            "pts": 70.0,
-            "outcome": "Target 1 Achieved",
-            "rationale": "Clear breakout above opening 15m candle high with institutional volume 2.4x above 20-period average.",
-            "tech": "15m Breakout Bar: High Volume Expansion | RSI: 62.4 | ADX: 28.5 Trending",
-            "exit_reason": "Morning ORB continuation yielded Target 1 within 22 minutes as BankNifty crossed 57,680."
-        },
-        {
-            "time": "10:30",
-            "name": "High-of-Day Liquidity Sweep & Mean-Reversion Scalp",
-            "type": "PE",
-            "strike_offset": -step,
-            "entry": 290.0,
-            "sl": 255.0,
-            "tgt1": 345.0,
-            "tgt2": 385.0,
-            "tgt3": 440.0,
-            "exit_p": 345.0,
-            "pts": 55.0,
-            "outcome": "Target 1 Achieved",
-            "rationale": f"Price tapped daily high {high_p:,.1f} with bearish divergence on 1m RSI. Mean-reversion scalp back to 5m VWAP support.",
-            "tech": "1m Bearish Divergence at 57,766 | Stochastic: Overbought 88 | Target: 5m VWAP Support",
-            "exit_reason": "Healthy pullback towards VWAP pivot executed Target 1 before resuming base."
-        },
-        {
-            "time": "12:15",
-            "name": "Midday VWAP Retest & PCR Support Bounce",
-            "type": "CE",
-            "strike_offset": 0,
-            "entry": 320.0,
-            "sl": 282.0,
-            "tgt1": 375.0,
-            "tgt2": 420.0,
-            "tgt3": 480.0,
-            "exit_p": 375.0,
-            "pts": 55.0,
-            "outcome": "Target 1 Achieved",
-            "rationale": "Retested 57,480 VWAP pivot in lunch session and formed bullish absorption pin-bar with rising call delta.",
-            "tech": "5m VWAP Support: 57,480 | Bullish Hammer Candle | Put-Call Ratio (PCR): 1.15",
-            "exit_reason": "Support bounce from session VWAP reached Target 1 at 12:48 PM."
-        },
-        {
-            "time": "13:40",
-            "name": "European Cues & Institutional Trend Runner",
-            "type": "CE",
-            "strike_offset": step,
-            "entry": 310.0,
-            "sl": 268.0,
-            "tgt1": 365.0,
-            "tgt2": 405.0,
-            "tgt3": 460.0,
-            "exit_p": 405.0,
-            "pts": 95.0,
-            "outcome": "Target 2 Achieved",
-            "rationale": "European bourses opened strong; aggressive block buying in HDFCBANK & ICICIBANK pushed index back towards highs.",
-            "tech": "DAX Opening +0.8% | HDFCBANK Institutional Delta +45K | Positive Order Flow Imbalance",
-            "exit_reason": "Afternoon surge lifted BankNifty to 57,680; Target 2 executed with volume confirmation."
-        }
-    ]
-
-    all_generated = []
-    total_pnl = pos_pnl
-    wins = 1
-
-    # Insert positional trade into SQLite
-    try:
-        db_exec("""
-            INSERT OR REPLACE INTO recommendations(id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, score, outcome, final_pnl, success, exit_reason, instrument_kind, option_side, option_strike, status, created_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, [
-            pos_reco_id, user_id, "reconstructed_date", pos_sym, root, "BUY", "1D", pos_entry, pos_tgt1, pos_sl,
-            f"[Predicted 31 July 2026 for {clean_date}] {pos_reason}", json.dumps(positional_trade["recommendation_before_outcome"]), 94.0, "Target 1 & 2 Achieved", pos_pnl, 1, pos_reason,
-            "OPTION", "CE", atm_strike, "COMPLETED", f"{clean_date}T09:00:00"
-        ])
-    except Exception:
-        pass
-    all_generated.append(positional_trade)
-
-    # Insert intraday trades into SQLite
-    for s in intraday_slots:
-        t = s["time"]
-        strike = atm_strike + s["strike_offset"]
-        opt_sym = f"{root} {strike} {s['type']}"
-        reco_id = f"reco_{clean_date.replace('-', '')}_{t.replace(':', '')}_{secrets.token_hex(3)}"
-        created_dt = f"{clean_date}T{t}:00"
-        trade_pnl = round(s["pts"] * lot_size, 2)
-        total_pnl += trade_pnl
-        wins += 1
-
-        before_obj = {
-            "symbol": opt_sym,
-            "action": "BUY",
-            "predicted_at": f"{clean_date} {t} IST",
-            "time": f"{t} IST",
-            "timeframe": timeframe,
-            "entry_price": s["entry"],
-            "target_1": s["tgt1"],
-            "target_2": s["tgt2"],
-            "target_3": s["tgt3"],
-            "stop_loss": s["sl"],
-            "risk_reward": f"1:{round((s['tgt2'] - s['entry']) / max(1, s['entry'] - s['sl']), 1)}",
-            "setup_name": s["name"],
-            "technical_indicators": s["tech"],
-            "rationale": s["rationale"],
-            "zero_lookahead": f"Generated strictly at {t} IST on {clean_date} before outcome was known."
-        }
-        after_obj = {
-            "status": "COMPLETED",
-            "outcome": s["outcome"],
-            "exit_price": s["exit_p"],
-            "points": s["pts"],
-            "final_pnl": trade_pnl,
-            "success": 1,
-            "exit_reason": s["exit_reason"]
-        }
-
-        trade_item = {
-            "id": reco_id,
-            "date": clean_date,
-            "time": t,
-            "created_at": created_dt,
-            "symbol": opt_sym,
-            "underlying": root,
-            "strike": strike,
-            "option_type": s["type"],
-            "recommendation": "BUY",
-            "entry": s["entry"],
-            "target": s["tgt1"],
-            "target2": s["tgt2"],
-            "target3": s["tgt3"],
-            "stop_loss": s["sl"],
-            "outcome": s["outcome"],
-            "points": s["pts"],
-            "final_pnl": trade_pnl,
-            "success": 1,
-            "exit_reason": s["exit_reason"],
-            "recommendation_before_outcome": before_obj,
-            "outcome_after_execution": after_obj
-        }
-
-        try:
-            db_exec("""
-                INSERT OR REPLACE INTO recommendations(id, user_id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, technical_basis, score, outcome, final_pnl, success, exit_reason, instrument_kind, option_side, option_strike, status, created_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, [
-                reco_id, user_id, "reconstructed_date", opt_sym, root, "BUY", timeframe, s["entry"], s["tgt1"], s["sl"],
-                f"[{clean_date} {t} IST] {s['rationale']}", json.dumps(before_obj), 92.0, s["outcome"], trade_pnl, 1, s["exit_reason"],
-                "OPTION", s["type"], strike, "COMPLETED", created_dt
-            ])
-        except Exception:
-            pass
-
-        all_generated.append(trade_item)
-
-    five_best = [x for x in all_generated if x.get("time")]
-    morning_setup = all_generated[1] if len(all_generated) > 1 else all_generated[0]
-
-    return {
-        "ok": True,
-        "source": "reconstructed_point_in_time",
-        "symbol": root,
-        "date": clean_date,
-        "timeframe": timeframe,
-        "spot_candle": {
-            "date": clean_date,
-            "open": open_p,
-            "high": high_p,
-            "low": low_p,
-            "close": close_p
-        },
-        "positional_prediction_31_july": positional_trade,
-        "morning_0900_recommendation": morning_setup,
-        "five_best_recommendations_for_day": five_best[:5],
-        "recommendations": all_generated[:limit],
-        "count": len(all_generated[:limit]),
-        "summary": {
-            "total_trades": len(all_generated),
-            "wins": wins,
-            "win_rate": 100.0,
-            "total_pnl": round(total_pnl, 2)
-        }
-    }
-
-
-class RecoForDateRequest(BaseModel):
-    date: str
-    symbol: str = "BANKNIFTY"
-    timeframe: str = "5m"
-    limit: int = 10
+    def run() -> dict[str, Any]:
+        items, sessions, d = [], 0, datetime.now(IST).date()
+        scanned = 0
+        while len(items) < want and scanned < 40 and sessions < 25:
+            d -= timedelta(days=1); scanned += 1
+            if d.weekday() >= 5 and extract_root_symbol(sym).upper() not in MCX_ROOTS:
+                continue
+            r = replay_signals_for_day(sym, d)
+            if r.get("ok"):
+                sessions += 1
+                items.extend(r["items"])
+        items = items[:want]
+        wins = sum(i["success"] for i in items)
+        return {"ok": True, "symbol": extract_root_symbol(sym).upper(), "sessions": sessions, "count": len(items), "items": items, "trades": items,
+                "summary": {"total_trades": len(items), "wins": wins, "losses": len(items) - wins,
+                            "win_rate": round(wins / len(items) * 100, 1) if items else None,
+                            "total_points": round(sum(i["final_pnl"] for i in items), 2)}}
+    return await asyncio.to_thread(run)
 
 
 @app.get("/api/recommendations/for-date")
 @app.post("/api/recommendations/for-date")
-async def api_recommendations_for_date(
-    request: Request,
-    date: str | None = None,
-    symbol: str | None = None,
-    timeframe: str | None = None,
-    limit: int | None = None,
-    user: dict[str, Any] = Depends(require_user)
-) -> dict[str, Any]:
-    req_body = {}
+async def api_recommendations_for_date(request: Request, date: str | None = None, symbol: str | None = None, timeframe: str | None = None,
+                                       limit: int | None = None, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    body = {}
     if request.method == "POST":
         try:
-            req_body = await request.json()
+            body = await request.json()
         except Exception:
-            req_body = {}
-    d = date or req_body.get("date") or request.query_params.get("date") or request.query_params.get("from") or datetime.now(IST).strftime("%Y-%m-%d")
-    sym = symbol or req_body.get("symbol") or request.query_params.get("symbol") or "BANKNIFTY"
-    tf = timeframe or req_body.get("timeframe") or request.query_params.get("timeframe") or "5m"
-    lim = limit or req_body.get("limit") or request.query_params.get("limit")
-    try:
-        lim_val = int(lim) if lim else 10
-    except Exception:
-        lim_val = 10
-    uid = user.get("id", 1) if isinstance(user, dict) else 1
+            body = {}
+    q = request.query_params
+    day = _parse_day(date or body.get("date") or q.get("date") or q.get("from"))
+    lim = int(limit or body.get("limit") or q.get("limit") or 10)
+    sym = symbol or body.get("symbol") or q.get("symbol") or "BANKNIFTY"
+    return await asyncio.to_thread(replay_signals_for_day, sym, day, lim)
 
-    result = await asyncio.to_thread(get_recommendations_for_date_engine, d, sym, tf, uid, lim_val)
-    return result
+
 
 
 # ===========================================================================
@@ -21117,20 +18914,20 @@ async def api_mcp_call_http(request: Request, user: dict[str, Any] = Depends(req
         s = str(args.get("symbol") or "BANKNIFTY")
         tf = str(args.get("timeframe") or "5m")
         lim = int(args.get("limit") or 10)
-        return await asyncio.to_thread(get_recommendations_for_date_engine, d, s, tf, user.get("id", 1), lim)
+        return await asyncio.to_thread(replay_signals_for_day, s, _parse_day(d), lim)
 
     elif name in ("get_100_trade_backtest", "backtest_100_trades"):
         s = str(args.get("symbol") or "BANKNIFTY")
         tf = str(args.get("timeframe") or "5m")
         cnt = int(args.get("count") or 100)
-        return await asyncio.to_thread(generate_100_trade_recommendation_backtest, s, tf, cnt, user.get("id", 1))
+        return await api_backtest_100_trades(request, s, tf, cnt, user)
 
     elif name in ("get_recommendations", "recommendations"):
         d = args.get("date")
         s = args.get("symbol")
         lim = int(args.get("limit") or 10)
         if d:
-            return await asyncio.to_thread(get_recommendations_for_date_engine, str(d), str(s or "BANKNIFTY"), "5m", user.get("id", 1), lim)
+            return await asyncio.to_thread(replay_signals_for_day, str(s or "BANKNIFTY"), _parse_day(str(d)), lim)
         rows = db_exec(
             "SELECT id, source, symbol, underlying, recommendation, timeframe, entry, target, stop_loss, rationale, outcome, final_pnl, success, created_at "
             "FROM recommendations ORDER BY created_at DESC LIMIT ?",

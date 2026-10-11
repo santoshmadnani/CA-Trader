@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CA Trader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/static/trade/trade.css?v=4">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">CA&nbsp;Trader</div>
+  <nav class="workspaces" aria-label="Workspaces">
+    <a href="#trade" data-ws="trade">Trade</a>
+    <a href="#scan" data-ws="scan">Scan</a>
+    <a href="#options" data-ws="options">Options</a>
+    <a href="#portfolio" data-ws="portfolio">Portfolio</a>
+    <a href="#research" data-ws="research">Research</a>
+  </nav>
+  <div class="feed" id="feedState" title="Market data source and freshness"><span class="dot"></span><span id="feedText">Connecting to Upstox…</span></div>
+  <details class="menu">
+    <summary aria-label="Menu" id="userName">Menu</summary>
+    <div class="menu-body">
+      <a href="/terminal/classic">Classic terminal (settings, Telegram, admin, notes)</a>
+      <button type="button" id="themeBtn">Switch light / dark</button>
+      <a href="/logout">Log out</a>
+    </div>
+  </details>
+</header>
+
+<div class="tickers" id="tickers" role="group" aria-label="Watchlist instruments"></div>
+
+<main>
+  <!-- ============ TRADE ============ -->
+  <section class="ws" id="ws-trade" hidden>
+    <div class="trade-grid">
+      <section class="panel signal" aria-label="Signal">
+        <div class="panel-head"><span class="label">Signal · 5m</span><span class="age" data-age="reco">—</span></div>
+        <div class="sig-side" id="sigSide">Loading…</div>
+        <div class="sig-sym" id="sigSym"></div>
+        <dl class="levels" id="levels"></dl>
+        <div class="ladder" id="ladder" aria-hidden="true"></div>
+        <div class="row small"><span class="muted" id="sizeNote"></span></div>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="buyBtn">Review buy <kbd>B</kbd></button>
+          <button type="button" class="btn" id="sellBtn">Review sell <kbd>S</kbd></button>
+        </div>
+        <p class="note" id="sigRationale"></p>
+      </section>
+
+      <section class="panel why" aria-label="Why this signal">
+        <div class="panel-head"><span class="label">Why · weighted factors from Upstox data</span><span class="age" data-age="reco">—</span></div>
+        <div class="score-head">
+          <div><div class="big" id="scoreVal">—</div><div class="muted small" id="scoreDecision"></div></div>
+          <div class="gauge-wrap">
+            <div class="gauge"><i id="gaugeNeedle"></i><b id="gateLo"></b><b id="gateHi"></b></div>
+            <div class="gscale"><span>−100 · PE</span><span>no trade</span><span>CE · +100</span></div>
+          </div>
+          <div class="conf"><div class="muted small">Confidence</div><div class="big2" id="confVal">—</div></div>
+        </div>
+        <div class="scroll-x">
+          <table class="factors">
+            <thead><tr><th>Factor</th><th>Live input</th><th class="r">Points</th><th class="r">Weight</th><th>Contribution</th><th class="r">Adds</th></tr></thead>
+            <tbody id="factorRows"></tbody>
+          </table>
+        </div>
+        <p class="note" id="confBasis"></p>
+        <p class="note" id="calibNote"></p>
+      </section>
+
+      <aside class="panel side" aria-label="Exposure, Stock Mantra and option chain">
+        <div class="panel-head"><span class="label">Today</span><span class="age" data-age="pos">—</span></div>
+        <div class="kv" id="todayKv"></div>
+        <div class="panel-head"><span class="label">Stock Mantra</span><span class="age" data-age="sm">—</span></div>
+        <div id="smBox" class="sm-box muted small">No call received yet today.</div>
+        <div class="panel-head"><span class="label">Option chain · ATM ±3</span><span class="age" data-age="chain">—</span></div>
+        <div class="scroll-x"><table class="chain mini"><thead><tr><th>CE ΔOI</th><th>CE</th><th>Strike</th><th>PE</th><th>PE ΔOI</th></tr></thead><tbody id="miniChain"></tbody></table></div>
+        <div class="row small"><span class="muted">PCR (OI)</span><span id="pcrVal">—</span></div>
+      </aside>
+
+      <section class="panel chart-panel" aria-label="Chart">
+        <div class="panel-head"><span class="label">5-minute chart · EMA 9 / 21 · VWAP · signal levels</span><span class="age" data-age="candles">—</span></div>
+        <canvas id="chart" height="320"></canvas>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============ SCAN ============ -->
+  <section class="ws" id="ws-scan" hidden>
+    <div class="cols">
+      <section class="panel">
+        <div class="panel-head"><span class="label">Watchlist</span><select id="wlSelect" aria-label="Choose watchlist"></select></div>
+        <div class="search">
+          <label for="symSearch" class="sr">Add instrument</label>
+          <input id="symSearch" placeholder="Add instrument — type a symbol (e.g. RELIANCE, NIFTY 22500 CE)" autocomplete="off">
+          <div id="searchResults" class="search-results"></div>
+        </div>
+        <div class="scroll-x"><table class="list"><thead><tr><th>Symbol</th><th class="r">LTP</th><th class="r">Change</th><th class="r">Volume</th><th></th></tr></thead><tbody id="wlRows"></tbody></table></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><span class="label">Market movers</span>
+          <div class="seg" role="group" aria-label="Mover type"><button type="button" data-mov="gainers" aria-pressed="true">Gainers</button><button type="button" data-mov="losers">Losers</button><button type="button" data-mov="high_volume">Volume</button></div>
+        </div>
+        <div class="scroll-x"><table class="list"><thead><tr><th>Symbol</th><th class="r">LTP</th><th class="r">Change</th></tr></thead><tbody id="moverRows"></tbody></table></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><span class="label">Alerts</span><span class="age" data-age="notif">—</span></div>
+        <ul class="alerts" id="alertList"></ul>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============ OPTIONS ============ -->
+  <section class="ws" id="ws-options" hidden>
+    <section class="panel">
+      <div class="panel-head"><span class="label" id="chainTitle">Option chain</span><span class="age" data-age="chainFull">—</span></div>
+      <div class="kv inline" id="chainStats"></div>
+      <div class="scroll-x"><table class="chain full"><thead><tr>
+        <th>OI</th><th>ΔOI</th><th>IV</th><th>Δ</th><th>LTP</th><th class="mid">Strike</th><th>LTP</th><th>Δ</th><th>IV</th><th>ΔOI</th><th>OI</th>
+      </tr></thead><tbody id="chainRows"></tbody></table></div>
+      <p class="note">Tap a price to open an order review for that contract. Source: Upstox option chain (nearest expiry).</p>
+    </section>
+  </section>
+
+  <!-- ============ PORTFOLIO ============ -->
+  <section class="ws" id="ws-portfolio" hidden>
+    <div class="kv cards" id="fundCards"></div>
+    <section class="panel">
+      <div class="panel-head"><span class="label">Open positions</span><span class="age" data-age="pos">—</span></div>
+      <div class="scroll-x"><table class="list"><thead><tr><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Avg</th><th class="r">LTP</th><th class="r">P&amp;L</th><th class="r">SL</th><th class="r">Target</th><th></th></tr></thead><tbody id="posRows"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><span class="label">Orders</span></div>
+      <div class="scroll-x"><table class="list"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Price</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody id="orderRows"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><span class="label">Closed trades &amp; P&amp;L</span></div>
+      <div class="kv inline" id="pnlStats"></div>
+      <div class="scroll-x"><table class="list"><thead><tr><th>Closed</th><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Entry</th><th class="r">Exit</th><th class="r">P&amp;L</th></tr></thead><tbody id="closedRows"></tbody></table></div>
+    </section>
+  </section>
+
+  <!-- ============ RESEARCH ============ -->
+  <section class="ws" id="ws-research" hidden>
+    <div class="seg tabs" role="tablist" aria-label="Research sections">
+      <button type="button" role="tab" data-rt="context" aria-selected="true">Market context</button>
+      <button type="button" role="tab" data-rt="matrix">Live data matrix</button>
+      <button type="button" role="tab" data-rt="mantra">Stock Mantra vs CA</button>
+      <button type="button" role="tab" data-rt="backtest">Backtest replay</button>
+      <button type="button" role="tab" data-rt="news">News</button>
+      <button type="button" role="tab" data-rt="fund">Fundamentals</button>
+      <button type="button" role="tab" data-rt="ask">Ask AI</button>
+    </div>
+    <div id="researchBody" class="research-body"></div>
+  </section>
+</main>
+
+<dialog id="ticket" aria-labelledby="ticketTitle">
+  <form method="dialog" id="ticketForm">
+    <h2 id="ticketTitle">Review order</h2>
+    <div class="ticket-grid">
+      <label>Contract<input id="tSymbol" required></label>
+      <label>Side<select id="tSide"><option>BUY</option><option>SELL</option></select></label>
+      <label>Lots<input id="tLots" type="number" min="1" step="1" value="1"></label>
+      <label>Lot size<input id="tLot" type="number" min="1" step="1" value="1"></label>
+      <label>Order type<select id="tType"><option>LIMIT</option><option>MARKET</option></select></label>
+      <label>Limit price<input id="tPrice" type="number" step="0.05"></label>
+      <label>Stop loss<input id="tSl" type="number" step="0.05"></label>
+      <label>Target<input id="tTgt" type="number" step="0.05"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="tLive"> Send to my broker (live). Unticked = paper trade.</label>
+    <p class="note" id="tSummary"></p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="tCancel">Cancel</button>
+      <button type="submit" class="btn primary" id="tSubmit">Place order</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/static/trade/trade.js?v=4" defer></script>
+</body>
+</html>
