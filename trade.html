@@ -4,231 +4,283 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CA Trader</title>
+<script>try{var t=localStorage.getItem("cat_theme");if(t)document.documentElement.dataset.theme=JSON.parse(t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="/static/trade/trade.css?v=5">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/static/trade/trade.css?v=7">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Zm4 4h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cursor" viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6L5 3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M4 19 20 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4" cy="19" r="2" fill="currentColor"/><circle cx="20" cy="5" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-ray" viewBox="0 0 24 24"><path d="M4 18 22 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4" cy="18" r="2" fill="currentColor"/><path d="m18 5 4 1-2 3" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-hline" viewBox="0 0 24 24"><path d="M3 12h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-vline" viewBox="0 0 24 24"><path d="M12 3v18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-fib" viewBox="0 0 24 24"><path d="M4 5h16M4 9h16M4 13h16M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-measure" viewBox="0 0 24 24"><path d="M4 20 20 4M7 17l2 2M10 14l2 2M13 11l2 2M16 8l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-erase" viewBox="0 0 24 24"><path d="m15 4 5 5-9 9H6l-2-2 11-12Zm-6 14h11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4H6Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-2h6l2 2h3v11H4V8Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-fx" viewBox="0 0 24 24"><path d="M5 18c3 0 3-12 6-12M4 11h6M14 9l6 8M20 9l-6 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-candle" viewBox="0 0 24 24"><path d="M8 3v4M8 15v6M16 3v6M16 17v4" stroke="currentColor" stroke-width="1.6"/><rect x="5.5" y="7" width="5" height="8" fill="currentColor"/><rect x="13.5" y="9" width="5" height="8" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-line" viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 8-9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 19h16M7 15l3-4 3 2 4-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">CA&nbsp;Trader</div>
+  <a class="brand" href="#trade" aria-label="CA Trader home"><span class="mark"></span>CA Trader</a>
+  <div class="idx" id="indexBar" aria-label="Indices"></div>
   <nav class="workspaces" aria-label="Workspaces">
     <a href="#trade" data-ws="trade">Trade</a>
-    <a href="#scan" data-ws="scan">Scan</a>
     <a href="#options" data-ws="options">Options</a>
     <a href="#portfolio" data-ws="portfolio">Portfolio</a>
+    <a href="#market" data-ws="market">Market</a>
     <a href="#research" data-ws="research">Research</a>
     <a href="#settings" data-ws="settings">Settings</a>
+    <span class="nav-ink" aria-hidden="true"></span>
   </nav>
-  <div class="feed" id="feedState" title="Market data source and freshness"><span class="dot"></span><span id="feedText">Connecting to Upstox…</span></div>
-  <details class="menu">
-    <summary aria-label="Menu" id="userName">Menu</summary>
-    <div class="menu-body">
-      <a href="/terminal/classic">Classic terminal (admin tools)</a>
-      <button type="button" id="themeBtn">Switch light / dark</button>
-      <a href="/logout">Log out</a>
-    </div>
-  </details>
+  <div class="top-actions">
+    <span class="feed" id="feedState" title="Market data source and freshness"><span class="dot"></span><span id="feedText">Connecting…</span></span>
+    <a class="icon-btn" href="#market" aria-label="Alerts"><svg><use href="#i-bell"/></svg><span class="badge" id="alertBadge" hidden></span></a>
+    <button type="button" class="icon-btn" id="themeBtn" aria-label="Switch light or dark theme"><svg class="sun"><use href="#i-sun"/></svg><svg class="moon"><use href="#i-moon"/></svg></button>
+    <details class="menu">
+      <summary id="userName">Account</summary>
+      <div class="menu-body">
+        <a href="/terminal/classic">Classic terminal</a>
+        <a href="/logout">Log out</a>
+      </div>
+    </details>
+  </div>
 </header>
 
-<div class="tickers" id="tickers" role="group" aria-label="Watchlist instruments"></div>
+<div class="shell">
+  <!-- ===== Marketwatch ===== -->
+  <aside class="watch" aria-label="Marketwatch">
+    <div class="watch-search">
+      <svg><use href="#i-search"/></svg>
+      <label for="symSearch" class="sr">Search instruments</label>
+      <input id="symSearch" placeholder="Search eg: NIFTY, RELIANCE, CRUDEOIL" autocomplete="off">
+      <kbd>/</kbd>
+      <div id="searchResults" class="search-results"></div>
+    </div>
+    <div class="watch-meta"><span id="watchCount"></span><select id="wlSelect" aria-label="Choose watchlist"></select></div>
+    <ul class="watch-list" id="watchList"></ul>
+  </aside>
 
-<main>
-  <!-- ============ TRADE ============ -->
-  <section class="ws" id="ws-trade" hidden>
-    <div class="trade-grid">
-      <section class="panel signal" aria-label="Signal">
-        <div class="panel-head"><span class="label">Signal · 5m</span><span class="age" data-age="reco">—</span></div>
-        <div class="sig-side" id="sigSide">Loading…</div>
-        <div class="sig-sym" id="sigSym"></div>
-        <dl class="levels" id="levels"></dl>
-        <div class="ladder" id="ladder" aria-hidden="true"></div>
-        <div class="row small"><span class="muted" id="sizeNote"></span></div>
-        <div class="btn-row">
-          <button type="button" class="btn primary" id="buyBtn">Review buy <kbd>B</kbd></button>
-          <button type="button" class="btn" id="sellBtn">Review sell <kbd>S</kbd></button>
-        </div>
-        <p class="note" id="sigRationale"></p>
-      </section>
-
-      <section class="panel why" aria-label="Why this signal">
-        <div class="panel-head"><span class="label">Why · weighted factors from Upstox data</span><span class="age" data-age="reco">—</span></div>
-        <div class="score-head">
-          <div><div class="big" id="scoreVal">—</div><div class="muted small" id="scoreDecision"></div></div>
-          <div class="gauge-wrap">
-            <div class="gauge"><i id="gaugeNeedle"></i><b id="gateLo"></b><b id="gateHi"></b></div>
-            <div class="gscale"><span>−100 · PE</span><span>no trade</span><span>CE · +100</span></div>
+  <main>
+    <!-- ===== TRADE ===== -->
+    <section class="ws" id="ws-trade" hidden>
+      <div class="trade-layout">
+        <section class="card chart-card" id="chartCard" tabindex="-1" aria-label="Chart">
+          <div class="cc-toolbar">
+            <div class="cc-group tf" role="group" aria-label="Timeframe">
+              <button type="button" data-tf="1m">1m</button><button type="button" data-tf="3m">3m</button><button type="button" data-tf="5m">5m</button>
+              <button type="button" data-tf="15m">15m</button><button type="button" data-tf="30m">30m</button><button type="button" data-tf="60m">1h</button><button type="button" data-tf="1D">1D</button>
+            </div>
+            <div class="cc-pop-wrap">
+              <button type="button" class="cc-btn cc-type-btn" aria-label="Chart type"><svg><use href="#i-candle"/></svg>Candles</button>
+              <div class="pop cc-type-pop" hidden>
+                <button type="button" data-ctype="candles"><svg><use href="#i-candle"/></svg>Candles</button>
+                <button type="button" data-ctype="hollow"><svg><use href="#i-candle"/></svg>Hollow candles</button>
+                <button type="button" data-ctype="heikin"><svg><use href="#i-candle"/></svg>Heikin Ashi</button>
+                <button type="button" data-ctype="bars"><svg><use href="#i-chart"/></svg>OHLC bars</button>
+                <button type="button" data-ctype="line"><svg><use href="#i-line"/></svg>Line</button>
+                <button type="button" data-ctype="area"><svg><use href="#i-line"/></svg>Area</button>
+              </div>
+            </div>
+            <div class="cc-pop-wrap">
+              <button type="button" class="cc-btn cc-ind-btn"><svg><use href="#i-fx"/></svg>Indicators</button>
+              <div class="pop cc-ind-pop wide" hidden></div>
+            </div>
+            <div class="cc-chips"></div>
+            <span class="grow"></span>
+            <button type="button" class="cc-icon cc-magnet" title="Magnet crosshair (snap to OHLC)" aria-label="Magnet crosshair"><svg><use href="#i-magnet"/></svg></button>
+            <button type="button" class="cc-icon cc-fit" title="Reset zoom" aria-label="Reset zoom"><svg><use href="#i-fit"/></svg></button>
+            <button type="button" class="cc-icon cc-shot" title="Save chart image" aria-label="Save chart image"><svg><use href="#i-camera"/></svg></button>
+            <button type="button" class="cc-icon cc-full" title="Fullscreen (F)" aria-label="Fullscreen"><svg><use href="#i-full"/></svg></button>
           </div>
-          <div class="conf"><div class="muted small">Confidence</div><div class="big2" id="confVal">—</div></div>
-        </div>
-        <div class="scroll-x">
-          <table class="factors">
-            <thead><tr><th>Factor</th><th>Live input</th><th class="r">Points</th><th class="r">Weight</th><th>Contribution</th><th class="r">Adds</th></tr></thead>
-            <tbody id="factorRows"></tbody>
-          </table>
-        </div>
-        <p class="note" id="confBasis"></p>
-        <p class="note" id="calibNote"></p>
-      </section>
+          <div class="cc-body">
+            <div class="cc-tools" role="toolbar" aria-label="Drawing tools">
+              <button type="button" data-tool="cursor" aria-pressed="true" title="Cursor (Esc)"><svg><use href="#i-cursor"/></svg></button>
+              <button type="button" data-tool="trend" title="Trend line"><svg><use href="#i-trend"/></svg></button>
+              <button type="button" data-tool="ray" title="Ray"><svg><use href="#i-ray"/></svg></button>
+              <button type="button" data-tool="hline" title="Horizontal line"><svg><use href="#i-hline"/></svg></button>
+              <button type="button" data-tool="vline" title="Vertical line"><svg><use href="#i-vline"/></svg></button>
+              <button type="button" data-tool="rect" title="Rectangle zone"><svg><use href="#i-rect"/></svg></button>
+              <button type="button" data-tool="fib" title="Fibonacci retracement"><svg><use href="#i-fib"/></svg></button>
+              <button type="button" data-tool="measure" title="Measure price and bars"><svg><use href="#i-measure"/></svg></button>
+              <span class="sep"></span>
+              <button type="button" data-tool="erase" title="Eraser: click a drawing"><svg><use href="#i-erase"/></svg></button>
+              <button type="button" class="cc-clear" title="Remove all drawings"><svg><use href="#i-trash"/></svg></button>
+            </div>
+            <div class="cc-stage">
+              <div class="cc-legend"></div>
+              <div class="cc-main"></div>
+              <canvas class="cc-draw"></canvas>
+              <div class="cc-empty-msg">No candles from Upstox for this instrument yet.</div>
+            </div>
+          </div>
+          <div class="cc-panes"></div>
+        </section>
 
-      <aside class="panel side" aria-label="Exposure, Stock Mantra and option chain">
-        <div class="panel-head"><span class="label">Today</span><span class="age" data-age="pos">—</span></div>
-        <div class="kv" id="todayKv"></div>
-        <div class="panel-head"><span class="label">Stock Mantra</span><span class="age" data-age="sm">—</span></div>
-        <div id="smBox" class="sm-box muted small">No call received yet today.</div>
-        <div class="panel-head"><span class="label">Option chain · ATM ±3</span><span class="age" data-age="chain">—</span></div>
-        <div class="scroll-x"><table class="chain mini"><thead><tr><th>CE ΔOI</th><th>CE</th><th>Strike</th><th>PE</th><th>PE ΔOI</th></tr></thead><tbody id="miniChain"></tbody></table></div>
-        <div class="row small"><span class="muted">PCR (OI)</span><span id="pcrVal">—</span></div>
-      </aside>
+        <aside class="card signal-card" aria-label="Signal">
+          <div class="sig-top">
+            <div><div class="eyebrow">Signal · 5m model</div><div class="sig-side" id="sigSide"><span class="skeleton w60"></span></div><div class="sig-sym" id="sigSym"></div></div>
+            <div class="ring" id="confRing" title="Measured confidence"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" class="ring-bg"/><circle cx="22" cy="22" r="19" class="ring-fg" id="ringFg"/></svg><span id="confVal">—</span></div>
+          </div>
+          <div class="score-row">
+            <div class="gauge"><i id="gaugeNeedle"></i><b id="gateLo"></b><b id="gateHi"></b></div>
+            <div class="gscale"><span>PE −100</span><span id="scoreVal" class="num">—</span><span>+100 CE</span></div>
+          </div>
+          <dl class="levels" id="levels"></dl>
+          <div class="btn-row">
+            <button type="button" class="btn buy" id="buyBtn">Buy <kbd>B</kbd></button>
+            <button type="button" class="btn sell" id="sellBtn">Sell <kbd>S</kbd></button>
+          </div>
+          <p class="note" id="sigRationale"></p>
+          <div class="sm-card" id="smBox"><div class="eyebrow">Stock Mantra</div><div class="muted small">Waiting for the channel…</div></div>
+          <div class="pulse" id="pulseBox"></div>
+          <span class="age" data-age="reco">—</span>
+        </aside>
 
-      <section class="panel chart-panel" aria-label="Chart">
-        <div class="panel-head"><span class="label">5-minute chart · EMA 9 / 21 · VWAP · signal levels</span><span class="age" data-age="candles">—</span></div>
-        <canvas id="chart" height="320"></canvas>
-      </section>
-    </div>
-  </section>
-
-  <!-- ============ SCAN ============ -->
-  <section class="ws" id="ws-scan" hidden>
-    <div class="cols">
-      <section class="panel">
-        <div class="panel-head"><span class="label">Watchlist</span><select id="wlSelect" aria-label="Choose watchlist"></select></div>
-        <div class="search">
-          <label for="symSearch" class="sr">Add instrument</label>
-          <input id="symSearch" placeholder="Add instrument — type a symbol (e.g. RELIANCE, NIFTY 22500 CE)" autocomplete="off">
-          <div id="searchResults" class="search-results"></div>
-        </div>
-        <div class="scroll-x"><table class="list"><thead><tr><th>Symbol</th><th class="r">LTP</th><th class="r">Change</th><th class="r">Volume</th><th></th></tr></thead><tbody id="wlRows"></tbody></table></div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><span class="label">Market movers</span>
-          <div class="seg" role="group" aria-label="Mover type"><button type="button" data-mov="gainers" aria-pressed="true">Gainers</button><button type="button" data-mov="losers">Losers</button><button type="button" data-mov="high_volume">Volume</button></div>
-        </div>
-        <div class="scroll-x"><table class="list"><thead><tr><th>Symbol</th><th class="r">LTP</th><th class="r">Change</th></tr></thead><tbody id="moverRows"></tbody></table></div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><span class="label">Alerts</span><span class="age" data-age="notif">—</span></div>
-        <ul class="alerts" id="alertList"></ul>
-      </section>
-    </div>
-  </section>
-
-  <!-- ============ OPTIONS ============ -->
-  <section class="ws" id="ws-options" hidden>
-    <section class="panel">
-      <div class="panel-head"><span class="label" id="chainTitle">Option chain</span><span class="age" data-age="chainFull">—</span></div>
-      <div class="kv inline" id="chainStats"></div>
-      <div class="scroll-x"><table class="chain full"><thead><tr>
-        <th>OI</th><th>ΔOI</th><th>IV</th><th>Δ</th><th>LTP</th><th class="mid">Strike</th><th>LTP</th><th>Δ</th><th>IV</th><th>ΔOI</th><th>OI</th>
-      </tr></thead><tbody id="chainRows"></tbody></table></div>
-      <p class="note">Tap a price to open an order review for that contract. Source: Upstox option chain (nearest expiry).</p>
+        <section class="card dock" aria-label="Details">
+          <div class="dock-tabs" role="tablist">
+            <button type="button" role="tab" data-dock="why" aria-selected="true">Signal breakdown</button>
+            <button type="button" role="tab" data-dock="chain">Option chain</button>
+            <button type="button" role="tab" data-dock="positions">Positions <span class="count" id="posCount"></span></button>
+            <button type="button" role="tab" data-dock="orders">Orders</button>
+            <span class="grow"></span><span class="age" data-age="reco">—</span>
+          </div>
+          <div class="dock-body" data-dock-body="why">
+            <div class="scroll-x"><table class="factors"><thead><tr><th>Factor</th><th>Live input (Upstox)</th><th class="r">Points</th><th class="r">Weight</th><th>Contribution</th><th class="r">Adds</th></tr></thead><tbody id="factorRows"></tbody></table></div>
+            <p class="note" id="confBasis"></p><p class="note" id="calibNote"></p>
+          </div>
+          <div class="dock-body" data-dock-body="chain" hidden>
+            <div class="scroll-x"><table class="chain mini"><thead><tr><th>CE OI</th><th>CE ΔOI</th><th>CE LTP</th><th class="mid">Strike</th><th>PE LTP</th><th>PE ΔOI</th><th>PE OI</th></tr></thead><tbody id="miniChain"></tbody></table></div>
+            <p class="note"><span id="pcrVal"></span> · tap a price to trade that contract · full chain in Options</p>
+          </div>
+          <div class="dock-body" data-dock-body="positions" hidden><div class="scroll-x"><table class="list"><thead><tr><th>Instrument</th><th>Side</th><th class="r">Qty</th><th class="r">Avg</th><th class="r">LTP</th><th class="r">P&amp;L</th><th></th></tr></thead><tbody id="dockPos"></tbody></table></div></div>
+          <div class="dock-body" data-dock-body="orders" hidden><div class="scroll-x"><table class="list"><thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th class="r">Qty</th><th class="r">Price</th><th>Status</th></tr></thead><tbody id="dockOrders"></tbody></table></div></div>
+        </section>
+      </div>
     </section>
-  </section>
 
-  <!-- ============ PORTFOLIO ============ -->
-  <section class="ws" id="ws-portfolio" hidden>
-    <div class="kv cards" id="fundCards"></div>
-    <section class="panel">
-      <div class="panel-head"><span class="label">Open positions</span><span class="age" data-age="pos">—</span></div>
-      <div class="scroll-x"><table class="list"><thead><tr><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Avg</th><th class="r">LTP</th><th class="r">P&amp;L</th><th class="r">SL</th><th class="r">Target</th><th></th></tr></thead><tbody id="posRows"></tbody></table></div>
+    <!-- ===== OPTIONS ===== -->
+    <section class="ws" id="ws-options" hidden>
+      <section class="card">
+        <div class="card-head"><h2 id="chainTitle">Option chain</h2><span class="age" data-age="chainFull">—</span></div>
+        <div class="stat-strip" id="chainStats"></div>
+        <div class="scroll-x"><table class="chain full"><thead><tr><th>OI</th><th>ΔOI</th><th>IV</th><th>Δ</th><th>LTP</th><th class="mid">Strike</th><th>LTP</th><th>Δ</th><th>IV</th><th>ΔOI</th><th>OI</th></tr></thead><tbody id="chainRows"></tbody></table></div>
+        <p class="note">Calls on the left, puts on the right. Shaded cells are in the money. Tap a price to trade. Source: Upstox option chain.</p>
+      </section>
     </section>
-    <section class="panel">
-      <div class="panel-head"><span class="label">Orders</span></div>
-      <div class="scroll-x"><table class="list"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Price</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody id="orderRows"></tbody></table></div>
-    </section>
-    <section class="panel">
-      <div class="panel-head"><span class="label">Closed trades &amp; P&amp;L</span></div>
-      <div class="kv inline" id="pnlStats"></div>
-      <div class="scroll-x"><table class="list"><thead><tr><th>Closed</th><th>Symbol</th><th>Side</th><th class="r">Qty</th><th class="r">Entry</th><th class="r">Exit</th><th class="r">P&amp;L</th></tr></thead><tbody id="closedRows"></tbody></table></div>
-    </section>
-  </section>
 
-  <!-- ============ RESEARCH ============ -->
-  <section class="ws" id="ws-research" hidden>
-    <div class="seg tabs" role="tablist" aria-label="Research sections">
-      <button type="button" role="tab" data-rt="context" aria-selected="true">Market context</button>
-      <button type="button" role="tab" data-rt="matrix">Live data matrix</button>
-      <button type="button" role="tab" data-rt="mantra">Stock Mantra vs CA</button>
-      <button type="button" role="tab" data-rt="backtest">Backtest replay</button>
-      <button type="button" role="tab" data-rt="news">News</button>
-      <button type="button" role="tab" data-rt="fund">Fundamentals</button>
-      <button type="button" role="tab" data-rt="ask">Ask AI</button>
-    </div>
-    <div id="researchBody" class="research-body"></div>
-  </section>
+    <!-- ===== PORTFOLIO ===== -->
+    <section class="ws" id="ws-portfolio" hidden>
+      <div class="stat-cards" id="fundCards"></div>
+      <section class="card"><div class="card-head"><h2>Positions</h2><span class="age" data-age="pos">—</span></div>
+        <div class="scroll-x"><table class="list"><thead><tr><th>Instrument</th><th>Side</th><th class="r">Qty</th><th class="r">Avg</th><th class="r">LTP</th><th class="r">P&amp;L</th><th class="r">Stop loss</th><th class="r">Target</th><th></th></tr></thead><tbody id="posRows"></tbody></table></div></section>
+      <section class="card"><div class="card-head"><h2>Orders</h2></div>
+        <div class="scroll-x"><table class="list"><thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th class="r">Qty</th><th class="r">Price</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody id="orderRows"></tbody></table></div></section>
+      <section class="card"><div class="card-head"><h2>Closed trades</h2></div><div class="stat-strip" id="pnlStats"></div>
+        <div class="scroll-x"><table class="list"><thead><tr><th>Closed</th><th>Instrument</th><th>Side</th><th class="r">Qty</th><th class="r">Entry</th><th class="r">Exit</th><th class="r">P&amp;L</th></tr></thead><tbody id="closedRows"></tbody></table></div></section>
+    </section>
 
-  <!-- ============ SETTINGS ============ -->
-  <section class="ws" id="ws-settings" hidden>
-    <div class="cols">
-      <section class="panel">
-        <div class="panel-head"><span class="label">Telegram alerts</span></div>
-        <form id="tgForm" class="stack">
-          <label class="check"><input type="checkbox" id="tgEnabled"> Send alerts to Telegram</label>
-          <label>Bot token <input id="tgToken" autocomplete="off" placeholder="Leave as is to keep the saved token"></label>
-          <label>Chat ID <input id="tgChat" autocomplete="off"></label>
-          <label class="check"><input type="checkbox" id="tgRecos"> New recommendations</label>
-          <label>Only when signal score is at least <input id="tgMin" type="number" min="0" max="100" step="1"></label>
-          <label class="check"><input type="checkbox" id="tgRisk"> Stop-loss and risk alerts</label>
-          <label class="check"><input type="checkbox" id="tgNews"> Material news</label>
-          <div class="btn-row"><button type="submit" class="btn primary">Save</button><button type="button" class="btn" id="tgTest">Send test message</button></div>
-        </form>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><span class="label">Auto-trade limits (paper unless live is enabled on the server)</span></div>
-        <form id="atForm" class="stack">
-          <label class="check"><input type="checkbox" id="atEnabled"> Auto-trade on</label>
-          <label>Capital (₹) <input id="atCapital" type="number" min="0" step="1000"></label>
-          <label>Max loss per day (₹) <input id="atLoss" type="number" min="0" step="100"></label>
-          <label>Profit target per day (₹) <input id="atProfit" type="number" min="0" step="100"></label>
-          <label>Symbols (comma separated; empty = your watchlist) <input id="atSymbols" autocomplete="off"></label>
-          <label class="check"><input type="checkbox" id="atOptions"> Allow options</label>
-          <div class="btn-row"><button type="submit" class="btn primary">Save limits</button></div>
-        </form>
-        <div class="panel-head"><span class="label">Alerts housekeeping</span></div>
-        <form id="nsForm" class="stack">
-          <label>Delete alerts older than (days) <input id="nsDays" type="number" min="1" max="365" value="15"></label>
-          <div class="btn-row"><button type="submit" class="btn">Save</button></div>
-        </form>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><span class="label">Trade journal</span><button type="button" class="btn tiny" id="noteNew">New note</button></div>
-        <form id="noteForm" class="stack">
-          <input type="hidden" id="noteId">
-          <label>Title <input id="noteTitle"></label>
-          <label>Folder <input id="noteFolder" value="Trade Journal"></label>
-          <label>Note <textarea id="noteBody" rows="6"></textarea></label>
-          <label>Tags <input id="noteTags" placeholder="e.g. nifty, breakout, mistake"></label>
-          <div class="btn-row"><button type="submit" class="btn primary">Save note</button><button type="button" class="btn" id="noteDelete">Delete</button></div>
-        </form>
-        <ul class="alerts" id="noteList"></ul>
-      </section>
-    </div>
-  </section>
-</main>
+    <!-- ===== MARKET ===== -->
+    <section class="ws" id="ws-market" hidden>
+      <div class="two-col">
+        <section class="card"><div class="card-head"><h2>Market movers</h2>
+          <div class="seg" role="group" aria-label="Mover type"><button type="button" data-mov="gainers" aria-pressed="true">Gainers</button><button type="button" data-mov="losers">Losers</button><button type="button" data-mov="high_volume">Volume</button></div></div>
+          <div class="scroll-x"><table class="list"><thead><tr><th>Symbol</th><th class="r">LTP</th><th class="r">Change</th><th class="r">Volume</th></tr></thead><tbody id="moverRows"></tbody></table></div></section>
+        <section class="card"><div class="card-head"><h2>Alerts</h2><span class="age" data-age="notif">—</span></div><ul class="feed-list" id="alertList"></ul></section>
+      </div>
+    </section>
+
+    <!-- ===== RESEARCH ===== -->
+    <section class="ws" id="ws-research" hidden>
+      <div class="seg tabs" role="tablist" aria-label="Research sections">
+        <button type="button" role="tab" data-rt="context" aria-selected="true">Market context</button>
+        <button type="button" role="tab" data-rt="matrix">Live data matrix</button>
+        <button type="button" role="tab" data-rt="mantra">Stock Mantra vs CA</button>
+        <button type="button" role="tab" data-rt="backtest">Backtest replay</button>
+        <button type="button" role="tab" data-rt="news">News</button>
+        <button type="button" role="tab" data-rt="fund">Fundamentals</button>
+        <button type="button" role="tab" data-rt="ask">Ask AI</button>
+      </div>
+      <div id="researchBody" class="research-body"></div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section class="ws" id="ws-settings" hidden>
+      <div class="three-col">
+        <section class="card"><div class="card-head"><h2>Telegram alerts</h2></div>
+          <form id="tgForm" class="stack">
+            <label class="switch"><input type="checkbox" id="tgEnabled"><span></span>Send alerts to Telegram</label>
+            <label>Bot token <input id="tgToken" autocomplete="off"></label>
+            <label>Chat ID <input id="tgChat" autocomplete="off"></label>
+            <label class="switch"><input type="checkbox" id="tgRecos"><span></span>New recommendations</label>
+            <label>Only when signal score is at least <input id="tgMin" type="number" min="0" max="100" step="1"></label>
+            <label class="switch"><input type="checkbox" id="tgRisk"><span></span>Stop-loss and risk alerts</label>
+            <label class="switch"><input type="checkbox" id="tgNews"><span></span>Material news</label>
+            <div class="btn-row"><button type="submit" class="btn primary">Save</button><button type="button" class="btn ghost" id="tgTest">Send test message</button></div>
+          </form></section>
+        <section class="card"><div class="card-head"><h2>Auto-trade limits</h2></div>
+          <form id="atForm" class="stack">
+            <label class="switch"><input type="checkbox" id="atEnabled"><span></span>Auto-trade on (paper unless live is enabled on the server)</label>
+            <label>Capital (₹) <input id="atCapital" type="number" min="0" step="1000"></label>
+            <label>Max loss per day (₹) <input id="atLoss" type="number" min="0" step="100"></label>
+            <label>Profit target per day (₹) <input id="atProfit" type="number" min="0" step="100"></label>
+            <label>Symbols (comma separated; empty = watchlist) <input id="atSymbols" autocomplete="off"></label>
+            <label class="switch"><input type="checkbox" id="atOptions"><span></span>Allow options</label>
+            <div class="btn-row"><button type="submit" class="btn primary">Save limits</button></div>
+          </form>
+          <div class="card-head sub"><h2>Alerts housekeeping</h2></div>
+          <form id="nsForm" class="stack"><label>Delete alerts older than (days) <input id="nsDays" type="number" min="1" max="365" value="15"></label><div class="btn-row"><button type="submit" class="btn ghost">Save</button></div></form></section>
+        <section class="card"><div class="card-head"><h2>Trade journal</h2><button type="button" class="btn tiny ghost" id="noteNew">New note</button></div>
+          <form id="noteForm" class="stack"><input type="hidden" id="noteId">
+            <label>Title <input id="noteTitle"></label><label>Folder <input id="noteFolder" value="Trade Journal"></label>
+            <label>Note <textarea id="noteBody" rows="6"></textarea></label><label>Tags <input id="noteTags" placeholder="e.g. nifty, breakout, mistake"></label>
+            <div class="btn-row"><button type="submit" class="btn primary">Save note</button><button type="button" class="btn ghost" id="noteDelete">Delete</button></div></form>
+          <ul class="feed-list" id="noteList"></ul></section>
+      </div>
+    </section>
+  </main>
+</div>
 
 <dialog id="ticket" aria-labelledby="ticketTitle">
   <form method="dialog" id="ticketForm">
-    <h2 id="ticketTitle">Review order</h2>
-    <div class="ticket-grid">
-      <label>Contract<input id="tSymbol" required></label>
-      <label>Side<select id="tSide"><option>BUY</option><option>SELL</option></select></label>
-      <label>Lots<input id="tLots" type="number" min="1" step="1" value="1"></label>
-      <label>Lot size<input id="tLot" type="number" min="1" step="1" value="1"></label>
-      <label>Order type<select id="tType"><option>LIMIT</option><option>MARKET</option></select></label>
-      <label>Limit price<input id="tPrice" type="number" step="0.05"></label>
-      <label>Stop loss<input id="tSl" type="number" step="0.05"></label>
-      <label>Target<input id="tTgt" type="number" step="0.05"></label>
+    <div class="ticket-head" id="ticketHead"><div><h2 id="ticketTitle">Buy</h2><div class="small" id="ticketSym"></div></div>
+      <label class="switch inv"><input type="checkbox" id="tSideToggle"><span></span>Sell</label></div>
+    <div class="ticket-body">
+      <div class="ticket-grid">
+        <label>Contract<input id="tSymbol" required></label>
+        <label>Lots<input id="tLots" type="number" min="1" step="1" value="1"></label>
+        <label>Lot size<input id="tLot" type="number" min="1" step="1" value="1"></label>
+        <label>Order type<select id="tType"><option>LIMIT</option><option>MARKET</option></select></label>
+        <label>Limit price<input id="tPrice" type="number" step="0.05"></label>
+        <label>Stop loss<input id="tSl" type="number" step="0.05"></label>
+        <label>Target<input id="tTgt" type="number" step="0.05"></label>
+        <input type="hidden" id="tSide" value="BUY">
+      </div>
+      <label class="switch"><input type="checkbox" id="tLive"><span></span>Send to my broker (live). Off = paper trade.</label>
+      <p class="note" id="tSummary"></p>
     </div>
-    <label class="check"><input type="checkbox" id="tLive"> Send to my broker (live). Unticked = paper trade.</label>
-    <p class="note" id="tSummary"></p>
-    <div class="btn-row">
-      <button type="button" class="btn" id="tCancel">Cancel</button>
-      <button type="submit" class="btn primary" id="tSubmit">Place order</button>
-    </div>
+    <div class="ticket-foot"><button type="button" class="btn ghost" id="tCancel">Cancel</button><button type="submit" class="btn buy" id="tSubmit">Place order</button></div>
   </form>
 </dialog>
 
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="/static/trade/trade.js?v=5" defer></script>
+<script src="/static/vendor/lightweight-charts-4.2.0.js"></script>
+<script src="/static/trade/chart.js?v=7" defer></script>
+<script src="/static/trade/trade.js?v=7" defer></script>
 </body>
 </html>
