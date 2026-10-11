@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="/static/trade/trade.css?v=4">
+<link rel="stylesheet" href="/static/trade/trade.css?v=5">
 </head>
 <body>
 <header class="topbar">
@@ -18,12 +18,13 @@
     <a href="#options" data-ws="options">Options</a>
     <a href="#portfolio" data-ws="portfolio">Portfolio</a>
     <a href="#research" data-ws="research">Research</a>
+    <a href="#settings" data-ws="settings">Settings</a>
   </nav>
   <div class="feed" id="feedState" title="Market data source and freshness"><span class="dot"></span><span id="feedText">Connecting to Upstox…</span></div>
   <details class="menu">
     <summary aria-label="Menu" id="userName">Menu</summary>
     <div class="menu-body">
-      <a href="/terminal/classic">Classic terminal (settings, Telegram, admin, notes)</a>
+      <a href="/terminal/classic">Classic terminal (admin tools)</a>
       <button type="button" id="themeBtn">Switch light / dark</button>
       <a href="/logout">Log out</a>
     </div>
@@ -155,6 +156,54 @@
     </div>
     <div id="researchBody" class="research-body"></div>
   </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="ws" id="ws-settings" hidden>
+    <div class="cols">
+      <section class="panel">
+        <div class="panel-head"><span class="label">Telegram alerts</span></div>
+        <form id="tgForm" class="stack">
+          <label class="check"><input type="checkbox" id="tgEnabled"> Send alerts to Telegram</label>
+          <label>Bot token <input id="tgToken" autocomplete="off" placeholder="Leave as is to keep the saved token"></label>
+          <label>Chat ID <input id="tgChat" autocomplete="off"></label>
+          <label class="check"><input type="checkbox" id="tgRecos"> New recommendations</label>
+          <label>Only when signal score is at least <input id="tgMin" type="number" min="0" max="100" step="1"></label>
+          <label class="check"><input type="checkbox" id="tgRisk"> Stop-loss and risk alerts</label>
+          <label class="check"><input type="checkbox" id="tgNews"> Material news</label>
+          <div class="btn-row"><button type="submit" class="btn primary">Save</button><button type="button" class="btn" id="tgTest">Send test message</button></div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><span class="label">Auto-trade limits (paper unless live is enabled on the server)</span></div>
+        <form id="atForm" class="stack">
+          <label class="check"><input type="checkbox" id="atEnabled"> Auto-trade on</label>
+          <label>Capital (₹) <input id="atCapital" type="number" min="0" step="1000"></label>
+          <label>Max loss per day (₹) <input id="atLoss" type="number" min="0" step="100"></label>
+          <label>Profit target per day (₹) <input id="atProfit" type="number" min="0" step="100"></label>
+          <label>Symbols (comma separated; empty = your watchlist) <input id="atSymbols" autocomplete="off"></label>
+          <label class="check"><input type="checkbox" id="atOptions"> Allow options</label>
+          <div class="btn-row"><button type="submit" class="btn primary">Save limits</button></div>
+        </form>
+        <div class="panel-head"><span class="label">Alerts housekeeping</span></div>
+        <form id="nsForm" class="stack">
+          <label>Delete alerts older than (days) <input id="nsDays" type="number" min="1" max="365" value="15"></label>
+          <div class="btn-row"><button type="submit" class="btn">Save</button></div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><span class="label">Trade journal</span><button type="button" class="btn tiny" id="noteNew">New note</button></div>
+        <form id="noteForm" class="stack">
+          <input type="hidden" id="noteId">
+          <label>Title <input id="noteTitle"></label>
+          <label>Folder <input id="noteFolder" value="Trade Journal"></label>
+          <label>Note <textarea id="noteBody" rows="6"></textarea></label>
+          <label>Tags <input id="noteTags" placeholder="e.g. nifty, breakout, mistake"></label>
+          <div class="btn-row"><button type="submit" class="btn primary">Save note</button><button type="button" class="btn" id="noteDelete">Delete</button></div>
+        </form>
+        <ul class="alerts" id="noteList"></ul>
+      </section>
+    </div>
+  </section>
 </main>
 
 <dialog id="ticket" aria-labelledby="ticketTitle">
@@ -180,6 +229,6 @@
 </dialog>
 
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="/static/trade/trade.js?v=4" defer></script>
+<script src="/static/trade/trade.js?v=5" defer></script>
 </body>
 </html>

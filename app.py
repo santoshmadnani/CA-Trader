@@ -5576,6 +5576,7 @@ def detect_candlestick_patterns(candles: list[dict[str, Any]], timeframe: str) -
                 "category": category,
                 "signal": signal,
                 "confidence": confidence,
+                "confidence_basis": "Textbook pattern reliability, not measured on this instrument",
                 "prediction": prediction,
                 "candle_time": candle_time_str,
                 "from_time": str(candles[pattern_start_idx].get("timestamp") or candles[pattern_start_idx].get("ts") or ""),
@@ -8392,54 +8393,6 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
         return {"status": "error", "detail": str(exc), "agents_healthy": 9, "total_agents": 9, "events": []}
 
 
-@app.get("/api/agents/set-active")
-@app.post("/api/agents/set-active")
-async def set_active_agent_endpoint(request: Request) -> dict[str, Any]:
-    """Dynamically activates designated agent(s) on a development or live task.
-    All non-active agents automatically transition to sleeping (zzz) state."""
-    global ACTIVE_AGENT_WORK_STATE
-    try:
-        params = request.query_params
-        body = {}
-        if request.method == "POST":
-            try:
-                body = await request.json()
-            except Exception:
-                pass
-        ids_raw = body.get("active_ids") or params.get("active_ids") or "a10"
-        if isinstance(ids_raw, str):
-            ids = [x.strip() for x in ids_raw.split(",") if x.strip()]
-        else:
-            ids = list(ids_raw)
-
-        task_desc = str(body.get("task") or params.get("task") or "Autonomous Code & Strategy Engineering")
-        names_raw = body.get("names") or params.get("names") or ""
-        names = [x.strip() for x in names_raw.split(",") if x.strip()] if isinstance(names_raw, str) else list(names_raw)
-
-        ACTIVE_AGENT_WORK_STATE["active_agent_ids"] = ids
-        ACTIVE_AGENT_WORK_STATE["current_task"] = task_desc
-        if names:
-            ACTIVE_AGENT_WORK_STATE["active_agent_names"] = names
-        now_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S IST")
-        ACTIVE_AGENT_WORK_STATE["last_updated"] = now_str
-
-        return {"ok": True, "state": ACTIVE_AGENT_WORK_STATE}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)}
-
-
-@app.get("/api/agents/set-standby")
-@app.post("/api/agents/set-standby")
-async def set_agents_standby_endpoint() -> dict[str, Any]:
-    """Resets swarm to standby state where sentinels sleep (zzz) until a new task or live market starts."""
-    global ACTIVE_AGENT_WORK_STATE
-    now_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S IST")
-    ACTIVE_AGENT_WORK_STATE["active_agent_ids"] = ["a8", "a14"]
-    ACTIVE_AGENT_WORK_STATE["current_task"] = "Standby Complete · Sentinels Sleeping (zzz) until next task"
-    ACTIVE_AGENT_WORK_STATE["last_updated"] = now_str
-    return {"ok": True, "state": ACTIVE_AGENT_WORK_STATE}
-
-
 @app.get("/api/agents/recommendation-history")
 async def agents_recommendation_history(request: Request) -> dict[str, Any]:
     """Dedicated endpoint returning SQLite recommendation history filterable by timeframe."""
@@ -8461,87 +8414,6 @@ async def agents_recommendation_history(request: Request) -> dict[str, Any]:
     except Exception as exc:
         return {"ok": False, "timeframe": "5m", "count": 0, "recommendations": [], "error": str(exc)}
 
-
-
-@app.post("/api/telegram/agent-dispatch")
-async def telegram_agent_dispatch(payload: dict, request: Request) -> dict[str, Any]:
-    """Dispatches an email-style Telegram status report from a named swarm agent."""
-    try:
-        user = None
-        try:
-            user = current_user(request)
-        except Exception:
-            user = None
-        uid = (user or {}).get("id", 1)
-        cfg = get_user_telegram_config(db_exec, uid)
-        if not cfg or not cfg.get("bot_token"):
-            tg_row = db_exec(
-                "SELECT value_json FROM settings WHERE key='telegram_config' AND value_json LIKE '%bot_token%' LIMIT 1",
-                [], "one"
-            )
-            if tg_row and tg_row.get("value_json"):
-                try:
-                    cfg = json.loads(tg_row["value_json"])
-                except Exception:
-                    pass
-        if not cfg or not cfg.get("bot_token"):
-            env_tok = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("TG_BOT_TOKEN")
-            env_cid = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TG_CHAT_ID")
-            if env_tok and env_cid:
-                cfg = {"bot_token": env_tok, "chat_id": env_cid}
-
-        if not cfg or not cfg.get("bot_token") or not cfg.get("chat_id"):
-            return {"ok": False, "detail": "Telegram not configured. Please set Bot Token and Chat ID in Settings."}
-
-        agent_name = str(payload.get("agent", "Chief Audit Orchestrator"))
-        subject     = str(payload.get("subject", "Daily Swarm Status Report"))
-        accuracy    = str(payload.get("accuracy", "96.4%"))
-        healthy     = int(payload.get("healthy", 9))
-        total       = int(payload.get("total", 9))
-        anomaly     = str(payload.get("anomaly", ""))
-
-        ist_now = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y %H:%M IST")
-
-        if anomaly:
-            body = (
-                f"⚠️ <b>ANOMALY DETECTED &amp; RESOLVED</b>\n"
-                f"{anomaly}\n\n"
-                f"✅ Rolling accuracy restored: <b>{accuracy}</b>\n"
-                f"Agents healthy: <b>{healthy}/{total}</b>"
-            )
-            emoji = "🚨"
-        else:
-            body = (
-                f"All <b>{total}</b> agents reporting <b>HEALTHY ✅</b>\n"
-                f"Rolling accuracy: <b>{accuracy}</b>\n"
-                f"Agents healthy: <b>{healthy}/{total}</b>\n"
-                f"72 recommendations saved for today's session.\n"
-                f"No SL breaches detected."
-            )
-            emoji = "📩"
-
-        msg = (
-            f"{emoji} <b>[CA-Trader Agent Dispatch]</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"FROM: <b>{agent_name}</b>\n"
-            f"TO: Santosh Madnani\n"
-            f"SUBJECT: {subject}\n"
-            f"TIME: {ist_now}\n\n"
-            f"Dear Trader,\n\n"
-            f"{body}\n\n"
-            f"Warm regards,\n"
-            f"<b>{agent_name}</b>\n"
-            f"CA-Trader Autonomous Swarm 🍄\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-
-        ok, err = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], msg)
-        if ok:
-            return {"ok": True, "detail": f"Agent dispatch sent from {agent_name} to chat {cfg['chat_id']}"}
-        return {"ok": False, "detail": err or "Telegram send failed"}
-    except Exception as exc:
-        log.exception("telegram_agent_dispatch error: %s", exc)
-        return {"ok": False, "detail": str(exc)}
 
 
 @app.get("/api/agents/run-test-dispatch")
@@ -8608,12 +8480,6 @@ async def run_agent_test_dispatch(request: Request) -> dict[str, Any]:
         return {"ok": False, "detail": str(exc)}
 
 
-@app.get("/api/agents/operator-mimic")
-async def get_operator_mimic_status() -> dict[str, Any]:
-    """Returns current live state and formula tuning weights of Operator Mimic Engine."""
-    return {"ok": True, "state": OPERATOR_MIMIC_STATE}
-
-
 @app.get("/api/agents/simulate-operator-mimic")
 @app.post("/api/agents/simulate-operator-mimic")
 async def simulate_operator_mimic(request: Request) -> dict[str, Any]:
@@ -8677,44 +8543,6 @@ async def option_ltp_audit_endpoint() -> dict[str, Any]:
         "discrepancies_detected": len([c for c in checked if c.get("is_discrepancy")]),
         "discrepancy_history": OPTION_LTP_DISCREPANCY_LOG[:10],
         "audit_results": checked
-    }
-
-
-@app.get("/api/agents/telegram-swarm-audit")
-async def telegram_swarm_audit_endpoint() -> dict[str, Any]:
-    """Telegram Swarm Reviewer Agent: Audits all 16 agents to verify that:
-    1) Agents are actively working and healthily executing tasks.
-    2) Messages are verified for truthfulness (no static 97.4% spam).
-    3) Anti-Spam Gate is active and suppressing duplicate blasts."""
-    acc_stat = get_verified_empirical_accuracy()
-    now_ist = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S IST")
-    agents_audit = [
-        {"id": "a1", "name": "Feature Auditor", "role": "Technical Rationale", "status": "WORKING", "last_work": "ADX, VWAP & Imbalance parity verified (100%)"},
-        {"id": "a2", "name": "DOM Sync Watcher", "role": "DOM-DB Parity", "status": "WORKING", "last_work": "Frontend to SQLite parities confirmed"},
-        {"id": "a3", "name": "Candle Stepper", "role": "Bar Completeness", "status": "WORKING", "last_work": "5-minute bars audited, 0 missing ticks"},
-        {"id": "a4", "name": "Zero-Mock Guard", "role": "Anti-Mock Invariant", "status": "WORKING", "last_work": "14 UI panels checked, 0 placeholder dashes"},
-        {"id": "a5", "name": "Position Tracker", "role": "Position Reconciler", "status": "WORKING", "last_work": "Open trades and margins reconciled"},
-        {"id": "a6", "name": "News Sentiment", "role": "Macro Ingestion", "status": "WORKING", "last_work": "News catalysts parsed & sentiment indexed"},
-        {"id": "a7", "name": "UI & Mobile Guard", "role": "Viewport Auditor", "status": "WORKING", "last_work": "Baseline layout and flex symmetry verified"},
-        {"id": "a8", "name": "Heartbeat Sentinel", "role": "Dead-Man Switch", "status": "WORKING", "last_work": "5m heartbeat active, zero dropouts"},
-        {"id": "a9", "name": "Auto-Recalibration", "role": "Self-Healing Tuning", "status": "WORKING", "last_work": f"Empirical win rate calibrated at {acc_stat['win_rate_pct']}%"},
-        {"id": "a10", "name": "Operator Mimic", "role": "StockMantra Reverse-Eng", "status": "WORKING", "last_work": "Ingesting channel signals · Anti-spam throttle ACTIVE"},
-        {"id": "a11", "name": "Option LTP Sentinel", "role": "Intrinsic Floor Parity", "status": "WORKING", "last_work": "BANKNIFTY 55600 CE verified at ₹600+ floor"},
-        {"id": "a12", "name": "Upstox Feed Guard", "role": "Broker WebSocket", "status": "WORKING", "last_work": "Feed latency 42ms OK · Fallback armed"},
-        {"id": "a13", "name": "Bracket SL Guard", "role": "Capital Protection", "status": "WORKING", "last_work": "Trailing SL ratchet active on all orders"},
-        {"id": "a14", "name": "09:15 Consolidator", "role": "Opening Session Setup", "status": "WORKING", "last_work": "Pre-market setups consolidated (1 per symbol)"},
-        {"id": "a15", "name": "Spread Auditor", "role": "Slippage Prevention", "status": "WORKING", "last_work": "Bid-ask spread <0.25% on liquid index strikes"},
-        {"id": "a16", "name": "Telegram Reviewer", "role": "Anti-Spam & Fact-Checker", "status": "WORKING", "last_work": "Auditing outbound bot alerts · Deduplication armed"}
-    ]
-    return {
-        "ok": True,
-        "swarm_status": "All 16 Sentinels Active",
-        "verified_accuracy_pct": acc_stat["win_rate_pct"],
-        "total_verified_closed_trades": acc_stat["total_trades"],
-        "time_ist": now_ist,
-        "anti_spam_gate": "ENABLED",
-        "option_ltp_sentinel": "ACTIVE",
-        "agents": agents_audit
     }
 
 
@@ -9048,50 +8876,6 @@ SKILL_CATALOG = [
         "code_impact": "backend/services/telegram_service.py: format_consolidated_watchlist_recommendation"
     }
 ]
-
-@app.get("/api/agents/skills/catalog")
-async def agents_skills_catalog(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """Returns the catalog of active skills and terminal capabilities."""
-    return {"ok": True, "skills": SKILL_CATALOG}
-
-@app.get("/api/agents/skills/proposals")
-async def agents_skills_proposals(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """Returns daily proposed features and approval status."""
-    rows = db_exec("SELECT * FROM feature_proposals ORDER BY proposed_at DESC LIMIT 20", [], "all") or []
-    return {"ok": True, "proposals": rows}
-
-@app.post("/api/agents/skills/propose")
-async def agents_skills_propose_feature(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """Autonomous agent generates a new daily feature enhancement and sends review request to Telegram."""
-    from backend.services.telegram_service import get_user_telegram_config, send_telegram_msg, make_feature_review_keyboard
-    existing_ids = {r["id"] for r in (db_exec("SELECT id FROM feature_proposals", [], "all") or [])}
-    candidate = next((s for s in SKILL_CATALOG if s["id"] not in existing_ids), SKILL_CATALOG[0])
-    
-    prop_id = f"{candidate['id']}_{datetime.now().strftime('%Y%m%d')}"
-    now_str = datetime.now().isoformat()
-    db_exec(
-        "INSERT INTO feature_proposals(id, title, category, description, code_impact, status, proposed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET proposed_at=excluded.proposed_at",
-        [prop_id, candidate["title"], candidate["category"], candidate["description"], candidate["code_impact"], "PENDING", now_str]
-    )
-
-    cfg = get_user_telegram_config(db_exec, user["id"])
-    sent = False
-    if cfg and cfg.get("bot_token") and cfg.get("chat_id"):
-        card = (
-            f"💡 <b>[CA-TRADER AUTONOMOUS FEATURE PROPOSAL]</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"✨ <b>Feature:</b> {candidate['title']}\n"
-            f"🏷️ <b>Category:</b> <code>{candidate['category']}</code>\n"
-            f"🎯 <b>Value:</b> {candidate['description']}\n"
-            f"⚡ <b>Target Pipeline:</b> <code>{candidate['code_impact']}</code>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"<i>Tap below to authorize or reject swarm deployment:</i>"
-        )
-        kb = make_feature_review_keyboard(prop_id)
-        ok, _ = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], card, "HTML", kb)
-        sent = ok
-
-    return {"ok": True, "proposal_id": prop_id, "dispatched_to_telegram": sent, "feature": candidate}
 
 @app.post("/api/agents/recommendations/dispatch-now")
 async def agents_dispatch_consolidated_recommendation(
@@ -9831,6 +9615,38 @@ def _load_market_mover_instruments() -> list[tuple[str,str]]:
         log.warning("Unable to refresh Upstox NSE instrument master for market movers: %s", safe_text(exc))
     return _market_mover_instruments
 
+UPSTOX_MCX_INSTRUMENTS_URL = "https://assets.upstox.com/market-quote/instruments/exchange/MCX.json.gz"
+_mcx_option_rows: list[dict[str, Any]] = []
+_mcx_option_rows_loaded_at: float = 0.0
+
+
+def _mcx_option_contracts(root: str) -> list[dict[str, Any]]:
+    """All live MCX option contracts for `root` from the Upstox MCX instrument master (refreshed daily)."""
+    global _mcx_option_rows, _mcx_option_rows_loaded_at
+    if not _mcx_option_rows or (time.time() - _mcx_option_rows_loaded_at) > 86400:
+        try:
+            r = requests.get(UPSTOX_MCX_INSTRUMENTS_URL, timeout=25, headers={"Accept": "application/json"})
+            r.raise_for_status()
+            payload = json.loads(gzip.decompress(r.content).decode("utf-8"))
+            rows = payload if isinstance(payload, list) else payload.get("data", [])
+            out = []
+            for row in rows:
+                if str(row.get("instrument_type") or "").upper() not in {"CE", "PE"}:
+                    continue
+                exp = row.get("expiry")
+                if isinstance(exp, (int, float)):
+                    exp = datetime.fromtimestamp(exp / 1000, IST).date().isoformat()
+                out.append({"instrument_key": row.get("instrument_key"), "trading_symbol": row.get("trading_symbol"),
+                            "underlying": str(row.get("underlying_symbol") or row.get("asset_symbol") or row.get("name") or "").upper().replace(" ", ""),
+                            "strike_price": row.get("strike_price"), "instrument_type": str(row.get("instrument_type")).upper(),
+                            "lot_size": row.get("lot_size"), "expiry": str(exp)[:10]})
+            if out:
+                _mcx_option_rows, _mcx_option_rows_loaded_at = out, time.time()
+        except Exception as exc:
+            log.warning("Unable to refresh Upstox MCX instrument master: %s", safe_text(exc))
+    return [r for r in _mcx_option_rows if r["underlying"] == root or r["underlying"].startswith(root)]
+
+
 def _full_market_mover_snapshot() -> list[dict[str,Any]]:
     global _market_mover_snapshot
     if _market_mover_snapshot and (time.time()-_market_mover_snapshot[0]) < 30:
@@ -9935,10 +9751,9 @@ async def market_movers(category: str = "gainers", limit: int = Query(10, ge=5, 
     cached_movers = CACHE.get(mover_cache_key)
     if cached_movers is not None: return cached_movers
     try:
-        items = _fetch_moneycontrol_movers(cat)
-        source = "moneycontrol" if items else "upstox"
-        if not items:
-            items = _full_market_mover_snapshot()
+        # Upstox only: full NSE equity snapshot from the Upstox instrument master + batched quotes
+        items = _full_market_mover_snapshot()
+        source = "upstox"
         if not items:
             # Fallback based on premier Nifty 50 constituents so section is never blank
             # Premier Nifty constituents batch quote from live Upstox API
@@ -9991,21 +9806,7 @@ async def market_movers(category: str = "gainers", limit: int = Query(10, ge=5, 
                 log.warning("Live market mover quote fallback failed: %s", safe_text(e_live))
 
         if not items:
-            # Ultimate safety fallback if Upstox connectivity is completely severed
-            sample_constituents = [
-                ("RELIANCE", 1307.20, -5.90, -0.45, 1250000),
-                ("HDFCBANK", 1650.40, 12.80, 0.78, 2300000),
-                ("INFY", 1885.00, 24.50, 1.32, 980000),
-                ("TCS", 4120.00, -18.20, -0.44, 450000),
-                ("ICICIBANK", 1245.50, 14.10, 1.14, 1800000),
-                ("BHARTIARTL", 1680.00, 32.00, 1.94, 1100000),
-                ("SBIN", 815.20, 6.40, 0.79, 1400000),
-                ("LICI", 985.00, -8.50, -0.85, 750000),
-                ("ITC", 465.30, 2.10, 0.45, 1900000),
-                ("HINDUNILVR", 2380.00, -15.00, -0.63, 620000)
-            ]
-            items = [{"symbol":s, "ltp":l, "change":c, "change_pct":p, "volume":v, "turnover":round(v*l,2), "circuit_limit":None} for s,l,c,p,v in sample_constituents]
-            source = "index_fallback"
+            source = "unavailable"  # no Upstox quotes: show an empty list, never sample prices
         if cat=="gainers": items.sort(key=lambda x:x.get("change_pct",0),reverse=True)
         elif cat=="losers": items.sort(key=lambda x:x.get("change_pct",0))
         elif cat=="high_volume": items.sort(key=lambda x:x.get("volume",0),reverse=True)
@@ -10740,12 +10541,15 @@ def generate_option_chain_engine(underlying: str, expiry: str | None = None) -> 
         spot = float(q.get("ltp") or 0.0) or None
     except Exception:
         spot = None
-    try:
-        found = UPSTOX.search_instruments(root, exchanges="MCX" if is_mcx else "NSE,BSE", segments="ALL").get("data") or []
-    except Exception as exc:
-        return {**empty, "error": f"Upstox contract search failed: {safe_text(exc)}"}
-    contracts = [r for r in found if str(r.get("instrument_type") or "").upper() in {"CE", "PE"}
-                 and str(r.get("underlying_symbol") or r.get("name") or root).upper().replace(" ", "").startswith(root)]
+    if is_mcx:
+        contracts = _mcx_option_contracts(root)  # full contract list from the Upstox MCX instrument master
+    else:
+        try:
+            found = UPSTOX.search_instruments(root, exchanges="NSE,BSE", segments="ALL").get("data") or []
+        except Exception as exc:
+            return {**empty, "error": f"Upstox contract search failed: {safe_text(exc)}"}
+        contracts = [r for r in found if str(r.get("instrument_type") or "").upper() in {"CE", "PE"}
+                     and str(r.get("underlying_symbol") or r.get("name") or root).upper().replace(" ", "").startswith(root)]
     today = datetime.now(IST).date().isoformat()
     exps = sorted({str(r.get("expiry"))[:10] for r in contracts if str(r.get("expiry") or "")[:10] >= today})
     if not contracts or not exps:
@@ -10846,10 +10650,9 @@ async def option_expiries(underlying: str, user: dict[str, Any] = Depends(requir
     if is_mcx:
         # MCX option expiries straight from the Upstox instrument search (no calendar guessing)
         try:
-            found = await asyncio.wait_for(asyncio.to_thread(UPSTOX.search_instruments, root, "MCX", "ALL"), timeout=4.0)
+            rows = await asyncio.wait_for(asyncio.to_thread(_mcx_option_contracts, root), timeout=30.0)
             today_iso = datetime.now(IST).date().isoformat()
-            exps = sorted({str(r.get("expiry"))[:10] for r in (found.get("data") or [])
-                           if str(r.get("instrument_type") or "").upper() in {"CE", "PE"} and str(r.get("expiry") or "")[:10] >= today_iso})
+            exps = sorted({r["expiry"] for r in rows if r["expiry"] >= today_iso})
             expiries = [datetime.strptime(x, "%Y-%m-%d").strftime("%d %b %Y").upper() for x in exps[:4]]
         except Exception as exc:
             log.warning("MCX expiry lookup failed for %s: %s", root, safe_text(exc))
@@ -16511,145 +16314,6 @@ async def ai_dashboard(symbol: str = Query("NIFTY"), force: int = Query(0), user
     CACHE.set(cache_key, result, 30)
     return result
 
-def _ca_ai_quantitative_chat(symbol: str, message: str, current_setup: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
-    """Generates authoritative institutional trader analysis with setup updates when AI API is unavailable."""
-    msg_low = message.lower().strip()
-    sym = (symbol or "NIFTY").upper()
-
-    # Conversational / Casual Queries (Hindi / Hinglish / English)
-    if any(w in msg_low for w in ["khana", "lunch", "dinner", "breakfast", "khao", "food", "khaye", "khaya"]):
-        return (
-            f"Arey Santosh ji, main to institutional AI assistant hoon, mera khana to live market ticks, Level-2 order flow aur charts hain! 😄\n\n"
-            f"Aap batayein, aapne lunch/dinner kar liya? Trading sessions mein time par khana, proper rest aur hydration bohot zaroori hai! "
-            f"Aaj `{sym}` par market ka structure kafi interesting hai. Koi specific strike ya setup analyze karein?",
-            None
-        )
-    if any(w in msg_low for w in ["kya haal", "kaise ho", "how are you", "kaisa hai", "sab thik", "sab theek", "all good"]):
-        return (
-            f"Main bilkul mast aur fully energized hoon! ⚡ Live market feeds continuously process kar raha hoon.\n\n"
-            f"Currently `{sym}` ka multi-timeframe structure scan ho chuka hai. "
-            f"Aap batayein, aaj trading session kaisa chal raha hai? Koi trade ya option hedge evaluate karna hai?",
-            None
-        )
-    if any(w in msg_low for w in ["hello", "hi", "hey", "namaste", "pranam", "good morning", "good afternoon", "good evening"]):
-        return (
-            f"Namaste Santosh ji! ✦ Main aapka CA AI quantitative trading assistant hoon.\n\n"
-            f"Aap `{sym}` ke option chain, Greeks (Delta/Theta), news impact ya entry/exit levels ke baare mein kuch bhi pooch sakte hain. "
-            f"Main real-time mathematical validation ke saath turant analyze karke bataunga!",
-            None
-        )
-    sym = (symbol or "NIFTY").upper()
-    direction = str(current_setup.get("direction") or "BUY").upper()
-    contract = str(current_setup.get("contract") or f"{sym} Nearest ATM")
-    entry = float(current_setup.get("entry") or 100.0)
-    sl = float(current_setup.get("stop_loss") or (entry * 0.85))
-    target = float(current_setup.get("target") or (entry * 1.30))
-    updated_setup = None
-
-    # Scenario 1: Trader requests switching to PUT / Short / Bearish
-    if any(w in msg_low for w in ["put", " pe", "bearish", "short", "downside", "sell call"]):
-        new_contract = contract.replace("CE", "PE") if "CE" in contract else f"{sym} At-The-Money PE"
-        new_entry = round(entry, 2)
-        tgt_gain = round(max(3.0, min(new_entry * 0.15, max(new_entry * 0.08, 20.0))), 2)
-        sl_dist = round(max(1.5, tgt_gain / 1.7), 2)
-        new_sl = round(max(0.05, new_entry - sl_dist), 2)
-        new_target = round(new_entry + tgt_gain, 2)
-        updated_setup = {
-            "action": "UPDATE_SETUP",
-            "symbol": sym,
-            "contract": new_contract,
-            "direction": "BUY",
-            "entry": new_entry,
-            "stop_loss": new_sl,
-            "target": new_target,
-            "target_profit": round((new_target - new_entry) * 50, 2),
-            "est_gain": round(((new_target - new_entry) / max(new_entry, 1)) * 100, 1),
-            "sl_rationale": "Tight trailing risk anchor placed just above short-term swing pivot resistance",
-            "target_rationale": "Projected downside liquidity sweep targeting daily session low",
-            "pillar_technical": "Bearish momentum divergence with breakdown below intraday volume-weighted average price",
-            "pillar_news": "Institutional sector repositioning favoring defensive put hedging",
-            "pillar_greeks": "Positive Delta on PE hedge with favorable Vega expansion on volatility spikes",
-            "pillar_risk": "Strict 1:2 R:R capital protection limit applied"
-        }
-        reply = (
-            f"**CA AI Institutional Strategy Update — {sym}**\n\n"
-            f"• **Setup Reversal Executed**: Shifted exposure to `{new_contract}`. "
-            f"Momentum signals show downside exhaustion in Call open interest and rising Put accumulation.\n"
-            f"• **Execution Level**: Entry at **₹{new_entry:.2f}**, Protective Stop Loss anchored at **₹{new_sl:.2f}** "
-            f"(-18% risk budget), Target at **₹{new_target:.2f}** (+35% reward, 1:2 Risk/Reward).\n"
-            f"• **Greeks Rationale**: Positive Gamma acceleration into intraday swings with controlled Theta decay.\n\n"
-            f"```json\n{json.dumps(updated_setup, indent=2)}\n```"
-        )
-        return reply, updated_setup
-
-    # Scenario 2: Trader requests tightening Stop Loss or reducing risk
-    if any(w in msg_low for w in ["sl", "stop", "loss", "tighten", "risk", "protect"]):
-        tight_sl = round(entry * 0.92, 2) if entry > sl else round(sl * 1.05, 2)
-        updated_setup = {
-            "action": "UPDATE_SETUP",
-            "symbol": sym,
-            "contract": contract,
-            "direction": direction,
-            "entry": entry,
-            "stop_loss": tight_sl,
-            "target": target,
-            "target_profit": round((target - entry) * 50, 2),
-            "est_gain": round(((target - entry) / max(entry, 1)) * 100, 1),
-            "sl_rationale": "High-conviction capital preservation stop trailed closely beneath the latest swing pivot",
-            "target_rationale": "Original expansion target preserved for favorable asymmetric return",
-            "pillar_technical": "Trailing defensive pivot guard",
-            "pillar_news": "Neutral macro flow",
-            "pillar_greeks": "Protects against sudden intraday IV contraction",
-            "pillar_risk": "Risk per unit reduced to under 8%"
-        }
-        reply = (
-            f"**CA AI Institutional Risk Adjustment — {sym}**\n\n"
-            f"• **Stop Loss Tightened**: Adjusted stop loss to **₹{tight_sl:.2f}** to lock in capital and eliminate tail risk.\n"
-            f"• **Current Bias**: Maintaining `{direction}` bias on `{contract}` with target intact at **₹{target:.2f}**.\n"
-            f"• **Execution Advice**: If price consolidates for more than 4 candles without advancing, consider taking partial profit at breakeven.\n\n"
-            f"```json\n{json.dumps(updated_setup, indent=2)}\n```"
-        )
-        return reply, updated_setup
-
-    # Scenario 3: Trader requests higher target or profit extension
-    if any(w in msg_low for w in ["target", "profit", "exit", "gain", "higher"]):
-        new_target = round(entry * 1.50, 2)
-        updated_setup = {
-            "action": "UPDATE_SETUP",
-            "symbol": sym,
-            "contract": contract,
-            "direction": direction,
-            "entry": entry,
-            "stop_loss": sl,
-            "target": new_target,
-            "target_profit": round((new_target - entry) * 50, 2),
-            "est_gain": round(((new_target - entry) / max(entry, 1)) * 100, 1),
-            "sl_rationale": "Preserved swing baseline",
-            "target_rationale": "Extended Fibonacci 1.618 expansion level target",
-            "pillar_technical": "Strong continuation impulse with breakout volume",
-            "pillar_news": "Catalyst supports broader rally",
-            "pillar_greeks": "Favorable Delta expansion",
-            "pillar_risk": "Asymmetric 1:3.3 R:R setup"
-        }
-        reply = (
-            f"**CA AI Profit Extension — {sym}**\n\n"
-            f"• **Target Extended**: Raised profit target to **₹{new_target:.2f}** (+50% est. gain) matching the Fibonacci extension.\n"
-            f"• **Risk Management**: Maintain Stop Loss at **₹{sl:.2f}**. Trail stop to cost once price hits +20% gain.\n\n"
-            f"```json\n{json.dumps(updated_setup, indent=2)}\n```"
-        )
-        return reply, updated_setup
-
-    # Default: Authoritative Quantitative Trader Analysis
-    reply = (
-        f"**CA AI Institutional Market Analysis — {sym}**\n\n"
-        f"• **Order Flow & Structure**: `{sym}` is trading around key session pivot zones. Institutional volume profile indicates steady liquidity absorption.\n"
-        f"• **Greeks Evaluation**: For the active contract `{contract}`, implied volatility remains stable. Current Delta gives solid price responsiveness while Theta decay is manageable inside the standard holding window.\n"
-        f"• **Levels to Watch**: Key intraday support is established near recent swing lows with overhead resistance at the prior session high.\n"
-        f"• **Tactical Recommendation**: Maintain disciplined trade execution on `{direction} {contract}` at entry ₹{entry:.2f}, honoring Stop Loss at ₹{sl:.2f} and Target ₹{target:.2f}."
-    )
-    return reply, None
-
-
 @app.post("/api/ai/dashboard/chat")
 async def ai_dashboard_chat(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     body = await request.json()
@@ -16740,10 +16404,8 @@ User's message:
         elif any(w in msg_low for w in ["fund", "balance", "capital", "money"]):
             text = f"Your starting account capital is **₹{float(pb.get('starting_balance') or 100000):,.2f}** and current balance is **₹{float(pb.get('current_balance') or 100000):,.2f}**."
         else:
-            fallback_reply, fallback_setup = _ca_ai_quantitative_chat(symbol, message, current_setup)
-            text = fallback_reply
-            if fallback_setup:
-                updated_setup = fallback_setup
+            ctx = await asyncio.to_thread(build_ai_market_context, extract_root_symbol(symbol).upper(), None)
+            text = render_ai_context_markdown(ctx)
 
     match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
     if match:
@@ -17909,41 +17571,6 @@ async def stock_mantra_telegram_feed(user: dict[str, Any] = Depends(require_user
         "setups": setups,
     }
 
-@app.get("/api/telegram/stockmantra-banknifty")
-async def stockmantra_banknifty_endpoint() -> dict[str, Any]:
-    """Returns the latest active recommendation specifically for BANKNIFTY from Stock Mantra."""
-    bn_setup = get_stock_mantra_setup("BANKNIFTY") or LIVE_STOCKMANTRA_SETUPS.get("BANKNIFTY")
-    if not bn_setup:
-        for k, v in LIVE_STOCKMANTRA_SETUPS.items():
-            if "BANKNIFTY" in str(k).upper() or "BANK" in str(k).upper():
-                bn_setup = v
-                break
-    raw_snippets = []
-    try:
-        _bdir = Path(__file__).resolve().parent
-        for p in [Path("/home/ubuntu/CA-Trader/data/stockmantra_3months.json"), _bdir / "data" / "stockmantra_3months.json"]:
-            if p.exists():
-                msgs = json.loads(p.read_text(encoding="utf-8", errors="ignore"))
-                for m in reversed(msgs):
-                    txt = m.get("text", "")
-                    if any(w in txt.upper() for w in ("BANKNIFTY", "BANK NIFTY", "BN ")):
-                        raw_snippets.append({"date": m.get("date"), "text": txt[:140]})
-                        if len(raw_snippets) >= 4:
-                            break
-                break
-    except Exception as exc:
-        raw_snippets.append({"err": str(exc)})
-
-    return {
-        "ok": True,
-        "underlying": "BANKNIFTY",
-        "has_recommendation": bn_setup is not None,
-        "setup": bn_setup,
-        "all_live_count": len(LIVE_STOCKMANTRA_SETUPS),
-        "live_symbols": list(LIVE_STOCKMANTRA_SETUPS.keys()),
-        "raw_bank_snippets": raw_snippets
-    }
-
 # ==============================================================================
 # 🎯 STOCK MANTRA INDEX DATABASE & FORMULA CALIBRATION API
 # ==============================================================================
@@ -18358,109 +17985,65 @@ async def api_recommendations_for_date(request: Request, date: str | None = None
 # 🤖 Ask CA AI & Model Intelligence Endpoint (Item 13)
 # ===========================================================================
 
-def synthesize_jarvis_market_analysis(root: str, prompt: str, cur_ltp: float, net_chg: float, chg_pct: float, hist_date: str | None = None) -> str:
-    candles = []
+def build_ai_market_context(root: str, hist_date: str | None = None) -> dict[str, Any]:
+    """Real data the AI may use: Upstox quote, signal-model factors, latest Stock Mantra call, recent app recommendations,
+    and a point-in-time replay when a past date is asked about."""
+    ctx: dict[str, Any] = {"instrument": root, "as_of": now_iso()}
     try:
-        candles = UPSTOX.candles(root, "5", "minutes", days=3)
+        q = UPSTOX.quote(root)
+        ctx["quote"] = {k: q.get(k) for k in ("ltp", "open", "high", "low", "cp", "net_change", "change_pct", "volume")}
+    except Exception as exc:
+        ctx["quote"] = {"error": safe_text(exc)}
+    try:
+        rec = overall_recommendation(root, "5m")
+        m = rec.get("signal_model") or {}
+        ctx["signal_model"] = {"decision": m.get("decision"), "score": m.get("score"), "gate": m.get("gate"), "confidence": m.get("confidence"),
+                               "factors": [{k: r.get(k) for k in ("name", "input", "points", "weight_pct", "contribution")} for r in (m.get("rows") or [])]}
+        ctx["engine_levels"] = {k: rec.get(k) for k in ("recommendation", "display_symbol", "entry", "stop_loss", "target", "risk_reward")}
+    except Exception as exc:
+        ctx["signal_model"] = {"error": safe_text(exc)}
+    sm = get_stock_mantra_setup(root)
+    if sm:
+        ctx["stock_mantra_latest"] = {k: sm.get(k) for k in ("symbol", "entry", "target_1", "stop_loss", "date", "time", "cmp", "peak_reported")}
+    try:
+        ctx["recent_app_recommendations"] = db_exec(
+            "SELECT created_at, symbol, recommendation, entry, target, stop_loss, outcome, final_pnl FROM recommendations "
+            "WHERE underlying=? OR symbol LIKE ? ORDER BY created_at DESC LIMIT 8", [root, f"%{root}%"], "all") or []
     except Exception:
-        candles = []
-    
-    ta = technical_analysis(candles) if candles else {}
-    rsi_val = ta.get("rsi")
-    ema20_val = ta.get("ema20")
-    vwap_val = ta.get("vwap")
-    atr_val = ta.get("atr")
-    trend = ta.get("trend") or ("BUY" if chg_pct >= 0 else "SELL")
-    supertrend_sig = ta.get("supertrend_signal") or trend
-    
-    p = cur_ltp if cur_ltp > 0 else (float(candles[-1].get("close")) if candles else (55000.0 if "BANK" in root else 24500.0 if "NIFTY" in root else 2500.0))
-    step = 100 if "BANK" in root else 50 if "NIFTY" in root else 20
-    atm_strike = int(round(p / step) * step)
-    
-    if candles and len(candles) >= 15:
-        hi = max(float(c.get("high") or p) for c in candles[-30:])
-        lo = min(float(c.get("low") or p) for c in candles[-30:])
-        cl = float(candles[-1].get("close") or p)
-    else:
-        hi = p * 1.008
-        lo = p * 0.992
-        cl = p
-    
-    pivot = (hi + lo + cl) / 3.0
-    r1 = 2 * pivot - lo
-    s1 = 2 * pivot - hi
-    r2 = pivot + (hi - lo)
-    s2 = pivot - (hi - lo)
-    
-    atr_est = float(atr_val) if atr_val and atr_val > 0 else round(p * 0.006, 2)
-    vwap_est = float(vwap_val) if vwap_val and vwap_val > 0 else round(p - (net_chg * 0.4), 2)
-    rsi_est = round(float(rsi_val), 1) if rsi_val and rsi_val > 0 else (58.4 if trend == "BUY" else 42.1)
-    ema20_est = round(float(ema20_val), 2) if ema20_val and ema20_val > 0 else round(p * (0.996 if trend == "BUY" else 1.004), 2)
-    
-    prompt_l = prompt.lower()
-    
-    if any(k in prompt_l for k in ["setup", "trade", "buy", "sell", "reco", "call", "put", "strike", "entry"]):
-        dir_bias = "BULLISH" if trend == "BUY" else "BEARISH"
-        pref_opt = f"{atm_strike} CE" if dir_bias == "BULLISH" else f"{atm_strike} PE"
-        entry_p = p
-        sl_p = p - (1.2 * atr_est) if dir_bias == "BULLISH" else p + (1.2 * atr_est)
-        t1_p = p + (1.5 * atr_est) if dir_bias == "BULLISH" else p - (1.5 * atr_est)
-        t2_p = p + (2.6 * atr_est) if dir_bias == "BULLISH" else p - (2.6 * atr_est)
-        
-        return f"""### 🎯 CA Jarvis Quantitative Setup: {root}
-**Directional Bias:** `{dir_bias}` (Supertrend: {supertrend_sig} | RSI 14: {rsi_est} | VWAP: ₹{vwap_est:,.2f})
+        pass
+    if hist_date:
+        day = _parse_day(hist_date)
+        r = replay_signals_for_day(root, day, 10)
+        ctx["replay_for_date"] = {"date": day.isoformat(), "ok": r.get("ok"), "error": r.get("error"), "summary": r.get("summary"),
+                                  "signals": [{k: i.get(k) for k in ("time", "recommendation", "score", "entry", "stop_loss", "target", "outcome", "exit_time", "final_pnl")} for i in r.get("items", [])],
+                                  "method": r.get("method")}
+    return ctx
 
----
 
-#### 1. Tactical Execution Plan
-- **Primary Contract:** `{root} {pref_opt}`
-- **Spot Pullback Entry Zone:** ₹{entry_p:,.2f}
-- **Structural Stop-Loss:** ₹{sl_p:,.2f} (Buffer: 1.2x ATR)
-- **Target 1 (Safe Exit / Lock Cost):** ₹{t1_p:,.2f} (R:R 1:1.5)
-- **Target 2 (Runner Expansion):** ₹{t2_p:,.2f} (R:R 1:2.6)
+def render_ai_context_markdown(ctx: dict[str, Any]) -> str:
+    """Plain rendering of the AI context when no language model is available."""
+    root = ctx.get("instrument"); q = ctx.get("quote") or {}; m = ctx.get("signal_model") or {}
+    out = [f"**{root}** · LTP {q.get('ltp', '—')} ({(q.get('change_pct') or 0):+.2f}%)" if q.get("ltp") else f"**{root}** · no Upstox quote available"]
+    if m.get("decision"):
+        conf = (m.get("confidence") or {}).get("label") or "not measured"
+        out.append(f"\n**Signal model:** {m['decision']} · score {m['score']:+.1f} (gate ±{m['gate']:.0f}) · confidence: {conf}\n")
+        out.append("| Factor | Live input | Points | Weight | Adds |\n|---|---|---|---|---|")
+        out += [f"| {r['name']} | {r['input']} | {r['points'] if r['points'] is not None else '—'} | {r['weight_pct']}% | {r['contribution']:+.1f} |" for r in m.get("factors", [])]
+    sm = ctx.get("stock_mantra_latest")
+    if sm:
+        out.append(f"\n**Stock Mantra:** {sm.get('symbol')} near ₹{sm.get('entry')} ({sm.get('date')} {sm.get('time')}); target {sm.get('target_1') or 'open'}, SL {sm.get('stop_loss') or 'not stated'}.")
+    rp = ctx.get("replay_for_date")
+    if rp:
+        if rp.get("ok"):
+            s = rp.get("summary") or {}
+            out.append(f"\n**Replay {rp['date']}:** {s.get('total_trades')} signals, {s.get('wins')} winners, net {s.get('total_points')} pts.\n")
+            out.append("| Time | Signal | Score | Entry | SL | Target | Outcome | Points |\n|---|---|---|---|---|---|---|---|")
+            out += [f"| {i['time']} | {i['recommendation']} | {i['score']:+.1f} | {i['entry']} | {i['stop_loss']} | {i['target']} | {i['outcome']} {i['exit_time']} | {i['final_pnl']:+.1f} |" for i in rp.get("signals", [])]
+        else:
+            out.append(f"\n**Replay {rp['date']}:** {rp.get('error')}")
+    out.append("\n_Gemini is not configured, so this is the underlying data rather than a written answer._")
+    return "\n".join(out)
 
-#### 2. Indicator Confluence Matrix
-- **Moving Average Alignment:** Spot is trading {f"₹{p - ema20_est:+.2f} above" if p >= ema20_est else f"₹{ema20_est - p:+.2f} below"} 20-EMA (₹{ema20_est:,.2f}).
-- **Relative Strength:** RSI (14) stands at `{rsi_est}`, reflecting {("healthy bullish expansion" if rsi_est >= 55 else "bearish continuation pressure" if rsi_est <= 45 else "sideways consolidation zone")}.
-- **Session VWAP Delta:** Spot is {f"+₹{p - vwap_est:.2f} above session VWAP" if p >= vwap_est else f"-₹{vwap_est - p:.2f} below session VWAP"}, signaling {("institutional absorption on dips" if p >= vwap_est else "seller dominance on retests")}.
-
-#### 3. Execution Discipline
-> [!NOTE]
-> Do not chase candles at extremes. Wait for a minor pullback towards ₹{ema20_est:,.2f} or VWAP (₹{vwap_est:,.2f}) before trigger execution."""
-
-    elif any(k in prompt_l for k in ["support", "resistance", "level", "pivot", "range", "s1", "r1"]):
-        return f"""### 📐 CA Jarvis Key Institutional Levels: {root}
-**Current Price:** ₹{p:,.2f} | **Session High/Low:** ₹{hi:,.2f} / ₹{lo:,.2f}
-
----
-
-| Level Identifier | Price (₹) | Distance (Pts) | Structural Significance |
-|---|---|---|---|
-| **Resistance 2 (R2)** | ₹{r2:,.2f} | {f"+{r2 - p:,.2f}" if r2 > p else f"{r2 - p:,.2f}"} | Secondary institutional profit-taking cluster |
-| **Resistance 1 (R1)** | ₹{r1:,.2f} | {f"+{r1 - p:,.2f}" if r1 > p else f"{r1 - p:,.2f}"} | Primary intraday breakout ceiling |
-| **Pivot Point (PP)** | ₹{pivot:,.2f} | {f"{pivot - p:+,.2f}"} | Neutral balance line for current session |
-| **Session VWAP** | ₹{vwap_est:,.2f} | {f"{vwap_est - p:+,.2f}"} | Institutional volume-weighted benchmark |
-| **Support 1 (S1)** | ₹{s1:,.2f} | {f"{s1 - p:+,.2f}"} | Primary buyer liquidity defense zone |
-| **Support 2 (S2)** | ₹{s2:,.2f} | {f"{s2 - p:+,.2f}"} | Deep demand zone / extreme oversold cushion |
-
----
-
-> [!TIP]
-> A sustained 5-minute candle close beyond **R1 (₹{r1:,.2f})** confirms continuation towards R2, while a break below **S1 (₹{s1:,.2f})** opens retests of S2."""
-
-    else:
-        regime = "Trend Expansion" if abs(chg_pct) >= 0.6 else "Range Consolidation"
-        volatility_state = "Elevated Volatility" if atr_est > (p * 0.007) else "Normal Compressed Volatility"
-        return f"""### 📊 CA Jarvis Quantitative Intelligence: {root}
-- **Current Quote:** ₹{p:,.2f} ({net_chg:+.2f} / {chg_pct:+.2f}%)
-- **Market Regime:** `{regime}` · `{volatility_state}` (ATR: {atr_est:,.2f} pts)
-- **Technical Confluence:**
-  - **Supertrend:** `{supertrend_sig}`
-  - **RSI (14):** `{rsi_est}` ({'Overbought Warning' if rsi_est > 70 else 'Oversold Opportunity' if rsi_est < 30 else 'Balanced Momentum'})
-  - **20-EMA:** ₹{ema20_est:,.2f} | Price is {('trading above' if p >= ema20_est else 'trading below')} short-term trend
-  - **Session VWAP:** ₹{vwap_est:,.2f} ({f"+₹{p - vwap_est:.2f}" if p >= vwap_est else f"-₹{vwap_est - p:.2f}"})
-- **Strike Landscape:** ATM Strike at `{atm_strike}`. Call writing hurdle at `{atm_strike + step*2}`; Put writing base at `{atm_strike - step*2}`.
-- **Risk Recommendation:** Maintain position sizing strictly within 1.0% to 1.5% max portfolio risk per trade."""
 
 class AskAiRequest(BaseModel):
     prompt: str
@@ -18491,73 +18074,28 @@ async def api_ask_ca_ai(payload: AskAiRequest, user: dict[str, Any] = Depends(re
         hist_date = payload.date
         
     if mode == "code":
-        reply = f"""### 🛠️ CA AI Code & App Management Mode (Admin)
-**Target Component:** CA Trader Bifurcated Core Engine & Terminal UI  
-**Execution Pipeline:** GitHub MCP / Server Sync Pipeline  
+        return {"ok": True, "mode": "code", "symbol": root,
+                "reply": "Code changes are not made from the web app. Use the repository (GitHub) and the deploy pipeline instead."}
 
-Your instruction:
-> "{prompt}"
-
-**Action Analysis:**
-1. Code verification: Scanned `terminal.html` and `app.py` for target structures.
-2. Syntax validation: `py_compile` checks passing with zero syntax or runtime errors.
-3. Live state: Server running healthy on Oracle VM under systemd (`catrader.service`).
-
-*To implement visual style changes immediately without code rebuilds, use the integrated **Edit UI** button.*"""
-        return {"ok": True, "mode": "code", "reply": reply, "symbol": root}
-
-    # Fetch real-time market quote
-    active_quote = {}
-    try:
-        active_quote = UPSTOX.quote(root)
-    except Exception:
-        pass
-    cur_ltp = float(active_quote.get("ltp") or 0)
-    net_chg = float(active_quote.get("net_change") or 0)
-    chg_pct = float(active_quote.get("change_pct") or (net_chg / (cur_ltp - net_chg) * 100 if cur_ltp and cur_ltp != net_chg else 0.0))
-
-    # Fetch recorded recommendations from database
-    db_recos = []
-    try:
-        uid = user.get("id") or 1
-        db_recos = db_exec(
-            "SELECT created_at, symbol, underlying, recommendation, entry, target, stop_loss, outcome, final_pnl, rationale FROM recommendations WHERE (user_id=? OR user_id=1 OR user_id IS NULL) AND (symbol LIKE ? OR underlying LIKE ?) ORDER BY created_at DESC LIMIT 10",
-            [uid, f"%{root}%", f"%{root}%"],
-            "all"
-        ) or []
-    except Exception:
-        db_recos = []
-
-    # Check if Gemini AI is available to generate dynamic response with live data
-    gemini_prompt = f"""You are CA AI, the chief quantitative market analyst at CA Trader.
-User Query: "{prompt}"
-Target Instrument: {root}
-Live Market Quote: LTP ₹{cur_ltp if cur_ltp else 'N/A'}, Change {net_chg:+.2f} ({chg_pct:+.2f}%)
-Historical/Target Date: {hist_date if hist_date else 'Current Session'}
-Database Recorded Recommendations: {json.dumps(db_recos[:5])}
-
-FORMATTING INSTRUCTIONS:
-- If the user asks for top recommendations or best setups for any day (e.g. 5 best setups, historical recommendations), present a clean, high-precision Markdown table with the following EXACT columns:
-| Time (IST) | Contract / Setup | Direction | Entry | Target | Stop Loss | R:R | Quantitative Rationale & Catalysts | Outcome |
-- Include 5 distinct, chronologically ordered trade setups (09:25, 10:30, 12:15, 13:40, 14:50 IST) constructed strictly without lookahead bias.
-- Use explicit BUY or SELL badges, realistic strike prices, realistic option premiums, and institutional rationale citing VWAP, order flow, OI buildup, and price action.
-- Format all key metrics cleanly in Markdown with bold headers and callout notes.
-- If the user asks general market questions, provide concise, professional institutional analysis with key support/resistance levels."""
-
+    ctx = await asyncio.to_thread(build_ai_market_context, root, hist_date)
+    gemini_prompt = (
+        "You are CA AI, an assistant inside the CA Trader app. Answer the user's question using ONLY the JSON context below. "
+        "Every price, level and signal you mention must appear in the context. If the context does not contain what is needed, "
+        "say exactly what is missing instead of estimating. Do not invent trades, premiums, news or statistics. Keep it short and use "
+        "Markdown tables where they help.\n\n"
+        f"User question: {prompt}\n\nContext (from Upstox and the app's own models):\n{json.dumps(ctx, default=str)[:20000]}"
+    )
     ai_text = None
     try:
-        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, gemini_prompt, 14000), timeout=8.0)
+        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, gemini_prompt, 14000), timeout=12.0)
         if isinstance(ai_resp, dict) and ai_resp.get("text"):
             ai_text = ai_resp.get("text").strip()
     except Exception:
         pass
-
     if ai_text:
-        return {"ok": True, "mode": "data", "reply": ai_text, "symbol": root}
-
-    # Dynamic quantitative analytical synthesis (replaces pre-defined/canned text)
-    reply = synthesize_jarvis_market_analysis(root, prompt, cur_ltp, net_chg, chg_pct, hist_date)
-    return {"ok": True, "mode": "data", "reply": reply, "symbol": root}
+        return {"ok": True, "mode": "data", "reply": ai_text, "symbol": root, "context_used": list(ctx.keys())}
+    return {"ok": True, "mode": "data", "reply": render_ai_context_markdown(ctx), "symbol": root, "context_used": list(ctx.keys()),
+            "note": "Gemini unavailable; showing the data the answer would be based on"}
 
 
 # ===========================================================================
@@ -18575,7 +18113,7 @@ class FailedTradeDiagnosisRequest(BaseModel):
     timestamp: str | None = None
 
 @app.post("/api/ai/analyze-failed-trade")
-async def api_analyze_failed_trade(payload: FailedTradeDiagnosisRequest, request: Request) -> dict[str, Any]:
+async def api_analyze_failed_trade(payload: FailedTradeDiagnosisRequest, request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     sym = str(payload.symbol or "BANKNIFTY").upper().strip()
     root = sym.replace("FUT", "").replace("EXP", "").strip() or "BANKNIFTY"
     side = str(payload.side or "BUY").upper()

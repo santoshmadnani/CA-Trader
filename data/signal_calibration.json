@@ -1,13 +1,13 @@
 {
- "version": "2026-10-11-stockmantra-v1",
- "generated": "2026-10-11",
- "source": "Fitted on 109 Stock Mantra Index calls (11 Sep - 9 Oct 2026) replayed on Upstox 1-minute candles; weights = logistic regression of factor scores on his call direction, trained on the first 80% of calls",
+ "version": "2026-10-11-stockmantra",
+ "generated": "2026-10-11T23:51:34.147872+05:30",
+ "source": "Fitted on 113 Stock Mantra Index calls replayed on Upstox 1-minute candles (first 80% for fitting)",
  "weights": {
-  "trend": 0.05,
-  "vwap": 0.277,
-  "momentum": 0.335,
-  "price_action": 0.236,
-  "day_change": 0.102,
+  "trend": 0.053,
+  "vwap": 0.278,
+  "momentum": 0.344,
+  "price_action": 0.252,
+  "day_change": 0.074,
   "option_flow": 0.0
  },
  "gate": 30.0,
@@ -16,63 +16,63 @@
   {
    "lo": 0,
    "hi": 10,
-   "n": 17,
+   "n": 18,
    "hit": 10
   },
   {
    "lo": 10,
    "hi": 20,
-   "n": 17,
-   "hit": 9
+   "n": 20,
+   "hit": 11
   },
   {
    "lo": 20,
    "hi": 30,
-   "n": 19,
-   "hit": 8
+   "n": 22,
+   "hit": 12
   },
   {
    "lo": 30,
    "hi": 40,
-   "n": 19,
-   "hit": 13
+   "n": 14,
+   "hit": 9
   },
   {
    "lo": 40,
    "hi": 55,
-   "n": 40,
-   "hit": 15
+   "n": 45,
+   "hit": 18
   },
   {
    "lo": 55,
    "hi": 70,
-   "n": 34,
-   "hit": 22
+   "n": 36,
+   "hit": 23
   },
   {
    "lo": 70,
    "hi": 101,
-   "n": 100,
-   "hit": 61
+   "n": 99,
+   "hit": 63
   }
  ],
- "bucket_definition": "Share of real moments (Stock Mantra call times + 240 random control times) where the underlying moved 0.3% in the score's direction before moving 0.3% against it, within 2 hours",
+ "bucket_definition": "Share of real moments (call times + random control times) where the underlying moved 0.3% in the score's direction first, within 2 hours",
  "validation": {
   "all": {
-   "calls": 109,
-   "fired": 82,
+   "calls": 113,
+   "fired": 83,
    "agree_with_mantra": 71,
-   "resolved": 55,
+   "resolved": 56,
    "model_right": 29,
-   "mantra_resolved": 72,
-   "mantra_right": 46
+   "mantra_resolved": 75,
+   "mantra_right": 47
   },
   "test": {
-   "calls": 22,
+   "calls": 23,
    "fired": 19,
    "agree_with_mantra": 16,
-   "resolved": 14,
-   "model_right": 10,
+   "resolved": 13,
+   "model_right": 9,
    "mantra_resolved": 16,
    "mantra_right": 12
   },
@@ -86,6 +86,14 @@
   ]
  },
  "stock_mantra_accuracy_by_underlying": {
+  "BANKNIFTY": [
+   4,
+   5
+  ],
+  "CRUDEOIL": [
+   19,
+   38
+  ],
   "NIFTY": [
    11,
    14
@@ -93,35 +101,6 @@
   "SENSEX": [
    13,
    18
-  ],
-  "BANKNIFTY": [
-   4,
-   5
-  ],
-  "CRUDEOIL": [
-   18,
-   35
   ]
- },
- "logistic": {
-  "coef": {
-   "trend": 0.121,
-   "vwap": 0.666,
-   "momentum": 0.806,
-   "price_action": 0.568,
-   "day_change": 0.244
-  },
-  "intercept": -0.327,
-  "train_n": 87,
-  "test_n": 22,
-  "train_acc": 80.5,
-  "test_acc": 77.3,
-  "weights": {
-   "trend": 0.05,
-   "vwap": 0.277,
-   "momentum": 0.335,
-   "price_action": 0.236,
-   "day_change": 0.102
-  }
  }
 }

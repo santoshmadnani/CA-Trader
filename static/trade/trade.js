@@ -430,6 +430,45 @@
     } catch (e) { body.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
 
+  // ---------------- SETTINGS ----------------
+  async function loadSettings() {
+    try { const t = (await api("/api/telegram/settings")).settings || {};
+      $("tgEnabled").checked = !!t.enabled; $("tgToken").value = ""; $("tgToken").placeholder = t.bot_token_masked ? `Saved: ${t.bot_token_masked}` : "Paste the bot token from BotFather";
+      $("tgChat").value = t.chat_id || ""; $("tgRecos").checked = t.notify_recos !== false; $("tgMin").value = t.min_reco_score ?? 75;
+      $("tgRisk").checked = t.notify_risk !== false; $("tgNews").checked = t.notify_news !== false; } catch (e) { toast(`Telegram settings: ${e.message}`); }
+    try { const a = await api("/api/auto-trade");
+      $("atEnabled").checked = !!a.enabled; $("atCapital").value = a.capital || ""; $("atLoss").value = a.max_loss || ""; $("atProfit").value = a.max_profit || a.desired_profit || "";
+      $("atSymbols").value = (a.symbols || []).join(", "); $("atOptions").checked = !!a.options_enabled; } catch (e) { toast(`Auto-trade: ${e.message}`); }
+    loadNotes();
+  }
+  $("tgForm").addEventListener("submit", async (e) => { e.preventDefault();
+    const body = { enabled: $("tgEnabled").checked, chat_id: $("tgChat").value.trim(), notify_recos: $("tgRecos").checked, min_reco_score: +$("tgMin").value || 0,
+      notify_risk: $("tgRisk").checked, notify_news: $("tgNews").checked };
+    if ($("tgToken").value.trim()) body.bot_token = $("tgToken").value.trim();
+    try { await api("/api/telegram/settings", { method: "POST", body }); toast("Telegram settings saved"); loadSettings(); } catch (err) { toast(err.message); } });
+  $("tgTest").addEventListener("click", async () => { try { const r = await api("/api/telegram/test", { method: "POST", body: {} }); toast(r.message || "Test sent"); } catch (err) { toast(err.message); } });
+  $("atForm").addEventListener("submit", async (e) => { e.preventDefault();
+    const body = { enabled: $("atEnabled").checked, capital: +$("atCapital").value || 0, max_loss: +$("atLoss").value || 0, max_profit: +$("atProfit").value || 0,
+      symbols: $("atSymbols").value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean), options_enabled: $("atOptions").checked };
+    try { await api("/api/auto-trade", { method: "POST", body }); toast("Auto-trade limits saved"); } catch (err) { toast(err.message); } });
+  $("nsForm").addEventListener("submit", async (e) => { e.preventDefault();
+    try { await api("/api/notifications/settings", { method: "POST", body: { auto_prune_days: +$("nsDays").value || 15 } }); toast("Saved"); } catch (err) { toast(err.message); } });
+  let notes = [];
+  async function loadNotes() {
+    try { notes = (await api("/api/notes")).notes || [];
+      $("noteList").innerHTML = notes.map((n) => `<li class="click" data-note="${esc(n.id)}"><b>${esc(n.title)}</b> <span class="muted small">${esc(n.folder || "")}</span><br>${esc(String(n.content || "").slice(0, 140))}<time>${esc(String(n.updated_at || "").replace("T", " ").slice(0, 16))}</time></li>`).join("") || `<li class="muted">No notes yet.</li>`;
+    } catch (e) { $("noteList").innerHTML = `<li>${esc(e.message)}</li>`; }
+  }
+  const fillNote = (n) => { $("noteId").value = n ? n.id : ""; $("noteTitle").value = n ? n.title : ""; $("noteFolder").value = n ? (n.folder || "Trade Journal") : "Trade Journal"; $("noteBody").value = n ? n.content : ""; $("noteTags").value = n ? (n.tags || "") : ""; };
+  $("noteList").addEventListener("click", (e) => { const li = e.target.closest("[data-note]"); if (li) fillNote(notes.find((n) => n.id === li.dataset.note)); });
+  $("noteNew").addEventListener("click", () => fillNote(null));
+  $("noteForm").addEventListener("submit", async (e) => { e.preventDefault();
+    try { await api("/api/notes", { method: "POST", body: { id: $("noteId").value || undefined, title: $("noteTitle").value.trim() || "Untitled", folder: $("noteFolder").value.trim(), content: $("noteBody").value, tags: $("noteTags").value.trim() } });
+      toast("Note saved"); fillNote(null); loadNotes(); } catch (err) { toast(err.message); } });
+  $("noteDelete").addEventListener("click", async (e) => { const id = $("noteId").value; if (!id) return;
+    const b = e.currentTarget; if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirm delete"; setTimeout(() => { b.dataset.confirm = ""; b.textContent = "Delete"; }, 4000); return; }
+    try { await api(`/api/notes/${encodeURIComponent(id)}`, { method: "DELETE" }); toast("Note deleted"); fillNote(null); loadNotes(); } catch (err) { toast(err.message); } });
+
   // ---------------- routing & lifecycle ----------------
   function refreshWorkspace(symbolChanged) {
     if (S.ws === "trade") { loadReco(); loadCandles(); loadMiniChain(); loadStockMantra(); if (!symbolChanged) loadToday(); }
@@ -438,7 +477,7 @@
   }
   function route() {
     const ws = (location.hash || "#trade").slice(1);
-    S.ws = ["trade", "scan", "options", "portfolio", "research"].includes(ws) ? ws : "trade";
+    S.ws = ["trade", "scan", "options", "portfolio", "research", "settings"].includes(ws) ? ws : "trade";
     document.querySelectorAll(".ws").forEach((el) => (el.hidden = el.id !== "ws-" + S.ws));
     document.querySelectorAll(".workspaces a").forEach((a) => { if (a.dataset.ws === S.ws) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     if (S.ws === "trade") { loadReco(); loadCandles(); loadMiniChain(); loadStockMantra(); loadToday(); setTimeout(drawChart, 30); }
@@ -446,6 +485,7 @@
     if (S.ws === "options") { if (S.chain) renderFullChain(); loadMiniChain(); }
     if (S.ws === "portfolio") { loadToday().then(() => S.positions && api("/api/funds").then((f) => renderPortfolio(S.positions, f)).catch(() => renderPortfolio(S.positions, {}))); loadOrders(); }
     if (S.ws === "research") loadResearch();
+    if (S.ws === "settings") loadSettings();
   }
   window.addEventListener("hashchange", route);
   document.addEventListener("keydown", (e) => {

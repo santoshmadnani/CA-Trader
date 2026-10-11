@@ -120,6 +120,10 @@ canvas#chart { width: 100%; display: block; }
 .cols .panel + .panel { margin-top: 0; }
 .list { min-width: 420px; } .list td { font-size: 13px; }
 .cols .list { min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.stack label:not(.check) { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.stack input:not([type="checkbox"]), .stack textarea { padding: 8px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font: inherit; }
+.alerts li.click { cursor: pointer; }
 .list tr.click { cursor: pointer; } .list tr.click:hover td { background: var(--panel-2); }
 .seg { display: flex; gap: 2px; flex-wrap: wrap; }
 .seg button { border: 1px solid var(--line); background: var(--panel); padding: 5px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 12px; }
