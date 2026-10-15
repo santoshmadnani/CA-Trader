@@ -1179,6 +1179,19 @@ def db_exec(sql: str, params: Iterable[Any] = (), fetch: str | None = None) -> A
             conn.close()
 
 
+def db_exec_many(sql: str, rows: list[list[Any]]) -> None:
+    """Write many rows in one transaction (one fsync) instead of one commit per row."""
+    if not rows:
+        return
+    with _DB_LOCK:
+        conn = db_conn()
+        try:
+            conn.executemany(sql, [tuple(r) for r in rows])
+            conn.commit()
+        finally:
+            conn.close()
+
+
 # Master Database Initializer: Auto-generates essential trading tables upon startup
 # (users, orders, live positions, portfolio holdings, AI recommendations, watchlists, passbook, and risk audit logs).
 def init_db() -> None:
@@ -4931,7 +4944,7 @@ def _news_build_result(query: str, max_results: int, target: str, user_id: int |
                     articles.extend([{"provider":"Upstox","source":"Upstox Market News","title":r.get("heading") or r.get("title"),"summary":r.get("summary") or r.get("description"),"published_at":r.get("published_time"),"url":r.get("article_link") or r.get("url")} for r in rows]); break
         except Exception: pass
 
-    unique=_news_dedupe(articles); hidden=set()
+    unique=_news_dedupe(articles); hidden=set(); persist_rows=[]
     if user_id: hidden={r["article_key"] for r in db_exec("SELECT article_key FROM news_hidden WHERE user_id=?",[user_id],"all")}
     current=[]
     for a in unique:
@@ -4951,14 +4964,14 @@ def _news_build_result(query: str, max_results: int, target: str, user_id: int |
         full_summary = re.sub(r'\s+', ' ', full_raw)[:1000] if full_raw else ""
         ev_item = {"event":title,"headline":title,"summary":_clean_news_summary(summary),"full_summary":full_summary,"source":a.get("source") or a.get("provider"),"provider":a.get("provider"),"published_at":a.get("published_at"),"url":a.get("url"),"matched_keyword":matched_kw,"scope":"stock" if target not in ("GLOBAL","MARKET") else "global",**c}
         current.append(ev_item)
-        try:
-            k = article_key(a)
-            db_exec(
-                "INSERT OR REPLACE INTO persisted_news_events(article_key, target, headline, summary, full_summary, url, source, published_at, matched_keyword, sentiment, materiality, scope, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                [k, target, title, summary, full_summary, a.get("url"), a.get("source") or a.get("provider"), str(a.get("published_at") or now_iso()), matched_kw, c.get("sentiment", "Neutral"), float(c.get("materiality") or 0), "stock" if target not in ("GLOBAL","MARKET") else "global", now_iso()]
-            )
-        except Exception:
-            pass
+        persist_rows.append([article_key(a), target, title, summary, full_summary, a.get("url"), a.get("source") or a.get("provider"), str(a.get("published_at") or now_iso()), matched_kw, c.get("sentiment", "Neutral"), float(c.get("materiality") or 0), "stock" if target not in ("GLOBAL","MARKET") else "global", now_iso()])
+    try:
+        db_exec_many(
+            "INSERT OR REPLACE INTO persisted_news_events(article_key, target, headline, summary, full_summary, url, source, published_at, matched_keyword, sentiment, materiality, scope, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            persist_rows,
+        )
+    except Exception as exc:
+        log.debug("persisting news events failed: %s", safe_text(exc))
     current.sort(key=lambda x: (_parse_news_datetime(str(x.get("published_at") or "")).timestamp() if _parse_news_datetime(str(x.get("published_at") or "")) else 0), reverse=True)
     return {"events":current[:max_results],"archived_events":[],"market_updates":[x for x in current if x.get("classification")=="MARKET_UPDATE"][:100],"analysis_events":[x for x in current if x.get("classification")=="ANALYSIS"][:100],"query":query,"provider":"combined","providers":["publisher_rss","gnews","newsapi","upstox"],"publisher_sources":{"india":20,"global":20},"timestamp":now_iso(),"fresh":not fast,"partial":fast,"raw_unique_count":len(unique),"returned_count":len(current)}
 
@@ -4984,7 +4997,7 @@ def _refresh_news_background(query: str, target: str, user_id: int | None, max_r
                 merged = list(existing_events) + new_events
                 merged.sort(key=lambda x: (_parse_news_datetime(str(x.get("published_at") or "")).timestamp() if _parse_news_datetime(str(x.get("published_at") or "")) else 0), reverse=True)
                 res["events"] = merged[:max_results]
-            CACHE.set(key, res, max(600, NEWS_CACHE_TTL))
+            CACHE.set(key, res, max(2400, NEWS_CACHE_TTL))  # outlives the news worker's 30-min off-hours cadence
         except Exception as exc: log.debug("background news refresh failed target=%s: %s",target,safe_text(exc))
         finally:
             with _NEWS_REFRESH_LOCK: _NEWS_REFRESH_INFLIGHT.discard(key)
@@ -7811,7 +7824,7 @@ init_db()
 seed_admin()
 
 async def _auto_news_worker_loop():
-    """Continuously refreshes and pre-warms news feeds in the background every 60 seconds."""
+    """Keeps the news cache warm: every 10 min while NSE is open, every 30 min otherwise (cache TTL is 10 min)."""
     while True:
         try:
             for tgt in ["NIFTY", "BANKNIFTY", "CRUDEOIL", "GLOBAL"]:
@@ -7822,7 +7835,7 @@ async def _auto_news_worker_loop():
                 await asyncio.sleep(2)
         except Exception as e:
             log.debug("Auto news loop error: %s", safe_text(e))
-        await asyncio.sleep(60)
+        await asyncio.sleep(600 if market_session("NSE_EQ").get("active") else 1800)
 
 async def _telegram_bot_service_loop():
     log.info("Starting Telegram interactive bot listener & price watch service...")
@@ -7970,6 +7983,9 @@ async def lifespan(app: FastAPI):
         await asyncio.to_thread(prune_transient_cache, 3)
     except Exception:
         pass
+    # asyncio.to_thread defaults to min(32, cpus+4) workers = 6 on the 2-vCPU VM; page requests then queue behind
+    # background jobs. These threads mostly wait on Upstox/HTTP, so a larger pool is cheap.
+    asyncio.get_running_loop().set_default_executor(ThreadPoolExecutor(max_workers=24, thread_name_prefix="ca-io"))
     cache_task = asyncio.create_task(_cache_maintenance_loop())
     auto_task = asyncio.create_task(_auto_trade_loop())
     risk_task = asyncio.create_task(_paper_risk_loop())
@@ -7979,6 +7995,23 @@ async def lifespan(app: FastAPI):
     sm_telethon_task = asyncio.create_task(_stockmantra_live_telethon_loop())
     reco_sender_task = asyncio.create_task(_recommendation_sender_agent_loop())
     skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop())
+
+    async def _warm_page_caches() -> None:
+        """After a restart (every deploy), pre-compute what /terminal asks for first so the first visit is instant."""
+        await asyncio.sleep(20)
+        try:
+            users = db_exec("SELECT id FROM users ORDER BY id LIMIT 3", [], "all") or []
+            for u in users:
+                uid = u["id"]
+                symbols = ["NIFTY"] + [s for s in (user_watchlist_symbols(uid) or []) if s and s.upper() != "NIFTY"][:3]
+                for sym in symbols:
+                    with contextlib.suppress(Exception):
+                        await asyncio.to_thread(analysis_candles_robust, sym, "5m", 10)
+                    with contextlib.suppress(Exception):
+                        await _reco_refresh_task(sym, "5m", None, None, uid, False, _reco_cache_key(sym, "5m", uid, None, False), persist=False)
+        except Exception as exc:
+            log.debug("cache warm-up skipped: %s", safe_text(exc))
+    asyncio.create_task(_warm_page_caches())
 
     async def _notify_deployment_online() -> None:
         await asyncio.sleep(5)
@@ -7990,7 +8023,7 @@ async def lifespan(app: FastAPI):
                     f"🚀 <b>[CA-Trader Autonomous Swarm Online]</b>\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"<b>Server Deployed &amp; Swarm Active</b> ✅\n"
-                    f"• <b>Host:</b> Oracle Cloud VM (140.238.251.214)\n"
+                    f"• <b>Host:</b> Oracle Cloud VM\n"
                     f"• <b>Active Sentinels:</b> 11/11 Active (Reco Sender &amp; Skill Discovery Armed)\n"
                     f"• <b>Time:</b> {now_str}\n"
                     f"• <b>Status:</b> SQLite database &amp; background loops healthy.\n"
@@ -9171,7 +9204,7 @@ async def market_quotes(instruments: str = Query("", max_length=12000), user: di
     symbols=[x.strip() for x in instruments.split(",") if x.strip()]
     if not symbols: return {"items":[],"provider":"upstox","timestamp":now_iso()}
     try:
-        return {"items":UPSTOX.quotes(symbols),"provider":"upstox","timestamp":now_iso()}
+        return {"items":await asyncio.to_thread(UPSTOX.quotes, symbols),"provider":"upstox","timestamp":now_iso()}
     except Exception as exc:
         log.warning("market_quotes fallback for %s symbols: %s", len(symbols), safe_text(exc))
         items = []
@@ -9183,7 +9216,7 @@ async def market_quotes(instruments: str = Query("", max_length=12000), user: di
 @app.get("/api/market/ltp/{instrument}")
 async def market_ltp(instrument: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     try:
-        res = UPSTOX.ltp(instrument)
+        res = await asyncio.to_thread(UPSTOX.ltp, instrument)
         if res and res.get("ltp") is not None:
             return res
     except Exception:
@@ -9446,7 +9479,7 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
         return JSONResponse(cached, headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0"})
     try:
         # One authoritative range-safe path for every chart request.
-        key_for_session, meta_for_session = UPSTOX.resolve_instrument(instrument)
+        key_for_session, meta_for_session = await asyncio.to_thread(UPSTOX.resolve_instrument, instrument)
         segment = classify_instrument_segment(instrument, meta_for_session, key_for_session)
         now = datetime.now(IST)
         session = market_session(segment, now)
@@ -9460,7 +9493,7 @@ async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=
             candles = _LAST_GOOD_CANDLES.get(f"{instrument}:{timeframe}") or []
             if not candles:
                 candles = generate_fallback_replay_candles(instrument, timeframe, days)
-        candles, live_quote = _merge_live_quote_into_candles(instrument, timeframe, candles)
+        candles, live_quote = await asyncio.to_thread(_merge_live_quote_into_candles, instrument, timeframe, candles)
         latest_candle = candles[-1] if candles else None
         expected = _latest_completed_session_date(segment, now)
         latest_date = _candle_ist_date(latest_candle) if latest_candle else None
@@ -10307,61 +10340,26 @@ async def analysis_fundamental(instrument: str, user: dict[str, Any] = Depends(r
         return {"instrument": instrument, "available": False, "reason": "Fundamental data is currently unavailable", "provider": None, "timestamp": now_iso()}
 
 
-@app.get("/api/analysis/overall/{instrument}")
-@app.get("/api/recommendations/{instrument}")
-async def analysis_overall(
-    instrument: str,
-    request: Request,
-    timeframe: str = "5m",
-    desired_profit: float | None = None,
-    bearable_loss: float | None = None,
-    expiry_scalp: str | int | bool | None = None,
-    user: dict[str, Any] = Depends(require_user)
-) -> dict[str, Any]:
-    inst_lower = instrument.lower().strip()
-    if inst_lower in ("for-date", "for_date", "date"):
-        return await api_recommendations_for_date(request=request, user=user)
-    if inst_lower in ("100-trades", "backtest-100", "100_trades"):
-        return await api_backtest_100_trades(request=request, user=user)
-    if inst_lower == "history":
-        return await recommendation_history(
-            request=request,
-            symbol=request.query_params.get("symbol"),
-            date=request.query_params.get("date") or request.query_params.get("from"),
-            limit=request.query_params.get("limit"),
-        )
-    req_date = request.query_params.get("date") or request.query_params.get("from")
-    if req_date:
-        return await api_recommendations_for_date(request=request, symbol=instrument, date=req_date, timeframe=timeframe, user=user)
-    uid = user.get("id") if isinstance(user, dict) else (getattr(user, "id", None) or 1)
-    is_scalp = bool(expiry_scalp and str(expiry_scalp).lower() in ("1", "true", "yes", "on"))
-    try:
-        dp_clean = float(desired_profit) if (desired_profit is not None and not hasattr(desired_profit, "default")) else None
-    except (ValueError, TypeError):
-        dp_clean = None
-    try:
-        bl_clean = float(bearable_loss) if (bearable_loss is not None and not hasattr(bearable_loss, "default")) else None
-    except (ValueError, TypeError):
-        bl_clean = None
+_RECO_LAST: dict[str, tuple[float, dict[str, Any]]] = {}
+_RECO_INFLIGHT: dict[str, "asyncio.Future[Any]"] = {}
 
+
+def _reco_cache_key(instrument: str, timeframe: str, uid: Any, dp_clean: float | None, is_scalp: bool) -> str:
     dp_val = dp_clean if dp_clean is not None else "def"
-    cache_key = f"overall-reco:{instrument.upper()}:{timeframe}:{uid}:{dp_val}"
-    cache_key = f"overall-reco:{instrument.upper()}:{timeframe}:{uid}:{dp_val}:{is_scalp}"
-    force_refresh = bool(request.query_params.get("refresh") in ("1", "true", "yes") or request.headers.get("Cache-Control") == "no-cache")
-    if not force_refresh:
-        cached = CACHE.get(cache_key)
-        if cached is not None:
-            return cached
+    return f"overall-reco:{instrument.upper()}:{timeframe}:{uid}:{dp_val}:{is_scalp}"
 
-    # Preview only: opening Recommendations/Dashboard must never create a saved
-    # recommendation and must not silently consume an AI request.
+
+def _instrument_market_active(instrument: str) -> bool:
     try:
-        rec = await asyncio.wait_for(
-            asyncio.to_thread(overall_recommendation, instrument, timeframe, dp_clean, bl_clean, None, {"enabled": True}, False, uid, is_scalp),
-            timeout=9.5
-        )
-    except asyncio.TimeoutError:
-        rec = fallback_recommendation_quick(instrument, uid, dp_clean)
+        return bool(market_session(get_symbol_segment(extract_root_symbol(instrument).upper())).get("active"))
+    except Exception:
+        return True
+
+
+def _compute_reco_result(instrument: str, timeframe: str, dp_clean: float | None, bl_clean: float | None, uid: Any, is_scalp: bool, cache_key: str, persist: bool = True) -> dict[str, Any]:
+    """Full (slow) recommendation build; runs in a worker thread and refreshes both caches."""
+    try:
+        rec = overall_recommendation(instrument, timeframe, dp_clean, bl_clean, None, {"enabled": True}, False, uid, is_scalp)
     except Exception as exc:
         log.warning("analysis_overall failed for %s: %s", instrument, safe_text(exc))
         rec = fallback_recommendation_quick(instrument, uid, dp_clean)
@@ -10378,10 +10376,8 @@ async def analysis_overall(
         except Exception:
             pass
 
-    if not force_refresh:
-        CACHE.set(cache_key, rec, 60)
     reco_action = str(rec.get("recommendation") or "").upper()
-    if reco_action in ("BUY", "SELL"):
+    if persist and reco_action in ("BUY", "SELL"):
         try:
             trade_sym = str(rec.get("display_symbol") or rec.get("symbol") or instrument).upper()
             und = str(rec.get("underlying") or instrument).upper()
@@ -10429,8 +10425,88 @@ async def analysis_overall(
             log.warning("Failed to auto-save recommendation: %s", exc)
 
     result = {"instrument": instrument, "timeframe": timeframe, **rec, "ai": {"available": False, "requested": False, "decision": "NOT REQUESTED", "reason": "CA AI opinion is manual. Click Ask CA AI to request it."}, "timestamp": now_iso()}
-    CACHE.set(cache_key, result, 60.0)
+    # Market open: results go stale within a minute. Market closed: nothing changes until the next session.
+    CACHE.set(cache_key, result, 60.0 if _instrument_market_active(instrument) else 1800.0)
+    _RECO_LAST[cache_key] = (time.time(), result)
+    if len(_RECO_LAST) > 300:
+        for k in sorted(_RECO_LAST, key=lambda k: _RECO_LAST[k][0])[:100]:
+            _RECO_LAST.pop(k, None)
     return result
+
+
+def _reco_refresh_task(instrument: str, timeframe: str, dp_clean: float | None, bl_clean: float | None, uid: Any, is_scalp: bool, cache_key: str, persist: bool = True) -> "asyncio.Future[Any]":
+    """One in-flight computation per cache key; concurrent callers share it."""
+    fut = _RECO_INFLIGHT.get(cache_key)
+    if fut is None or fut.done():
+        fut = asyncio.ensure_future(asyncio.to_thread(_compute_reco_result, instrument, timeframe, dp_clean, bl_clean, uid, is_scalp, cache_key, persist))
+        _RECO_INFLIGHT[cache_key] = fut
+
+        def _done(f: "asyncio.Future[Any]", k: str = cache_key) -> None:
+            _RECO_INFLIGHT.pop(k, None)
+            if not f.cancelled() and f.exception() is not None:
+                log.warning("Recommendation refresh failed for %s: %s", k, safe_text(f.exception()))
+        fut.add_done_callback(_done)
+    return fut
+
+
+@app.get("/api/analysis/overall/{instrument}")
+@app.get("/api/recommendations/{instrument}")
+async def analysis_overall(
+    instrument: str,
+    request: Request,
+    timeframe: str = "5m",
+    desired_profit: float | None = None,
+    bearable_loss: float | None = None,
+    expiry_scalp: str | int | bool | None = None,
+    user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    inst_lower = instrument.lower().strip()
+    if inst_lower in ("for-date", "for_date", "date"):
+        return await api_recommendations_for_date(request=request, user=user)
+    if inst_lower in ("100-trades", "backtest-100", "100_trades"):
+        return await api_backtest_100_trades(request=request, user=user)
+    if inst_lower == "history":
+        return await recommendation_history(
+            request=request,
+            symbol=request.query_params.get("symbol"),
+            date=request.query_params.get("date") or request.query_params.get("from"),
+            limit=request.query_params.get("limit"),
+        )
+    req_date = request.query_params.get("date") or request.query_params.get("from")
+    if req_date:
+        return await api_recommendations_for_date(request=request, symbol=instrument, date=req_date, timeframe=timeframe, user=user)
+    uid = user.get("id") if isinstance(user, dict) else (getattr(user, "id", None) or 1)
+    is_scalp = bool(expiry_scalp and str(expiry_scalp).lower() in ("1", "true", "yes", "on"))
+    try:
+        dp_clean = float(desired_profit) if (desired_profit is not None and not hasattr(desired_profit, "default")) else None
+    except (ValueError, TypeError):
+        dp_clean = None
+    try:
+        bl_clean = float(bearable_loss) if (bearable_loss is not None and not hasattr(bearable_loss, "default")) else None
+    except (ValueError, TypeError):
+        bl_clean = None
+
+    cache_key = _reco_cache_key(instrument, timeframe, uid, dp_clean, is_scalp)
+
+    force_refresh = bool(request.query_params.get("refresh") in ("1", "true", "yes") or request.headers.get("Cache-Control") == "no-cache")
+    if not force_refresh:
+        cached = CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+        last = _RECO_LAST.get(cache_key)
+        # Stale-while-revalidate: answer instantly with the last result, refresh in the background.
+        max_age = 1800 if await asyncio.to_thread(_instrument_market_active, instrument) else 18 * 3600
+        if last is not None and time.time() - last[0] < max_age:
+            _reco_refresh_task(instrument, timeframe, dp_clean, bl_clean, uid, is_scalp, cache_key)
+            return {**last[1], "refreshing": True}
+    fut = _reco_refresh_task(instrument, timeframe, dp_clean, bl_clean, uid, is_scalp, cache_key)
+    try:
+        return await asyncio.wait_for(asyncio.shield(fut), timeout=9.5)
+    except asyncio.TimeoutError:
+        # The full build keeps running and fills the cache; answer now with the quick estimate.
+        rec = await asyncio.to_thread(fallback_recommendation_quick, instrument, uid, dp_clean)
+        return {"instrument": instrument, "timeframe": timeframe, **rec, "ai": {"available": False, "requested": False, "decision": "NOT REQUESTED", "reason": "CA AI opinion is manual. Click Ask CA AI to request it."}, "timestamp": now_iso(), "partial": True}
+
 
 # ---------------------------------------------------------------------------
 # Options APIs
@@ -10541,9 +10617,7 @@ async def options_summary(underlying: str, expiry: str | None = None, user: dict
             data = None
     
     if not data or not (data.get("strikes") or []):
-        data = generate_option_chain_engine(underlying, expiry)
-
-        
+        data = await asyncio.to_thread(generate_option_chain_engine, underlying, expiry)
     CACHE.set(key, data, 120)
     return data
 

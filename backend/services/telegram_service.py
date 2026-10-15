@@ -6,6 +6,9 @@ import time
 from typing import Any, Callable, Dict, Optional, Tuple
 import requests
 
+# One pooled session: the bot polls every few seconds, so reusing the TLS connection saves a handshake per call.
+_HTTP = requests.Session()
+
 logger = logging.getLogger("ca_trader.telegram")
 
 # Cache to avoid duplicate messages within 2 minutes: key -> timestamp
@@ -91,7 +94,7 @@ def _sync_send_telegram(
         payload["reply_markup"] = reply_markup
     
     try:
-        resp = requests.post(url, json=payload, timeout=8.0)
+        resp = _HTTP.post(url, json=payload, timeout=8.0)
         data = resp.json()
         if resp.status_code == 200 and data.get("ok"):
             _SENT_DEDUPE_CACHE[dedupe_key] = now_ts
@@ -102,7 +105,7 @@ def _sync_send_telegram(
             clean_text = re.sub(r"<[^>]+>", "", text)
             payload["text"] = clean_text
             payload.pop("parse_mode", None)
-            retry_resp = requests.post(url, json=payload, timeout=8.0)
+            retry_resp = _HTTP.post(url, json=payload, timeout=8.0)
             retry_data = retry_resp.json()
             if retry_resp.status_code == 200 and retry_data.get("ok"):
                 _SENT_DEDUPE_CACHE[dedupe_key] = now_ts
@@ -145,7 +148,7 @@ def _sync_edit_telegram(
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
-        resp = requests.post(url, json=payload, timeout=8.0)
+        resp = _HTTP.post(url, json=payload, timeout=8.0)
         data = resp.json()
         if resp.status_code == 200 and data.get("ok"):
             return True, "Message edited successfully."
@@ -158,7 +161,7 @@ def _sync_answer_callback(bot_token: str, callback_query_id: str, text: str = ""
     try:
         clean_token = str(bot_token).strip().strip('"\'')
         url = f"https://api.telegram.org/bot{clean_token}/answerCallbackQuery"
-        requests.post(url, json={"callback_query_id": callback_query_id, "text": text}, timeout=4.0)
+        _HTTP.post(url, json={"callback_query_id": callback_query_id, "text": text}, timeout=4.0)
     except Exception:
         pass
 
@@ -596,7 +599,7 @@ def _sync_fetch_telegram_updates(bot_token: str, offset: int = 0, timeout: int =
     url = f"https://api.telegram.org/bot{clean_token}/getUpdates"
     params = {"offset": offset, "timeout": timeout, "limit": 20}
     try:
-        resp = requests.get(url, params=params, timeout=timeout + 5)
+        resp = _HTTP.get(url, params=params, timeout=timeout + 5)
         if resp.status_code == 200:
             data = resp.json()
             if data.get("ok"):
