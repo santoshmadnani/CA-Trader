@@ -1,0 +1,175 @@
+{
+  "generated": "2026-10-15T23:18:03.600366+00:00",
+  "symbols": [
+    "NIFTY",
+    "BANKNIFTY"
+  ],
+  "split": 0.7,
+  "horizons": {
+    "scalp": {
+      "params": {
+        "gate": 35.0,
+        "strict_htf": false,
+        "t1_r": 1.0,
+        "t2_r": 2.0,
+        "sl_min_atr": 0.8,
+        "sl_max_atr": 2.2,
+        "pullback_only": false
+      },
+      "accepted_tuned": false,
+      "train_expectancy_r": 0.121,
+      "test": {
+        "tuned": {
+          "NIFTY": {
+            "from": "2026-09-21",
+            "to": "2026-10-15",
+            "signals": 95,
+            "filled": 81,
+            "t1_hit_rate": 56.8,
+            "expectancy_r": 0.079
+          },
+          "BANKNIFTY": {
+            "from": "2026-09-21",
+            "to": "2026-10-15",
+            "signals": 77,
+            "filled": 64,
+            "t1_hit_rate": 53.1,
+            "expectancy_r": -0.027
+          }
+        },
+        "default": {
+          "NIFTY": {
+            "from": "2026-09-21",
+            "to": "2026-10-15",
+            "signals": 116,
+            "filled": 98,
+            "t1_hit_rate": 61.2,
+            "expectancy_r": 0.094
+          },
+          "BANKNIFTY": {
+            "from": "2026-09-21",
+            "to": "2026-10-15",
+            "signals": 141,
+            "filled": 120,
+            "t1_hit_rate": 68.3,
+            "expectancy_r": 0.136
+          }
+        },
+        "tuned_avg_expectancy_r": 0.026,
+        "default_avg_expectancy_r": 0.115,
+        "tuned_avg_t1_hit_rate": 54.95,
+        "default_avg_t1_hit_rate": 64.75
+      }
+    },
+    "intraday": {
+      "params": {
+        "gate": 35.0,
+        "strict_htf": true,
+        "t1_r": 0.8,
+        "t2_r": 2.0,
+        "sl_min_atr": 0.8,
+        "sl_max_atr": 2.2,
+        "pullback_only": true
+      },
+      "accepted_tuned": true,
+      "train_expectancy_r": 0.058,
+      "test": {
+        "tuned": {
+          "NIFTY": {
+            "from": "2026-08-17",
+            "to": "2026-10-14",
+            "signals": 55,
+            "filled": 41,
+            "t1_hit_rate": 75.6,
+            "expectancy_r": 0.227
+          },
+          "BANKNIFTY": {
+            "from": "2026-08-17",
+            "to": "2026-10-14",
+            "signals": 42,
+            "filled": 27,
+            "t1_hit_rate": 55.6,
+            "expectancy_r": -0.091
+          }
+        },
+        "default": {
+          "NIFTY": {
+            "from": "2026-08-17",
+            "to": "2026-10-14",
+            "signals": 73,
+            "filled": 54,
+            "t1_hit_rate": 51.9,
+            "expectancy_r": -0.093
+          },
+          "BANKNIFTY": {
+            "from": "2026-08-17",
+            "to": "2026-10-14",
+            "signals": 65,
+            "filled": 57,
+            "t1_hit_rate": 56.1,
+            "expectancy_r": 0.015
+          }
+        },
+        "tuned_avg_expectancy_r": 0.068,
+        "default_avg_expectancy_r": -0.039,
+        "tuned_avg_t1_hit_rate": 65.6,
+        "default_avg_t1_hit_rate": 54.0
+      }
+    },
+    "swing": {
+      "params": {
+        "gate": 55.0,
+        "strict_htf": false,
+        "t1_r": 0.8,
+        "t2_r": 2.0,
+        "sl_min_atr": 0.8,
+        "sl_max_atr": 2.2,
+        "pullback_only": true
+      },
+      "accepted_tuned": true,
+      "train_expectancy_r": 0.14,
+      "test": {
+        "tuned": {
+          "NIFTY": {
+            "from": "2026-06-18",
+            "to": "2026-10-15",
+            "signals": 27,
+            "filled": 15,
+            "t1_hit_rate": 73.3,
+            "expectancy_r": 0.297
+          },
+          "BANKNIFTY": {
+            "from": "2026-06-18",
+            "to": "2026-10-15",
+            "signals": 25,
+            "filled": 16,
+            "t1_hit_rate": 68.8,
+            "expectancy_r": -0.047
+          }
+        },
+        "default": {
+          "NIFTY": {
+            "from": "2026-06-18",
+            "to": "2026-10-15",
+            "signals": 32,
+            "filled": 20,
+            "t1_hit_rate": 55.0,
+            "expectancy_r": 0.018
+          },
+          "BANKNIFTY": {
+            "from": "2026-06-18",
+            "to": "2026-10-15",
+            "signals": 30,
+            "filled": 25,
+            "t1_hit_rate": 44.0,
+            "expectancy_r": -0.216
+          }
+        },
+        "tuned_avg_expectancy_r": 0.125,
+        "default_avg_expectancy_r": -0.099,
+        "tuned_avg_t1_hit_rate": 71.05,
+        "default_avg_t1_hit_rate": 49.5
+      }
+    }
+  }
+}

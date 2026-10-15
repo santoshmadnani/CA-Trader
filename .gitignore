@@ -1,4 +1,4 @@
-# Secrets
+﻿# Secrets
 .env
 .env.*
 *.key
@@ -23,7 +23,7 @@ build/
 *.db-*
 backups/
 logs/
-data/candles_cache.json
+data/candles_cache*.json
 data/ui_customization.json
 data/videos/
 server_host/

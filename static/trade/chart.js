@@ -143,8 +143,9 @@
 
     // ---- data
     function setData(candles, symbol, tf) {
-      const fresh = symbol !== state.symbol || tf !== state.tf;
-      state.symbol = symbol; state.tf = tf || state.tf;
+      // compare with what was last *loaded*: the timeframe buttons update state.tf before the new candles arrive
+      const fresh = symbol !== state.loadedSym || (tf || state.tf) !== state.loadedTf;
+      state.symbol = symbol; state.tf = tf || state.tf; state.loadedSym = symbol; state.loadedTf = state.tf;
       state.raw = (candles || []).map((c) => ({ time: Math.floor(new Date(c.timestamp).getTime() / 1000) + IST_SHIFT, open: +c.open, high: +c.high, low: +c.low, close: +c.close, volume: +(c.volume || 0) }))
         .filter((b) => isFinite(b.open)).sort((a, b) => a.time - b.time).filter((b, i, a) => !i || b.time !== a[i - 1].time);
       main.setData(mainData()); renderIndicators(); applyLevels(); applyMarkers();
@@ -154,6 +155,9 @@
     }
     function tick(ltp) {   // live price into the forming bar
       const b = state.raw[state.raw.length - 1]; if (!b || !(ltp > 0)) return;
+      // Only a bar that is still forming may move: after the close (or before Upstox publishes the session) the last
+      // bar is history, and writing today's price into it would draw a fake candle.
+      if (Date.now() / 1000 + IST_SHIFT - b.time > barStep() * 2) return;
       b.close = ltp; b.high = Math.max(b.high, ltp); b.low = Math.min(b.low, ltp);
       const d = mainData(); main.update(d[d.length - 1]); showLegend(state.bars.length - 1);
     }
@@ -167,9 +171,41 @@
 
     // ---- drawings (stored per symbol as time/price so they survive reloads)
     const ctx = overlay.getContext("2d");
-    function toPoint(p) { if (!p) return null; const t = chart.timeScale().coordinateToTime(p.x); const pr = main.coordinateToPrice(p.y); if (t === null || pr === null) return null; return { t, p: pr }; }
-    const X = (t) => chart.timeScale().timeToCoordinate(t), Y = (p) => main.priceToCoordinate(p);
-    function redrawDrawings() {
+    // Drawings are stored as (time, price). Times are mapped through a fractional bar index so a point keeps its place
+    // between bars, to the right of the last bar, and after switching timeframe (timeToCoordinate only knows exact bars).
+    const barStep = () => { const r = state.raw, n = r.length; return n > 1 ? r[n - 1].time - r[n - 2].time : 60; };
+    function timeToLogical(t) {
+      const r = state.raw; if (!r.length) return null; const n = r.length;
+      if (t <= r[0].time) return (t - r[0].time) / barStep();
+      if (t >= r[n - 1].time) return n - 1 + (t - r[n - 1].time) / barStep();
+      let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (r[m].time <= t) lo = m; else hi = m; }
+      return lo + (t - r[lo].time) / ((r[hi].time - r[lo].time) || 1);
+    }
+    function logicalToTime(l) {
+      const r = state.raw, n = r.length; if (!n) return null;
+      if (l <= 0) return r[0].time + l * barStep();
+      if (l >= n - 1) return r[n - 1].time + (l - (n - 1)) * barStep();
+      const i = Math.floor(l); return r[i].time + (l - i) * (r[i + 1].time - r[i].time);
+    }
+    // Lightweight Charts only converts whole bar indices (logicalToCoordinate returns 0 for 12.5, coordinateToLogical
+    // rounds), so fractional positions are interpolated between neighbouring bars here.
+    function logicalToX(l) {
+      const ts = chart.timeScale(), i = Math.floor(l), f = l - i, x0 = ts.logicalToCoordinate(i);
+      if (x0 === null) return null; if (!f) return x0; const x1 = ts.logicalToCoordinate(i + 1); return x1 === null ? x0 : x0 + f * (x1 - x0);
+    }
+    function xToLogical(x) {
+      const ts = chart.timeScale(), i = ts.coordinateToLogical(x); if (i === null) return null;
+      const x0 = ts.logicalToCoordinate(i), x1 = ts.logicalToCoordinate(i + 1); if (x0 === null || x1 === null || x1 === x0) return i;
+      return i + (x - x0) / (x1 - x0);
+    }
+    function toPoint(p) { if (!p) return null; const l = xToLogical(p.x); const pr = main.coordinateToPrice(p.y);
+      if (l === null || pr === null) return null; return { t: logicalToTime(l), p: pr }; }
+    const X = (t) => { const l = timeToLogical(t); return l === null ? null : logicalToX(l); }, Y = (p) => main.priceToCoordinate(p);
+    // Coalesced and deferred one frame: after setData/zoom the chart applies its new scale on the next frame, and
+    // drawing in the same tick would map every point with the previous timeframe's scale.
+    let drawQueued = false;
+    function redrawDrawings() { if (drawQueued) return; drawQueued = true; requestAnimationFrame(() => requestAnimationFrame(() => { drawQueued = false; drawNow(); })); }
+    function drawNow() {
       const r = overlay.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
       if (overlay.width !== Math.round(r.width * dpr)) { overlay.width = Math.round(r.width * dpr); overlay.height = Math.round(r.height * dpr); }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, r.width, r.height);
@@ -204,18 +240,30 @@
       root.querySelectorAll("[data-tool]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === t)));
       redrawDrawings();
     }
-    overlay.addEventListener("click", (e) => {
-      const r = overlay.getBoundingClientRect(); const p = { x: e.clientX - r.left, y: e.clientY - r.top }; const pt = toPoint(p);
-      if (state.tool === "erase") { const k = nearDrawing(p.x, p.y); if (k >= 0) { state.drawings.splice(k, 1); persist(); redrawDrawings(); } return; }
-      if (!pt) return;
-      if (state.tool === "hline" || state.tool === "vline") { state.drawings.push({ type: state.tool, a: pt }); persist(); setTool("cursor"); return; }
-      if (!state.draft) { state.draft = { type: state.tool, a: pt, b: pt }; return; }
-      state.draft.b = pt; const done = state.draft; state.drawings.push(done);
+    // Pointer events cover mouse, pen and touch: press-drag-release draws in one gesture; tap, then tap again also works.
+    const local = (e) => { const r = overlay.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    let downAt = null;
+    function finishDraft(pt) {
+      if (!state.draft) return; if (pt) state.draft.b = pt; const done = state.draft; delete done.pending; state.drawings.push(done);
       if (done.type === "measure") setTimeout(() => { const k = state.drawings.indexOf(done); if (k >= 0) { state.drawings.splice(k, 1); redrawDrawings(); } }, 6000); // measure is temporary
       else persist();
       state.draft = null; setTool("cursor");
+    }
+    overlay.addEventListener("pointerdown", (e) => {
+      if (state.tool === "cursor") return; e.preventDefault();
+      const p = local(e);
+      if (state.tool === "erase") { const k = nearDrawing(p.x, p.y); if (k >= 0) { state.drawings.splice(k, 1); persist(); redrawDrawings(); } return; }
+      const pt = toPoint(p); if (!pt) return;
+      if (state.tool === "hline" || state.tool === "vline") { state.drawings.push({ type: state.tool, a: pt }); persist(); setTool("cursor"); return; }
+      if (state.draft && state.draft.pending) { finishDraft(pt); return; }   // second tap
+      try { overlay.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+      downAt = p; state.draft = { type: state.tool, a: pt, b: pt }; redrawDrawings();
     });
-    overlay.addEventListener("mousemove", (e) => { if (!state.draft) return; const r = overlay.getBoundingClientRect(); const pt = toPoint({ x: e.clientX - r.left, y: e.clientY - r.top }); if (pt) { state.draft.b = pt; redrawDrawings(); } });
+    overlay.addEventListener("pointermove", (e) => { if (!state.draft) return; const pt = toPoint(local(e)); if (pt) { state.draft.b = pt; redrawDrawings(); } });
+    overlay.addEventListener("pointerup", (e) => {
+      if (!state.draft || !downAt) return; const p = local(e); const moved = Math.hypot(p.x - downAt.x, p.y - downAt.y) > 8; downAt = null;
+      if (moved) finishDraft(toPoint(p)); else state.draft.pending = true;   // a tap: wait for the second point
+    });
     const persist = () => store.set("draw_" + state.symbol, state.drawings.filter((d) => d.type !== "measure"));
     new ResizeObserver(() => redrawDrawings()).observe(host);
 
@@ -257,7 +305,8 @@
     root.addEventListener("keydown", (e) => { if (e.key === "Escape") setTool("cursor"); if ((e.key === "Delete" || e.key === "Backspace") && state.tool === "erase") setTool("cursor"); });
 
     function setTheme() { chart.applyOptions(themeOpts()); state.panes.forEach((p) => p.chart.applyOptions({ ...themeOpts(), timeScale: { visible: false } })); buildMain(); main.setData(mainData()); renderIndicators(); applyLevels(); applyMarkers(); redrawDrawings(); }
-    return { setData, tick, setLevels, setMarkers, setTheme, get timeframe() { return state.tf; }, get symbol() { return state.symbol; } };
+    const probe = (t) => ({ logical: timeToLogical(t), x: X(t), visible: chart.timeScale().getVisibleLogicalRange(), bars: state.raw.length });
+    return { setData, tick, setLevels, setMarkers, setTheme, probe, get timeframe() { return state.tf; }, get symbol() { return state.symbol; } };
   }
   window.CAChart = { create };
 })();

@@ -152,6 +152,8 @@ except Exception as exc:  # pragma: no cover
 # Lightning-fast ASGI production web server engine that runs FastAPI.
 
 from backend.services import signal_model as SIGNAL_MODEL
+from backend.services import trade_plan as TRADE_PLAN
+from backend.services import next_session as NEXT_SESSION
 from backend.services.telegram_service import (
     mask_token,
     send_telegram_msg,
@@ -1789,46 +1791,56 @@ def fitness_allowlisted(user: dict[str, Any] | None) -> bool:
 def selected_terminal(request: Request) -> str | None:
     return "trading"
 
-def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] | None = None) -> dict[str, Any]:
+# Primary model first (best answers, ~5-10 s for a 20 KB context), then a fast lite model as fallback.
+GEMINI_CHAT_MODELS = list(dict.fromkeys([m for m in [os.getenv("GEMINI_MODEL", "").strip(), "gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"] if m and m != "gemini-3.8-flash-high"]))
+
+
+def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] | None = None,
+                history: list[dict[str, str]] | None = None, budget_s: float = 35.0) -> dict[str, Any]:
+    """Call Gemini with a total time budget. `history` = prior turns [{"role": "user"|"model", "text": ...}]."""
     if not GEMINI_API_KEY:
         return {"available": False, "reason": "Gemini API key is not configured"}
     headers = {"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"}
-    body = {"contents": [{"parts": [{"text": prompt[:max_chars]}]}]}
-    parts = [{"text": prompt[:max_chars]}]
+    parts: list[dict[str, Any]] = [{"text": prompt[:max_chars]}]
     if image_data and image_data.get("data"):
-        mime = image_data.get("mime_type") or "image/png"
         raw_b64 = str(image_data.get("data") or "")
         if "," in raw_b64:
             raw_b64 = raw_b64.split(",", 1)[1]
-        parts.append({
-            "inlineData": {
-                "mimeType": mime,
-                "data": raw_b64
-            }
-        })
-    body = {"contents": [{"parts": parts}]}
-    for model in AVAILABLE_AI_MODELS:
-        if model == "antigravity-deep-trader":
-            continue
+        parts.append({"inlineData": {"mimeType": image_data.get("mime_type") or "image/png", "data": raw_b64}})
+    contents = []
+    for turn in (history or [])[-8:]:
+        txt = str(turn.get("text") or "").strip()
+        if txt:
+            contents.append({"role": "model" if turn.get("role") in ("model", "assistant", "ai") else "user", "parts": [{"text": txt[:4000]}]})
+    contents.append({"role": "user", "parts": parts})
+    body = {"contents": contents}
+    deadline = time.monotonic() + budget_s
+    reasons = []
+    for i, model in enumerate(GEMINI_CHAT_MODELS):
+        remaining = deadline - time.monotonic()
+        if remaining < 3:
+            break
+        # Leave time for the fast fallback if the primary model stalls.
+        per_call = remaining if i == len(GEMINI_CHAT_MODELS) - 1 else max(3.0, min(25.0, remaining - 8.0))
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{quote(model, safe='-_.')}:generateContent"
         try:
-            resp = requests.post(url, headers=headers, json=body, timeout=4.5)
-            if resp.status_code == 429 or resp.status_code >= 500:
-                continue
+            resp = requests.post(url, headers=headers, json=body, timeout=per_call)
             if resp.status_code >= 400:
+                reasons.append(f"{model}: HTTP {resp.status_code}")
                 continue
             payload = resp.json()
             candidates = payload.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                t = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
-                if t:
-                    provider_ok("gemini")
-                    return {"available": True, "text": t, "model": model, "timestamp": now_iso()}
-        except Exception:
-            continue
-    return {"available": False, "reason": "All Gemini models unavailable"}
-
+            t = "".join(p.get("text", "") for p in (candidates[0].get("content", {}).get("parts", []) if candidates else []) if isinstance(p, dict))
+            if t:
+                provider_ok("gemini")
+                return {"available": True, "text": t, "model": model, "timestamp": now_iso()}
+            reasons.append(f"{model}: empty response ({(candidates[0].get('finishReason') if candidates else 'no candidates')})")
+        except requests.Timeout:
+            reasons.append(f"{model}: timed out after {per_call:.0f}s")
+        except Exception as exc:
+            reasons.append(f"{model}: {safe_text(exc)}")
+    log.warning("Gemini unavailable: %s", "; ".join(reasons))
+    return {"available": False, "reason": "; ".join(reasons) or "All Gemini models unavailable"}
 
 def _ai_complete(prompt: str, model: str = "gemini-3.8-flash-high") -> dict[str, Any]:
     return gemini_text(prompt)
@@ -2529,16 +2541,17 @@ class UpstoxAdapter:
         self._resolve_cache[ident_key]=(now,result)
         return result
 
-    def _previous_session_close(self, key: str) -> float | None:
-        """Get and cache the last completed daily close for change calculations.
-        The full-market quote endpoint normally returns net_change directly, but some
-        responses/feeds can omit it or return 0 while a live move is present.
-        Cache this recovery value so it never becomes a per-tick request.
-        """
-        cache_key = f"prev-close:{key}"
+    def _previous_session_close(self, key: str, exclude: float | None = None) -> float | None:
+        """Last completed daily close for change calculations (cached, never a per-tick request).
+        `exclude` is the current price: when Upstox has already published today's daily bar, its close equals the
+        current price, so the close before it is the real previous-session close."""
+        cache_key = f"prev-closes:{key}"
         cached = CACHE.get(cache_key)
-        if cached is not None and isinstance(cached, (int, float)) and cached > 0:
-            return float(cached)
+        if isinstance(cached, list):
+            for c in reversed(cached):
+                if exclude is None or abs(c - exclude) > 1e-4:
+                    return float(c)
+            return None
         # For F&O instruments (options/futures), attempt to fetch the last session close
         # from the Upstox historical candle endpoint. If that fails, return None.
         # NOTE: Do NOT fall back to Black-Scholes for the prev-close — use None so the
@@ -2563,14 +2576,17 @@ class UpstoxAdapter:
                 except Exception:
                     continue
             if vals:
-                close = sorted(vals)[-1][1]
-                CACHE.set(cache_key, close, 1800.0)
-                return close
+                closes = [v for _, v in sorted(vals)]
+                CACHE.set(cache_key, closes, 1800.0)
+                for c in reversed(closes):
+                    if exclude is None or abs(c - exclude) > 1e-4:
+                        return c
+                return None
             if is_fo:
-                CACHE.set(cache_key, 0.0, 1800.0)
-            CACHE.set(cache_key, 0.0, 1800.0)
+                CACHE.set(cache_key, [], 600.0)
+            CACHE.set(cache_key, [], 600.0)
         except Exception as exc:
-            CACHE.set(cache_key, 0.0, 1800.0)
+            CACHE.set(cache_key, [], 300.0)
             log.debug("Previous close lookup failed for %s: %s", key, safe_text(exc))
         return None
 
@@ -2599,7 +2615,7 @@ class UpstoxAdapter:
                 except Exception:
                     pass
             if prev_close is None or prev_close <= 0 or abs(fltp - prev_close) < 1e-4:
-                recovered_prev = self._previous_session_close(key)
+                recovered_prev = self._previous_session_close(key, exclude=fltp)
                 if recovered_prev and recovered_prev > 0 and abs(fltp - recovered_prev) > 1e-4:
                     prev_close = float(recovered_prev)
                     q["cp"] = prev_close
@@ -2631,7 +2647,7 @@ class UpstoxAdapter:
         # overwrite the session change shown by the terminal.
         need_recovery=(net is None) or (ltp is not None and abs(float(net or 0)) < 1e-12)
         if need_recovery and ltp is not None:
-            prev=self._previous_session_close(key)
+            prev=self._previous_session_close(key, exclude=float(ltp))
             if prev is not None and prev>0:
                 q["cp"]=prev
                 q["net_change"]=float(ltp)-prev
@@ -2882,6 +2898,62 @@ class UpstoxAdapter:
             merged = resample_candles_to_tf(merged, target_resample)
         return merged
 
+    # Upstox V3 historical API: native intervals, so no local resampling. Range per request: minutes 1-15 ~1 month,
+    # 30 minutes and hours ~1 quarter, days/weeks/months ~10 years (measured: 32 days of 5-minute data is rejected).
+    _V3_TF = {"1m": ("minutes", 1, 28), "3m": ("minutes", 3, 28), "5m": ("minutes", 5, 28), "15m": ("minutes", 15, 28),
+              "30m": ("minutes", 30, 85), "60m": ("hours", 1, 85), "1D": ("days", 1, 3650), "1W": ("weeks", 1, 3650),
+              "1M": ("months", 1, 3650)}
+
+    def candles_v3(self, instrument: str, tf: str, days: int) -> list[dict[str, Any]]:
+        if tf not in self._V3_TF:
+            raise ValueError(f"unsupported timeframe {tf}")
+        unit, interval, chunk = self._V3_TF[tf]
+        key, meta = self.resolve_instrument(instrument)
+        segment = classify_instrument_segment(instrument, meta, key)
+        now = datetime.now(IST)
+        qkey = quote(key, safe="")
+        out: list[dict[str, Any]] = []
+        end, remaining = now.date(), max(1, int(days))
+        while remaining > 0:
+            span = min(chunk, remaining)
+            frm = end - timedelta(days=span)
+            recent = end >= now.date() - timedelta(days=1)
+            path = f"/historical-candle/{qkey}/{unit}/{interval}/{end.isoformat()}/{frm.isoformat()}"
+            payload = self._get(path, ttl=30.0 if recent else 6 * 3600.0, base_url=UPSTOX_V3_BASE_URL,
+                                cache_key=f"v3c:{key}:{unit}{interval}:{end}:{frm}")
+            out.extend(self._parse_candle_rows((payload.get("data") or {}).get("candles") or []))
+            end, remaining = frm - timedelta(days=1), remaining - span - 1
+        if unit in ("minutes", "hours"):
+            try:
+                payload = self._get(f"/historical-candle/intraday/{qkey}/{unit}/{interval}", ttl=5.0, base_url=UPSTOX_V3_BASE_URL,
+                                    cache_key=f"v3i:{key}:{unit}{interval}")
+                out.extend(self._parse_candle_rows((payload.get("data") or {}).get("candles") or []))
+            except Exception as exc:
+                log.debug("v3 intraday candles %s/%s failed: %s", instrument, tf, safe_text(exc))
+        merged = _merge_candle_series(out)
+        # Upstox publishes the previous session's history for different intervals at different times; fill a
+        # missing completed session from its 1-minute candles so every timeframe ends on the same day.
+        expected = _latest_completed_session_date(segment, now)
+        latest = _latest_candle_date(merged)
+        if tf in ("1m", "3m", "5m", "15m", "30m", "60m", "1D") and (latest is None or latest < expected):
+            day = expected.isoformat()
+            tf_min = {"1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "60m": 60, "1D": 1440}[tf]
+            # finest source interval that divides the requested one (Upstox may already have 3m but not 1m for that day)
+            for src in [m for m in (1, 3, 5, 15, 30) if tf_min % m == 0 and m < tf_min] + ([1] if tf == "1m" else []):
+                try:
+                    # Upstox returns nothing when from == to; ask for [day, day+1] and keep only that session's bars.
+                    nxt = (expected + timedelta(days=1)).isoformat()
+                    payload = self._get(f"/historical-candle/{qkey}/minutes/{src}/{nxt}/{day}", ttl=120.0, base_url=UPSTOX_V3_BASE_URL,
+                                        cache_key=f"v3fill:{key}:{src}:{day}")
+                    rows = [r for r in self._parse_candle_rows((payload.get("data") or {}).get("candles") or [])
+                            if datetime.fromisoformat(str(r["timestamp"]).replace("Z", "+00:00")).astimezone(IST).date() == expected]
+                except Exception as exc:
+                    log.debug("v3 session fill %s/%s via %sm failed: %s", instrument, tf, src, safe_text(exc))
+                    continue
+                if rows:
+                    merged = _merge_candle_series([merged, _session_resample(rows, tf, segment, src)])
+                    break
+        return merged
     def candles_between(self, instrument: str, timeframe: str, unit: str, from_date: datetime.date, to_date: datetime.date) -> list[dict[str, Any]]:
         key, meta = self.resolve_instrument(instrument)
         interval_str, target_resample = self._format_upstox_interval(unit, timeframe)
@@ -4323,6 +4395,7 @@ def _clean_news_summary(v: Any) -> str:
     raw = html.unescape(raw)
     raw = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
     raw = re.sub(r"<[^>]+>", " ", raw)
+    raw = re.sub(r"\S+\.(?:jpe?g|png|gif|webp|svg)\b", " ", raw, flags=re.I)  # some feeds put an image filename in the summary
     raw = re.sub(r"\s+", " ", raw).strip()
     return raw[:1200]
 
@@ -4619,7 +4692,7 @@ def _gnews_articles(query: str, limit: int) -> list[dict[str,Any]]:
 def _rss_articles(source_name: str, rss_url: str, target: str, limit: int=20, timeout: float | None = None) -> list[dict[str,Any]]:
     try:
         r=requests.get(rss_url,headers={"User-Agent":"CA-Trader/1.0 RSS reader"},timeout=(NEWS_RSS_TIMEOUT if timeout is None else timeout)); r.raise_for_status()
-        root=ET.fromstring(r.text); out=[]; target_u=str(target or "GLOBAL").upper()
+        root=ET.fromstring(r.content); out=[]; target_u=str(target or "GLOBAL").upper()  # bytes: let the XML declaration pick the encoding (r.text guessed Latin-1 -> mojibake)
         for item in root.iter():
             tag=item.tag.lower().split("}")[-1]
             if tag not in {"item","entry"}: continue
@@ -4668,6 +4741,36 @@ MACRO_NEGATIVE_TERMS = [
 ]
 MACRO_POSITIVE_TERMS = ["ceasefire", "peace deal", "rate cut", "inflation cools", "disinflation", "stimulus", "production rises", "supply restored"]
 
+# Balanced headline lexicon (whole-word / phrase matches only, so "award" is not "war" and "strike price" is not a strike).
+_SENT_POS = [
+    "beats estimates", "beat estimates", "profit rises", "profit jumps", "profit surges", "net profit up", "revenue rises", "record high",
+    "all-time high", "upgrade", "upgraded", "order win", "wins order", "bags order", "approval", "approved", "rate cut", "cuts rates",
+    "ceasefire", "peace deal", "truce", "rally", "rallies", "surge", "surges", "soars", "jumps", "gains", "climbs", "rebounds",
+    "buyback", "dividend", "bonus issue", "stake buy", "acquires", "inflows", "fii buying", "strong demand", "expansion",
+    "inflation cools", "inflation eases", "disinflation", "stimulus", "outperform", "beats", "higher guidance", "raises guidance",
+    "upbeat", "optimism", "recovery", "easing", "supply restored", "production rises", "deal signed", "positive",
+]
+_SENT_NEG = [
+    "misses estimates", "missed estimates", "profit falls", "profit drops", "net loss", "loss widens", "revenue falls", "downgrade",
+    "downgraded", "probe", "raid", "fraud", "penalty", "fined", "default", "defaults", "war", "airstrike", "missile", "attack",
+    "sanctions", "tariff hike", "new tariffs", "rate hike", "hikes rates", "outflows", "fii selling", "slump", "slumps", "plunge",
+    "plunges", "tumbles", "crash", "crashes", "falls", "drops", "slides", "sinks", "declines", "selloff", "sell-off", "layoffs",
+    "resigns", "resignation", "recession", "bank failure", "banking crisis", "escalation", "inflation rises", "inflation surges",
+    "hot inflation", "lower guidance", "cuts guidance", "weak demand", "underperform", "bearish", "negative", "crude jumps",
+    "oil prices rise", "supply disruption", "shutdown", "strike called", "workers strike", "nationwide strike",
+]
+_SENT_POS_RE = [re.compile(r"\b" + re.escape(w) + r"\b") for w in _SENT_POS]
+_SENT_NEG_RE = [re.compile(r"\b" + re.escape(w) + r"\b") for w in _SENT_NEG]
+
+
+def _headline_sentiment(title: str, body: str = "") -> str:
+    """Positive / Negative / Neutral from the headline (weight 2) and the summary's first sentence (weight 1)."""
+    t = (title or "").lower()
+    b = re.split(r"(?<=[.!?])\s", (body or "").lower(), maxsplit=1)[0]
+    score = 2 * (sum(1 for r in _SENT_POS_RE if r.search(t)) - sum(1 for r in _SENT_NEG_RE if r.search(t)))
+    score += sum(1 for r in _SENT_POS_RE if r.search(b)) - sum(1 for r in _SENT_NEG_RE if r.search(b))
+    return "Positive" if score >= 2 else "Negative" if score <= -2 else "Neutral"
+
 def _strip_news_boilerplate(summary: str) -> str:
     t=_clean_news_summary(summary)
     for phrase in NEWS_BOILERPLATE_PHRASES:
@@ -4704,20 +4807,20 @@ def _news_classify_v6(title: str, summary: str, target: str) -> dict[str, Any]:
     # Headline dominates. A clear macro event is material even if the feed body is promotional boilerplate.
     if title_macro or (macro_high and (concrete or event_hits or target in {"GLOBAL","MARKET","NIFTY","NIFTY50","BANKNIFTY","NIFTYBANK"})):
         mat=95.0 if title_macro else 85.0
-        sent="Negative" if title_neg>title_pos else "Positive" if title_pos>title_neg else "Neutral"
+        sent=_headline_sentiment(raw_title, body)
         return {"classification":"NEWS","relevance":0.95,"materiality":mat,"materiality_label":"HIGH","confidence":0.93,"sentiment":sent,"reason":"Headline contains a market-moving macro/geopolitical/rates event; publisher boilerplate was discounted."}
     if direct_target and analysis_only:
         return {"classification":"ANALYSIS","relevance":0.55,"materiality":35.0,"materiality_label":"LOW","confidence":0.90,"reason":"Targeted research/forecast commentary rather than a newly reported event."}
     if direct_target and concrete:
         high=_news_contains(text,HIGH_MATERIALITY_TERMS)
-        return {"classification":"NEWS","relevance":0.90,"materiality":90.0 if high else 70.0,"materiality_label":"HIGH" if high else "MEDIUM","confidence":0.92,"sentiment":"Negative" if title_neg>title_pos else "Positive" if title_pos>title_neg else "Neutral","reason":"Direct company event reported for the selected instrument."}
+        return {"classification":"NEWS","relevance":0.90,"materiality":90.0 if high else 70.0,"materiality_label":"HIGH" if high else "MEDIUM","confidence":0.92,"sentiment":_headline_sentiment(raw_title, body),"reason":"Direct company event reported for the selected instrument."}
     if direct_target:
-        return {"classification":"NEWS","relevance":0.78,"materiality":60.0,"materiality_label":"MEDIUM","confidence":0.82,"sentiment":"Negative" if title_neg>title_pos else "Positive" if title_pos>title_neg else "Neutral","reason":"The selected instrument is directly named in a substantive report."}
+        return {"classification":"NEWS","relevance":0.78,"materiality":60.0,"materiality_label":"MEDIUM","confidence":0.82,"sentiment":_headline_sentiment(raw_title, body),"reason":"The selected instrument is directly named in a substantive report."}
     if target in {"GLOBAL","MARKET"} and (concrete or macro_high or event_hits):
-        sent="Negative" if title_neg>title_pos else "Positive" if title_pos>title_neg else "Neutral"
+        sent=_headline_sentiment(raw_title, body)
         return {"classification":"NEWS","relevance":0.80,"materiality":80.0 if macro_high else 65.0,"materiality_label":"HIGH" if macro_high else "MEDIUM","confidence":0.88,"sentiment":sent,"reason":"Substantive global/market event; headline and event terms indicate investment relevance."}
     if target in {"NIFTY","NIFTY50"} and _nifty50_news_match(text):
-        return {"classification":"NEWS","relevance":0.82,"materiality":65.0,"materiality_label":"MEDIUM","confidence":0.87,"sentiment":"Negative" if title_neg>title_pos else "Positive" if title_pos>title_neg else "Neutral","reason":"News names a NIFTY 50 constituent and can affect the selected index."}
+        return {"classification":"NEWS","relevance":0.82,"materiality":65.0,"materiality_label":"MEDIUM","confidence":0.87,"sentiment":_headline_sentiment(raw_title, body),"reason":"News names a NIFTY 50 constituent and can affect the selected index."}
     if _news_market_update(text) and not (title_macro or concrete):
         return {"classification":"MARKET_UPDATE","relevance":0.30,"materiality":30.0,"materiality_label":"LOW","confidence":0.90,"reason":"Market movement commentary without a new underlying event."}
     return {"classification":"IRRELEVANT","relevance":0.05,"materiality":5.0,"materiality_label":"LOW","confidence":0.75,"reason":"No clear investable event or target exposure after removing feed boilerplate."}
@@ -7824,10 +7927,11 @@ init_db()
 seed_admin()
 
 async def _auto_news_worker_loop():
-    """Keeps the news cache warm: every 10 min while NSE is open, every 30 min otherwise (cache TTL is 10 min)."""
+    """Keeps the news cache warm for the indices, crude, global and the top watchlist symbols: every 5 min while NSE is open, 30 min otherwise."""
     while True:
         try:
-            for tgt in ["NIFTY", "BANKNIFTY", "CRUDEOIL", "GLOBAL"]:
+            wl = [extract_root_symbol(s).upper() for s in (user_watchlist_symbols(1) or []) if s][:3]
+            for tgt in list(dict.fromkeys(["NIFTY", "BANKNIFTY", "CRUDEOIL", "GLOBAL"] + wl)):
                 try:
                     await asyncio.to_thread(_refresh_news_background, tgt, tgt, None, 50)
                 except Exception:
@@ -7835,7 +7939,7 @@ async def _auto_news_worker_loop():
                 await asyncio.sleep(2)
         except Exception as e:
             log.debug("Auto news loop error: %s", safe_text(e))
-        await asyncio.sleep(600 if market_session("NSE_EQ").get("active") else 1800)
+        await asyncio.sleep(300 if market_session("NSE_EQ").get("active") else 1800)
 
 async def _telegram_bot_service_loop():
     log.info("Starting Telegram interactive bot listener & price watch service...")
@@ -7995,6 +8099,7 @@ async def lifespan(app: FastAPI):
     sm_telethon_task = asyncio.create_task(_stockmantra_live_telethon_loop())
     reco_sender_task = asyncio.create_task(_recommendation_sender_agent_loop())
     skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop())
+    plan_tracker_task = asyncio.create_task(_signal_plan_tracker_loop())
 
     async def _warm_page_caches() -> None:
         """After a restart (every deploy), pre-compute what /terminal asks for first so the first visit is instant."""
@@ -8040,7 +8145,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        cache_task.cancel(); auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel(); sm_telethon_task.cancel(); reco_sender_task.cancel(); skill_agent_task.cancel()
+        cache_task.cancel(); auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel(); sm_telethon_task.cancel(); reco_sender_task.cancel(); skill_agent_task.cancel(); plan_tracker_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await cache_task
         with contextlib.suppress(asyncio.CancelledError):
@@ -8648,17 +8753,40 @@ def get_cached_terminal_html() -> str:
         return HTML_PATH.read_text(encoding="utf-8")
 
 TRADE_HTML_PATH = BASE_DIR / "trade.html"
+MOBILE_HTML_PATH = BASE_DIR / "mobile.html"
+_MOBILE_UA = re.compile(r"Mobi|Android|iPhone|iPod|Opera Mini|IEMobile", re.I)
+
+
+def _ui_response(path: Path, choice: str | None) -> Response:
+    resp = HTMLResponse(path.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+    if choice:
+        resp.set_cookie("cat_ui", choice, max_age=365 * 86400, samesite="lax")
+    return resp
 
 
 @app.get("/terminal", response_class=HTMLResponse)
 async def terminal_page(request: Request) -> Response:
-    """New trading screen. The previous terminal stays available at /terminal/classic."""
+    """Trading screen: the mobile app on phones, the desktop terminal elsewhere (?ui=desktop|mobile switches and is remembered).
+    The previous terminal stays available at /terminal/classic."""
     user=current_user(request)
     if AUTH_ENABLED and not user:
         return RedirectResponse("/login", status_code=302)
+    choice = request.query_params.get("ui")
+    choice = choice if choice in ("desktop", "mobile") else None
+    want = choice or request.cookies.get("cat_ui") or ("mobile" if _MOBILE_UA.search(request.headers.get("user-agent", "")) else "desktop")
+    if want == "mobile" and MOBILE_HTML_PATH.exists():
+        return _ui_response(MOBILE_HTML_PATH, choice)
     if TRADE_HTML_PATH.exists():
-        return HTMLResponse(TRADE_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+        return _ui_response(TRADE_HTML_PATH, choice)
     return await classic_terminal_page(request)
+
+
+@app.get("/m", response_class=HTMLResponse)
+async def mobile_page(request: Request) -> Response:
+    user=current_user(request)
+    if AUTH_ENABLED and not user:
+        return RedirectResponse("/login", status_code=302)
+    return _ui_response(MOBILE_HTML_PATH, None)
 
 
 @app.get("/terminal/classic", response_class=HTMLResponse)
@@ -9272,6 +9400,32 @@ def _canonical_candle(row: dict[str, Any]) -> dict[str, Any] | None:
     return out
 
 
+def _session_resample(ones: list[dict[str, Any]], tf: str, segment: str, src_minutes: int = 1) -> list[dict[str, Any]]:
+    """Aggregate one session's `src_minutes` candles into `tf` bars aligned to the session open (09:15 NSE/BSE, 09:00 MCX)."""
+    if tf == "1m" or {"3m": 3, "5m": 5, "15m": 15, "30m": 30, "60m": 60}.get(tf) == src_minutes:
+        return ones
+    mins = {"3m": 3, "5m": 5, "15m": 15, "30m": 30, "60m": 60}.get(tf)
+    rows = sorted(ones, key=lambda c: c["timestamp"])
+    buckets: dict[Any, dict[str, Any]] = {}
+    for c in rows:
+        t = datetime.fromisoformat(str(c["timestamp"]).replace("Z", "+00:00")).astimezone(IST)
+        if tf == "1D":
+            b = t.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            open_t = t.replace(hour=9, minute=0 if str(segment).upper().startswith("MCX") else 15, second=0, microsecond=0)
+            k = int((t - open_t).total_seconds() // 60 // mins)
+            b = open_t + timedelta(minutes=k * mins)
+        cur = buckets.get(b)
+        if cur is None:
+            buckets[b] = {"timestamp": b.astimezone(timezone.utc).isoformat(), "open": c["open"], "high": c["high"], "low": c["low"],
+                          "close": c["close"], "volume": float(c.get("volume") or 0)}
+        else:
+            cur["high"] = max(cur["high"], c["high"])
+            cur["low"] = min(cur["low"], c["low"])
+            cur["close"] = c["close"]
+            cur["volume"] += float(c.get("volume") or 0)
+    return [buckets[k] for k in sorted(buckets)]
+
 def _merge_candle_series(*series: Any) -> list[dict[str, Any]]:
     """Merge candle arrays by normalized epoch timestamp; never let old text-formatted timestamps win."""
     by_ts: dict[int, dict[str, Any]] = {}
@@ -9320,7 +9474,7 @@ try:
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
     pass
-_CANDLES_CACHE_FILE = _DATA_DIR / "candles_cache.json"
+_CANDLES_CACHE_FILE = _DATA_DIR / "candles_cache_v3.json"  # v3: native-interval candles (older file held mis-resampled 15m/60m)
 _LAST_GOOD_CANDLES: dict[str, list[dict[str, Any]]] = {}
 try:
     if _CANDLES_CACHE_FILE.exists():
@@ -9347,7 +9501,7 @@ def analysis_candles_robust(instrument: str, timeframe: str, days: int) -> list[
     segment=classify_instrument_segment(instrument, meta, key)
     active=bool(market_session(segment, now).get('active'))
     target_day=_latest_completed_session_date(segment, now)
-    cache_key=f"analysis-candles-r20:{instrument}:{tf}:{days}:{target_day.isoformat()}:{'open' if active else 'closed'}"
+    cache_key=f"analysis-candles-r21:{instrument}:{tf}:{days}:{target_day.isoformat()}:{'open' if active else 'closed'}"
     cached=CACHE.get(cache_key)
     if cached is not None and cached:
         return cached
@@ -9356,17 +9510,24 @@ def analysis_candles_robust(instrument: str, timeframe: str, days: int) -> list[
     # historical and intraday data, so a temporary failure of either Upstox endpoint
     # no longer blanks the chart. Exact-session probing is only used when the returned
     # history is actually missing the expected completed session.
+    v3_ok=False
     try:
-        out=_merge_candle_series(UPSTOX.candles(instrument, '1' if tf=='1D' else '1' if tf=='60m' else tf[:-1], 'days' if tf=='1D' else 'hours' if tf=='60m' else 'minutes', days=min(days,365) if tf=='1D' else min(days,90) if tf=='60m' else min(days,365)))
+        # Native intervals from the Upstox V3 API (chunked to its range limits, previous session back-filled).
+        out=UPSTOX.candles_v3(instrument, tf, days)
+        v3_ok=bool(out)
     except Exception as exc:
-        log.warning("Primary candle series failed for %s/%s: %s", instrument, tf, safe_text(exc))
+        log.warning("V3 candle series failed for %s/%s: %s", instrument, tf, safe_text(exc))
         out=[]
+    if not out:
+        try:
+            out=_merge_candle_series(UPSTOX.candles(instrument, '1' if tf=='1D' else tf[:-1], 'days' if tf=='1D' else 'minutes', days=min(days,365) if tf=='1D' else min(days,28)))
+        except Exception as exc:
+            log.warning("Primary candle series failed for %s/%s: %s", instrument, tf, safe_text(exc))
+            out=[]
 
-    # Only spend extra requests when the primary series is empty or stale. For an open
-    # session, current-day intraday data can make the series fresh even if the historical
-    # endpoint is one session behind.
+    # Only spend extra requests when the V2 fallback series is empty or stale.
     latest=_latest_candle_date(out)
-    if not out or (latest is not None and latest < target_day):
+    if not v3_ok and tf in ('1m','1D') and (not out or (latest is not None and latest < target_day)):
         interval='1' if tf=='60m' else '1' if tf=='1D' else tf[:-1]
         unit='hours' if tf=='60m' else 'days' if tf=='1D' else 'minutes'
         probe=target_day
@@ -10507,6 +10668,312 @@ async def analysis_overall(
         rec = await asyncio.to_thread(fallback_recommendation_quick, instrument, uid, dp_clean)
         return {"instrument": instrument, "timeframe": timeframe, **rec, "ai": {"available": False, "requested": False, "decision": "NOT REQUESTED", "reason": "CA AI opinion is manual. Click Ask CA AI to request it."}, "timestamp": now_iso(), "partial": True}
 
+
+# ---------------------------------------------------------------------------
+# Time-bound multi-timeframe trade plans (scalp / intraday / swing)
+# ---------------------------------------------------------------------------
+
+_PLAN_TF_DAYS = {"1m": 5, "5m": 20, "15m": 60, "60m": 120, "1D": 400}
+_PLAN_BT_DAYS = {"1m": 25, "5m": 60, "15m": 120, "60m": 240, "1D": 600}
+_SIGNAL_BT: dict[str, dict[str, Any]] = {}
+_SIGNAL_BT_INFLIGHT: set[str] = set()
+
+
+def _news_bias(root: str, hours: float = 3.0) -> dict[str, Any]:
+    """Recent material news for the instrument (and market-wide news at half weight) as a -100..+100 bias, decayed by age."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    rows = db_exec(
+        "SELECT target, headline, summary, materiality, published_at FROM persisted_news_events "
+        "WHERE target IN (?, 'GLOBAL') AND created_at >= ? ORDER BY created_at DESC LIMIT 60", [root, since], "all") or []
+    total, weight, used = 0.0, 0.0, []
+    now = datetime.now(timezone.utc)
+    for r in rows:
+        sent = _headline_sentiment(str(r.get("headline") or ""), str(r.get("summary") or ""))  # re-scored: older rows carry a biased label
+        sign = {"Positive": 1, "Negative": -1}.get(sent, 0)
+        mat = float(r.get("materiality") or 0) / 100.0
+        if sign == 0 or mat <= 0:
+            continue
+        try:
+            age_h = max(0.0, (now - datetime.fromisoformat(str(r.get("published_at")).replace("Z", "+00:00"))).total_seconds() / 3600)
+        except Exception:
+            age_h = hours
+        w = mat * (0.5 ** (age_h / 1.5)) * (0.5 if r.get("target") == "GLOBAL" else 1.0)
+        total += sign * w
+        weight += w
+        if len(used) < 3:
+            used.append({"headline": r.get("headline"), "sentiment": sent, "materiality": r.get("materiality")})
+    bias = max(-100.0, min(100.0, total / max(weight, 1.0) * 100)) if weight else 0.0
+    return {"bias": round(bias, 1), "items": used, "window_hours": hours}
+
+
+def _load_plan_series(instrument: str, days_map: dict[str, int]) -> dict[str, Any]:
+    out = {}
+    day_close = (23, 30) if get_symbol_segment(extract_root_symbol(instrument).upper()) == "MCX" else (15, 30)
+    for tf, days in days_map.items():
+        try:
+            out[tf] = TRADE_PLAN.Series(analysis_candles_robust(instrument, tf, days) or [], tf, day_close)
+        except Exception as exc:
+            log.debug("plan candles %s %s failed: %s", instrument, tf, safe_text(exc))
+    return out
+
+
+def _atm_contract(chain: dict[str, Any] | None, spot: float, side: str) -> dict[str, Any] | None:
+    """Nearest-to-money liquid contract on the side that profits from the plan (CE for BUY, PE for SELL)."""
+    leg = "call" if side == "BUY" else "put"
+    best = None
+    for s in (chain or {}).get("strikes") or []:
+        c = s.get(leg) or {}
+        if not c.get("ltp") or not c.get("delta"):
+            continue
+        dist = abs(float(s.get("strike") or 0) - spot)
+        if best is None or dist < best[0]:
+            best = (dist, {**c, "strike": s.get("strike"), "option_type": "CE" if leg == "call" else "PE",
+                           "symbol": f"{(chain or {}).get('underlying') or ''} {s.get('strike'):g} {'CE' if leg == 'call' else 'PE'} {c.get('expiry') or ''}".strip()})
+    return best[1] if best else None
+
+
+def _compute_signals(instrument: str) -> dict[str, Any]:
+    root = extract_root_symbol(instrument).upper()
+    mcx = get_symbol_segment(root) == "MCX"
+    series = _load_plan_series(instrument, _PLAN_TF_DAYS)
+    news = _news_bias(root)
+    chain = None
+    if is_option_underlying := (root in {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"} or root in NIFTY50_SYMBOLS or mcx):
+        try:
+            chain = UPSTOX.option_chain(root) if not mcx else generate_option_chain_engine(root)
+        except Exception as exc:
+            log.debug("plan option chain %s failed: %s", root, safe_text(exc))
+    plans = []
+    now_ist = datetime.now(IST)
+    for h in TRADE_PLAN.HORIZONS:
+        p = TRADE_PLAN.build_plan(h, series, mcx=mcx, news_bias=news["bias"])
+        if p.get("decision") in ("BUY", "SELL") and datetime.fromisoformat(p["valid_until"]) <= now_ist:
+            # built from the last closed bar, but its entry window is already over (e.g. after the close): not a live call
+            p["expired"] = True
+            p["reason"] = f"Last session's {p['decision']} plan; its entry window closed at {datetime.fromisoformat(p['valid_until']).strftime('%H:%M')} IST. A new plan forms after the open."
+        if p.get("decision") in ("BUY", "SELL") and is_option_underlying and not p.get("expired"):
+            spot = float(p["inputs"]["price"])
+            p["option"] = TRADE_PLAN.option_levels(p, _atm_contract(chain, spot, p["decision"]), spot)
+        bt = _SIGNAL_BT.get(f"{root}:{h}")
+        if bt:
+            p["track_record"] = {k: bt.get(k) for k in ("from", "to", "signals", "fill_rate", "t1_hit_rate", "t2_hit_rate", "expectancy_r", "rule")}
+        plans.append(p)
+    active = market_session("MCX" if mcx else "NSE_EQ").get("active")
+    return {"instrument": instrument, "root": root, "market_open": bool(active), "plans": plans, "news": news,
+            "timestamp": now_iso(), "source": "Upstox candles 1m/5m/15m/60m/1D + Upstox option chain"}
+
+
+def _signals_backtest(instrument: str) -> dict[str, Any]:
+    root = extract_root_symbol(instrument).upper()
+    mcx = get_symbol_segment(root) == "MCX"
+    series = _load_plan_series(instrument, _PLAN_BT_DAYS)
+    out = {}
+    for h in TRADE_PLAN.HORIZONS:
+        res = TRADE_PLAN.backtest(h, series, mcx=mcx)
+        res["computed_at"] = now_iso()
+        _SIGNAL_BT[f"{root}:{h}"] = res
+        out[h] = res
+    return {"instrument": instrument, "root": root, "results": out}
+
+
+async def _ensure_signal_backtest(instrument: str) -> None:
+    root = extract_root_symbol(instrument).upper()
+    fresh = _SIGNAL_BT.get(f"{root}:intraday")
+    if root in _SIGNAL_BT_INFLIGHT or (fresh and (datetime.now(timezone.utc) - datetime.fromisoformat(fresh["computed_at"])).total_seconds() < 6 * 3600):
+        return
+    _SIGNAL_BT_INFLIGHT.add(root)
+    try:
+        await asyncio.to_thread(_signals_backtest, instrument)
+    except Exception as exc:
+        log.warning("signal backtest %s failed: %s", root, safe_text(exc))
+    finally:
+        _SIGNAL_BT_INFLIGHT.discard(root)
+
+
+def _next_trading_day(after: date, segment: str = "NSE_EQ") -> date:
+    d = after + timedelta(days=1)
+    for _ in range(14):
+        if d.weekday() < 5 and not get_market_holiday_info(d, segment)[0]:
+            return d
+        d += timedelta(days=1)
+    return d
+
+
+def _us_session_returns() -> dict[date, float]:
+    """S&P 500 daily returns (in %) keyed by US session date, via Yahoo Finance. A global cue only; never used as Indian price data."""
+    cached = CACHE.get("us-session-returns")
+    if cached is not None:
+        return cached
+    out: dict[date, float] = {}
+    try:
+        import yfinance as yf
+        df = yf.download("^GSPC", period="4y", interval="1d", progress=False, auto_adjust=False)
+        closes = df["Close"].squeeze().dropna()
+        prev = None
+        for idx, val in closes.items():
+            v = float(val)
+            if prev:
+                out[idx.date()] = (v / prev - 1) * 100
+            prev = v
+    except Exception as exc:
+        log.warning("US session returns unavailable: %s", safe_text(exc))
+    CACHE.set("us-session-returns", out, 3 * 3600.0 if out else 300.0)
+    return out
+
+
+def _compute_next_session(instrument: str) -> dict[str, Any]:
+    root = extract_root_symbol(instrument).upper()
+    segment = "MCX" if get_symbol_segment(root) == "MCX" else "NSE_EQ"
+    daily = analysis_candles_robust(instrument, "1D", 1100) or []
+    try:
+        hourly = analysis_candles_robust(instrument, "60m", 360) or []
+    except Exception:
+        hourly = []
+    try:
+        vix = analysis_candles_robust("NSE_INDEX|India VIX", "1D", 1100) or [] if segment != "MCX" else []
+    except Exception:
+        vix = []
+    us = _us_session_returns() if segment != "MCX" else {}
+    rows = NEXT_SESSION.build_dataset(daily, hourly, vix, us)
+    pred = NEXT_SESSION.predict(rows)
+    if pred.get("available"):
+        pred["us_session_included"] = bool(rows and rows[-1].get("us_known"))
+    if pred.get("available"):
+        pred["for_date"] = _next_trading_day(date.fromisoformat(pred["as_of"]), segment).isoformat()
+    return {"instrument": instrument, "root": root, "prediction": pred,
+            "validation": {"direction": NEXT_SESSION.walk_forward(rows, "next_up"), "gap": NEXT_SESSION.walk_forward(rows, "next_gap_up")},
+            "method": "Logistic regression on end-of-day features, validated walk-forward (each test day fitted only on earlier days).",
+            "data": {"daily_bars": len(daily), "hourly_bars": len(hourly), "vix_bars": len(vix)}, "timestamp": now_iso()}
+
+
+@app.get("/api/prediction/next-session/{instrument}")
+async def api_next_session(instrument: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    key = f"next-session:{instrument.upper()}"
+    cached = CACHE.get(key)
+    if cached is not None:
+        return cached
+    res = await asyncio.wait_for(asyncio.to_thread(_compute_next_session, instrument), timeout=90)
+    CACHE.set(key, res, 1800.0)
+    return res
+
+db_exec("""CREATE TABLE IF NOT EXISTS signal_plans (
+    id TEXT PRIMARY KEY, user_id INTEGER, symbol TEXT, horizon TEXT, timeframe TEXT, side TEXT, score REAL,
+    entry_low REAL, entry_high REAL, stop_loss REAL, target_1 REAL, target_2 REAL, valid_until TEXT,
+    time_stop_bars INTEGER, time_stop_at_latest TEXT, option_json TEXT, instructions TEXT, created_at TEXT,
+    status TEXT, fill_price REAL, filled_at TEXT, exit_price REAL, closed_at TEXT, r REAL, updated_at TEXT)""")
+db_exec("CREATE INDEX IF NOT EXISTS idx_signal_plans_created ON signal_plans(created_at)")
+_PLAN_OPEN_STATES = ("PENDING", "OPEN")
+
+
+def _record_plans(res: dict[str, Any]) -> int:
+    """Store each new BUY/SELL plan once (one live plan per symbol and horizon) so its outcome can be tracked."""
+    if not res.get("market_open"):
+        return 0
+    added = 0
+    for p in res.get("plans") or []:
+        if p.get("decision") not in ("BUY", "SELL") or p.get("expired"):
+            continue
+        live = db_exec("SELECT id FROM signal_plans WHERE symbol=? AND horizon=? AND status IN ('PENDING','OPEN') LIMIT 1",
+                       [res["root"], p["horizon"]], "one")
+        if live:
+            continue
+        db_exec("""INSERT INTO signal_plans(id, user_id, symbol, horizon, timeframe, side, score, entry_low, entry_high, stop_loss,
+                   target_1, target_2, valid_until, time_stop_bars, time_stop_at_latest, option_json, instructions, created_at, status, updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                [secrets.token_hex(10), 1, res["root"], p["horizon"], p["timeframe"], p["decision"], p["score"], p["entry_low"],
+                 p["entry_high"], p["stop_loss"], p["target_1"], p["target_2"], p["valid_until"], p["time_stop_bars"],
+                 p["time_stop_at_latest"], json.dumps(p.get("option")) if p.get("option") else None, p.get("instructions"),
+                 now_iso(), "PENDING", now_iso()])
+        added += 1
+    return added
+
+
+def _evaluate_open_plans() -> int:
+    rows = db_exec("SELECT * FROM signal_plans WHERE status IN ('PENDING','OPEN') ORDER BY created_at", [], "all") or []
+    changed, by_sym = 0, {}
+    for r in rows:
+        by_sym.setdefault(r["symbol"], []).append(r)
+    now = datetime.now(IST)
+    for sym, plans in by_sym.items():
+        try:
+            one = TRADE_PLAN.Series(analysis_candles_robust(sym, "1m", 3) or [], "1m")
+        except Exception as exc:
+            log.debug("plan evaluation candles %s failed: %s", sym, safe_text(exc))
+            continue
+        for r in plans:
+            out = TRADE_PLAN.evaluate_live(r, one, now)
+            if out.get("status") != r["status"] or out.get("fill_price") != r.get("fill_price"):
+                db_exec("UPDATE signal_plans SET status=?, fill_price=?, filled_at=?, exit_price=?, closed_at=?, r=?, updated_at=? WHERE id=?",
+                        [out.get("status"), out.get("fill_price"), out.get("filled_at"), out.get("exit_price"), out.get("closed_at"),
+                         out.get("r"), now_iso(), r["id"]])
+                changed += 1
+    return changed
+
+
+async def _signal_plan_tracker_loop() -> None:
+    """While a market is open: refresh plans for the indices and the top watchlist symbols, record and grade them."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            nse = bool(market_session("NSE_EQ").get("active"))
+            mcx = bool(market_session("MCX").get("active"))
+            if nse or mcx:
+                wl = [s for s in (user_watchlist_symbols(1) or []) if s][:3]
+                for sym in list(dict.fromkeys((["NIFTY", "BANKNIFTY"] if nse else []) + wl)):
+                    if (get_symbol_segment(extract_root_symbol(sym).upper()) == "MCX") != mcx and not (nse and mcx):
+                        continue
+                    try:
+                        res = await asyncio.to_thread(_compute_signals, sym)
+                        CACHE.set(f"signals:{sym.upper()}", res, 20.0)
+                        await asyncio.to_thread(_record_plans, res)
+                    except Exception as exc:
+                        log.debug("plan tracker %s failed: %s", sym, safe_text(exc))
+            await asyncio.to_thread(_evaluate_open_plans)
+        except Exception as exc:
+            log.warning("signal plan tracker failed: %s", safe_text(exc))
+        await asyncio.sleep(90)
+
+
+@app.get("/api/signals/history")
+async def api_signals_history(days: int = Query(7, ge=1, le=90), symbol: str | None = None, horizon: str | None = None,
+                              user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    sql, args = "SELECT * FROM signal_plans WHERE created_at >= ?", [since]
+    if symbol:
+        sql, args = sql + " AND symbol=?", args + [extract_root_symbol(symbol).upper()]
+    if horizon:
+        sql, args = sql + " AND horizon=?", args + [horizon]
+    rows = db_exec(sql + " ORDER BY created_at DESC LIMIT 500", args, "all") or []
+    for r in rows:
+        r["option"] = json.loads(r.pop("option_json")) if r.get("option_json") else None
+    stats = {}
+    for h in TRADE_PLAN.HORIZONS:
+        hs = [r for r in rows if r["horizon"] == h]
+        closed = [r for r in hs if r["status"] in ("T1", "T2", "SL", "TIME")]
+        stats[h] = {"issued": len(hs), "expired_unfilled": sum(1 for r in hs if r["status"] == "EXPIRED"),
+                    "closed": len(closed), "target_hit": sum(1 for r in closed if r["status"] in ("T1", "T2")),
+                    "target_hit_pct": round(sum(1 for r in closed if r["status"] in ("T1", "T2")) / len(closed) * 100, 1) if closed else None,
+                    "avg_r": round(sum(float(r["r"] or 0) for r in closed) / len(closed), 2) if closed else None}
+    return {"days": days, "items": rows, "stats": stats, "timestamp": now_iso()}
+
+@app.get("/api/signals/{instrument}")
+async def api_signals(instrument: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Scalp (1m), intraday (5m) and swing (15m) plans with entry zone, stop, targets, expiry and measured track record."""
+    key = f"signals:{instrument.upper()}"
+    cached = CACHE.get(key)
+    if cached is not None:
+        return cached
+    res = await asyncio.wait_for(asyncio.to_thread(_compute_signals, instrument), timeout=45)
+    CACHE.set(key, res, 20.0 if res.get("market_open") else 900.0)
+    asyncio.create_task(_ensure_signal_backtest(instrument))
+    return res
+
+
+@app.get("/api/signals/{instrument}/backtest")
+async def api_signals_backtest(instrument: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    root = extract_root_symbol(instrument).upper()
+    await _ensure_signal_backtest(instrument)
+    return {"instrument": instrument, "root": root, "results": {h: _SIGNAL_BT.get(f"{root}:{h}") for h in TRADE_PLAN.HORIZONS}}
 
 # ---------------------------------------------------------------------------
 # Options APIs
@@ -16021,6 +16488,21 @@ async def get_ai_models(user: dict[str, Any] = Depends(require_user)) -> dict[st
     }
 
 
+_MARKET_WORDS_RE = re.compile(r"\b(market|markets|stock|stocks|shares|equity|equities|sensex|nifty|index|indices|rupee|dollar|oil|crude|brent|gold|silver|"
+                              r"fed|rbi|ecb|inflation|cpi|gdp|bond|bonds|yield|yields|rate|rates|earnings|profit|revenue|ipo|sebi|tariff|tariffs|trade|"
+                              r"economy|economic|bank|banks|fii|fpi|opec|recession|sanctions|war|ceasefire|budget|fiscal|exports|imports)\b", re.I)
+
+
+def _newsworthy(e: dict[str, Any]) -> bool:
+    """Drop items the classifier itself marked irrelevant, and market-wide items with no market/economy link at all."""
+    if str(e.get("classification") or "").upper() == "IRRELEVANT" or float(e.get("relevance") or 0) < 0.3:
+        return False
+    if e.get("scope") == "global":
+        text = f"{e.get('headline') or ''} {e.get('summary') or ''}"
+        if not _MARKET_WORDS_RE.search(text):
+            return False
+    return bool(str(e.get("headline") or e.get("event") or "").strip())
+
 @app.get("/api/news/unified")
 async def news_unified(symbol: str = Query("NIFTY"), limit: int = Query(150, ge=10, le=500), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     sym = (symbol or "NIFTY").upper().strip()
@@ -16035,7 +16517,7 @@ async def news_unified(symbol: str = Query("NIFTY"), limit: int = Query(150, ge=
     seen = set()
     for item in [*stock_res.get("events", []), *global_res.get("events", [])]:
         k = str(item.get('url') or item.get('headline') or item.get('event') or id(item))
-        if k not in seen:
+        if k not in seen and _newsworthy(item):
             seen.add(k)
             combined.append(item)
     combined.sort(key=lambda x: (_parse_news_datetime(str(x.get("published_at") or "")).timestamp() if _parse_news_datetime(str(x.get("published_at") or "")) else 0), reverse=True)
@@ -16171,25 +16653,18 @@ User's message:
 
     updated_setup = None
     ai_resp = {}
+    history = body.get("history") if isinstance(body.get("history"), list) else []
     try:
-        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, system_prompt, 14000, image_data), timeout=25.0)
+        ai_resp = await asyncio.to_thread(gemini_text, system_prompt, 24000, image_data, history, 40.0)
     except Exception as e:
         log.warning(f"[CA AI Chat] Gemini generation exception: {e}")
     text = ai_resp.get("text") if isinstance(ai_resp, dict) else None
     if not text:
-        msg_low = message.lower()
-        if any(w in msg_low for w in ["hi", "hello", "hey", "good morning", "good evening"]):
-            text = f"Hello! I am **CA AI**, your trading intelligence companion. I'm actively monitoring **{symbol}** (LTP: ₹{active_quote.get('ltp', 'N/A')}) and your open positions. How can I assist you with your trade analysis, options strategies, or portfolio today?"
-        elif any(w in msg_low for w in ["position", "trade", "holding", "pnl", "open"]):
-            pos_cnt = len(open_pos)
-            text = f"You currently have **{pos_cnt} open position{'s' if pos_cnt != 1 else ''}** in your portfolio. Your current tracked account balance is **₹{float(pb.get('current_balance') or 100000):,.2f}**."
-            if pos_cnt > 0:
-                text += "\n\n" + "\n".join([f"• **{p.get('symbol')}** ({p.get('side')} {p.get('quantity')} qty @ ₹{p.get('avg_price')}) — SL: ₹{p.get('stop_loss')}, Target: ₹{p.get('target')}" for p in open_pos[:5]])
-        elif any(w in msg_low for w in ["fund", "balance", "capital", "money"]):
-            text = f"Your starting account capital is **₹{float(pb.get('starting_balance') or 100000):,.2f}** and current balance is **₹{float(pb.get('current_balance') or 100000):,.2f}**."
-        else:
-            ctx = await asyncio.to_thread(build_ai_market_context, extract_root_symbol(symbol).upper(), None)
-            text = render_ai_context_markdown(ctx)
+        # No canned answers: say plainly that the AI is unreachable and show the live data instead.
+        ctx = await asyncio.to_thread(build_ai_market_context, extract_root_symbol(symbol).upper(), None)
+        reason = str((ai_resp or {}).get("reason") or "unknown error")[:200]
+        text = (f"**CA AI could not reach Gemini just now** ({reason}). Please try again in a moment. "
+                f"Live data for {symbol}:\n\n" + render_ai_context_markdown(ctx))
 
     match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
     if match:
@@ -17801,6 +18276,18 @@ def build_ai_market_context(root: str, hist_date: str | None = None) -> dict[str
         ctx["replay_for_date"] = {"date": day.isoformat(), "ok": r.get("ok"), "error": r.get("error"), "summary": r.get("summary"),
                                   "signals": [{k: i.get(k) for k in ("time", "recommendation", "score", "entry", "stop_loss", "target", "outcome", "exit_time", "final_pnl")} for i in r.get("items", [])],
                                   "method": r.get("method")}
+    try:
+        sig = CACHE.get(f"signals:{root}") or _compute_signals(root)
+        ctx["trade_plans"] = {"market_open": sig.get("market_open"), "note": "Primary, time-bound plans (these supersede signal_model for trade calls)",
+                              "plans": [{k: p.get(k) for k in ("label", "timeframe", "decision", "expired", "score", "gate", "reason", "entry_low", "entry_high",
+                                                              "stop_loss", "target_1", "target_2", "valid_until", "instructions", "option", "track_record",
+                                                              "higher_timeframes")} for p in sig.get("plans") or []],
+                              "news_bias": sig.get("news")}
+    except Exception as exc:
+        ctx["trade_plans"] = {"error": safe_text(exc)}
+    nxt = CACHE.get(f"next-session:{root}")
+    if nxt:
+        ctx["next_session_outlook"] = {"prediction": nxt.get("prediction"), "validation": nxt.get("validation")}
     return ctx
 
 
@@ -17834,6 +18321,32 @@ class AskAiRequest(BaseModel):
     symbol: str = "BANKNIFTY"
     mode: str = "data"  # "data" or "code"
     date: str | None = None
+    history: list[dict[str, str]] = Field(default_factory=list)  # prior turns: {"role": "user"|"model", "text": ...}
+
+
+_AI_INDEX_ALIASES = {"NIFTY": ["NIFTY 50", "NIFTY50", "NIFTY"], "BANKNIFTY": ["BANK NIFTY", "BANKNIFTY", "NIFTY BANK"],
+                     "FINNIFTY": ["FINNIFTY", "FIN NIFTY"], "SENSEX": ["SENSEX"], "CRUDEOIL": ["CRUDE OIL", "CRUDEOIL", "CRUDE"],
+                     "GOLD": ["GOLD"], "SILVER": ["SILVER"], "NATURALGAS": ["NATURAL GAS", "NATURALGAS"]}
+
+
+def _symbols_from_question(prompt: str, default: str, limit: int = 3) -> list[str]:
+    """Instruments named in the question (index/commodity aliases, NIFTY 50 / known stocks); `default` if none."""
+    up = " " + re.sub(r"[^A-Z0-9 ]", " ", prompt.upper()) + " "
+    found: list[str] = []
+    for root, aliases in _AI_INDEX_ALIASES.items():
+        hits = [a for a in aliases if f" {a} " in up]
+        if not hits:
+            continue
+        if root == "NIFTY":
+            # Every "BANK NIFTY"/"FIN NIFTY" also contains " NIFTY "; count NIFTY only if it appears on its own as well.
+            longer = sum(up.count(f" {a} ") for a in _AI_INDEX_ALIASES["BANKNIFTY"] + _AI_INDEX_ALIASES["FINNIFTY"] if " NIFTY" in f" {a}")
+            if up.count(" NIFTY ") + up.count(" NIFTY 50 ") <= longer and not any(f" {a} " in up for a in ("NIFTY 50", "NIFTY50")):
+                continue
+        found.append(root)
+    for sym in list(dict.fromkeys(list(NIFTY50_SYMBOLS) + list(STOCKS.keys()))):
+        if len(sym) >= 3 and f" {sym.upper()} " in up and sym.upper() not in found:
+            found.append(sym.upper())
+    return found[:limit] or [default]
 
 @app.post("/api/ai/ask")
 async def api_ask_ca_ai(payload: AskAiRequest, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
@@ -17861,25 +18374,37 @@ async def api_ask_ca_ai(payload: AskAiRequest, user: dict[str, Any] = Depends(re
         return {"ok": True, "mode": "code", "symbol": root,
                 "reply": "Code changes are not made from the web app. Use the repository (GitHub) and the deploy pipeline instead."}
 
-    ctx = await asyncio.to_thread(build_ai_market_context, root, hist_date)
+    roots = _symbols_from_question(prompt, root)
+    root = roots[0]
+    if len(roots) == 1:
+        ctx = await asyncio.to_thread(build_ai_market_context, root, hist_date)
+    else:
+        built = await asyncio.gather(*[asyncio.to_thread(build_ai_market_context, r, hist_date) for r in roots], return_exceptions=True)
+        ctx = {r: (b if isinstance(b, dict) else {"error": safe_text(b)}) for r, b in zip(roots, built)}
     gemini_prompt = (
-        "You are CA AI, an assistant inside the CA Trader app. Answer the user's question using ONLY the JSON context below. "
-        "Every price, level and signal you mention must appear in the context. If the context does not contain what is needed, "
-        "say exactly what is missing instead of estimating. Do not invent trades, premiums, news or statistics. Keep it short and use "
-        "Markdown tables where they help.\n\n"
-        f"User question: {prompt}\n\nContext (from Upstox and the app's own models):\n{json.dumps(ctx, default=str)[:20000]}"
+        "You are CA AI, the analyst inside the CA Trader app (Indian markets: NSE, BSE, MCX). Read the user's question carefully and "
+        "answer that specific question; do not produce a generic market summary unless asked.\n"
+        "Rules:\n"
+        "- Market facts (prices, levels, signals, option data, news) must come from the JSON context below. Never invent numbers, "
+        "trades, premiums, news or statistics. If something needed is missing from the context, say what is missing.\n"
+        "- General trading knowledge (concepts, indicators, risk management, how to read a setup) may be explained normally.\n"
+        "- When asked for a trade view, reason step by step from the context (trend, VWAP, momentum, option flow, news) and give "
+        "the conclusion, the levels from the context, and what would invalidate it.\n"
+        "- The app's official calls are `trade_plans` (scalp 1m / intraday 5m / swing 15m, each with entry zone, stop, targets, expiry "
+        "and backtested track record). `signal_model` is an older 5-minute score: never present it as a trade call when it disagrees "
+        "with trade_plans. If the market is closed, say so and use `next_session_outlook` for tomorrow.\n"
+        "- Be concise; use short Markdown sections or tables where they help.\n\n"
+        f"Instrument(s) in focus: {', '.join(roots)}\nUser question: {prompt}\n\n"
+        f"Context (live from Upstox and the app's own models):\n{json.dumps(ctx, default=str)[:20000]}"
     )
-    ai_text = None
-    try:
-        ai_resp = await asyncio.wait_for(asyncio.to_thread(gemini_text, gemini_prompt, 14000), timeout=12.0)
-        if isinstance(ai_resp, dict) and ai_resp.get("text"):
-            ai_text = ai_resp.get("text").strip()
-    except Exception:
-        pass
-    if ai_text:
-        return {"ok": True, "mode": "data", "reply": ai_text, "symbol": root, "context_used": list(ctx.keys())}
-    return {"ok": True, "mode": "data", "reply": render_ai_context_markdown(ctx), "symbol": root, "context_used": list(ctx.keys()),
-            "note": "Gemini unavailable; showing the data the answer would be based on"}
+    ai_resp = await asyncio.to_thread(gemini_text, gemini_prompt, 24000, None, payload.history, 40.0)
+    if ai_resp.get("text"):
+        return {"ok": True, "mode": "data", "reply": ai_resp["text"].strip(), "symbol": root, "model": ai_resp.get("model"),
+                "context_used": list(ctx.keys())}
+    return {"ok": False, "mode": "data", "symbol": root, "context_used": list(ctx.keys()),
+            "reply": "**CA AI could not reach Gemini just now** (" + str(ai_resp.get("reason") or "unknown error")[:200] + "). "
+                     "Please try again in a moment. Below is the live data the answer would be based on.\n\n"
+                     + render_ai_context_markdown(ctx if len(roots) == 1 else ctx.get(root) or {})}
 
 
 # ===========================================================================
