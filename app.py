@@ -33,6 +33,7 @@ import json
 # Converts incoming market feeds, orders, and recommendations into organized readable text format so server and browser can exchange data effortlessly.
 
 import gzip
+from logging.handlers import RotatingFileHandler
 # Compresses large market data and historical candle responses into small packets so they load rapidly over the internet without lagging.
 
 import logging
@@ -957,35 +958,11 @@ except Exception:
 # ---------------------------------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
-HTML_CANDIDATES = [
-    BASE_DIR / "terminal.html",
-    BASE_DIR / "CA_Trader_Final.html",
-    BASE_DIR / "CA_Trader_Updated.html",
-    BASE_DIR / "ca-trader-terminal-ui (2)(3).html",
-    BASE_DIR / "ca-trader-terminal-ui_final_v3.html",
-    BASE_DIR / "ca-trader-terminal-ui_final_v2.html",
-    BASE_DIR / "ca-trader-terminal-ui_final.html",
-    BASE_DIR / "ca-trader-terminal-ui_modified.html",
-    BASE_DIR / "ca-trader-terminal-ui (2).html",
-    BASE_DIR / "ca-trader-terminal-ui.html",
-    BASE_DIR / "index.html",
-]
-LOGIN_HTML_CANDIDATES = [
-    BASE_DIR / "CA_Trader_Login.html",
-    BASE_DIR / "CA_Trader_Login(1).html",
-    BASE_DIR / "CA_Trader_Login (1).html",
-    BASE_DIR / "ca-trader-login-final-v2.html",
-]
-HTML_PATH = next((p for p in HTML_CANDIDATES if p.exists()), None)
-LOGIN_HTML_PATH = next((p for p in LOGIN_HTML_CANDIDATES if p.exists()), None)
-FITNESS_HTML_PATH = BASE_DIR / "fitness.html"
+HTML_PATH = BASE_DIR / "terminal.html"  # classic UI, served at /terminal/classic
+LOGIN_HTML_PATH = BASE_DIR / "CA_Trader_Login.html"
 TERMINAL_SELECTOR_HTML_PATH = BASE_DIR / "terminal_selector.html"
 GUIDE_HTML_PATH = BASE_DIR / "ca_trader_guide.html"
 HARNESS_HTML_PATH = BASE_DIR / "multi_agent_harness.html"
-if HTML_PATH is None:
-    # The exact uploaded filename is kept as a fallback reference for users
-    # who place app.py elsewhere and keep the HTML beside it.
-    HTML_PATH = BASE_DIR / "ca-trader-terminal-ui (2).html"
 
 load_dotenv(BASE_DIR / ".env")
 load_dotenv(Path.cwd() / ".env")
@@ -1110,7 +1087,7 @@ LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, encoding="utf-8")],
+    handlers=[logging.StreamHandler(), RotatingFileHandler(LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=2, encoding="utf-8")],
 )
 log = logging.getLogger("ca-trader")
 
@@ -3053,7 +3030,7 @@ def normalize_depth(instrument: str, key: str, meta: dict[str, Any], raw: dict[s
             raw_levels = raw_levels.get("buy" if name == "bids" else "sell", [])
         out = []
         for level in raw_levels[:10]:
-            if isinstance(level, dict):
+            if isinstance(level, dict) and level.get("price"):
                 out.append({"price": level.get("price"), "quantity": level.get("quantity"), "orders": level.get("order") or level.get("orders")})
         return out
     bids = levels("bids")
@@ -3065,6 +3042,23 @@ def normalize_depth(instrument: str, key: str, meta: dict[str, Any], raw: dict[s
     ask_qty = sum(float(x.get("quantity") or 0) for x in asks)
     denom = bid_qty + ask_qty
     imbalance = (bid_qty - ask_qty) / denom if denom else None
+    return {
+        "symbol": meta.get("symbol") or instrument.upper(),
+        "instrument_key": key,
+        "bids": bids,
+        "asks": asks,
+        "best_bid": best_bid,
+        "best_ask": best_ask,
+        "spread": spread,
+        "total_buy_quantity": raw.get("total_buy_quantity", bid_qty),
+        "total_sell_quantity": raw.get("total_sell_quantity", ask_qty),
+        "imbalance": imbalance,
+        "ltp": raw.get("last_price"),
+        "timestamp": raw.get("timestamp") or now_iso(),
+        "source": "upstox",
+    }
+
+
 def norm_cdf(x: float) -> float:
     return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
 
@@ -8418,7 +8412,7 @@ async def agents_recommendation_history(request: Request) -> dict[str, Any]:
 
 @app.get("/api/agents/run-test-dispatch")
 @app.post("/api/agents/run-test-dispatch")
-async def run_agent_test_dispatch(request: Request) -> dict[str, Any]:
+async def run_agent_test_dispatch(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Runs a live agent audit probe and dispatches the live report to Telegram."""
     try:
         tg_row = db_exec(
@@ -8482,7 +8476,7 @@ async def run_agent_test_dispatch(request: Request) -> dict[str, Any]:
 
 @app.get("/api/agents/simulate-operator-mimic")
 @app.post("/api/agents/simulate-operator-mimic")
-async def simulate_operator_mimic(request: Request) -> dict[str, Any]:
+async def simulate_operator_mimic(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Simulates an incoming Stock Mantra index signal, triggers Operator Mimic Engine to tune
     internal quant formulas, and dispatches a live verification alert to Telegram."""
     sample_setup = {
@@ -8505,7 +8499,7 @@ async def simulate_operator_mimic(request: Request) -> dict[str, Any]:
 
 @app.get("/api/agents/option-ltp-audit")
 @app.post("/api/agents/option-ltp-audit")
-async def option_ltp_audit_endpoint() -> dict[str, Any]:
+async def option_ltp_audit_endpoint(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Option LTP / CMP Sentinel: Audits all active option setups, watchlist contracts,
     and recent recommendations to verify that option CMP strictly respects underlying spot
     and intrinsic floors. Auto-corrects anomalies (like 55600 CE at 285 when market is 600+)."""
@@ -8548,7 +8542,7 @@ async def option_ltp_audit_endpoint() -> dict[str, Any]:
 
 @app.get("/api/agents/dispatch-swarm-briefing")
 @app.post("/api/agents/dispatch-swarm-briefing")
-async def dispatch_swarm_briefing_endpoint() -> dict[str, Any]:
+async def dispatch_swarm_briefing_endpoint(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Dispatches a consolidated, fact-checked report from ALL working agents to Telegram,
     ensuring the user gets a verified swarm report rather than one agent spamming."""
     try:
@@ -9560,30 +9554,10 @@ async def market_candles_diagnostics(user: dict[str, Any] = Depends(require_user
 async def market_depth(instrument: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     try:
         return UPSTOX.depth(instrument)
-    except Exception:
-        sym = instrument.upper().strip()
-        ltp = 23873.45 if sym == "NIFTY" else (57380.6 if sym == "BANKNIFTY" else 1322.0)
-        return {
-            "symbol": sym,
-            "bids": [
-                {"price": round(ltp - 0.05, 2), "quantity": 1450, "orders": 12},
-                {"price": round(ltp - 0.10, 2), "quantity": 2800, "orders": 24},
-                {"price": round(ltp - 0.15, 2), "quantity": 4200, "orders": 31},
-                {"price": round(ltp - 0.20, 2), "quantity": 5600, "orders": 45},
-                {"price": round(ltp - 0.25, 2), "quantity": 7800, "orders": 62}
-            ],
-            "asks": [
-                {"price": round(ltp + 0.05, 2), "quantity": 1200, "orders": 9},
-                {"price": round(ltp + 0.10, 2), "quantity": 2350, "orders": 18},
-                {"price": round(ltp + 0.15, 2), "quantity": 3900, "orders": 27},
-                {"price": round(ltp + 0.20, 2), "quantity": 5100, "orders": 38},
-                {"price": round(ltp + 0.25, 2), "quantity": 6900, "orders": 54}
-            ],
-            "total_buy_quantity": 21850,
-            "total_sell_quantity": 19450,
-            "mode": "live_fallback",
-            "timestamp": now_iso()
-        }
+    except Exception as exc:
+        # No synthetic book: an empty depth renders as "No depth" in the UI.
+        return {"symbol": instrument.upper().strip(), "bids": [], "asks": [], "status": "unavailable",
+                "message": safe_text(exc), "timestamp": now_iso()}
 
 
 UPSTOX_NSE_INSTRUMENTS_URL = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"
@@ -9675,67 +9649,6 @@ def _full_market_mover_snapshot() -> list[dict[str,Any]]:
             log.warning("Market mover batch %s failed: %s", i, safe_text(exc))
     _market_mover_snapshot=(time.time(),rows)
     return rows
-
-def _fetch_moneycontrol_movers(cat: str) -> list[dict[str, Any]]:
-    cache_key = f"mc_movers:{cat}"
-    cached = CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-    url_map = {
-        "gainers": "https://www.moneycontrol.com/stocks/marketstats/nsegainer/index.php",
-        "losers": "https://www.moneycontrol.com/stocks/marketstats/nseloser/index.php",
-        "high_volume": "https://www.moneycontrol.com/stocks/marketstats/nsevol/index.php",
-        "turnover": "https://www.moneycontrol.com/stocks/marketstats/nse-mostactive-stocks/index.php",
-        "unusual_volume": "https://www.moneycontrol.com/stocks/marketstats/nsevol/index.php",
-    }
-    url = url_map.get(cat, url_map["gainers"])
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-    items = []
-    try:
-        resp = requests.get(url, headers=headers, timeout=2.0)
-        if resp.ok:
-            tables = sorted(re.findall(r'<table[^>]*>(.*?)</table>', resp.text, re.S), key=len, reverse=True)
-            if tables:
-                rows = re.findall(r'<tr[^>]*>(.*?)</tr>', tables[0], re.S)
-                for row in rows[1:]:
-                    tds = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
-                    if len(tds) >= 3:
-                        name_m = re.search(r'<a[^>]*>([^<]+)</a>', tds[0])
-                        name = name_m.group(1).strip() if name_m else re.sub(r'<[^>]+>', '', tds[0]).strip()
-                        price_cell = tds[2] if len(tds) > 2 else tds[1]
-                        clean = re.sub(r'<!--.*?-->', '', price_cell)
-                        clean = re.sub(r'<[^>]+>', ' ', clean).replace(',', '').strip()
-                        nums = re.findall(r'[-+]?\d+\.?\d*', clean)
-                        if len(nums) >= 3:
-                            ltp = float(nums[0])
-                            chg = float(nums[1])
-                            pct = float(nums[2])
-                        elif len(nums) == 1:
-                            ltp = float(nums[0])
-                            chg = 0.0
-                            pct = 0.0
-                        else:
-                            continue
-                        vol = 0.0
-                        if len(tds) >= 4:
-                            v_clean = re.sub(r'<[^>]+>', '', tds[3]).replace(',', '').strip()
-                            try: vol = float(v_clean)
-                            except Exception: vol = 0.0
-                        if name and ltp:
-                            items.append({
-                                "symbol": html.unescape(name),
-                                "ltp": ltp,
-                                "change": chg,
-                                "change_pct": pct,
-                                "volume": vol,
-                                "turnover": round(vol * ltp, 2),
-                                "circuit_limit": None
-                            })
-        if items:
-            CACHE.set(cache_key, items, 300)
-    except Exception as exc:
-        log.warning("Moneycontrol movers scrape error for %s: %s", cat, safe_text(exc))
-    return items
 
 @app.get("/api/market/movers")
 async def market_movers(category: str = "gainers", limit: int = Query(10, ge=5, le=20), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
@@ -10416,7 +10329,6 @@ async def analysis_overall(
             symbol=request.query_params.get("symbol"),
             date=request.query_params.get("date") or request.query_params.get("from"),
             limit=request.query_params.get("limit"),
-            user=user
         )
     req_date = request.query_params.get("date") or request.query_params.get("from")
     if req_date:
@@ -12363,208 +12275,6 @@ async def backtest_recalibration_reset(
     return {"status": "success", "message": f"Reset calibration for {symbol} back to factory defaults."}
 
 
-@app.post("/api/backtest/quick-test")
-async def backtest_quick_test(
-    request: Request,
-    user: dict[str, Any] = Depends(require_user)
-) -> dict[str, Any]:
-    """Quickly backtest recommendations for a particular date, time and timeframe
-    for selected stocks, tracking before and after calibration with rationale for failed recommendations.
-    """
-    if hasattr(request, "json") and callable(request.json):
-        res = request.json()
-        payload = await res if asyncio.iscoroutine(res) else res
-    else:
-        payload = request if isinstance(request, dict) else {}
-
-    sym_raw = str(payload.get("symbol") or "NIFTY").upper().strip()
-    trade_date = str(payload.get("date") or datetime.date.today().isoformat()).strip()
-    trade_time = str(payload.get("time") or "09:45").strip()
-    timeframe = str(payload.get("timeframe") or "5m").strip().lower()
-    root = extract_root_symbol(sym_raw).upper()
-    seg = get_symbol_segment(root)
-    lot = resolve_lot_size(root, 100 if "CRUDE" in root else (25 if "NIFTY" in root else 1))
-
-    # Initialize DB table
-    try:
-        db_exec("""
-            CREATE TABLE IF NOT EXISTS backtest_quick_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                symbol TEXT,
-                trade_date TEXT,
-                trade_time TEXT,
-                timeframe TEXT,
-                before_signal TEXT,
-                before_entry REAL,
-                before_target REAL,
-                before_sl REAL,
-                before_outcome TEXT,
-                before_pnl REAL,
-                after_signal TEXT,
-                after_entry REAL,
-                after_target REAL,
-                after_sl REAL,
-                after_outcome TEXT,
-                after_pnl REAL,
-                unconsidered_factors TEXT,
-                ai_explanation TEXT,
-                created_at TEXT
-            )
-        """, [], "commit")
-    except Exception:
-        pass
-
-    # Determine reference spot price
-    ref_spot = 23450.0 if "NIFTY" in root else (52200.0 if "BANK" in root else (5850.0 if "CRUDE" in root else 2950.0))
-    try:
-        q = UPSTOX.quote(sym_raw)
-        if q and float(q.get("ltp") or 0) > 0:
-            ref_spot = float(q.get("ltp"))
-    except Exception:
-        pass
-
-    # Timeframe volatility factors
-    tf_pct_map = {
-        "1m": 0.0010,
-        "3m": 0.0015,
-        "5m": 0.0020,
-        "10m": 0.0030,
-        "15m": 0.0040,
-        "30m": 0.0065,
-        "1h": 0.0090,
-        "1d": 0.0160
-    }
-    calib_pct = tf_pct_map.get(timeframe, 0.0020)
-    baseline_pct = max(0.017, calib_pct * 8.5)
-
-    # Signal determination
-    t_hour, t_min = 9, 45
-    try:
-        parts = trade_time.split(":")
-        t_hour, t_min = int(parts[0]), int(parts[1])
-    except Exception:
-        pass
-
-    is_morning_surge = (t_hour == 9 and t_min < 50) or (t_hour == 14)
-    signal = "BUY" if is_morning_surge or ((t_hour + t_min) % 2 == 0) else "SELL"
-
-    # Baseline Model (Before Calibration)
-    before_entry = round(ref_spot, 2)
-    before_move = round(before_entry * baseline_pct, 2)
-    before_target = round(before_entry + before_move, 2) if signal == "BUY" else round(max(0.5, before_entry - before_move), 2)
-    before_sl_dist = round(before_move * 0.55, 2)
-    before_sl = round(max(0.5, before_entry - before_sl_dist), 2) if signal == "BUY" else round(before_entry + before_sl_dist, 2)
-    
-    before_outcome = "FAILED · Hit Stop Loss / Volatility Reversal"
-    before_pnl_pts = -round(before_sl_dist * 0.85, 2)
-    before_pnl_inr = round(before_pnl_pts * lot, 2)
-
-    # Calibrated Model (After Calibration)
-    after_entry = round(ref_spot * 0.9988, 2) if signal == "BUY" else round(ref_spot * 1.0012, 2)
-    after_move = round(after_entry * calib_pct, 2)
-    after_target = round(after_entry + after_move, 2) if signal == "BUY" else round(max(0.5, after_entry - after_move), 2)
-    after_sl_dist = round(after_move / 1.80, 2)
-    after_sl = round(max(0.5, after_entry - after_sl_dist), 2) if signal == "BUY" else round(after_entry + after_sl_dist, 2)
-
-    after_outcome = "SUCCESS · Hit Calibrated Target in 2 bars"
-    after_pnl_pts = round(after_move, 2)
-    after_pnl_inr = round(after_pnl_pts * lot, 2)
-
-    # Compile unconsidered factors in failed recommendation
-    unconsidered_factors = [
-        f"Unrealistic Target Scale: Baseline targeted {before_move:.1f} pts on a {timeframe} bar (8.5x the typical {timeframe} ATR envelope of {after_move:.1f} pts).",
-        f"Ignored Multi-Timeframe Confluence: Lower timeframe signal ({timeframe}) fired without requiring higher timeframe (15m/1h) trend alignment.",
-        "Unhedged Theta Decay: On option contracts, waiting multiple hours for a 400 pt spot move eroded over 65% of option extrinsic value through Theta acceleration.",
-        "No Pullback Entry Discipline: Baseline entered at peak breakout price instead of demanding a limit pullback near VWAP / EMA support.",
-        "Open Interest Resistance Wall: Heavy call/put OI cluster at nearest round strike was ignored by the baseline model."
-    ]
-
-    # CA AI Diagnostic Explanation
-    ca_ai_explanation = (
-        f"🤖 **CA AI Quantitative Diagnosis for {root} ({trade_date} at {trade_time} IST - {timeframe}):**\n\n"
-        f"1. **Root Cause of Baseline Failure:**\n"
-        f"The uncalibrated model issued a {signal} order at ₹{before_entry:,.2f} with an exorbitant target of ₹{before_target:,.2f} (+{before_move:.1f} pts). "
-        f"In a {timeframe} window, expecting a {before_move:.1f}-point expansion is statistically unviable without an extreme macroeconomic catalyst. "
-        f"As price consolidated within normal volatility bounds, the trade suffered a reversal and hit stop loss at ₹{before_sl:,.2f} (Loss: {before_pnl_pts:,.2f} pts / ₹{before_pnl_inr:,.0f}).\n\n"
-        f"2. **Key Analytical Blind Spots (What Was NOT Considered):**\n"
-        f"• **Volatility Geometry Mismatch:** Daily ATR was incorrectly applied directly to a {timeframe} intraday trade.\n"
-        f"• **Option Greek Deterioration:** Holding an intraday option contract for an oversized move triggered catastrophic theta decay (-₹14.2/day theta).\n"
-        f"• **Micro vs Macro Trend Conflict:** The {timeframe} micro-burst conflicted with the dominant 15m supply zone.\n\n"
-        f"3. **How Calibration Fixed This Setup:**\n"
-        f"The calibrated engine resized the target to a realistic **+{after_move:.1f} pts** (₹{after_target:,.2f}) with a pullback entry at ₹{after_entry:,.2f} and strict 1:1.80 R:R (SL ₹{after_sl:,.2f}). "
-        f"This achievable target was filled within 2 candles, banking **+{after_pnl_pts:,.2f} pts (+₹{after_pnl_inr:,.0f} per lot)**."
-    )
-
-    uid = user.get("id") if isinstance(user, dict) else (getattr(user, "id", None) or 1)
-    try:
-        db_exec("""
-            INSERT INTO backtest_quick_history (
-                user_id, symbol, trade_date, trade_time, timeframe,
-                before_signal, before_entry, before_target, before_sl, before_outcome, before_pnl,
-                after_signal, after_entry, after_target, after_sl, after_outcome, after_pnl,
-                unconsidered_factors, ai_explanation, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, [
-            uid, root, trade_date, trade_time, timeframe,
-            signal, before_entry, before_target, before_sl, before_outcome, before_pnl_pts,
-            signal, after_entry, after_target, after_sl, after_outcome, after_pnl_pts,
-            json.dumps(unconsidered_factors), ca_ai_explanation, now_iso()
-        ], "commit")
-    except Exception as e:
-        log.warning("Save quick backtest history error: %s", safe_text(e))
-
-    history = []
-    try:
-        history = db_exec("SELECT * FROM backtest_quick_history WHERE user_id=? ORDER BY id DESC LIMIT 20", [uid], "all")
-    except Exception:
-        pass
-
-    return {
-        "ok": True,
-        "symbol": root,
-        "date": trade_date,
-        "time": trade_time,
-        "timeframe": timeframe,
-        "lot_size": lot,
-        "before": {
-            "signal": signal,
-            "entry": before_entry,
-            "target": before_target,
-            "stop_loss": before_sl,
-            "target_pts": before_move,
-            "outcome": before_outcome,
-            "pnl_pts": before_pnl_pts,
-            "pnl_inr": before_pnl_inr,
-            "status": "FAILED"
-        },
-        "after": {
-            "signal": signal,
-            "entry": after_entry,
-            "target": after_target,
-            "stop_loss": after_sl,
-            "target_pts": after_move,
-            "outcome": after_outcome,
-            "pnl_pts": after_pnl_pts,
-            "pnl_inr": after_pnl_inr,
-            "status": "SUCCESS"
-        },
-        "unconsidered_factors": unconsidered_factors,
-        "ca_ai_explanation": ca_ai_explanation,
-        "history": history
-    }
-
-
-@app.get("/api/backtest/quick-history")
-async def backtest_quick_history_get(
-    user: dict[str, Any] = Depends(require_user)
-) -> dict[str, Any]:
-    """Retrieve history of all quick backtests before and after calibration."""
-    uid = user.get("id") if isinstance(user, dict) else (getattr(user, "id", None) or 1)
-    history = db_exec("SELECT * FROM backtest_quick_history WHERE user_id=? ORDER BY id DESC LIMIT 50", [uid], "all")
-    return {"ok": True, "history": history or []}
-
-
 @app.get("/api/options/historical")
 async def get_historical_options_api(
     symbol: str = Query("BANKNIFTY", description="Underlying symbol e.g. BANKNIFTY"),
@@ -12635,9 +12345,8 @@ def get_current_user_optional(request: Request) -> dict[str, Any] | None:
 
 @app.delete("/api/recommendations/history")
 @app.delete("/api/recommendations/history/all")
-async def recommendation_history_delete_all(user: dict[str, Any] = Depends(get_current_user_optional)) -> dict[str, Any]:
-    uid = user["id"] if (isinstance(user, dict) and "id" in user) else 1
-    db_exec("DELETE FROM recommendations WHERE user_id=? OR user_id=1", [uid])
+async def recommendation_history_delete_all(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    db_exec("DELETE FROM recommendations WHERE user_id=?", [user["id"]])
     return {"ok": True, "message": "All recommendations cleared"}
 
 
@@ -15605,8 +15314,9 @@ async def server_logs(lines: int = Query(300, ge=20, le=1000), user: dict[str, A
     try:
         if not LOG_FILE.exists():
             return {"lines": "No server log file exists yet.", "path": str(LOG_FILE), "timestamp": now_iso()}
-        data = LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
-        return {"lines": "\n".join(data), "path": str(LOG_FILE), "timestamp": now_iso()}
+        with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as fh:
+            data = deque(fh, maxlen=lines)
+        return {"lines": "".join(data).rstrip("\n"), "path": str(LOG_FILE), "timestamp": now_iso()}
     except Exception as exc:
         return error_json("SERVER_LOG_UNAVAILABLE", safe_text(exc), 503)
 
@@ -16458,7 +16168,7 @@ async def reports_pnl(
     pos_args = [uid, cutoff] if cutoff else [uid]
     positions = db_exec(pos_sql, pos_args, "all")
 
-    reco_sql = "SELECT * FROM recommendations WHERE user_id=? AND COALESCE(status,'') IN ('CLOSED','EXECUTED')" + (" AND updated_at >= ?" if cutoff else "") + " ORDER BY updated_at DESC"
+    reco_sql = "SELECT symbol, recommendation, entry, target, final_pnl, created_at FROM recommendations WHERE user_id=? AND COALESCE(status,'') IN ('CLOSED','EXECUTED')" + (" AND created_at >= ?" if cutoff else "") + " ORDER BY created_at DESC"
     reco_args = [uid, cutoff] if cutoff else [uid]
     recos = db_exec(reco_sql, reco_args, "all")
 
@@ -16504,7 +16214,7 @@ async def reports_pnl(
                     "exit_price": float(r.get("exit_price") or r.get("target") or 0),
                     "pnl": pnl,
                     "created_at": r.get("created_at"),
-                    "closed_at": r.get("updated_at")
+                    "closed_at": r.get("created_at")
                 })
 
     total_trades = len(records)
@@ -17686,7 +17396,7 @@ async def get_live_data_inspector(instrument: str = "BANKNIFTY", user: dict[str,
 # ==============================================================================
 @app.get("/api/agents/ui-agent/audit-and-dispatch")
 @app.post("/api/agents/ui-agent/audit-and-dispatch")
-async def ui_agent_audit_and_dispatch(request: Request) -> dict[str, Any]:
+async def ui_agent_audit_and_dispatch(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Wakes up Agent a7 (UI & Mobile Guard), inspects UI error queue, verifies HTML/CSS integrity,
     and dispatches an active diagnostic telegram message to verify agent execution and API key access."""
     global ACTIVE_AGENT_WORK_STATE
@@ -18214,93 +17924,8 @@ Please produce a comprehensive, empathetic, and mathematically rigorous Markdown
 # 🎨 Visual UI Customization & Persistence (Item 14)
 # ===========================================================================
 
-def update_terminal_html_customizations(data: dict[str, Any]) -> bool:
-    try:
-        terminal_file = BASE_DIR / "terminal.html"
-        if not terminal_file.exists():
-            return False
-        content = terminal_file.read_text(encoding="utf-8")
-        
-        css_rules = []
-        for sel, cfg in data.items():
-            if not isinstance(cfg, dict):
-                continue
-            rules = []
-            if cfg.get("hidden") is True:
-                rules.append("display: none !important;")
-            if cfg.get("fontSize"):
-                rules.append(f"font-size: {cfg['fontSize']} !important;")
-            if cfg.get("fontFamily"):
-                rules.append(f"font-family: {cfg['fontFamily']} !important;")
-            if cfg.get("width"):
-                rules.append(f"width: {cfg['width']} !important;")
-            if cfg.get("padding"):
-                rules.append(f"padding: {cfg['padding']} !important;")
-            if cfg.get("top"):
-                rules.append(f"position: relative !important; top: {cfg['top']} !important;")
-            if cfg.get("left"):
-                rules.append(f"position: relative !important; left: {cfg['left']} !important;")
-            if rules:
-                css_rules.append(f"{sel} {{ {' '.join(rules)} }}")
-                
-        custom_css = "\n".join(css_rules)
-        style_block = f'<style id="caPreloadedUiCustomStyles">\n{custom_css}\n</style>'
-        script_block = f'<script id="caPreloadedUiCustomOverrides">\nwindow.__caUiCustomOverrides = {json.dumps(data)};\n</script>'
-        
-        if '<style id="caPreloadedUiCustomStyles">' in content:
-            content = re.sub(r'<style id="caPreloadedUiCustomStyles">.*?</style>', style_block, content, flags=re.DOTALL)
-        else:
-            content = content.replace('</head>', f'{style_block}\n</head>', 1)
-            
-        if '<script id="caPreloadedUiCustomOverrides">' in content:
-            content = re.sub(r'<script id="caPreloadedUiCustomOverrides">.*?</script>', script_block, content, flags=re.DOTALL)
-        else:
-            content = content.replace('</body>', f'{script_block}\n</body>', 1)
-            
-        terminal_file.write_text(content, encoding="utf-8")
-        return True
-    except Exception as e:
-        logger.warning(f"Failed to update terminal.html customizations: {e}")
-        return False
-
-
-async def git_sync_customizations():
-    try:
-        import shutil
-        git_bin = shutil.which("git")
-        if not git_bin:
-            return
-        add_p = await asyncio.create_subprocess_exec(
-            git_bin, "add", "data/ui_customization.json", "terminal.html",
-            cwd=str(BASE_DIR), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        await add_p.communicate()
-        
-        com_p = await asyncio.create_subprocess_exec(
-            git_bin, "commit", "-m", "chore(ui): persist Edit UI layout and placement customizations",
-            cwd=str(BASE_DIR), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        await com_p.communicate()
-        
-        push_p = await asyncio.create_subprocess_exec(
-            git_bin, "push", "origin", "CA-Trader-Bifurcated",
-            cwd=str(BASE_DIR), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        try:
-            await asyncio.wait_for(push_p.communicate(), timeout=15.0)
-            logger.info("Git push for UI customizations completed")
-        except asyncio.TimeoutError:
-            try:
-                push_p.kill()
-            except Exception:
-                pass
-            logger.warning("Git push for UI customizations timed out")
-    except Exception as e:
-        logger.warning(f"Git sync customizations notice: {e}")
-
-
 @app.get("/api/ui/customize")
-async def get_ui_customization() -> dict[str, Any]:
+async def get_ui_customization(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     cfg_file = BASE_DIR / "data" / "ui_customization.json"
     if cfg_file.exists():
         try:
@@ -18310,20 +17935,15 @@ async def get_ui_customization() -> dict[str, Any]:
     return {"font_size": "standard", "font_family": "inter", "card_padding": "standard"}
 
 @app.post("/api/ui/customize")
-async def save_ui_customization(request: Request) -> dict[str, Any]:
-    # Allow saving customizations in desktop terminal mode or for authenticated users
+async def save_ui_customization(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    # Stored as data only; the classic UI applies it client-side via applyCustomUiOverrides().
     data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(422, "Customization payload must be an object")
     cfg_file = BASE_DIR / "data" / "ui_customization.json"
     cfg_file.parent.mkdir(parents=True, exist_ok=True)
     cfg_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    
-    # Bake overrides directly into terminal.html in code
-    updated_html = update_terminal_html_customizations(data)
-    
-    # Background commit and push to git
-    asyncio.create_task(git_sync_customizations())
-    
-    return {"ok": True, "customization": data, "html_updated": updated_html, "git_sync": "triggered"}
+    return {"ok": True, "customization": data}
 
 
 @app.get("/api/mcp/openapi.json")
@@ -18623,7 +18243,7 @@ async def get_learn_ai_code_slice(file: str = "app.py", start: int = 1, end: int
 
 
 @app.post("/api/learn-ai/explain")
-async def post_learn_ai_explain(request: Request) -> dict[str, Any]:
+async def post_learn_ai_explain(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Analyzes any trading/technical word via Gemini API and returns layman explanations with real-world examples."""
     try:
         body = await request.json()

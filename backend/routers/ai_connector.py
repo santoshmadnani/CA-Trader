@@ -21,8 +21,11 @@ def verify_ai_auth(
 ) -> bool:
     secret = get_auth_token()
     if not secret:
-        return True
-    
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "MCP_DISABLED", "message": "Set CA_MCP_TOKEN or CA_AUTH_SECRET to enable the AI connector"}
+        )
+
     token = x_api_key or ""
     if not token and authorization:
         if authorization.startswith("Bearer "):
@@ -760,7 +763,7 @@ async def mcp_sql(payload: SqlQueryIn, request: Request):
         raise HTTPException(status_code=500, detail={"error": f"Database not found at {db_path}"})
         
     try:
-        conn = sqlite3.connect(db_path, timeout=5.0)
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(q)

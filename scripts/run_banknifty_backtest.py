@@ -373,9 +373,6 @@ def run_banknifty_backtest():
 
     out_files = [
         repo_dir / "docs" / "banknifty_backtest_report.md",
-        repo_dir / "static" / "banknifty_backtest_report.md",
-        Path("/home/ubuntu/CA-Trader/docs/banknifty_backtest_report.md"),
-        Path("/home/ubuntu/CA-Trader/static/banknifty_backtest_report.md")
     ]
     for p in out_files:
         try:
@@ -398,9 +395,6 @@ def run_banknifty_backtest():
     }
     json_files = [
         repo_dir / "data" / "banknifty_backtest_summary.json",
-        repo_dir / "static" / "banknifty_backtest_summary.json",
-        Path("/home/ubuntu/CA-Trader/data/banknifty_backtest_summary.json"),
-        Path("/home/ubuntu/CA-Trader/static/banknifty_backtest_summary.json")
     ]
     for jp in json_files:
         try:

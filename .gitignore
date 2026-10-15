@@ -1,28 +1,37 @@
+# Secrets
 .env
+.env.*
+*.key
+*.pem
+*.pub
+
+# Python / build
 __pycache__/
 *.pyc
+dist/
+build/
+*.exe
+*.zip
+*.bak
+
+# Runtime state (lives only on the host; deploys never touch it)
 *.log
+*.log.*
 *.sqlite3
 *.sqlite3-*
 *.db
 *.db-*
-scratch/
-*.bak
-*.zip
-terminal_modular.html
-server_host/bin/
-server_host/logs/
-server_host/backups/
-*.key
-*.pem
-*.pub
-*.exe
-dist/
-build/
-.desktop_cache/
+backups/
+logs/
+data/candles_cache.json
+data/ui_customization.json
+data/videos/
+server_host/
+
 # Broker exports and Telegram sessions (personal data)
 data/tradebook-*
 *.session
 *.session-journal
 
-
+# Editor
+.vscode/

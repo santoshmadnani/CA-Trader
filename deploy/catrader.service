@@ -1,0 +1,16 @@
+# Installed at /etc/systemd/system/catrader.service on the host (copied from the live Oracle VM).
+[Unit]
+Description=CA Trader Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/CA-Trader
+ExecStart=/home/ubuntu/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000 --log-level info
+Restart=always
+RestartSec=3
+EnvironmentFile=/home/ubuntu/CA-Trader/.env
+
+[Install]
+WantedBy=multi-user.target
