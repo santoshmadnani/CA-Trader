@@ -10688,7 +10688,10 @@ async def analysis_overall(
 # Time-bound multi-timeframe trade plans (scalp / intraday / swing)
 # ---------------------------------------------------------------------------
 
-_PLAN_TF_DAYS = {"1m": 5, "5m": 20, "15m": 60, "60m": 120, "1D": 400}
+# Enough bars for each plan (>= 60 bars + 60-bar pivot lookback) and for the higher-timeframe trend (>= 30 closed bars).
+_PLAN_TF_DAYS = {"1m": 4, "5m": 8, "15m": 20, "60m": 40, "1D": 120}   # calendar days: covers weekends and holidays
+_SIGNALS_LAST: dict[str, dict[str, Any]] = {}
+_SIGNALS_INFLIGHT: dict[str, "asyncio.Future[Any]"] = {}
 _PLAN_BT_DAYS = {"1m": 25, "5m": 60, "15m": 120, "60m": 240, "1D": 600}
 _SIGNAL_BT: dict[str, dict[str, Any]] = {}
 _SIGNAL_BT_INFLIGHT: set[str] = set()
@@ -10933,7 +10936,7 @@ async def _signal_plan_tracker_loop() -> None:
             nse = bool(market_session("NSE_EQ").get("active"))
             mcx = bool(market_session("MCX").get("active"))
             if nse or mcx:
-                wl = [s for s in (user_watchlist_symbols(1) or []) if s][:3]
+                wl = [s for s in (user_watchlist_symbols(1) or []) if s][:max(0, int(os.getenv("PLAN_TRACKER_EXTRA_SYMBOLS", "1")))]
                 for sym in list(dict.fromkeys((["NIFTY", "BANKNIFTY"] if nse else []) + wl)):
                     if (get_symbol_segment(extract_root_symbol(sym).upper()) == "MCX") != mcx and not (nse and mcx):
                         continue
@@ -10946,7 +10949,7 @@ async def _signal_plan_tracker_loop() -> None:
             await asyncio.to_thread(_evaluate_open_plans)
         except Exception as exc:
             log.warning("signal plan tracker failed: %s", safe_text(exc))
-        await asyncio.sleep(90)
+        await asyncio.sleep(120)
 
 
 @app.get("/api/signals/history")
@@ -10978,8 +10981,30 @@ async def api_signals(instrument: str, user: dict[str, Any] = Depends(require_us
     cached = CACHE.get(key)
     if cached is not None:
         return cached
-    res = await asyncio.wait_for(asyncio.to_thread(_compute_signals, instrument), timeout=45)
-    CACHE.set(key, res, 20.0 if res.get("market_open") else 900.0)
+    fut = _SIGNALS_INFLIGHT.get(key)
+    if fut is None or fut.done():
+        fut = asyncio.ensure_future(asyncio.to_thread(_compute_signals, instrument))
+        _SIGNALS_INFLIGHT[key] = fut
+
+        def _store(f: "asyncio.Future[Any]", k: str = key) -> None:
+            _SIGNALS_INFLIGHT.pop(k, None)
+            if f.cancelled():
+                return
+            if f.exception() is None:
+                res = f.result()
+                CACHE.set(k, res, 20.0 if res.get("market_open") else 900.0)
+                _SIGNALS_LAST[k] = res
+            else:
+                log.warning("signals %s failed: %s", k, safe_text(f.exception()))
+        fut.add_done_callback(_store)
+    last = _SIGNALS_LAST.get(key)
+    if last is not None:
+        # stale-while-revalidate: answer instantly; the fresh plans land in the cache for the next poll
+        return {**last, "refreshing": True}
+    try:
+        res = await asyncio.wait_for(asyncio.shield(fut), timeout=40)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, "Signals are still being calculated from Upstox candles; they will appear in a few seconds.")
     asyncio.create_task(_ensure_signal_backtest(instrument))
     return res
 
