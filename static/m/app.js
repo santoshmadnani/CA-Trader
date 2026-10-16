@@ -305,7 +305,7 @@
       const d = await api(`/api/signals/${encodeURIComponent(sym)}`, { timeout: 60000 }); if (sym !== S.symbol) return;
       S.signals[sym] = { data: d, at: Date.now() }; renderPlans(); $("sigLive").classList.toggle("on", !!d.market_open);
     } catch (e) { if (sym === S.symbol && !S.signals[sym]) $("sigPlans").innerHTML = `<div class="plan"><div class="empty"><b>Signals unavailable</b>${esc(e.message)}</div></div>`; }
-    if (force) { loadNextSession(sym); loadSigNews(sym); }
+    if (force) { loadNextSession(sym); loadSigNews(sym); loadSigCal(sym); }
   }
 
   const FACTOR_NAMES = { trend: "Trend", vwap: "VWAP", momentum: "Momentum", price_action: "Price action", day_change: "Day change", option_flow: "Option flow" };
@@ -369,7 +369,7 @@
       <div class="tiles"><div class="tile"><span>Reward : risk</span><b class="num">${p.rr_t1 ? `${fmt(p.rr_t1, 2)}<small> : 1</small>` : "—"}</b></div>
         <div class="tile"><span>To entry</span><b class="num" id="sigDist">—</b></div>
         <div class="tile"><span>Time left</span><b class="num countdown" data-short data-until="${esc(p.valid_until)}">${hhmm(p.valid_until)}</b><div class="timebar" id="sigTbar" data-from="${esc(p.as_of || "")}" data-until="${esc(p.valid_until)}"><i></i></div></div></div>
-      <div class="steps"><span class="step"><svg><use href="#m-clock"/></svg>Enter by <b>${hhmm(p.valid_until)}</b></span><span class="step"><svg><use href="#m-bolt"/></svg>Book part at <b class="up">T1</b></span>
+      <div class="steps">${p.event_risk ? `<span class="step risk"><svg><use href="#m-bell"/></svg>${esc(p.event_risk.currency)} ${esc(p.event_risk.title)} <b>${p.event_risk.minutes_away >= 0 ? "in " + esc(p.event_risk.minutes_away) + "m" : esc(-p.event_risk.minutes_away) + "m ago"}</b></span>` : ""}<span class="step"><svg><use href="#m-clock"/></svg>Enter by <b>${hhmm(p.valid_until)}</b></span><span class="step"><svg><use href="#m-bolt"/></svg>Book part at <b class="up">T1</b></span>
         <span class="step"><svg><use href="#m-trend"/></svg>Trail to <b class="up">T2</b></span>${p.time_stop_bars ? `<span class="step"><svg><use href="#m-stop"/></svg>Exit after <b>${esc(p.time_stop_bars)}</b> bars</span>` : ""}</div>
       ${o ? `<div class="opt"><div class="opt-h"><span class="opt-name">${esc(on.name)} ${on.exp ? `<small>${esc(on.exp)}</small>` : ""}</span><span class="pill">LTP <b class="num">${fmt(o.ltp)}</b></span><span class="pill">Δ <b class="num">${fmt(o.delta, 2)}</b></span></div>
         <div class="opt-lv"><div><span>Buy</span><b class="num">${fmt(o.entry_low)}</b><small>to ${fmt(o.entry_high)}</small></div><div><span>SL</span><b class="num dn">${fmt(o.stop_loss)}</b></div><div><span>T1</span><b class="num up">${fmt(o.target_1)}</b></div><div><span>T2</span><b class="num up">${fmt(o.target_2)}</b></div></div>
@@ -441,10 +441,44 @@
   async function loadSigNews(sym) {
     try { const d = await api(`/api/news/unified?symbol=${encodeURIComponent(root(sym))}&limit=40`, { timeout: 30000 }); if (sym !== S.symbol) return;
       const items = (d.events || []).slice(0, 5);
-      $("sigNews").innerHTML = `<div class="card"><div class="card-h"><h3>News that can move ${esc(root(sym))}</h3><button type="button" class="pill-btn" data-more-news>All</button></div><ul class="news-mini">${items.map((n) => `<li><span class="dot ${esc(n.sentiment || "")}"></span>${esc(n.headline || n.event)}<div class="small muted">${esc(n.source || "")} · ${esc(hhmm(n.published_at))}</div></li>`).join("") || `<li class="muted">No material news right now.</li>`}</ul></div>`;
+      $("sigNews").innerHTML = `<div class="card"><div class="card-h"><h3>News that can move ${esc(d.topic || root(sym))}</h3><button type="button" class="pill-btn" data-more-news>All</button></div><ul class="news-mini">${items.map((n) => `<li><span class="dot ${esc(n.sentiment || "")}"></span>${esc(n.headline || n.event)}<div class="small muted">${esc(n.source || "")} · ${esc(hhmm(n.published_at))}</div></li>`).join("") || `<li class="muted">No material news right now.</li>`}</ul></div>`;
     } catch { /* optional */ }
   }
   $("sigNews").addEventListener("click", (e) => { if (e.target.closest("[data-more-news]")) openNews(S.symbol); });
+
+  // ------------------------------------------------------------------ economic calendar
+  const calWhen = (e) => { const t = new Date(e.time), m = Math.round((t - Date.now()) / 60000);
+    const rel = m < -1 ? "done" : m <= 1 ? "now" : m < 60 ? `in ${m}m` : m < 1440 ? `in ${Math.floor(m / 60)}h ${m % 60}m` : t.toLocaleDateString("en-IN", { weekday: "short", timeZone: "Asia/Kolkata" });
+    return { t, m, rel }; };
+  const calRow = (e) => { const w = calWhen(e);
+    return `<li class="cal-row${w.m < -1 ? " past" : w.m < 90 ? " soon" : ""}"><span class="tm">${hhmm(e.time)}<small>${esc(w.rel)}</small></span>
+      <span class="tt"><i class="imp ${esc(e.impact)}"></i>${esc(e.title)}${e.why ? `<span class="why">${esc(e.why)}</span>` : ""}</span>
+      <span class="rt"><span class="pill ${e.kind === "leader" ? "warn" : e.kind === "rates" ? "acc" : ""}">${esc(e.currency)}</span></span>
+      ${e.forecast || e.previous || e.actual ? `<span class="fp">${e.actual ? `Actual ${esc(e.actual)} · ` : ""}${e.forecast ? `Forecast ${esc(e.forecast)}` : ""}${e.forecast && e.previous ? " · " : ""}${e.previous ? `Previous ${esc(e.previous)}` : ""}</span>` : ""}</li>`; };
+  async function loadSigCal(sym) {
+    const box = $("sigCal");
+    try { const d = await api(`/api/calendar?symbol=${encodeURIComponent(root(sym))}`, { timeout: 20000 }); if (sym !== S.symbol) return;
+      const up = (d.events || []).filter((e) => calWhen(e).m >= -30).slice(0, 4);
+      box.innerHTML = `<div class="card"><div class="card-h"><h3>Coming up for ${esc(d.topic || root(sym))}</h3><button type="button" class="pill-btn" data-cal-all>Week</button></div>
+        ${up.length ? `<ul class="cal-list">${up.map(calRow).join("")}</ul>` : `<div class="why-text">No market-moving events scheduled in the next few days.</div>`}</div>`;
+    } catch { box.innerHTML = ""; }
+  }
+  $("sigCal").addEventListener("click", (e) => { if (e.target.closest("[data-cal-all]")) openCalendar(S.symbol); });
+  let calScope = "relevant", calHigh = false, calSym = "NIFTY";
+  async function openCalendar(sym) {
+    calSym = root(sym || S.symbol); if ($("p-calendar").hidden) openPage("calendar"); inkify($("p-calendar"));
+    $("calBody").innerHTML = `<div class="card" style="padding:16px"><span class="skel w80"></span><span class="skel w60"></span><span class="skel w80"></span></div>`;
+    try { const d = await api(`/api/calendar?symbol=${encodeURIComponent(calSym)}&scope=${calScope}`, { timeout: 20000 });
+      $("calSub").textContent = `${calScope === "relevant" ? `What matters for ${d.topic || calSym}` : "All currencies"} · IST`;
+      const evs = (d.events || []).filter((e) => !calHigh || e.impact === "High" || e.kind === "leader");
+      const days = {}; evs.forEach((e) => { const k = new Date(e.time).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "Asia/Kolkata" }); (days[k] = days[k] || []).push(e); });
+      $("calBody").innerHTML = Object.keys(days).length ? Object.entries(days).map(([k, v]) => `<div class="cal-day">${esc(k)}</div><div class="card" style="margin-top:6px"><ul class="cal-list">${v.map(calRow).join("")}</ul></div>`).join("")
+        + `<p class="hint">Source: ${esc(d.source)}. Covers ${esc(d.covers)}.${d.source_ok === false ? " The feed didn't answer just now; showing the last saved copy." : ""}</p>`
+        : `<div class="empty"><b>Nothing scheduled</b>No ${calHigh ? "high-impact " : ""}events in this window.</div>`;
+    } catch (e) { $("calBody").innerHTML = `<div class="empty"><b>Calendar unavailable</b>${esc(e.message)}</div>`; }
+  }
+  $("calScope").addEventListener("click", (e) => { const b = e.target.closest("[data-scope]"); if (!b) return; haptic(); calScope = b.dataset.scope; $("calScope").querySelectorAll("button").forEach((x) => x.setAttribute("aria-selected", String(x === b))); openCalendar(calSym); });
+  $("calHigh").addEventListener("click", () => { haptic(); calHigh = !calHigh; $("calHigh").setAttribute("aria-pressed", String(calHigh)); openCalendar(calSym); });
 
   // ------------------------------------------------------------------ chart page
   const DAYS = { "1m": 3, "3m": 5, "5m": 10, "15m": 20, "30m": 40, "60m": 80, "1D": 400 };
@@ -556,7 +590,7 @@
         .map(([k, v]) => `<div><span class="k">${k}</span><span class="v">${v}</span></div>`).join(""); } catch { /* ignore */ }
   }
   document.querySelector("#s-account .menu").addEventListener("click", (e) => { const b = e.target.closest("[data-open]"); if (!b) return; haptic();
-    ({ alerts: () => openAlerts(), ai: () => openAI(), history: () => { openPage("history"); renderHistory($("histBody"), 7); }, news: () => openNews(S.symbol), chain: () => openChain(hasOptions(S.symbol) ? S.symbol : "NIFTY") }[b.dataset.open] || (() => {}))(); });
+    ({ alerts: () => openAlerts(), calendar: () => openCalendar(S.symbol), ai: () => openAI(), history: () => { openPage("history"); renderHistory($("histBody"), 7); }, news: () => openNews(S.symbol), chain: () => openChain(hasOptions(S.symbol) ? S.symbol : "NIFTY") }[b.dataset.open] || (() => {}))(); });
   $("themeToggle").addEventListener("click", () => { const dark = document.documentElement.dataset.theme !== "dark"; document.documentElement.dataset.theme = dark ? "dark" : "light"; store.set("theme", dark ? "dark" : "light");
     try { localStorage.setItem("catc_theme", JSON.stringify(dark ? "dark" : "light")); } catch { /* ignore */ } if (S.chart) S.chart.setTheme(); });
 
@@ -642,6 +676,7 @@
         ${rule("min_signals", "Sample size", "Past trades behind those numbers", c.min_signals, 25, 25, 1000)}
         ${sw("require_htf_agree", "Higher timeframes agree", "Every confirming timeframe points the same way")}
         ${sw("context_edge", "Skip losing contexts", "Block a plan if its time of day or volatility lost money in the backtest")}
+        ${sw("avoid_events", "Hold around big events", "No alert from 45–90 min before to 15 min after CPI, Fed, inventories or a President speech")}
         <div class="rule hz-rule"><b>Horizons</b><span>Which plans can alert</span><div class="ctl hz-chips">${["scalp", "intraday", "swing"].map((h) => `<button type="button" data-hzc="${h}" aria-pressed="${(c.horizons || []).includes(h)}">${h[0].toUpperCase() + h.slice(1)}</button>`).join("")}</div></div></div>
       <div class="card"><div class="card-h"><h3>Coverage</h3></div>
         ${rule("scan_watchlist", "Watchlist symbols to scan", "Besides NIFTY and BANKNIFTY, from the top of your watchlist", c.scan_watchlist, 1, 0, 6)}

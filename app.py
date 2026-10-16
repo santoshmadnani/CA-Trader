@@ -155,6 +155,8 @@ from backend.services import signal_model as SIGNAL_MODEL
 from backend.services import trade_plan as TRADE_PLAN
 from backend.services import next_session as NEXT_SESSION
 from backend.services import alerts as ALERTS
+from backend.services import news_topics as NEWS_TOPICS
+from backend.services import econ_calendar as ECON_CAL
 from backend.services.telegram_service import (
     mask_token,
     send_telegram_msg,
@@ -10716,6 +10718,8 @@ def _news_bias(root: str, hours: float = 3.0) -> dict[str, Any]:
     total, weight, used = 0.0, 0.0, []
     now = datetime.now(timezone.utc)
     for r in rows:
+        if not NEWS_TOPICS.is_relevant(root, r):
+            continue
         sent = _headline_sentiment(str(r.get("headline") or ""), str(r.get("summary") or ""))  # re-scored: older rows carry a biased label
         sign = {"Positive": 1, "Negative": -1}.get(sent, 0)
         mat = float(r.get("materiality") or 0) / 100.0
@@ -10787,6 +10791,11 @@ def _compute_signals(instrument: str) -> dict[str, Any]:
         bt = _SIGNAL_BT.get(f"{root}:{h}")
         if bt:
             p["track_record"] = {k: bt.get(k) for k in _TRACK_KEYS}
+        if p.get("decision") in ("BUY", "SELL") and not p.get("expired"):
+            try:
+                p["event_risk"] = ECON_CAL.risk_near(root, before_min=45 if h == "scalp" else 90, after_min=15)
+            except Exception as exc:
+                log.debug("event risk %s failed: %s", root, safe_text(exc))
         plans.append(p)
     active = market_session("MCX" if mcx else "NSE_EQ").get("active")
     return {"instrument": instrument, "root": root, "market_open": bool(active), "plans": plans, "news": news,
@@ -11138,6 +11147,14 @@ async def api_alerts_test(user: dict[str, Any] = Depends(require_user)) -> dict[
     cfg = {**ALERTS.get_config(db_exec), "push": True}
     msg = {"title": "CA Trader alerts are on", "body": "You'll get a notification when a plan passes every high-conviction filter.", "tag": "test", "url": "/terminal?ui=mobile"}
     return await _send_alert(cfg, msg, f"<b>{msg['title']}</b>\n{msg['body']}")
+
+
+@app.get("/api/calendar")
+async def api_calendar(symbol: str = Query("NIFTY"), scope: str = Query("relevant", pattern="^(relevant|all)$"),
+                       user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    root = extract_root_symbol(symbol).upper()
+    res = await asyncio.to_thread(ECON_CAL.for_symbol, root, scope=scope)
+    return {**res, "topic": (NEWS_TOPICS.profile(root) or {}).get("label")}
 
 
 @app.get("/api/signals/history")
@@ -16740,19 +16757,25 @@ async def news_unified(symbol: str = Query("NIFTY"), limit: int = Query(150, ge=
         limit_val = int(raw_limit) if raw_limit is not None else 150
     except Exception:
         limit_val = 150
-    stock_res = news_result(_target_news_query(sym), max_results=limit_val//2, target=sym, user_id=user["id"])
-    global_res = news_result("global markets geopolitics rates oil inflation tariffs central banks", max_results=limit_val//2, target="GLOBAL", user_id=user["id"])
+    prof = NEWS_TOPICS.profile(sym)
+    if prof:   # commodities: their own drivers, never the Indian equity market feed
+        stock_res = news_result(prof["query"], max_results=limit_val//2, target=prof["key"], user_id=user["id"])
+        global_res = news_result(prof["macro_query"], max_results=limit_val//2, target=f"{prof['key']}_MACRO", user_id=user["id"])
+    else:
+        stock_res = news_result(_target_news_query(sym), max_results=limit_val//2, target=sym, user_id=user["id"])
+        global_res = news_result("global markets geopolitics rates oil inflation tariffs central banks", max_results=limit_val//2, target="GLOBAL", user_id=user["id"])
     combined = []
     seen = set()
     for item in [*stock_res.get("events", []), *global_res.get("events", [])]:
         k = str(item.get('url') or item.get('headline') or item.get('event') or id(item))
-        if k not in seen and _newsworthy(item):
+        if k not in seen and _newsworthy(item) and NEWS_TOPICS.is_relevant(sym, item):
             seen.add(k)
             combined.append(item)
     combined.sort(key=lambda x: (_parse_news_datetime(str(x.get("published_at") or "")).timestamp() if _parse_news_datetime(str(x.get("published_at") or "")) else 0), reverse=True)
     return {
         "events": combined[:limit_val],
         "symbol": sym,
+        "topic": prof["label"] if prof else None,
         "total": len(combined),
         "timestamp": now_iso()
     }

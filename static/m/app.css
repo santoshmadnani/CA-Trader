@@ -531,6 +531,26 @@ table.chain { width: calc(100% - 28px); margin: 0 14px; border-collapse: separat
 .al-sug-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; } .al-sug-grid span { padding: 4px 9px; border-radius: 99px; background: var(--surface); font-size: 12px; font-weight: 700; }
 .al-sug .btn { width: 100%; height: 44px; }
 
+/* economic calendar */
+.cal-list { list-style: none; margin: 0; padding: 2px 16px 10px; }
+.cal-row { display: grid; grid-template-columns: 54px 1fr auto; gap: 2px 10px; padding: 11px 0; border-top: 1px solid var(--line); align-items: start; }
+.cal-row:first-child { border-top: 0; }
+.cal-row .tm { font: 800 14px/1.2 var(--f-display); } .cal-row .tm small { display: block; font: 600 11px var(--f-body); color: var(--muted); }
+.cal-row .tt { font-size: 14px; font-weight: 700; line-height: 1.3; min-width: 0; }
+.cal-row .tt .why { display: block; padding: 2px 0 0; font-size: 12px; font-weight: 500; color: var(--muted); text-align: left; }
+.cal-row .fp { grid-column: 2; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.cal-row .rt { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.cal-row.past { opacity: .55; }
+.cal-row.soon .tm { color: var(--warn); }
+.imp { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--line-strong); vertical-align: 1px; }
+.imp.High { background: var(--dn); box-shadow: 0 0 0 3px var(--dn-soft); } .imp.Medium { background: var(--warn); } .imp.Holiday { background: var(--muted); }
+.cal-day { padding: 12px 16px 2px; font: 700 13px var(--f-display); color: var(--muted); }
+.cal-filters { display: flex; align-items: center; gap: 8px; padding: 8px 14px 4px; flex: none; }
+.cal-filters .seg { margin: 0; flex: 1; }
+.cal-filters .pill-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.step.risk { border-color: var(--warn); background: var(--warn-soft); color: var(--ink); }
+.step.risk svg { color: var(--warn); }
+
 /* toast */
 .toast { position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + var(--tabbar-gap) * 2 + var(--safe-b) + 8px); transform: translate(-50%, 20px) scale(.96); z-index: 60; opacity: 0; pointer-events: none;
   max-width: calc(100vw - 32px); padding: 12px 16px; border-radius: 16px; background: var(--ink); color: var(--bg); font-size: 14px; font-weight: 700; box-shadow: var(--shadow-2);
