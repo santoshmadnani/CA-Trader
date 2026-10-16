@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CA Trader</title>
+<script>/* Phones get the mobile app even when the browser asks for the desktop site (iOS "Request Desktop Website" sends a Mac
+  user agent). Choosing "Desktop version" in the app sets cat_ui=desktop and is respected. */
+(function(){try{if(/(?:^|;\s*)cat_ui=desktop/.test(document.cookie))return;if(Math.min(screen.width,screen.height)<=820&&navigator.maxTouchPoints>0)location.replace("/m"+location.hash);}catch(e){}})();</script>
 <script>try{var t=localStorage.getItem("cat_theme");if(t)document.documentElement.dataset.theme=JSON.parse(t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

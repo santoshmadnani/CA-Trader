@@ -8773,12 +8773,27 @@ async def terminal_page(request: Request) -> Response:
         return RedirectResponse("/login", status_code=302)
     choice = request.query_params.get("ui")
     choice = choice if choice in ("desktop", "mobile") else None
-    want = choice or request.cookies.get("cat_ui") or ("mobile" if _MOBILE_UA.search(request.headers.get("user-agent", "")) else "desktop")
+    ua = request.headers.get("user-agent", "")
+    want = choice or request.cookies.get("cat_ui") or ("mobile" if _MOBILE_UA.search(ua) else "desktop")
+    log.info("terminal ui=%s (choice=%s cookie=%s) ua=%s", want, choice, request.cookies.get("cat_ui"), ua[:140])
     if want == "mobile" and MOBILE_HTML_PATH.exists():
         return _ui_response(MOBILE_HTML_PATH, choice)
     if TRADE_HTML_PATH.exists():
         return _ui_response(TRADE_HTML_PATH, choice)
     return await classic_terminal_page(request)
+
+
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+@app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
+@app.get("/apple-touch-icon-120x120.png", include_in_schema=False)
+@app.get("/apple-touch-icon-120x120-precomposed.png", include_in_schema=False)
+async def apple_touch_icon() -> Response:
+    return FileResponse(BASE_DIR / "static" / "m" / "icon-180.png", media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> Response:
+    return FileResponse(BASE_DIR / "static" / "m" / "icon-192.png", media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @app.get("/m", response_class=HTMLResponse)
