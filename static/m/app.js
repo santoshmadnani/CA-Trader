@@ -176,7 +176,7 @@
       if ($("shRange")) $("shRange").innerHTML = lo !== null && hi !== null && hi > lo ? `<div class="eyebrow">Day's range</div><div class="bar"><i style="left:${((Math.min(op ?? lt, lt) - lo) / (hi - lo)) * 100}%;width:${(Math.abs(lt - (op ?? lt)) / (hi - lo)) * 100}%;background:${lt >= (op ?? lt) ? "var(--up)" : "var(--dn)"}"></i><b style="left:${((lt - lo) / (hi - lo)) * 100}%"></b></div><div class="lh"><span>Low <b>${fmt(lo)}</b></span><span>High <b>${fmt(hi)}</b></span></div>` : "";
       if ($("shKv")) $("shKv").innerHTML = [["Open", fmt(q.open)], ["Prev. close", fmt(q.prev_close ?? q.cp)], ["Volume", q.volume ? Number(q.volume).toLocaleString("en-IN") : "—"]].map(([k, v]) => `<div><span class="muted">${k}</span><span>${v}</span></div>`).join("");
     }
-    if (S.tab === "signals") renderSigQuote();
+    if (S.tab === "signals") { renderSigQuote(); updateLadders(); }
     if (S.chartSym && $("chQuote")) { const c = S.quotes[S.chartSym] || {}; $("chQuote").innerHTML = `<span class="num ${cls(c.change_pct)}">${fmt(c.ltp)}</span> <span class="num">${num(c.change_pct) === null ? "" : `${sgn(c.change_pct)}%`}</span>`; }
   }
   $("sheetBody").addEventListener("click", async (e) => {
@@ -245,30 +245,73 @@
     if (force) { loadNextSession(sym); loadSigNews(sym); }
   }
   const lvl = (k, v, c = "") => `<div><span class="k">${k}</span><span class="v ${c}">${v}</span></div>`;
+  const FACTOR_NAMES = { trend: "Trend", vwap: "VWAP", momentum: "Momentum", price_action: "Price action", day_change: "Day change", option_flow: "Option flow" };
+  const openWhy = new Set(); let animatedSym = null;
+  // Price ladder: SL, entry zone, T1, T2 and the live price placed on one scale (works for BUY and SELL, since it sorts by value).
+  function ladder(p) {
+    const pts = [num(p.stop_loss), num(p.entry_low), num(p.entry_high), num(p.target_1), num(p.target_2)];
+    if (pts.some((x) => x === null)) return "";
+    const lo = Math.min(...pts), hi = Math.max(...pts), pad = (hi - lo) * 0.06 || 1, a = lo - pad, b = hi + pad;
+    const at = (v) => (((v - a) / (b - a)) * 100).toFixed(2);
+    const buy = p.decision === "BUY";
+    const mk = (v, k, c) => `<span class="lad-mk ${c}" style="left:${at(v)}%"><i></i><em>${k}</em><b class="num">${fmt(v)}</b></span>`;
+    return `<div class="ladder" data-lo="${a}" data-hi="${b}">
+      <div class="lad-track"><span class="lad-risk" style="left:${at(Math.min(p.stop_loss, p.entry_low))}%;width:${Math.abs(at(p.entry_low) - at(p.stop_loss)) || 0}%"></span>
+        <span class="lad-zone" style="left:${at(p.entry_low)}%;width:${Math.max(1.5, at(p.entry_high) - at(p.entry_low))}%"></span>
+        <span class="lad-reward" style="left:${at(buy ? p.entry_high : p.target_2)}%;width:${Math.abs(at(p.target_2) - at(buy ? p.entry_high : p.entry_low))}%"></span>
+        <span class="lad-ltp" data-ltp-dot hidden></span></div>
+      <div class="lad-marks">${mk(p.stop_loss, "SL", "dn")}${mk(p.target_1, "T1", "up")}${mk(p.target_2, "T2", "up")}</div></div>`;
+  }
+  function updateLadders() {
+    const q = S.quotes[S.symbol] || {}, v = num(q.ltp);
+    document.querySelectorAll("#sigPlans .ladder").forEach((l) => { const dot = l.querySelector("[data-ltp-dot]"); if (!dot) return;
+      const a = +l.dataset.lo, b = +l.dataset.hi; if (v === null || !(b > a)) { dot.hidden = true; return; }
+      dot.hidden = false; dot.style.left = `${Math.max(0, Math.min(100, ((v - a) / (b - a)) * 100))}%`; dot.title = `LTP ${fmt(v)}`; });
+  }
+  const optName = (o) => { const s = String(o.symbol || ""); const m = s.match(/(\d+(?:\.\d+)?)\s*(CE|PE)\s*(\d{4}-\d{2}-\d{2})?/i);
+    return m ? `${m[1]} ${m[2].toUpperCase()}${m[3] ? ` · ${dmy(m[3])}` : ""}` : s; };
   function renderPlans() {
     const rec = S.signals[S.symbol]; if (!rec) return; const d = rec.data;
-    const closedNote = d.market_open ? "" : `<div class="card" style="padding:12px 14px;font-size:13.5px"><b>Market closed.</b> <span class="muted">New plans start when trading opens (NSE 09:15, MCX 09:00 IST). Below: what the model sees now, and the outlook for the next session.</span></div>`;
-    $("sigPlans").innerHTML = closedNote + (d.plans || []).map((p) => {
-      if (!p.available) return `<div class="card plan"><div class="ph"><span class="hz">${esc(p.label)}</span><span class="tf">${esc(p.timeframe)}</span><span class="grow"></span><span class="decision NO_TRADE">NO DATA</span></div><div class="why">${esc(p.reason || "")}</div></div>`;
+    const anim = animatedSym !== S.symbol; animatedSym = S.symbol;
+    const closedNote = d.market_open ? "" : `<div class="card closed-note"><span class="pill warn">Market closed</span><span class="small muted">New plans from 09:15 NSE · 09:00 MCX</span></div>`;
+    const opt = isIdx(S.symbol) || hasOptions(S.symbol);
+    $("sigPlans").innerHTML = closedNote + (d.plans || []).map((p, idx) => {
+      const enter = anim ? ` enter" style="--i:${idx}` : "";
+      if (!p.available) return `<div class="card plan${enter}"><div class="ph"><span class="hz">${esc(p.label)}</span><span class="tf">${esc(p.timeframe)}</span><span class="grow"></span><span class="decision NO_TRADE">NO DATA</span></div><div class="why">${esc(p.reason || "")}</div></div>`;
       const dec = p.expired ? "NO_TRADE" : p.decision, live = !p.expired && (dec === "BUY" || dec === "SELL"), sc = Math.max(-100, Math.min(100, num(p.score) || 0));
-      const label = p.expired ? `${p.decision} · EXPIRED` : dec === "BUY" ? (isIdx(S.symbol) || hasOptions(S.symbol) ? "BUY · CE" : "BUY") : dec === "SELL" ? (isIdx(S.symbol) || hasOptions(S.symbol) ? "SELL · PE" : "SELL") : "NO TRADE";
-      const tr = p.track_record, o = p.option;
-      return `<div class="card plan" data-plan="${esc(p.horizon)}">
-        <div class="ph"><span class="hz">${esc(p.label)}</span><span class="tf">${esc(p.timeframe)} · hold ${esc(p.hold || "")}</span><span class="grow"></span><span class="decision ${dec}">${label}</span></div>
+      const label = p.expired ? `${p.decision} · EXPIRED` : dec === "BUY" ? (opt ? "BUY · CE" : "BUY") : dec === "SELL" ? (opt ? "SELL · PE" : "SELL") : "NO TRADE";
+      const tr = p.track_record, o = p.option, key = `${S.symbol}|${p.horizon}`;
+      const factors = Object.entries(p.factors || {}).map(([k, v]) => { const x = Math.max(-100, Math.min(100, num(v) || 0));
+        return `<div class="fx"><span>${esc(FACTOR_NAMES[k] || k)}</span><span class="fx-bar"><i class="${x >= 0 ? "up" : "dn"}" style="${x >= 0 ? "left:50%" : `left:${50 + x / 2}%`};width:${Math.abs(x) / 2}%"></i></span><b class="num ${cls(x)}">${sgn(x, 0)}</b></div>`; }).join("");
+      const steps = live ? [
+        ["m-history", `Enter by <b class="countdown" data-until="${esc(p.valid_until)}">${hhmm(p.valid_until)}</b>`],
+        ["m-bolt", `Book part at <b class="up">T1</b>`],
+        ["m-trend", `Trail to <b class="up">T2</b>`],
+        p.time_stop_bars ? ["m-x", `Exit after <b>${esc(p.time_stop_bars)}</b> bars`] : null,
+      ].filter(Boolean) : [];
+      return `<div class="card plan${live ? ` live ${dec}` : ""}${enter}" data-plan="${esc(p.horizon)}">
+        <div class="ph"><span class="hz">${esc(p.label)}</span><span class="tf">${esc(p.timeframe)} · ${esc(p.hold || "")}</span><span class="grow"></span><span class="decision ${dec}">${label}</span></div>
         <div class="score-bar" title="Score ${sgn(p.score, 0)}"><b style="left:${(100 - p.gate) / 2}%"></b><b style="left:${(100 + p.gate) / 2}%"></b><i style="left:${(sc + 100) / 2}%"></i></div>
-        ${live ? `<div class="lv">${lvl("Entry zone", `${fmt(p.entry_low)}–${fmt(p.entry_high)}`)}${lvl("Stop loss", fmt(p.stop_loss), "dn")}${lvl("Valid till", `<span class="countdown" data-until="${esc(p.valid_until)}">${hhmm(p.valid_until)}</span>`)}${lvl("Target 1", fmt(p.target_1), "up")}${lvl("Target 2", fmt(p.target_2), "up")}${lvl("Reward : risk", p.rr_t1 ? `${fmt(p.rr_t1, 2)} : 1` : "—")}</div>
-          <div class="instr">${esc(p.instructions || "")}</div>
-          ${o ? `<div class="opt"><div class="eyebrow">Option · ${esc(o.symbol || "")}</div>Buy <b>${fmt(o.entry_low)}–${fmt(o.entry_high)}</b> · SL <b class="dn">${fmt(o.stop_loss)}</b> · T1 <b class="up">${fmt(o.target_1)}</b> · T2 <b class="up">${fmt(o.target_2)}</b><div class="small muted" style="margin-top:4px">LTP ${fmt(o.ltp)} · delta ${fmt(o.delta, 2)} · ${esc(o.basis || "")}</div>
-            <button type="button" class="btn tiny" style="margin-top:8px" data-trade-opt='${esc(JSON.stringify({ symbol: o.symbol, entry: o.entry_high, sl: o.stop_loss, tgt: o.target_1 }))}'>Trade this option</button></div>` : ""}`
+        ${live ? `${ladder(p)}
+          <div class="lv">${lvl("Entry zone", `${fmt(p.entry_low)}<small>to ${fmt(p.entry_high)}</small>`)}${lvl("Reward : risk", p.rr_t1 ? `${fmt(p.rr_t1, 2)}<small class="inl"> : 1</small>` : "—")}${lvl("Time left", `<span class="countdown" data-short data-until="${esc(p.valid_until)}">${hhmm(p.valid_until)}</span><small>till ${hhmm(p.valid_until)}</small>`)}</div>
+          <div class="steps">${steps.map(([ic, t]) => `<span class="step"><svg><use href="#${ic}"/></svg>${t}</span>`).join("")}</div>
+          ${o ? `<div class="opt">
+            <div class="opt-h"><span class="opt-name">${esc(optName(o))}</span><span class="pill">LTP <b class="num">${fmt(o.ltp)}</b></span><span class="pill">Δ <b class="num">${fmt(o.delta, 2)}</b></span></div>
+            <div class="opt-lv"><div><span>Buy</span><b class="num">${fmt(o.entry_low)}<small>– ${fmt(o.entry_high)}</small></b></div><div><span>SL</span><b class="num dn">${fmt(o.stop_loss)}</b></div><div><span>T1</span><b class="num up">${fmt(o.target_1)}</b></div><div><span>T2</span><b class="num up">${fmt(o.target_2)}</b></div></div>
+            <button type="button" class="btn trade-opt" data-trade-opt='${esc(JSON.stringify({ symbol: o.symbol, entry: o.entry_high, sl: o.stop_loss, tgt: o.target_1 }))}'>Trade ${esc(optName(o).split(" · ")[0])}<svg><use href="#m-back"/></svg></button></div>` : ""}`
         : `<div class="why">${esc(p.reason || "")}</div>`}
-        <div class="meta">${(p.higher_timeframes || []).map((h) => `<span class="pill ${h.bias > 0 ? "up" : h.bias < 0 ? "dn" : ""}">${esc(h.tf)} ${h.bias > 0 ? "up" : h.bias < 0 ? "down" : "mixed"}</span>`).join("")}<span class="pill">score ${sgn(p.score, 0)}</span></div>
-        ${tr && tr.signals ? `<div class="track"><span>Backtest ${esc(dmy(tr.from))}–${esc(dmy(tr.to))}</span><span>T1 first <b>${fmt(tr.t1_hit_rate, 0)}%</b></span><span>Avg <b class="${cls(tr.expectancy_r)}">${sgn(tr.expectancy_r, 2)}R</b></span><span>n=${tr.signals}</span></div>` : ""}
+        <div class="meta">${(p.higher_timeframes || []).map((h) => `<span class="pill ${h.bias > 0 ? "up" : h.bias < 0 ? "dn" : ""}">${esc(h.tf)} ${h.bias > 0 ? "▲" : h.bias < 0 ? "▼" : "•"}</span>`).join("")}<span class="pill acc">score ${sgn(p.score, 0)}</span></div>
+        ${tr && tr.signals ? `<div class="stats"><div><b class="num">${fmt(tr.t1_hit_rate, 0)}%</b><span>T1 first</span></div><div><b class="num ${cls(tr.expectancy_r)}">${sgn(tr.expectancy_r, 2)}R</b><span>Avg / trade</span></div><div><b class="num">${esc(tr.signals)}</b><span>Backtested</span></div><em>${esc(dmy(tr.from))} – ${esc(dmy(tr.to))}</em></div>` : ""}
+        ${factors || p.instructions || (o && o.basis) ? `<details class="whybox" data-why="${esc(key)}"${openWhy.has(key) ? " open" : ""}><summary>Why &amp; full plan<svg><use href="#m-down"/></svg></summary>
+          ${factors ? `<div class="fxs">${factors}</div>` : ""}${p.instructions ? `<p>${esc(p.instructions)}</p>` : ""}${o && o.basis ? `<p class="muted">${esc(o.basis)}</p>` : ""}</details>` : ""}
       </div>`; }).join("");
-    tickCountdowns();
+    tickCountdowns(); updateLadders();
   }
+  $("sigPlans").addEventListener("toggle", (e) => { const d = e.target.closest && e.target.closest("details[data-why]"); if (!d) return; if (d.open) openWhy.add(d.dataset.why); else openWhy.delete(d.dataset.why); }, true);
   function tickCountdowns() {
     document.querySelectorAll(".countdown[data-until]").forEach((el) => { const left = (new Date(el.dataset.until) - Date.now()) / 1000;
-      el.textContent = left <= 0 ? "expired" : left < 3600 ? `${hhmm(el.dataset.until)} · ${Math.floor(left / 60)}m ${Math.floor(left % 60)}s` : hhmm(el.dataset.until);
+      const mmss = `${Math.floor(left / 60)}m ${String(Math.floor(left % 60)).padStart(2, "0")}s`;
+      el.textContent = left <= 0 ? "expired" : "short" in el.dataset ? (left < 3600 ? mmss : `${Math.floor(left / 3600)}h ${Math.floor((left % 3600) / 60)}m`) : hhmm(el.dataset.until);
       el.classList.toggle("dn", left <= 0); });
     const rec = S.signals[S.symbol]; if (rec && S.tab === "signals") { const s = Math.round((Date.now() - rec.at) / 1000); $("sigAge").textContent = s < 60 ? `updated ${s}s ago` : `updated ${Math.round(s / 60)}m ago`; }
   }
