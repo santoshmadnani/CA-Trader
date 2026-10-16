@@ -265,7 +265,7 @@ input, textarea, select { font: inherit; font-size: 16px; color: var(--ink); } /
 .stat b { display: block; font: 800 18px/1.15 var(--f-display); }
 .stat span { font-size: 11px; color: var(--muted); font-weight: 700; }
 .stats-note { text-align: center; font-size: 11.5px; color: var(--muted); padding: 6px 16px 0; }
-.plan .why-text { padding: 2px 16px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.why-text, .plan .why-text { padding: 2px 16px 16px; text-align: center; color: var(--muted); font-size: 13px; }
 .whybox { margin-top: 12px; border-top: 1px solid var(--line); }
 .whybox summary { list-style: none; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px; font-weight: 700; font-size: 13.5px; color: var(--accent); cursor: pointer; }
 .whybox summary::-webkit-details-marker { display: none; }
@@ -525,6 +525,11 @@ table.chain { width: calc(100% - 28px); margin: 0 14px; border-collapse: separat
 .hz-chips button { padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line); font-size: 12.5px; font-weight: 700; color: var(--muted); background: var(--surface); transition: all .25s var(--ease); }
 .hz-chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .al-actions { display: grid; gap: 8px; padding: 6px 14px 4px; }
+.card .al-actions { padding: 10px 16px 14px; }
+.al-sug { margin: 0 16px 16px; padding: 12px 14px; border-radius: 16px; background: var(--accent-soft); animation: drop .3s var(--ease); }
+.al-sug b { font: 700 15px var(--f-display); } .al-sug p { margin: 4px 0 8px; font-size: 12.5px; color: var(--ink-2); }
+.al-sug-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; } .al-sug-grid span { padding: 4px 9px; border-radius: 99px; background: var(--surface); font-size: 12px; font-weight: 700; }
+.al-sug .btn { width: 100%; height: 44px; }
 
 /* toast */
 .toast { position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + var(--tabbar-gap) * 2 + var(--safe-b) + 8px); transform: translate(-50%, 20px) scale(.96); z-index: 60; opacity: 0; pointer-events: none;

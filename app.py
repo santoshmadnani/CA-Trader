@@ -10702,6 +10702,9 @@ _SIGNALS_INFLIGHT: dict[str, "asyncio.Future[Any]"] = {}
 _PLAN_BT_DAYS = {"1m": 25, "5m": 60, "15m": 120, "60m": 240, "1D": 600}
 _SIGNAL_BT: dict[str, dict[str, Any]] = {}
 _SIGNAL_BT_INFLIGHT: set[str] = set()
+_LAST_ATM: dict[str, dict[str, float]] = {}   # root -> latest ATM option premium/delta seen live (for backtest cost estimates)
+_TRACK_KEYS = ("from", "to", "signals", "filled", "fill_rate", "t1_hit_rate", "t2_hit_rate", "expectancy_r", "expectancy_r_net", "cost_r_avg",
+               "trading_days", "context", "rule")
 
 
 def _news_bias(root: str, hours: float = 3.0) -> dict[str, Any]:
@@ -10779,26 +10782,50 @@ def _compute_signals(instrument: str) -> dict[str, Any]:
         if p.get("decision") in ("BUY", "SELL") and is_option_underlying and not p.get("expired"):
             spot = float(p["inputs"]["price"])
             p["option"] = TRADE_PLAN.option_levels(p, _atm_contract(chain, spot, p["decision"]), spot)
+            if p["option"] and p["option"].get("ltp"):
+                _LAST_ATM[root] = {"premium": float(p["option"]["ltp"]), "delta": abs(float(p["option"].get("delta") or 0.5))}
         bt = _SIGNAL_BT.get(f"{root}:{h}")
         if bt:
-            p["track_record"] = {k: bt.get(k) for k in ("from", "to", "signals", "fill_rate", "t1_hit_rate", "t2_hit_rate", "expectancy_r", "rule")}
+            p["track_record"] = {k: bt.get(k) for k in _TRACK_KEYS}
         plans.append(p)
     active = market_session("MCX" if mcx else "NSE_EQ").get("active")
     return {"instrument": instrument, "root": root, "market_open": bool(active), "plans": plans, "news": news,
             "timestamp": now_iso(), "source": "Upstox candles 1m/5m/15m/60m/1D + Upstox option chain"}
 
 
+def _plan_cost_model(root: str) -> dict[str, Any]:
+    """Round-trip cost assumptions for backtests: ATM options for index/F&O/MCX underlyings, intraday equity otherwise."""
+    acfg = ALERTS.get_config(db_exec)
+    opt = root in {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"} or root in NIFTY50_SYMBOLS or get_symbol_segment(root) == "MCX"
+    cost: dict[str, Any] = {"option": opt, "per_order": acfg.get("per_order", 20), "slippage_ticks": acfg.get("slippage_ticks", 1), "tick": 0.05}
+    if opt:
+        atm = _LAST_ATM.get(root) or {}
+        cost.update({"lot": resolve_lot_size(root, 1), "premium": atm.get("premium"), "delta": atm.get("delta", 0.5)})
+    return cost
+
+
 def _signals_backtest(instrument: str) -> dict[str, Any]:
     root = extract_root_symbol(instrument).upper()
     mcx = get_symbol_segment(root) == "MCX"
     series = _load_plan_series(instrument, _PLAN_BT_DAYS)
+    cost = _plan_cost_model(root)
     out = {}
     for h in TRADE_PLAN.HORIZONS:
-        res = TRADE_PLAN.backtest(h, series, mcx=mcx)
+        res = TRADE_PLAN.backtest(h, series, mcx=mcx, cost=cost)
         res["computed_at"] = now_iso()
         _SIGNAL_BT[f"{root}:{h}"] = res
         out[h] = res
     return {"instrument": instrument, "root": root, "results": out}
+
+
+_SIGNAL_BT_LOCK: "asyncio.Lock | None" = None
+
+
+def _signal_bt_lock() -> asyncio.Lock:
+    global _SIGNAL_BT_LOCK
+    if _SIGNAL_BT_LOCK is None:
+        _SIGNAL_BT_LOCK = asyncio.Lock()
+    return _SIGNAL_BT_LOCK
 
 
 async def _ensure_signal_backtest(instrument: str) -> None:
@@ -10808,7 +10835,8 @@ async def _ensure_signal_backtest(instrument: str) -> None:
         return
     _SIGNAL_BT_INFLIGHT.add(root)
     try:
-        await asyncio.to_thread(_signals_backtest, instrument)
+        async with _signal_bt_lock():   # one backtest at a time: the VM has 1 GB of RAM
+            await asyncio.to_thread(_signals_backtest, instrument)
     except Exception as exc:
         log.warning("signal backtest %s failed: %s", root, safe_text(exc))
     finally:
@@ -10972,7 +11000,12 @@ async def _dispatch_signal_alerts(symbol: str, new_plans: list[tuple[str, dict[s
     cfg = ALERTS.get_config(db_exec)
     if not cfg.get("enabled"):
         return
+    day_start = datetime.now(IST).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).isoformat()
     for pid, p in new_plans:
+        sent_today = int((db_exec("SELECT COUNT(*) AS n FROM signal_plans WHERE alerted=1 AND created_at >= ?", [day_start], "one") or {}).get("n") or 0)
+        if sent_today >= int(cfg.get("max_per_day") or 10):
+            log.info("signal alert skipped %s %s: daily cap of %s reached", symbol, p.get("horizon"), cfg.get("max_per_day"))
+            continue
         ok, reasons = ALERTS.qualifies(p, cfg)
         if not ok:
             log.info("signal alert skipped %s %s: %s", symbol, p.get("horizon"), "; ".join(reasons))
@@ -10995,6 +11028,15 @@ async def _dispatch_outcome_alerts(rows: list[dict[str, Any]]) -> None:
             await _send_alert(cfg, msg, f"<b>{msg['title']}</b>\n{msg['body']}")
 
 
+def _tracked_symbols(nse: bool = True) -> list[str]:
+    """NIFTY and BANKNIFTY (when NSE is open) plus the first N watchlist symbols chosen in Signal alerts."""
+    n = int(ALERTS.get_config(db_exec).get("scan_watchlist", int(os.getenv("PLAN_TRACKER_EXTRA_SYMBOLS", "1"))))
+    wl = [s for s in (user_watchlist_symbols(1) or []) if s and "|" not in s]
+    base = ["NIFTY", "BANKNIFTY"] if nse else []
+    extra = [s for s in wl if extract_root_symbol(s).upper() not in base][:max(0, n)]
+    return list(dict.fromkeys(base + extra))
+
+
 async def _signal_plan_tracker_loop() -> None:
     """While a market is open: refresh plans for the indices and the top watchlist symbols, record and grade them."""
     await asyncio.sleep(60)
@@ -11003,11 +11045,11 @@ async def _signal_plan_tracker_loop() -> None:
             nse = bool(market_session("NSE_EQ").get("active"))
             mcx = bool(market_session("MCX").get("active"))
             if nse or mcx:
-                wl = [s for s in (user_watchlist_symbols(1) or []) if s][:max(0, int(os.getenv("PLAN_TRACKER_EXTRA_SYMBOLS", "1")))]
-                for sym in list(dict.fromkeys((["NIFTY", "BANKNIFTY"] if nse else []) + wl)):
+                for sym in _tracked_symbols(nse):
                     if (get_symbol_segment(extract_root_symbol(sym).upper()) == "MCX") != mcx and not (nse and mcx):
                         continue
                     try:
+                        asyncio.create_task(_ensure_signal_backtest(sym))
                         res = await asyncio.to_thread(_compute_signals, sym)
                         CACHE.set(f"signals:{sym.upper()}", res, 20.0)
                         new_plans = await asyncio.to_thread(_record_plans, res)
@@ -11031,7 +11073,45 @@ async def api_alerts_config(user: dict[str, Any] = Depends(require_user)) -> dic
 @app.post("/api/alerts/config")
 async def api_alerts_config_save(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     body = await request.json()
-    return {"config": ALERTS.save_config(db_exec, body if isinstance(body, dict) else {})}
+    before = ALERTS.get_config(db_exec)
+    cfg = ALERTS.save_config(db_exec, body if isinstance(body, dict) else {})
+    if (before.get("per_order"), before.get("slippage_ticks")) != (cfg.get("per_order"), cfg.get("slippage_ticks")):
+        for v in _SIGNAL_BT.values():   # costs changed: recompute net results on the next refresh
+            v["computed_at"] = "2000-01-01T00:00:00+00:00"
+    return {"config": cfg}
+
+
+@app.post("/api/alerts/preview")
+async def api_alerts_preview(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Replay recent backtested signals through alert settings (saved, or a draft in the body) and report alerts/day and
+    their out-of-sample results. With {"suggest": true}, also search for settings that give 5-10 alerts a day."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    cfg = {**ALERTS.get_config(db_exec), **{k: v for k, v in (body.get("config") or {}).items() if k in ALERTS.DEFAULTS}}
+    syms = _tracked_symbols(True)
+    for sym in syms:
+        asyncio.create_task(_ensure_signal_backtest(sym))
+    keyed = {f"{extract_root_symbol(sym).upper()}:{h}": (_SIGNAL_BT.get(f"{extract_root_symbol(sym).upper()}:{h}") or {}).get("rows") or []
+             for sym in syms for h in TRADE_PLAN.HORIZONS}
+    keyed = {k: v for k, v in keyed.items() if v}
+    pending = [s for s in syms if not any(k.startswith(extract_root_symbol(s).upper() + ":") for k in keyed)]
+    if not keyed:
+        return {"available": False, "pending": pending, "reason": "Backtests are still running for the scanned symbols. Try again in a minute."}
+    res = await asyncio.to_thread(ALERTS.evaluate, cfg, keyed)
+    out: dict[str, Any] = {"available": True, "symbols": syms, "pending": pending, "result": res,
+                           "window": {k: {"from": v[int(len(v) * 0.6)]["d"], "to": v[-1]["d"]} for k, v in keyed.items()}}
+    if body.get("suggest"):
+        stamp = ",".join(f"{k}@{(_SIGNAL_BT.get(k) or {}).get('computed_at', '')}" for k in sorted(keyed))
+        ck = "alerts-suggest:" + hashlib.sha1((stamp + json.dumps(cfg, sort_keys=True)).encode()).hexdigest()
+        sug = CACHE.get(ck)
+        if sug is None:
+            sug = await asyncio.wait_for(asyncio.to_thread(ALERTS.suggest, cfg, keyed), timeout=60)
+            if sug.get("available"):
+                CACHE.set(ck, sug, 900.0)
+        out["suggestion"] = sug
+    return out
 
 
 @app.post("/api/alerts/subscribe")
@@ -11121,7 +11201,8 @@ async def api_signals(instrument: str, user: dict[str, Any] = Depends(require_us
 async def api_signals_backtest(instrument: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     root = extract_root_symbol(instrument).upper()
     await _ensure_signal_backtest(instrument)
-    return {"instrument": instrument, "root": root, "results": {h: _SIGNAL_BT.get(f"{root}:{h}") for h in TRADE_PLAN.HORIZONS}}
+    return {"instrument": instrument, "root": root,
+            "results": {h: {k: v for k, v in (_SIGNAL_BT.get(f"{root}:{h}") or {}).items() if k != "rows"} or None for h in TRADE_PLAN.HORIZONS}}
 
 # ---------------------------------------------------------------------------
 # Options APIs

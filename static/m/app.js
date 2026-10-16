@@ -335,6 +335,13 @@
     const { plans } = currentPlan(); const from = plans.findIndex((x) => x.horizon === S.hz), to = plans.findIndex((x) => x.horizon === b.dataset.hz);
     slideDir = to > from ? "l" : "r"; S.hz = b.dataset.hz; store.set("hz", S.hz); renderPlans(); if (S.chartSym) applyPlanLevels(); });
 
+  const CTX_NAMES = { open: "the opening hour", morning: "late morning", midday: "midday", late: "the afternoon", daily: "daily bars", low: "low", normal: "normal", high: "high" };
+  function ctxLine(p) {
+    const cx = p.context, st = (p.track_record || {}).context; if (!cx || !st) return "";
+    const b = (dim) => (st[dim] || {})[cx[dim]] || {}, t = b("tod"), v = b("vol");
+    const part = (name, x) => x.n ? `${name}: ${x.n} past trades, hit ${fmt(x.hit, 0)}%, ${sgn(x.exp_net ?? x.exp, 2)}R after costs` : `${name}: not enough past trades`;
+    return `<p class="muted">Context now: ${esc(CTX_NAMES[cx.tod] || cx.tod)}, ${esc(CTX_NAMES[cx.vol] || cx.vol)} volatility. ${esc(part("Same time of day", t))}; ${esc(part("same volatility", v))}.</p>`;
+  }
   function planHtml(p, key, anim, draw) {
     const opt = isIdx(S.symbol) || hasOptions(S.symbol);
     const factors = Object.entries(p.factors || {}).map(([k, v]) => { const x = Math.max(-100, Math.min(100, num(v) || 0));
@@ -345,9 +352,9 @@
     const head = `<div class="plan-h"><div class="ring" style="--p:${Math.abs(sc)};--c:${ringC}"><div><b class="num">${sgn(sc, 0)}</b><small>score</small></div></div>
       <div class="t"><b>${esc(p.label)}</b><span>${esc(p.timeframe)} chart${p.hold ? ` · hold ${esc(p.hold)}` : ""}</span></div><span class="decision ${live ? p.decision : "NO_TRADE"}">${label}</span></div>`;
     const why = factors || p.instructions || (p.option && p.option.basis) ? `<details class="whybox" data-why="${esc(key)}"${openWhy.has(key) ? " open" : ""}><summary>Why this signal<svg><use href="#m-down"/></svg></summary><div class="why-body">${factors}
-      ${p.instructions ? `<p>${esc(p.instructions)}</p>` : ""}${p.option && p.option.basis ? `<p class="muted">Option levels: ${esc(p.option.basis)}</p>` : ""}${p.gate ? `<p class="muted">Trades need a score beyond ±${esc(p.gate)}.</p>` : ""}</div></details>` : "";
+      ${p.instructions ? `<p>${esc(p.instructions)}</p>` : ""}${p.option && p.option.basis ? `<p class="muted">Option levels: ${esc(p.option.basis)}</p>` : ""}${ctxLine(p)}${p.gate ? `<p class="muted">Trades need a score beyond ±${esc(p.gate)}.</p>` : ""}</div></details>` : "";
     const tr = p.track_record;
-    const stats = tr && tr.signals ? `<div class="stats"><div class="stat"><b class="num">${fmt(tr.t1_hit_rate, 0)}%</b><span>Hit T1 first</span></div><div class="stat"><b class="num ${cls(tr.expectancy_r)}">${sgn(tr.expectancy_r, 2)}R</b><span>Avg per trade</span></div><div class="stat"><b class="num">${esc(tr.signals)}</b><span>Past signals</span></div></div><div class="stats-note">Backtest ${esc(dmy(tr.from))} – ${esc(dmy(tr.to))}</div>` : "";
+    const stats = tr && tr.signals ? `<div class="stats"><div class="stat"><b class="num">${fmt(tr.t1_hit_rate, 0)}%</b><span>Hit T1 first</span></div>${tr.expectancy_r_net !== undefined && tr.expectancy_r_net !== null ? `<div class="stat"><b class="num ${cls(tr.expectancy_r_net)}">${sgn(tr.expectancy_r_net, 2)}R</b><span>Avg after costs</span></div>` : `<div class="stat"><b class="num ${cls(tr.expectancy_r)}">${sgn(tr.expectancy_r, 2)}R</b><span>Avg per trade</span></div>`}<div class="stat"><b class="num">${esc(tr.filled ?? tr.signals)}</b><span>Past trades</span></div></div><div class="stats-note">Backtest ${esc(dmy(tr.from))} – ${esc(dmy(tr.to))}${tr.cost_r_avg ? ` · costs ≈ ${fmt(tr.cost_r_avg, 2)}R a trade · before costs ${sgn(tr.expectancy_r, 2)}R` : ""}</div>` : "";
     if (!live) {
       const title = !p.available ? "No data yet" : p.expired ? "Entry window closed" : "Sit this one out";
       const text = p.expired && p.valid_until ? `This ${p.decision === "SELL" ? "sell" : "buy"} plan expired at ${hhmm(p.valid_until)}. A new plan appears when the score clears the gate again.` : (p.reason || "");
@@ -582,13 +589,39 @@
     return true;
   }
   async function disablePush() { const sub = await thisDeviceSub(); if (sub) { try { await api("/api/alerts/unsubscribe", { method: "POST", body: { endpoint: sub.endpoint } }); } catch { /* ignore */ } await sub.unsubscribe().catch(() => {}); } }
-  let alSaveT;
+  let alSaveT, alPrevT, alSug = null, alPrev = null, alPrevBusy = false;
   function saveAlerts(patch) { Object.assign(AL.config, patch); renderAlerts(); clearTimeout(alSaveT);
-    alSaveT = setTimeout(async () => { try { const r = await api("/api/alerts/config", { method: "POST", body: AL.config }); AL.config = r.config; } catch (e) { toast(e.message); } }, 400); }
+    alSaveT = setTimeout(async () => { try { const r = await api("/api/alerts/config", { method: "POST", body: AL.config }); AL.config = r.config; renderAlerts(); } catch (e) { toast(e.message); } }, 400);
+    schedulePreview(); }
+  function schedulePreview() { clearTimeout(alPrevT); alPrevT = setTimeout(() => loadPreview(false), 700); }
+  async function loadPreview(suggest) {
+    if (!AL) return; alPrevBusy = true; if (suggest) alSug = "loading"; renderPreview();
+    try { const r = await api("/api/alerts/preview", { method: "POST", body: { config: AL.config, suggest }, timeout: 90000 }); alPrev = r; if (suggest) alSug = r.suggestion || null; }
+    catch (e) { alPrev = { available: false, reason: e.message }; if (suggest) alSug = null; }
+    alPrevBusy = false; renderPreview();
+  }
   async function openAlerts() {
-    openPage("alerts"); $("alertsBody").innerHTML = `<div class="card" style="padding:16px"><span class="skel w60"></span><span class="skel w80"></span></div>`;
-    try { AL = await api("/api/alerts/config"); AL.device = pushSupported() ? !!(await thisDeviceSub()) && Notification.permission === "granted" : false; renderAlerts(); }
+    openPage("alerts"); alSug = null; alPrev = null; $("alertsBody").innerHTML = `<div class="card" style="padding:16px"><span class="skel w60"></span><span class="skel w80"></span></div>`;
+    try { AL = await api("/api/alerts/config"); AL.device = pushSupported() ? !!(await thisDeviceSub()) && Notification.permission === "granted" : false; renderAlerts(); loadPreview(false); }
     catch (e) { $("alertsBody").innerHTML = `<div class="empty"><b>Alerts unavailable</b>${esc(e.message)}</div>`; }
+  }
+  const pctTxt = (v) => (v === null || v === undefined ? "—" : `${fmt(v, 0)}%`), rTxt = (v) => (v === null || v === undefined ? "—" : `${sgn(v, 2)}R`);
+  function renderPreview() {
+    const box = $("alPreview"); if (!box) return; const p = alPrev;
+    if (!p) { box.innerHTML = `<div class="card-h"><h3>Last weeks with these settings</h3></div><div style="padding:0 16px 14px"><span class="skel w80"></span><span class="skel w60"></span></div>`; return; }
+    if (!p.available) { box.innerHTML = `<div class="card-h"><h3>Last weeks with these settings</h3></div><div class="why-text">${esc(p.reason || "Not available yet")}</div>`; return; }
+    const r = p.result, hz = r.by_horizon || {};
+    const sug = alSug === "loading" ? `<div class="why-text"><span class="skel w80"></span>Searching settings on older history…</div>`
+      : alSug && alSug.available ? `<div class="al-sug"><b>Suggested for 5–10 a day</b><p>${esc(alSug.note)}</p>
+          <div class="al-sug-grid"><span>Score +${esc(alSug.settings.min_score_margin)}</span><span>Hit ≥ ${esc(alSug.settings.min_hit_rate)}%</span><span>Avg ≥ ${fmt(alSug.settings.min_expectancy_r, 2)}R</span><span>HTF ${alSug.settings.require_htf_agree ? "all agree" : "majority"}</span><span>Context ${alSug.settings.context_edge ? "on" : "off"}</span></div>
+          <p class="small">Recent untouched period: <b>${fmt(alSug.check.per_day, 1)}/day</b> · hit ${pctTxt(alSug.check.hit)} · ${rTxt(alSug.check.exp_net)} after costs</p>
+          <button type="button" class="btn ghost" id="alApply">Apply these settings</button></div>`
+      : alSug && !alSug.available ? `<div class="why-text">${esc(alSug.reason)}</div>` : "";
+    box.innerHTML = `<div class="card-h"><h3>Last weeks with these settings</h3>${alPrevBusy ? `<span class="pill">updating</span>` : ""}</div>
+      <div class="stats" style="padding-top:2px"><div class="stat"><b class="num">${fmt(r.per_day, 1)}</b><span>Alerts / day</span></div><div class="stat"><b class="num">${pctTxt(r.hit)}</b><span>Hit T1 first</span></div><div class="stat"><b class="num ${cls(r.exp_net)}">${rTxt(r.exp_net)}</b><span>Avg after costs</span></div></div>
+      <div class="pills">${Object.entries(hz).map(([k, v]) => `<span class="pill ${v.exp_net > 0 ? "up" : v.exp_net < 0 ? "dn" : ""}">${k[0].toUpperCase() + k.slice(1)} · ${v.alerts} · ${rTxt(v.exp_net)}</span>`).join("")}</div>
+      <p class="stats-note">Replayed on the most recent 40% of each backtest, using track records from the older part only. Symbols: ${esc((p.symbols || []).join(", "))}${(p.pending || []).length ? ` · still computing ${esc(p.pending.join(", "))}` : ""}</p>
+      <div class="al-actions"><button type="button" class="btn primary" id="alSuggest"${alSug === "loading" ? " disabled" : ""}>Suggest settings for 5–10 a day</button></div>${sug}`;
   }
   function renderAlerts() {
     const c = AL.config, on = c.enabled && (AL.device || (c.telegram && AL.telegram_ready));
@@ -599,23 +632,35 @@
         <p>A notification arrives the moment a new plan clears every filter below. You also get a follow-up when it hits a target or the stop.</p>
         <div class="al-status"><span class="pill ${AL.device ? "up" : ""}">This phone: ${AL.device ? "on" : "off"}</span><span class="pill">${esc(AL.devices)} device${AL.devices === 1 ? "" : "s"}</span><span class="pill ${AL.telegram_ready ? "up" : "warn"}">Telegram: ${AL.telegram_ready ? "connected" : "not set up"}</span></div></div>
       ${isiOS() && !standalone() ? `<div class="al-note"><b>On iPhone:</b> tap Share → Add to Home Screen, open CA Trader from the home screen, then switch alerts on here. iOS only allows notifications from home-screen apps.</div>` : ""}
-      <div class="al-note"><b>No signal is sure-shot.</b> These filters only let through plans whose past results were strong, so alerts are rare. They still lose sometimes. Size each trade so its stop loss is affordable.</div>
+      <div class="card" id="alPreview"></div>
+      <div class="al-note"><b>No signal is sure-shot.</b> Judge settings by the result after costs, not the hit rate: a random market already hits a small T1 about 60% of the time.</div>
       <div class="card"><div class="card-h"><h3>What a plan must pass</h3></div>
         ${rule("min_score_margin", "Score strength", "Beyond the no-trade band by at least this much", `+${c.min_score_margin}`, 5, 0, 60)}
-        ${rule("min_hit_rate", "Backtest hit rate", "Past signals that reached T1 before the stop", c.min_hit_rate, 5, 40, 90, "%")}
-        ${rule("min_expectancy_r", "Average result", "Average past result per trade, in R", (+c.min_expectancy_r).toFixed(2), 0.05, 0, 1, "R")}
-        ${rule("min_signals", "Sample size", "Past signals behind those numbers", c.min_signals, 25, 25, 500)}
+        ${rule("min_hit_rate", "Backtest hit rate", "Past trades that reached T1 before the stop", c.min_hit_rate, 5, 30, 95, "%")}
+        ${rule("min_expectancy_r", "Average result", c.use_net ? "Average past result per trade, after costs" : "Average past result per trade, before costs", (+c.min_expectancy_r).toFixed(2), 0.05, -0.5, 1, "R")}
+        ${sw("use_net", "Count trading costs", "Brokerage, STT, exchange charges, GST and slippage")}
+        ${rule("min_signals", "Sample size", "Past trades behind those numbers", c.min_signals, 25, 25, 1000)}
         ${sw("require_htf_agree", "Higher timeframes agree", "Every confirming timeframe points the same way")}
+        ${sw("context_edge", "Skip losing contexts", "Block a plan if its time of day or volatility lost money in the backtest")}
         <div class="rule hz-rule"><b>Horizons</b><span>Which plans can alert</span><div class="ctl hz-chips">${["scalp", "intraday", "swing"].map((h) => `<button type="button" data-hzc="${h}" aria-pressed="${(c.horizons || []).includes(h)}">${h[0].toUpperCase() + h.slice(1)}</button>`).join("")}</div></div></div>
+      <div class="card"><div class="card-h"><h3>Coverage</h3></div>
+        ${rule("scan_watchlist", "Watchlist symbols to scan", "Besides NIFTY and BANKNIFTY, from the top of your watchlist", c.scan_watchlist, 1, 0, 6)}
+        ${rule("max_per_day", "Most alerts per day", "Stops new-signal alerts after this many", c.max_per_day, 1, 1, 50)}</div>
+      <div class="card"><div class="card-h"><h3>Costs</h3></div>
+        ${rule("per_order", "Brokerage per order", "Your broker's flat fee, in ₹", `₹${c.per_order}`, 5, 0, 100)}
+        ${rule("slippage_ticks", "Slippage", "Ticks lost per side on entry and exit", c.slippage_ticks, 1, 0, 10)}</div>
       <div class="card"><div class="card-h"><h3>Delivery</h3></div>
         ${sw("push", "Phone notifications", "From the CA Trader app on your subscribed devices")}
         ${sw("telegram", "Telegram", AL.telegram_ready ? "Your configured Telegram chat" : "Add your bot token and chat ID in the desktop settings")}
         ${sw("outcomes", "Result follow-ups", "Target hit, stop hit, time exit or zone missed")}</div>
-      <div class="al-actions"><button type="button" class="btn primary" id="alTest">Send test notification</button></div>
-      <p class="hint">Checked every 2 minutes while the market is open, for NIFTY, BANKNIFTY and the top of your watchlist.</p>`;
+      <div class="al-actions"><button type="button" class="btn ghost" id="alTest">Send test notification</button></div>
+      <p class="hint">Checked every 2 minutes while the market is open.</p>`;
+    renderPreview();
   }
   $("alertsBody").addEventListener("click", async (e) => {
     const m = e.target.closest("#alMaster"), r = e.target.closest("[data-rk]"), s = e.target.closest("[data-sw]"), h = e.target.closest("[data-hzc]"), t = e.target.closest("#alTest");
+    if (e.target.closest("#alSuggest")) { haptic(); loadPreview(true); return; }
+    if (e.target.closest("#alApply") && alSug && alSug.settings) { haptic(); const st = alSug.settings; alSug = null; saveAlerts(st); toast("Suggested settings applied"); return; }
     if (m) { haptic(); const turnOn = m.getAttribute("aria-checked") !== "true";
       if (turnOn) { let got = false; if (AL.config.push) { try { got = await enablePush(); } catch (err) { toast(err.message); } } AL.device = got || AL.device;
         saveAlerts({ enabled: true }); if (got) toast("Alerts on for this phone"); else if (AL.config.telegram && AL.telegram_ready) toast("Alerts on (Telegram)"); }

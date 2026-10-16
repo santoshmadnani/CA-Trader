@@ -199,6 +199,29 @@ def _score(s: Series, i: int) -> dict[str, Any]:
                        "macd_hist": h, "last_pivot_high": last_hi, "last_pivot_low": last_lo}}
 
 
+TOD_BUCKETS = (("open", (9, 15), (10, 0)), ("morning", (10, 0), (12, 0)), ("midday", (12, 0), (13, 30)), ("late", (13, 30), (23, 59)))
+
+
+def bar_context(s: Series, i: int) -> dict[str, str]:
+    """Time-of-day bucket and volatility regime of bar i. Volatility compares the bar's ATR with its own average over
+    roughly the previous five sessions (closed bars only), so it never peeks ahead."""
+    t = s.t[i]
+    hm = (t.hour, t.minute)
+    tod = next((name for name, a, b in TOD_BUCKETS if a <= hm < b), "late")
+    if s.tf == "1D":
+        tod = "daily"
+    n = max(20, int(5 * 375 / max(1, TF_MIN.get(s.tf, 5))))
+    past = s.atr[max(0, i - n):i]
+    ratio = s.atr[i] / (sum(past) / len(past)) if past else 1.0
+    vol = "low" if ratio < 0.8 else "high" if ratio > 1.25 else "normal"
+    return {"tod": tod, "vol": vol}
+
+
+def score_band(score: float) -> str:
+    a = abs(score)
+    return "<45" if a < 45 else "45-55" if a < 55 else "55-65" if a < 65 else "65+"
+
+
 def _htf_bias(s: Series | None, at: datetime) -> dict[str, Any]:
     if s is None or len(s) < 30:
         return {"tf": getattr(s, "tf", None), "bias": 0, "text": "not enough data"}
@@ -298,6 +321,7 @@ def build_plan(horizon: str, series: dict[str, Series], at_index: int | None = N
     plan: dict[str, Any] = {
         "horizon": horizon, "label": cfg["label"], "timeframe": cfg["tf"], "hold": cfg["hold"], "available": True,
         "decision": decision, "score": round(total, 1), "gate": gate, "factors": sc["scores"], "inputs": sc["inputs"],
+        "context": bar_context(s, i),
         "higher_timeframes": htf, "as_of": t.isoformat(), "reason": reason,
     }
     if decision in ("BUY", "SELL"):
@@ -351,14 +375,77 @@ def option_levels(plan: dict[str, Any], contract: dict[str, Any] | None, spot: f
 # backtest
 # ---------------------------------------------------------------------------
 
-def backtest(horizon: str, series: dict[str, Series], mcx: bool = False, step: int = 1, max_signals: int = 400,
-             params: dict[str, Any] | None = None, start: int = 60, stop: int | None = None) -> dict[str, Any]:
-    """Replay `horizon` over the loaded history. One open idea at a time; same-bar SL/T1 counts as a loss."""
+# Round-trip trading costs. Option charges follow NSE retail rates in force from 1 Apr 2026 (STT 0.15% of the sell
+# premium); brokerage and slippage are user settings. Costs are converted to R so they can be subtracted per trade.
+OPTION_RATES = {"stt_sell": 0.0015, "txn": 0.0003503, "stamp_buy": 0.00003, "sebi": 0.000001, "gst": 0.18}
+EQUITY_RATES = {"stt_sell": 0.00025, "txn": 0.0000297, "stamp_buy": 0.00003, "sebi": 0.000001, "gst": 0.18}
+
+
+def cost_in_r(trade_risk_pts: float, price: float, cost: dict[str, Any] | None) -> float:
+    """Round-trip cost of one trade as a fraction of its risk (1R).
+
+    Options: risk and premium are per unit of the option (premium risk = |delta| x underlying risk); one lot.
+    Equity: per share at the underlying price; brokerage is spread over a position sized to `equity_risk_rupees`."""
+    if not cost or trade_risk_pts <= 0:
+        return 0.0
+    per_order, slip_ticks, tick = float(cost.get("per_order", 20)), float(cost.get("slippage_ticks", 1)), float(cost.get("tick", 0.05))
+    if cost.get("option"):
+        lot, delta = max(1, int(cost.get("lot") or 1)), abs(float(cost.get("delta") or 0.5)) or 0.5
+        prem = float(cost.get("premium") or 0) or max(1.0, 0.005 * price)
+        rt, turnover = OPTION_RATES, prem * lot
+        charges = 2 * per_order + turnover * (rt["stt_sell"] + 2 * rt["txn"] + rt["stamp_buy"] + 2 * rt["sebi"]) + rt["gst"] * (2 * per_order + 2 * turnover * rt["txn"])
+        charges += 2 * slip_ticks * tick * lot
+        return charges / (delta * trade_risk_pts * lot)
+    rt, qty = EQUITY_RATES, max(1.0, float(cost.get("equity_risk_rupees", 2000)) / trade_risk_pts)
+    turnover = price * qty
+    charges = 2 * min(per_order, 0.0003 * turnover) + turnover * (rt["stt_sell"] + 2 * rt["txn"] + rt["stamp_buy"] + 2 * rt["sebi"])
+    charges += rt["gst"] * 2 * min(per_order, 0.0003 * turnover) + 2 * slip_ticks * tick * qty
+    return charges / (trade_risk_pts * qty)
+
+
+def _bucket_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    filled = [r for r in rows if r["o"] != "NOT_FILLED"]
+    if not filled:
+        return {"n": 0, "hit": None, "exp": None, "exp_net": None}
+    return {"n": len(filled), "hit": round(sum(1 for r in filled if r["o"] in ("T1", "T2")) / len(filled) * 100, 1),
+            "exp": round(sum(r["r"] for r in filled) / len(filled), 3), "exp_net": round(sum(r["rn"] for r in filled) / len(filled), 3)}
+
+
+def context_stats(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Hit rate and average result per context bucket: time of day, volatility, score band, higher-timeframe agreement."""
+    out: dict[str, dict[str, Any]] = {}
+    for dim in ("tod", "vol", "band", "htf"):
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for r in rows:
+            groups.setdefault(str(r[dim]), []).append(r)
+        out[dim] = {k: _bucket_stats(v) for k, v in sorted(groups.items())}
+    return out
+
+
+def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    filled = [r for r in rows if r["o"] != "NOT_FILLED"]
+    st = _bucket_stats(rows)
+    return {"signals": len(rows), "filled": len(filled), "fill_rate": round(len(filled) / len(rows) * 100, 1) if rows else None,
+            "t1_hit_rate": st["hit"], "t2_hit_rate": round(sum(1 for r in filled if r["o"] == "T2") / len(filled) * 100, 1) if filled else None,
+            "stopped": sum(1 for r in filled if r["o"] == "SL"), "time_exits": sum(1 for r in filled if r["o"] == "TIME"),
+            "expectancy_r": st["exp"], "expectancy_r_net": st["exp_net"],
+            "cost_r_avg": round(sum(r["r"] - r["rn"] for r in filled) / len(filled), 3) if filled else None,
+            "from": rows[0]["d"] if rows else None, "to": rows[-1]["d"] if rows else None,
+            "trading_days": len({r["d"] for r in rows})}
+
+
+def backtest(horizon: str, series: dict[str, Series], mcx: bool = False, step: int = 1, max_signals: int = 3000,
+             params: dict[str, Any] | None = None, start: int = 60, stop: int | None = None, cost: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Replay `horizon` over the loaded history. One open idea at a time; same-bar SL/T1 counts as a loss.
+
+    Every trade is tagged with its score, higher-timeframe agreement and bar context, and carries both its gross
+    result (r) and its result after round-trip costs (rn), so filters can be judged on what they would have earned."""
     cfg = HORIZONS[horizon]
     s = series.get(cfg["tf"])
     if s is None or len(s) < 120:
         return {"horizon": horizon, "available": False, "reason": "not enough history"}
     trades: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     i = max(60, start)
     end_i = min(len(s) - 2, stop if stop is not None else len(s) - 2)
     while i < end_i and len(trades) < max_signals:
@@ -368,21 +455,23 @@ def backtest(horizon: str, series: dict[str, Series], mcx: bool = False, step: i
             continue
         res = _simulate(p, s, i, cfg)
         trades.append(res)
+        want = 1 if p["decision"] == "BUY" else -1
+        htf = p.get("higher_timeframes") or []
+        risk_pts = abs(float(res.get("fill") or p["entry"]) - p["stop_loss"]) or float(p["risk"])
+        c_r = cost_in_r(risk_pts, float(res.get("fill") or p["entry"]), cost) if res["outcome"] != "NOT_FILLED" else 0.0
+        ctx = p.get("context") or {}
+        rows.append({"d": str(s.t[i].date()), "t": s.t[i].strftime("%H:%M"), "side": p["decision"], "score": p["score"], "g": p["gate"], "band": score_band(p["score"]),
+                     "htf": "all" if htf and all((h.get("bias") or 0) * want > 0 for h in htf) else "mixed",
+                     "tod": ctx.get("tod", "late"), "vol": ctx.get("vol", "normal"), "o": res["outcome"], "r": float(res["r"]), "rn": round(float(res["r"]) - c_r, 3)})
         i = max(i + step, res["exit_index"] + 1)
-    filled = [t for t in trades if t["outcome"] != "NOT_FILLED"]
-    wins = [t for t in filled if t["outcome"] in ("T1", "T2")]
-    r_vals = [t["r"] for t in filled]
-    days = sorted({str(s.t[k].date()) for k in range(len(s))})
-    return {
-        "horizon": horizon, "timeframe": cfg["tf"], "available": True, "from": days[0] if days else None, "to": days[-1] if days else None,
-        "signals": len(trades), "filled": len(filled), "fill_rate": round(len(filled) / len(trades) * 100, 1) if trades else None,
-        "t1_hit_rate": round(len(wins) / len(filled) * 100, 1) if filled else None,
-        "t2_hit_rate": round(sum(1 for t in filled if t["outcome"] == "T2") / len(filled) * 100, 1) if filled else None,
-        "stopped": sum(1 for t in filled if t["outcome"] == "SL"), "time_exits": sum(1 for t in filled if t["outcome"] == "TIME"),
-        "expectancy_r": round(sum(r_vals) / len(r_vals), 3) if r_vals else None,
-        "rule": "T1 before stop loss after the entry zone was touched; same-bar touches of both count as a loss",
-        "recent": trades[-15:],
-    }
+    out = {"horizon": horizon, "timeframe": cfg["tf"], "available": True, **summarize(rows),
+           "rule": "T1 before stop loss after the entry zone was touched; same-bar touches of both count as a loss; net = after round-trip costs",
+           "context": context_stats(rows), "cost_model": {k: cost.get(k) for k in ("option", "lot", "premium", "per_order", "slippage_ticks")} if cost else None,
+           "recent": trades[-15:], "rows": rows}
+    if not rows:
+        days = sorted({str(s.t[k].date()) for k in range(len(s))})
+        out.update({"from": days[0] if days else None, "to": days[-1] if days else None})
+    return out
 
 
 def _simulate(p: dict[str, Any], s: Series, i: int, cfg: dict[str, Any]) -> dict[str, Any]:
