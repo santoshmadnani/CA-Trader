@@ -541,6 +541,7 @@
 
   // ------------------------------------------------------------------ account
   async function loadAccount() {
+    refreshAlertBadge();
     try { const me = await api("/api/auth/me"); const u = me.user || {}; const name = u.full_name || u.username || "Trader";
       $("uName").textContent = name; $("uMail").textContent = u.email || ""; $("avatar").textContent = name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase(); } catch { /* ignore */ }
     try { const f = await api("/api/funds"); const l = f.local || {};
@@ -548,9 +549,89 @@
         .map(([k, v]) => `<div><span class="k">${k}</span><span class="v">${v}</span></div>`).join(""); } catch { /* ignore */ }
   }
   document.querySelector("#s-account .menu").addEventListener("click", (e) => { const b = e.target.closest("[data-open]"); if (!b) return; haptic();
-    ({ ai: () => openAI(), history: () => { openPage("history"); renderHistory($("histBody"), 7); }, news: () => openNews(S.symbol), chain: () => openChain(hasOptions(S.symbol) ? S.symbol : "NIFTY") }[b.dataset.open] || (() => {}))(); });
+    ({ alerts: () => openAlerts(), ai: () => openAI(), history: () => { openPage("history"); renderHistory($("histBody"), 7); }, news: () => openNews(S.symbol), chain: () => openChain(hasOptions(S.symbol) ? S.symbol : "NIFTY") }[b.dataset.open] || (() => {}))(); });
   $("themeToggle").addEventListener("click", () => { const dark = document.documentElement.dataset.theme !== "dark"; document.documentElement.dataset.theme = dark ? "dark" : "light"; store.set("theme", dark ? "dark" : "light");
     try { localStorage.setItem("catc_theme", JSON.stringify(dark ? "dark" : "light")); } catch { /* ignore */ } if (S.chart) S.chart.setTheme(); });
+
+  // ------------------------------------------------------------------ signal alerts (push + Telegram)
+  const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const isiOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  let swReg = null, AL = null;
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).then((r) => { swReg = r; refreshAlertBadge(); }).catch(() => {});
+    navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.type === "open-signals") setTab("signals"); });
+  }
+  const u8 = (b64) => { const s = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+  async function thisDeviceSub() { try { const r = swReg || (await navigator.serviceWorker.getRegistration("/")); return r ? await r.pushManager.getSubscription() : null; } catch { return null; } }
+  async function refreshAlertBadge() {
+    const el = $("alertsState"); if (!el) return;
+    const sub = pushSupported() ? await thisDeviceSub() : null;
+    const on = !!sub && Notification.permission === "granted";
+    el.textContent = on ? "On" : "Off"; el.className = `pill ${on ? "up" : ""}`;
+  }
+  async function enablePush() {
+    if (!pushSupported()) { toast(isiOS() && !standalone() ? "Add CA Trader to your Home Screen first, then open it from there" : "This browser can't show notifications"); return false; }
+    if (!AL || !AL.vapid_public_key) { toast("Push isn't available on the server yet"); return false; }
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast(perm === "denied" ? "Notifications are blocked. Allow them for catrader.site in your phone settings." : "Notifications not allowed"); return false; }
+    const reg = swReg || (await navigator.serviceWorker.register("/sw.js", { scope: "/" })); await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(AL.vapid_public_key) });
+    await api("/api/alerts/subscribe", { method: "POST", body: { subscription: sub.toJSON() } });
+    return true;
+  }
+  async function disablePush() { const sub = await thisDeviceSub(); if (sub) { try { await api("/api/alerts/unsubscribe", { method: "POST", body: { endpoint: sub.endpoint } }); } catch { /* ignore */ } await sub.unsubscribe().catch(() => {}); } }
+  let alSaveT;
+  function saveAlerts(patch) { Object.assign(AL.config, patch); renderAlerts(); clearTimeout(alSaveT);
+    alSaveT = setTimeout(async () => { try { const r = await api("/api/alerts/config", { method: "POST", body: AL.config }); AL.config = r.config; } catch (e) { toast(e.message); } }, 400); }
+  async function openAlerts() {
+    openPage("alerts"); $("alertsBody").innerHTML = `<div class="card" style="padding:16px"><span class="skel w60"></span><span class="skel w80"></span></div>`;
+    try { AL = await api("/api/alerts/config"); AL.device = pushSupported() ? !!(await thisDeviceSub()) && Notification.permission === "granted" : false; renderAlerts(); }
+    catch (e) { $("alertsBody").innerHTML = `<div class="empty"><b>Alerts unavailable</b>${esc(e.message)}</div>`; }
+  }
+  function renderAlerts() {
+    const c = AL.config, on = c.enabled && (AL.device || (c.telegram && AL.telegram_ready));
+    const rule = (k, title, sub, val, step, min, max, unit = "") => `<div class="rule"><b>${title}</b><span>${sub}</span><div class="ctl"><button type="button" data-rk="${k}" data-d="${-step}" data-min="${min}" data-max="${max}" aria-label="Lower">−</button><output>${val}${unit}</output><button type="button" data-rk="${k}" data-d="${step}" data-min="${min}" data-max="${max}" aria-label="Higher">+</button></div></div>`;
+    const sw = (k, title, sub) => `<div class="rule"><b>${title}</b><span>${sub}</span><div class="ctl"><span class="switch ${c[k] ? "on" : ""}" role="switch" tabindex="0" aria-checked="${!!c[k]}" data-sw="${k}"></span></div></div>`;
+    $("alertsBody").innerHTML = `
+      <div class="card al-hero"><h3>Notify me on high-conviction signals</h3><span class="switch ${on ? "on" : ""}" role="switch" tabindex="0" aria-checked="${on}" id="alMaster" aria-label="Signal alerts"></span>
+        <p>A notification arrives the moment a new plan clears every filter below. You also get a follow-up when it hits a target or the stop.</p>
+        <div class="al-status"><span class="pill ${AL.device ? "up" : ""}">This phone: ${AL.device ? "on" : "off"}</span><span class="pill">${esc(AL.devices)} device${AL.devices === 1 ? "" : "s"}</span><span class="pill ${AL.telegram_ready ? "up" : "warn"}">Telegram: ${AL.telegram_ready ? "connected" : "not set up"}</span></div></div>
+      ${isiOS() && !standalone() ? `<div class="al-note"><b>On iPhone:</b> tap Share → Add to Home Screen, open CA Trader from the home screen, then switch alerts on here. iOS only allows notifications from home-screen apps.</div>` : ""}
+      <div class="al-note"><b>No signal is sure-shot.</b> These filters only let through plans whose past results were strong, so alerts are rare. They still lose sometimes. Size each trade so its stop loss is affordable.</div>
+      <div class="card"><div class="card-h"><h3>What a plan must pass</h3></div>
+        ${rule("min_score_margin", "Score strength", "Beyond the no-trade band by at least this much", `+${c.min_score_margin}`, 5, 0, 60)}
+        ${rule("min_hit_rate", "Backtest hit rate", "Past signals that reached T1 before the stop", c.min_hit_rate, 5, 40, 90, "%")}
+        ${rule("min_expectancy_r", "Average result", "Average past result per trade, in R", (+c.min_expectancy_r).toFixed(2), 0.05, 0, 1, "R")}
+        ${rule("min_signals", "Sample size", "Past signals behind those numbers", c.min_signals, 25, 25, 500)}
+        ${sw("require_htf_agree", "Higher timeframes agree", "Every confirming timeframe points the same way")}
+        <div class="rule hz-rule"><b>Horizons</b><span>Which plans can alert</span><div class="ctl hz-chips">${["scalp", "intraday", "swing"].map((h) => `<button type="button" data-hzc="${h}" aria-pressed="${(c.horizons || []).includes(h)}">${h[0].toUpperCase() + h.slice(1)}</button>`).join("")}</div></div></div>
+      <div class="card"><div class="card-h"><h3>Delivery</h3></div>
+        ${sw("push", "Phone notifications", "From the CA Trader app on your subscribed devices")}
+        ${sw("telegram", "Telegram", AL.telegram_ready ? "Your configured Telegram chat" : "Add your bot token and chat ID in the desktop settings")}
+        ${sw("outcomes", "Result follow-ups", "Target hit, stop hit, time exit or zone missed")}</div>
+      <div class="al-actions"><button type="button" class="btn primary" id="alTest">Send test notification</button></div>
+      <p class="hint">Checked every 2 minutes while the market is open, for NIFTY, BANKNIFTY and the top of your watchlist.</p>`;
+  }
+  $("alertsBody").addEventListener("click", async (e) => {
+    const m = e.target.closest("#alMaster"), r = e.target.closest("[data-rk]"), s = e.target.closest("[data-sw]"), h = e.target.closest("[data-hzc]"), t = e.target.closest("#alTest");
+    if (m) { haptic(); const turnOn = m.getAttribute("aria-checked") !== "true";
+      if (turnOn) { let got = false; if (AL.config.push) { try { got = await enablePush(); } catch (err) { toast(err.message); } } AL.device = got || AL.device;
+        saveAlerts({ enabled: true }); if (got) toast("Alerts on for this phone"); else if (AL.config.telegram && AL.telegram_ready) toast("Alerts on (Telegram)"); }
+      else { await disablePush(); AL.device = false; saveAlerts({ enabled: false }); toast("Alerts off"); }
+      refreshAlertBadge(); return; }
+    if (r) { haptic(); const k = r.dataset.rk, d = +r.dataset.d, v = Math.round((+AL.config[k] + d) * 100) / 100; saveAlerts({ [k]: Math.max(+r.dataset.min, Math.min(+r.dataset.max, v)) }); return; }
+    if (s) { haptic(); const k = s.dataset.sw; saveAlerts({ [k]: !AL.config[k] });
+      if (k === "push" && !AL.config.push) { await disablePush(); AL.device = false; renderAlerts(); refreshAlertBadge(); }
+      else if (k === "push" && AL.config.push && AL.config.enabled) { try { AL.device = await enablePush(); } catch (err) { toast(err.message); } renderAlerts(); refreshAlertBadge(); } return; }
+    if (h) { haptic(); const set = new Set(AL.config.horizons || []); set.has(h.dataset.hzc) ? set.delete(h.dataset.hzc) : set.add(h.dataset.hzc); saveAlerts({ horizons: [...set] }); return; }
+    if (t) { t.disabled = true; try { if (AL.config.push && !AL.device) AL.device = await enablePush().catch(() => false);
+        const res = await api("/api/alerts/test", { method: "POST" }); const p = res.push || {};
+        toast(`Test sent · phone ${p.sent || 0}${p.failed ? `, ${p.failed} failed` : ""} · Telegram ${res.telegram || "off"}`); renderAlerts(); refreshAlertBadge(); }
+      catch (err) { toast(err.message); } finally { const b = $("alTest"); if (b) b.disabled = false; } }
+  });
+  $("alertsBody").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role=switch]")) { e.preventDefault(); e.target.click(); } });
 
   // ------------------------------------------------------------------ news page
   async function openNews(sym) {

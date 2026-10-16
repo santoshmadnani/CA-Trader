@@ -154,6 +154,7 @@ except Exception as exc:  # pragma: no cover
 from backend.services import signal_model as SIGNAL_MODEL
 from backend.services import trade_plan as TRADE_PLAN
 from backend.services import next_session as NEXT_SESSION
+from backend.services import alerts as ALERTS
 from backend.services.telegram_service import (
     mask_token,
     send_telegram_msg,
@@ -8791,6 +8792,12 @@ async def apple_touch_icon() -> Response:
     return FileResponse(BASE_DIR / "static" / "m" / "icon-180.png", media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker() -> Response:
+    return FileResponse(BASE_DIR / "static" / "m" / "sw.js", media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon() -> Response:
     return FileResponse(BASE_DIR / "static" / "m" / "icon-192.png", media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
@@ -10880,14 +10887,16 @@ db_exec("""CREATE TABLE IF NOT EXISTS signal_plans (
     time_stop_bars INTEGER, time_stop_at_latest TEXT, option_json TEXT, instructions TEXT, created_at TEXT,
     status TEXT, fill_price REAL, filled_at TEXT, exit_price REAL, closed_at TEXT, r REAL, updated_at TEXT)""")
 db_exec("CREATE INDEX IF NOT EXISTS idx_signal_plans_created ON signal_plans(created_at)")
+ALERTS.ensure_tables(db_exec)
 _PLAN_OPEN_STATES = ("PENDING", "OPEN")
 
 
-def _record_plans(res: dict[str, Any]) -> int:
-    """Store each new BUY/SELL plan once (one live plan per symbol and horizon) so its outcome can be tracked."""
+def _record_plans(res: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """Store each new BUY/SELL plan once (one live plan per symbol and horizon) so its outcome can be tracked.
+    Returns the newly stored (plan_id, plan) pairs."""
     if not res.get("market_open"):
-        return 0
-    added = 0
+        return []
+    added: list[tuple[str, dict[str, Any]]] = []
     for p in res.get("plans") or []:
         if p.get("decision") not in ("BUY", "SELL") or p.get("expired"):
             continue
@@ -10895,19 +10904,22 @@ def _record_plans(res: dict[str, Any]) -> int:
                        [res["root"], p["horizon"]], "one")
         if live:
             continue
+        pid = secrets.token_hex(10)
         db_exec("""INSERT INTO signal_plans(id, user_id, symbol, horizon, timeframe, side, score, entry_low, entry_high, stop_loss,
                    target_1, target_2, valid_until, time_stop_bars, time_stop_at_latest, option_json, instructions, created_at, status, updated_at)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                [secrets.token_hex(10), 1, res["root"], p["horizon"], p["timeframe"], p["decision"], p["score"], p["entry_low"],
+                [pid, 1, res["root"], p["horizon"], p["timeframe"], p["decision"], p["score"], p["entry_low"],
                  p["entry_high"], p["stop_loss"], p["target_1"], p["target_2"], p["valid_until"], p["time_stop_bars"],
                  p["time_stop_at_latest"], json.dumps(p.get("option")) if p.get("option") else None, p.get("instructions"),
                  now_iso(), "PENDING", now_iso()])
-        added += 1
+        added.append((pid, p))
     return added
 
 
-def _evaluate_open_plans() -> int:
+def _evaluate_open_plans() -> list[dict[str, Any]]:
+    """Grade open plans against 1m candles. Returns the alerted plans that just reached a final outcome."""
     rows = db_exec("SELECT * FROM signal_plans WHERE status IN ('PENDING','OPEN') ORDER BY created_at", [], "all") or []
+    finished: list[dict[str, Any]] = []
     changed, by_sym = 0, {}
     for r in rows:
         by_sym.setdefault(r["symbol"], []).append(r)
@@ -10925,7 +10937,62 @@ def _evaluate_open_plans() -> int:
                         [out.get("status"), out.get("fill_price"), out.get("filled_at"), out.get("exit_price"), out.get("closed_at"),
                          out.get("r"), now_iso(), r["id"]])
                 changed += 1
-    return changed
+                if r.get("alerted") and out.get("status") not in _PLAN_OPEN_STATES:
+                    finished.append({**r, **out})
+    return finished
+
+
+def _alert_telegram_cfg() -> dict[str, Any] | None:
+    cfg = get_user_telegram_config(db_exec, 1)
+    if cfg.get("bot_token") and cfg.get("chat_id"):
+        return cfg
+    tok = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("TG_BOT_TOKEN")
+    cid = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TG_CHAT_ID")
+    return {"bot_token": tok, "chat_id": cid} if tok and cid else None
+
+
+async def _send_alert(cfg: dict[str, Any], message: dict[str, Any], telegram_text: str) -> dict[str, Any]:
+    out: dict[str, Any] = {"push": None, "telegram": None}
+    if cfg.get("push"):
+        out["push"] = await asyncio.to_thread(ALERTS.push_to_all, db_exec, {k: message[k] for k in ("title", "body", "tag", "url") if k in message}, now_iso)
+    if cfg.get("telegram"):
+        tg = _alert_telegram_cfg()
+        if tg:
+            ok, err = await send_telegram_msg(tg["bot_token"], tg["chat_id"], telegram_text, "HTML")
+            out["telegram"] = "sent" if ok else f"failed: {err}"
+        else:
+            out["telegram"] = "not configured"
+    return out
+
+
+async def _dispatch_signal_alerts(symbol: str, new_plans: list[tuple[str, dict[str, Any]]]) -> None:
+    """Alert only the new plans that pass every high-conviction filter (see backend/services/alerts.py)."""
+    if not new_plans:
+        return
+    cfg = ALERTS.get_config(db_exec)
+    if not cfg.get("enabled"):
+        return
+    for pid, p in new_plans:
+        ok, reasons = ALERTS.qualifies(p, cfg)
+        if not ok:
+            log.info("signal alert skipped %s %s: %s", symbol, p.get("horizon"), "; ".join(reasons))
+            continue
+        msg = ALERTS.build_alert(symbol, p, reasons)
+        res = await _send_alert(cfg, msg, ALERTS.telegram_html(msg))
+        db_exec("UPDATE signal_plans SET alerted=1 WHERE id=?", [pid])
+        log.info("signal alert sent %s %s: %s", symbol, p.get("horizon"), res)
+
+
+async def _dispatch_outcome_alerts(rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    cfg = ALERTS.get_config(db_exec)
+    if not (cfg.get("enabled") and cfg.get("outcomes")):
+        return
+    for r in rows:
+        msg = ALERTS.build_outcome(r)
+        if msg:
+            await _send_alert(cfg, msg, f"<b>{msg['title']}</b>\n{msg['body']}")
 
 
 async def _signal_plan_tracker_loop() -> None:
@@ -10943,13 +11010,54 @@ async def _signal_plan_tracker_loop() -> None:
                     try:
                         res = await asyncio.to_thread(_compute_signals, sym)
                         CACHE.set(f"signals:{sym.upper()}", res, 20.0)
-                        await asyncio.to_thread(_record_plans, res)
+                        new_plans = await asyncio.to_thread(_record_plans, res)
+                        await _dispatch_signal_alerts(res.get("root") or sym.upper(), new_plans)
                     except Exception as exc:
                         log.debug("plan tracker %s failed: %s", sym, safe_text(exc))
-            await asyncio.to_thread(_evaluate_open_plans)
+            await _dispatch_outcome_alerts(await asyncio.to_thread(_evaluate_open_plans))
         except Exception as exc:
             log.warning("signal plan tracker failed: %s", safe_text(exc))
         await asyncio.sleep(120)
+
+
+@app.get("/api/alerts/config")
+async def api_alerts_config(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    keys = await asyncio.to_thread(ALERTS.vapid_keys, db_exec)
+    n = (db_exec("SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id=?", [1], "one") or {}).get("n", 0)
+    return {"config": ALERTS.get_config(db_exec), "push_available": bool(keys), "vapid_public_key": keys["public"] if keys else None,
+            "devices": n, "telegram_ready": bool(_alert_telegram_cfg())}
+
+
+@app.post("/api/alerts/config")
+async def api_alerts_config_save(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    body = await request.json()
+    return {"config": ALERTS.save_config(db_exec, body if isinstance(body, dict) else {})}
+
+
+@app.post("/api/alerts/subscribe")
+async def api_alerts_subscribe(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    body = await request.json(); sub = body.get("subscription") or body
+    ep, keys = str(sub.get("endpoint") or ""), sub.get("keys") or {}
+    if not ep.startswith("https://") or not keys.get("p256dh") or not keys.get("auth"):
+        raise HTTPException(422, "Invalid push subscription")
+    db_exec("""INSERT INTO push_subscriptions(endpoint, user_id, p256dh, auth, user_agent, created_at, failures) VALUES(?,?,?,?,?,?,0)
+               ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth, user_agent=excluded.user_agent, failures=0""",
+            [ep, 1, keys["p256dh"], keys["auth"], request.headers.get("user-agent", "")[:200], now_iso()])
+    return {"ok": True}
+
+
+@app.post("/api/alerts/unsubscribe")
+async def api_alerts_unsubscribe(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    body = await request.json()
+    db_exec("DELETE FROM push_subscriptions WHERE endpoint=?", [str(body.get("endpoint") or "")])
+    return {"ok": True}
+
+
+@app.post("/api/alerts/test")
+async def api_alerts_test(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    cfg = {**ALERTS.get_config(db_exec), "push": True}
+    msg = {"title": "CA Trader alerts are on", "body": "You'll get a notification when a plan passes every high-conviction filter.", "tag": "test", "url": "/terminal?ui=mobile"}
+    return await _send_alert(cfg, msg, f"<b>{msg['title']}</b>\n{msg['body']}")
 
 
 @app.get("/api/signals/history")

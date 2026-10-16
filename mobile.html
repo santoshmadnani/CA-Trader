@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Manrope:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/m/app.css?v=6">
+<link rel="stylesheet" href="/static/m/app.css?v=7">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="m-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="m-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
@@ -57,6 +57,7 @@
   <symbol id="m-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="m-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
   <symbol id="m-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+  <symbol id="m-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16Zm4 4a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/></symbol>
   <symbol id="m-line" viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 8-9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
 </svg>
 </head>
@@ -118,6 +119,7 @@
         <div class="profile"><div class="avatar" id="avatar">CA</div><div><b id="uName">—</b><div class="muted small" id="uMail"></div></div></div>
         <div class="funds" id="funds"></div>
         <ul class="menu">
+          <li><button type="button" data-open="alerts"><svg><use href="#m-bell"/></svg>Signal alerts<span class="pill" id="alertsState" style="margin-left:auto">—</span><span class="chev" style="margin-left:6px">›</span></button></li>
           <li><button type="button" data-open="ai"><svg><use href="#m-spark"/></svg>Ask CA AI<span class="chev">›</span></button></li>
           <li><button type="button" data-open="history"><svg><use href="#m-history"/></svg>Signal history &amp; hit rates<span class="chev">›</span></button></li>
           <li><button type="button" data-open="news"><svg><use href="#m-news"/></svg>News<span class="chev">›</span></button></li>
@@ -188,6 +190,11 @@
     <div class="scroll"><div id="histBody"></div></div>
   </section>
 
+  <section class="page" id="p-alerts" hidden aria-label="Signal alerts">
+    <div class="page-head"><button type="button" class="icon" data-back aria-label="Back"><svg><use href="#m-back"/></svg></button><div class="ph-title"><b>Signal alerts</b><span class="small">only plans that pass every filter</span></div></div>
+    <div class="scroll"><div id="alertsBody"></div></div>
+  </section>
+
   <section class="page" id="p-news" hidden aria-label="News">
     <div class="page-head"><button type="button" class="icon" data-back aria-label="Back"><svg><use href="#m-back"/></svg></button><div class="ph-title"><b>News</b><span class="small" id="newsSub"></span></div></div>
     <div class="scroll"><ul class="news" id="newsList"></ul></div>
@@ -211,6 +218,6 @@
 </div>
 <script src="/static/vendor/lightweight-charts-4.2.0.js" defer></script>
 <script src="/static/trade/chart.js?v=13" defer></script>
-<script src="/static/m/app.js?v=7" defer></script>
+<script src="/static/m/app.js?v=8" defer></script>
 </body>
 </html>

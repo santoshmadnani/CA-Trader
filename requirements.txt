@@ -14,3 +14,4 @@ websocket-client
 upstox-python-sdk>=2.23,<3
 yfinance>=0.2.38
 telethon
+cryptography>=41
