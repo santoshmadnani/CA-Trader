@@ -156,7 +156,6 @@ from backend.services import trade_plan as TRADE_PLAN
 from backend.services import next_session as NEXT_SESSION
 from backend.services import alerts as ALERTS
 from backend.services import news_topics as NEWS_TOPICS
-from backend.services import econ_calendar as ECON_CAL
 from backend.services.telegram_service import (
     mask_token,
     send_telegram_msg,
@@ -10791,11 +10790,6 @@ def _compute_signals(instrument: str) -> dict[str, Any]:
         bt = _SIGNAL_BT.get(f"{root}:{h}")
         if bt:
             p["track_record"] = {k: bt.get(k) for k in _TRACK_KEYS}
-        if p.get("decision") in ("BUY", "SELL") and not p.get("expired"):
-            try:
-                p["event_risk"] = ECON_CAL.risk_near(root, before_min=45 if h == "scalp" else 90, after_min=15)
-            except Exception as exc:
-                log.debug("event risk %s failed: %s", root, safe_text(exc))
         plans.append(p)
     active = market_session("MCX" if mcx else "NSE_EQ").get("active")
     return {"instrument": instrument, "root": root, "market_open": bool(active), "plans": plans, "news": news,
@@ -11147,14 +11141,6 @@ async def api_alerts_test(user: dict[str, Any] = Depends(require_user)) -> dict[
     cfg = {**ALERTS.get_config(db_exec), "push": True}
     msg = {"title": "CA Trader alerts are on", "body": "You'll get a notification when a plan passes every high-conviction filter.", "tag": "test", "url": "/terminal?ui=mobile"}
     return await _send_alert(cfg, msg, f"<b>{msg['title']}</b>\n{msg['body']}")
-
-
-@app.get("/api/calendar")
-async def api_calendar(symbol: str = Query("NIFTY"), scope: str = Query("relevant", pattern="^(relevant|all)$"),
-                       user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    root = extract_root_symbol(symbol).upper()
-    res = await asyncio.to_thread(ECON_CAL.for_symbol, root, scope=scope)
-    return {**res, "topic": (NEWS_TOPICS.profile(root) or {}).get("label")}
 
 
 @app.get("/api/signals/history")

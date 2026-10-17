@@ -40,7 +40,6 @@ DEFAULTS: dict[str, Any] = {
     "scan_watchlist": 2,       # also scan this many watchlist symbols (besides NIFTY and BANKNIFTY), 0-6
     "per_order": 20,           # brokerage per order, in rupees (used for net results)
     "slippage_ticks": 1,       # assumed slippage per side, in ticks
-    "avoid_events": True,      # hold alerts around high-impact scheduled events (CPI, Fed, inventories, President speeches)
 }
 LIMITS = {"min_score_margin": (0, 60), "min_hit_rate": (30, 95), "min_expectancy_r": (-0.5, 1.0), "min_signals": (10, 1000), "min_context_n": (5, 200),
           "max_per_day": (1, 50), "scan_watchlist": (0, 6), "per_order": (0, 100), "slippage_ticks": (0, 10)}
@@ -131,10 +130,6 @@ def qualifies(plan: dict[str, Any], cfg: dict[str, Any]) -> tuple[bool, list[str
     side = plan.get("decision")
     if side not in ("BUY", "SELL") or plan.get("expired") or not plan.get("available", True):
         return False, ["not a live BUY/SELL plan"]
-    er = plan.get("event_risk")
-    if cfg.get("avoid_events") and er:
-        m = int(er.get("minutes_away") or 0)
-        return False, [f"{er.get('currency')} {er.get('title')} {'in ' + str(m) + ' min' if m >= 0 else str(-m) + ' min ago'}: event risk"]
     want = 1 if side == "BUY" else -1
     htf = plan.get("higher_timeframes") or []
     tr = plan.get("track_record") or {}

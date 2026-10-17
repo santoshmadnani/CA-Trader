@@ -1,4 +1,4 @@
-"""What news (and which calendar events) belong to which instrument.
+"""What news belongs to which instrument.
 
 Indian indices and stocks follow Indian market news plus global macro. Commodities follow their own world: crude oil
 news is about OPEC, supply, inventories and the Middle East, not the Nifty. Each profile gives the search queries and
@@ -16,7 +16,6 @@ PROFILES: dict[str, dict[str, Any]] = {
         "macro_query": "OPEC+ output Saudi Russia Iran sanctions Middle East oil supply EIA crude inventories refinery shale rig count",
         "words": r"crude|oil|brent|wti|opec|petroleum|refiner|refinery|barrel|bbl|gasoline|diesel|distillate|eia|api inventor|inventor(?:y|ies)|"
                  r"iran|saudi|aramco|russia|urals|hormuz|red sea|houthi|shale|rig count|energy prices|fuel",
-        "calendar_words": r"crude|oil|opec|gasoline|distillate|rig count|petroleum|energy",
     },
     "NATURALGAS": {
         "label": "Natural gas",
@@ -24,7 +23,6 @@ PROFILES: dict[str, dict[str, Any]] = {
         "macro_query": "natural gas storage LNG exports Henry Hub weather forecast heating demand Europe gas TTF pipeline",
         "words": r"natural gas|\bgas\b|lng|henry hub|ttf|gas storage|storage report|pipeline|heating|cooling demand|weather|freeze|cold snap|heatwave|"
                  r"hurricane|gulf of mexico|qatar|norway|gazprom",
-        "calendar_words": r"natural gas|gas storage",
     },
     "GOLD": {
         "label": "Gold",
@@ -32,7 +30,6 @@ PROFILES: dict[str, dict[str, Any]] = {
         "macro_query": "gold bullion Fed rate cut Treasury yields dollar index safe haven central bank gold buying ETF flows",
         "words": r"gold|bullion|precious metal|safe[- ]haven|fed\b|federal reserve|fomc|treasury|yield|dollar|dxy|inflation|cpi|rate cut|rate hike|"
                  r"central bank|geopolitic|war|tariff",
-        "calendar_words": r"",
     },
     "SILVER": {
         "label": "Silver",
@@ -40,14 +37,12 @@ PROFILES: dict[str, dict[str, Any]] = {
         "macro_query": "silver precious metals industrial demand solar Fed dollar Treasury yields China manufacturing",
         "words": r"silver|precious metal|bullion|gold|industrial metal|solar|fed\b|federal reserve|fomc|treasury|yield|dollar|dxy|inflation|"
                  r"china|manufacturing|pmi",
-        "calendar_words": r"",
     },
     "BASEMETALS": {
         "label": "Base metals",
         "query": 'copper OR aluminium OR aluminum OR zinc OR "base metals" OR LME',
         "macro_query": "copper aluminium zinc LME China demand manufacturing PMI property stimulus smelter",
         "words": r"copper|alumin(?:i)?um|zinc|lead|nickel|base metal|lme|smelter|china|manufacturing|pmi|stimulus|property|construction",
-        "calendar_words": r"pmi|industrial production|gdp",
     },
 }
 

@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Manrope:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/m/app.css?v=9">
+<link rel="stylesheet" href="/static/m/app.css?v=10">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="m-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="m-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
@@ -95,7 +95,6 @@
         <div id="sigClosed"></div>
         <nav class="hz" id="sigHz" role="tablist" aria-label="Plan horizon"></nav>
         <div id="sigPlans"></div>
-        <div id="sigCal"></div>
         <div id="sigNext"></div>
         <div id="sigNews"></div>
         <p class="hint">Plans use Upstox 1m/5m/15m candles with 60m and daily confirmation. Each shows its measured track record. Not investment advice.</p>
@@ -123,7 +122,6 @@
           <li><button type="button" data-open="alerts"><svg><use href="#m-bell"/></svg>Signal alerts<span class="pill" id="alertsState" style="margin-left:auto">—</span><span class="chev" style="margin-left:6px">›</span></button></li>
           <li><button type="button" data-open="ai"><svg><use href="#m-spark"/></svg>Ask CA AI<span class="chev">›</span></button></li>
           <li><button type="button" data-open="history"><svg><use href="#m-history"/></svg>Signal history &amp; hit rates<span class="chev">›</span></button></li>
-          <li><button type="button" data-open="calendar"><svg><use href="#m-clock"/></svg>Economic calendar<span class="chev">›</span></button></li>
           <li><button type="button" data-open="news"><svg><use href="#m-news"/></svg>News<span class="chev">›</span></button></li>
           <li><button type="button" data-open="chain"><svg><use href="#m-layers"/></svg>Option chain<span class="chev">›</span></button></li>
           <li><button type="button" id="themeToggle"><svg><use href="#m-moon"/></svg>Dark mode<span class="switch" id="themeSwitch" aria-hidden="true"></span></button></li>
@@ -197,13 +195,6 @@
     <div class="scroll"><div id="alertsBody"></div></div>
   </section>
 
-  <section class="page" id="p-calendar" hidden aria-label="Economic calendar">
-    <div class="page-head"><button type="button" class="icon" data-back aria-label="Back"><svg><use href="#m-back"/></svg></button><div class="ph-title"><b>Economic calendar</b><span class="small" id="calSub"></span></div></div>
-    <div class="cal-filters"><div class="seg small-seg" id="calScope" role="tablist"><button type="button" role="tab" data-scope="relevant" aria-selected="true">This symbol</button><button type="button" role="tab" data-scope="all" aria-selected="false">All</button></div>
-      <button type="button" class="pill-btn" id="calHigh" aria-pressed="false">High impact</button></div>
-    <div class="scroll"><div id="calBody"></div></div>
-  </section>
-
   <section class="page" id="p-news" hidden aria-label="News">
     <div class="page-head"><button type="button" class="icon" data-back aria-label="Back"><svg><use href="#m-back"/></svg></button><div class="ph-title"><b>News</b><span class="small" id="newsSub"></span></div></div>
     <div class="scroll"><ul class="news" id="newsList"></ul></div>
@@ -227,6 +218,6 @@
 </div>
 <script src="/static/vendor/lightweight-charts-4.2.0.js" defer></script>
 <script src="/static/trade/chart.js?v=13" defer></script>
-<script src="/static/m/app.js?v=10" defer></script>
+<script src="/static/m/app.js?v=11" defer></script>
 </body>
 </html>

@@ -36,5 +36,3 @@ data/tradebook-*
 # Editor
 .vscode/
 
-# economic calendar feed cache (runtime)
-data/econ_calendar_cache.json
