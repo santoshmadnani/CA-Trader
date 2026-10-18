@@ -56,6 +56,15 @@ input, select, textarea { font: inherit; font-size: 16px; color: var(--ink); }
 .tabbar button[aria-current="page"] svg { transform: translateY(-1px) scale(1.08); }
 .tab-ink { position: absolute; top: 0; left: 0; width: 0; height: 0; border-radius: 18px; background: var(--accent-soft); transition: transform .45s var(--spring), width .3s, height .3s; pointer-events: none; }
 .nav-brand, .nav-foot { display: none; }
+/* theme toggle: shows the theme you'd switch TO */
+.tm-light { display: none; } :root[data-theme="dark"] .tm-light { display: inline; } :root[data-theme="dark"] svg.tm-light { display: block; } :root[data-theme="dark"] .tm-dark { display: none; }
+.theme-btn svg { transition: transform .5s var(--spring); } .theme-btn:active svg { transform: rotate(-40deg) scale(.85); }
+.head .theme-btn { margin-left: 2px; }
+.split { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 16px 6px; }
+.split .field small { font-weight: 800; }
+.sumline { margin: 0; padding: 4px 18px 12px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.sumline.off { color: var(--warn); }
+.sumline button { color: var(--accent); font-weight: 800; font-size: 12.5px; margin-left: 4px; }
 
 /* cards & bits */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; margin: 10px 14px; box-shadow: var(--shadow); overflow: hidden; }
@@ -248,8 +257,9 @@ input, select, textarea { font: inherit; font-size: 16px; color: var(--ink); }
   .nav-brand b { display: block; font: 800 19px/1.1 var(--f-display); letter-spacing: -.01em; } .nav-brand small { color: var(--muted); font-size: 12px; font-weight: 700; }
   .nav-logo { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent); }
   .nav-foot { display: grid; gap: 2px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
-  .nav-foot a { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; color: var(--muted); font-size: 13.5px; font-weight: 700; }
-  .nav-foot a:hover { background: var(--surface-2); color: var(--ink); } .nav-foot svg { width: 18px; height: 18px; }
+  .nav-foot a, .nav-foot .nav-theme { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; color: var(--muted); font-size: 13.5px; font-weight: 700; }
+  .nav-foot a:hover, .nav-foot .nav-theme:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-foot .nav-theme { width: 100%; text-align: left; } .head .theme-btn { display: none; } .nav-foot svg { width: 18px; height: 18px; }
 
   .head { max-width: 1240px; width: 100%; margin: 0 auto; padding: 26px 32px 10px; }
   .head h1 { font-size: 32px; }

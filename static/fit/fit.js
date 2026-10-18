@@ -216,6 +216,18 @@
     }));
   }
 
+  // ------------------------------------------------------------------ light / dark
+  const THEME_BTN = `<button type="button" class="icon-btn theme-btn" data-theme-toggle aria-label="Switch light or dark mode"><svg class="tm-dark"><use href="#i-moon"/></svg><svg class="tm-light"><use href="#i-sun"/></svg></button>`;
+  function setTheme(t) {
+    document.documentElement.dataset.theme = t; store.set("cam_theme", t);
+    $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", t === "dark" ? "#000000" : "#f2f1ee"));
+    $$("#meTheme button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === t));
+  }
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-theme-toggle]")) return;
+    buzz(8); setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
+
   // ------------------------------------------------------------------ tabs
   const RENDER = {};
   function setTab(t) {
@@ -241,7 +253,7 @@
     const hr = Number(IST_HM.format(new Date()).slice(0, 2));
     const first = displayName().split(" ")[0];
     const hello = (hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening") + (first ? `, ${first}` : "");
-    el.innerHTML = `<header class="head"><h1>${esc(hello)}</h1>${datebar("tdDate")}</header><div class="scroll" id="tdBody"><div class="card card-b"><span class="skel"></span><span class="skel" style="width:60%"></span><span class="skel"></span></div></div>`;
+    el.innerHTML = `<header class="head"><h1>${esc(hello)}</h1>${datebar("tdDate")}${THEME_BTN}</header><div class="scroll" id="tdBody"><div class="card card-b"><span class="skel"></span><span class="skel" style="width:60%"></span><span class="skel"></span></div></div>`;
     bindDatebar(el, RENDER.today);
     if (S.dayData && S.dayData.day === S.day) paintToday();
     loadDay().then(paintToday).catch(fail);
@@ -483,7 +495,7 @@
   // ------------------------------------------------------------------ DIET
   RENDER.diet = () => {
     const el = $("#scr-diet");
-    el.innerHTML = `<header class="head"><h1>Diet</h1>${datebar("dtDate")}</header>
+    el.innerHTML = `<header class="head"><h1>Diet</h1>${datebar("dtDate")}${THEME_BTN}</header>
       <div class="chips" id="dtActions">
         <button type="button" class="chip" data-a="copy">${"Copy yesterday"}</button><button type="button" class="chip" data-a="meals">Saved meals</button>
         <button type="button" class="chip" data-a="photo">Snap plate</button><button type="button" class="chip" data-a="barcode">Scan barcode</button>
@@ -778,7 +790,7 @@
   // ------------------------------------------------------------------ WORKOUT
   RENDER.workout = () => {
     const el = $("#scr-workout");
-    el.innerHTML = `<header class="head"><h1>Workout</h1><button type="button" class="icon-btn" id="wkPast" aria-label="Log a past workout">${ic("plus")}</button></header><div class="scroll" id="wkBody"><div class="card card-b"><span class="skel"></span><span class="skel"></span></div></div>`;
+    el.innerHTML = `<header class="head"><h1>Workout</h1><button type="button" class="icon-btn" id="wkPast" aria-label="Log a past workout">${ic("plus")}</button>${THEME_BTN}</header><div class="scroll" id="wkBody"><div class="card card-b"><span class="skel"></span><span class="skel"></span></div></div>`;
     $("#wkPast", el).onclick = pastWorkout;
     paintWorkoutTab();
   };
@@ -1081,7 +1093,7 @@
   // ------------------------------------------------------------------ PROGRESS
   RENDER.progress = () => {
     const el = $("#scr-progress");
-    el.innerHTML = `<header class="head"><h1>Progress</h1><div class="seg" id="pgRange" style="width:170px">${[7, 30, 90].map((n) => `<button type="button" data-n="${n}" aria-pressed="${S.progDays === n}">${n}d</button>`).join("")}</div></header>
+    el.innerHTML = `<header class="head"><h1>Progress</h1><div class="seg" id="pgRange" style="width:170px">${[7, 30, 90].map((n) => `<button type="button" data-n="${n}" aria-pressed="${S.progDays === n}">${n}d</button>`).join("")}</div>${THEME_BTN}</header>
       <div class="scroll" id="pgBody"><div class="card card-b"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div>`;
     $("#pgRange", el).addEventListener("click", (e) => { const b = e.target.closest("[data-n]"); if (!b) return; S.progDays = Number(b.dataset.n); RENDER.progress(); });
     paintProgress();
@@ -1148,12 +1160,12 @@
 
   // ------------------------------------------------------------------ ME
   RENDER.me = () => {
-    const el = $("#scr-me"); const p = S.profile || {}, t = p.targets || {}, ov = p.overrides || {};
+    const el = $("#scr-me"); const p = S.profile || {}, t = p.targets || {}, ov = p.overrides || {}, calc = p.calculated || {};
     const u = (S.me && S.me.user) || {};
     const theme = document.documentElement.dataset.theme || "light";
     const rest = store.get("fit_rest", 90);
     const fdb = S.foodDb || {};
-    el.innerHTML = `<header class="head"><h1>Me</h1></header><div class="scroll">
+    el.innerHTML = `<header class="head"><h1>Me</h1>${THEME_BTN}</header><div class="scroll">
       <div class="card"><div class="card-h"><div class="row"><span class="thumb" style="border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:800">${esc((displayName() || "?").slice(0, 1).toUpperCase())}</span><div><b style="font:700 17px var(--f-display)">${esc(displayName())}</b><div class="small muted">${esc(u.email || "")}</div></div></div></div>
         <div class="form" id="meForm">
           <div class="field full">Sex (for the calorie formula)<div class="seg" id="meSex" style="margin-top:4px"><button type="button" data-v="male" aria-pressed="${p.sex !== "female"}">Male</button><button type="button" data-v="female" aria-pressed="${p.sex === "female"}">Female</button></div></div>
@@ -1164,10 +1176,13 @@
           <label class="field full">Activity<select name="activity">${ACTIVITY.map(([v, l]) => `<option value="${v}" ${(p.activity || "moderate") === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
         </div><div style="padding:0 16px 16px"><button type="button" class="btn primary block" id="meSave">Save profile</button></div></div>
 
-      <div class="card"><div class="card-h"><h3>Daily targets</h3><span class="muted small">${t.tdee ? `BMR ${num(t.bmr)} · TDEE ${num(t.tdee)}` : "fill in your profile"}</span></div>
-        <p class="small muted" style="margin:0;padding:0 16px">Calculated with Mifflin-St Jeor. Type a number to override, or clear it to go back to the calculated value.</p>
-        <div class="form" id="meOv">${[["kcal", "Calories (kcal)"], ["protein_g", "Protein (g)"], ["carb_g", "Carbs (g)"], ["fat_g", "Fat (g)"], ["fibre_g", "Fibre (g)"], ["water_ml", "Water (ml)"]].map(([k, l]) => `<label class="field">${l}<input name="${k}" type="number" inputmode="numeric" value="${ov[k] ?? ""}" placeholder="${t[k] != null && !ov[k] ? num(t[k]).replace(/,/g, "") : ""}"></label>`).join("")}</div>
-        <div style="padding:0 16px 16px"><button type="button" class="btn block" id="meOvSave">Save targets</button></div></div>
+      <div class="card" id="meTargets"><div class="card-h"><h3>Daily targets</h3><span class="muted small">${calc.tdee ? `BMR ${num(calc.bmr)} · TDEE ${num(calc.tdee)}` : "fill in your profile"}</span></div>
+        <p class="small muted" style="margin:0;padding:0 16px">Calculated with Mifflin-St Jeor for your goal. Change the calories and protein, carbs and fat are refilled in the same proportions. You can still edit each one.</p>
+        <div class="form" style="padding-bottom:8px"><label class="field full">Calories (kcal)<input name="kcal" type="number" inputmode="numeric" value="${t.kcal ?? ""}"></label></div>
+        <div class="split">${[["protein_g", "Protein", "var(--p)"], ["carb_g", "Carbs", "var(--c)"], ["fat_g", "Fat", "var(--f)"]].map(([k, l, c]) => `<label class="field"><span>${l} (g) <small data-pct="${k}" style="color:${c}"></small></span><input name="${k}" type="number" inputmode="numeric" value="${t[k] ?? ""}"></label>`).join("")}</div>
+        <p class="sumline" id="meSum"></p>
+        <div class="form" style="padding-top:0">${[["fibre_g", "Fibre (g)"], ["water_ml", "Water (ml)"]].map(([k, l]) => `<label class="field">${l}<input name="${k}" type="number" inputmode="numeric" value="${t[k] ?? ""}"></label>`).join("")}</div>
+        <div style="padding:0 16px 16px;display:grid;grid-template-columns:1fr auto;gap:8px"><button type="button" class="btn primary" id="meOvSave">Save targets</button><button type="button" class="btn" id="meOvReset" ${Object.keys(ov).length ? "" : "disabled"}>Reset</button></div></div>
 
       <div class="card"><div class="card-h"><h3>Meal times</h3><button type="button" class="pill acc" id="meSlotAdd">Add</button></div>
         <ul class="list" id="meSlots">${S.slots.map((s) => `<li class="li" data-s="${s.id}" style="cursor:default"><input value="${esc(s.name)}" data-k="name" aria-label="Meal name" style="flex:1;min-width:0;border:0;background:none;font-weight:700;outline:0">
@@ -1192,9 +1207,45 @@
       if (!v.age || !v.height_cm || !v.weight_kg) { toast("Fill in age, height and weight to calculate targets"); return; }
       try { const r = await put("/profile", v); S.profile = r.profile; S.dayData = null; toast("Profile saved. Targets updated."); RENDER.me(); } catch (e) { fail(e); }
     };
+    // Targets: a calorie change rescales protein/carbs/fat in the calculated proportions (or the current ones if there is no profile yet).
+    const tg = $("#meTargets", el), tv = (k) => { const i = $(`[name=${k}]`, tg); return i && i.value !== "" ? Number(i.value) : null; };
+    const MK = { protein_g: 4, carb_g: 4, fat_g: 9 };
+    const shares = () => {
+      const src = calc.kcal ? calc : { protein_g: tv("protein_g"), carb_g: tv("carb_g"), fat_g: tv("fat_g") };
+      const e = Object.keys(MK).reduce((a, k) => a + (src[k] || 0) * MK[k], 0);
+      return e ? Object.fromEntries(Object.keys(MK).map((k) => [k, ((src[k] || 0) * MK[k]) / e])) : { protein_g: 0.2, carb_g: 0.55, fat_g: 0.25 };
+    };
+    const paintSum = () => {
+      const kc = tv("kcal"), sum = Object.keys(MK).reduce((a, k) => a + (tv(k) || 0) * MK[k], 0);
+      Object.keys(MK).forEach((k) => { const sp = $(`[data-pct=${k}]`, tg); sp.textContent = sum ? `${Math.round(((tv(k) || 0) * MK[k] * 100) / sum)}%` : ""; });
+      const line = $("#meSum", tg), off = kc && sum && Math.abs(sum - kc) > Math.max(40, kc * 0.03);
+      line.classList.toggle("off", !!off);
+      const free = Object.keys(MK).filter((k) => !locked.has(k));
+      line.innerHTML = sum ? `Protein, carbs and fat add up to <b>${num(sum)} kcal</b>${off ? ` · ${num(kc)} kcal target <button type="button" id="meFit">Rebalance ${free.length && free.length < 3 ? free.map((k) => ({ protein_g: "protein", carb_g: "carbs", fat_g: "fat" })[k]).join(" & ") : ""}</button>` : ""}` : "";
+      const fit = $("#meFit", tg); fit && (fit.onclick = () => refill(true));
+    };
+    // A calorie change refills all three macros. "Rebalance" keeps the ones you typed and refills only the rest.
+    const locked = new Set();
+    const refill = (keepLocked) => {
+      const kc = tv("kcal"); if (!kc) return; const sh = shares();
+      if (!keepLocked) locked.clear();
+      let free = Object.keys(MK).filter((k) => !locked.has(k));
+      if (!free.length) { locked.clear(); free = Object.keys(MK); }
+      const fixedE = [...locked].reduce((a, k) => a + (tv(k) || 0) * MK[k], 0), left = Math.max(0, kc - fixedE);
+      const shSum = free.reduce((a, k) => a + sh[k], 0) || 1;
+      free.forEach((k) => { const i = $(`[name=${k}]`, tg); i.value = Math.round((left * sh[k]) / shSum / MK[k]); i.animate([{ background: "var(--accent-soft)" }, { background: "transparent" }], { duration: 700 }); });
+      paintSum();
+    };
+    $("[name=kcal]", tg).addEventListener("input", debounce(() => refill(false), 250));
+    Object.keys(MK).forEach((k) => $(`[name=${k}]`, tg).addEventListener("input", () => { locked.add(k); paintSum(); }));
+    paintSum();
     $("#meOvSave", el).onclick = async () => {
-      const ov2 = {}; $$("#meOv input", el).forEach((i) => { if (i.value !== "") ov2[i.name] = Number(i.value); });
+      const ov2 = {};
+      ["kcal", "protein_g", "carb_g", "fat_g", "fibre_g", "water_ml"].forEach((k) => { const v = tv(k); if (v != null && !(calc[k] != null && Math.round(calc[k]) === Math.round(v))) ov2[k] = v; });
       try { const r = await put("/profile", { overrides: ov2 }); S.profile = r.profile; S.dayData = null; toast("Targets saved"); RENDER.me(); } catch (e) { fail(e); }
+    };
+    $("#meOvReset", el).onclick = async () => {
+      try { const r = await put("/profile", { overrides: {} }); S.profile = r.profile; S.dayData = null; toast("Back to the calculated targets"); RENDER.me(); } catch (e) { fail(e); }
     };
     $("#meSlots", el).addEventListener("change", async (e) => {
       const li = e.target.closest("[data-s]"); if (!li || !e.target.dataset.k) return;
@@ -1206,7 +1257,7 @@
       try { const r = await del("/slots/" + li.dataset.s); S.slots = r.slots; S.dayData = null; RENDER.me(); } catch (er) { fail(er); }
     });
     $("#meSlotAdd", el).onclick = async () => { await addSlot(); RENDER.me(); };
-    $("#meTheme", el).addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (!b) return; document.documentElement.dataset.theme = b.dataset.v; store.set("cam_theme", b.dataset.v); RENDER.me(); });
+    $("#meTheme", el).addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (!b) return; setTheme(b.dataset.v); });
     $("#meRest", el).addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (!b) return; store.set("fit_rest", Number(b.dataset.v)); RENDER.me(); });
     $$("[data-go]", el).forEach((li) => li.addEventListener("click", () => { try { localStorage.setItem("ca_last_app", li.dataset.go === "/terminal" ? "trading" : "fitness"); } catch (e) {} location.href = li.dataset.go; }));
   };

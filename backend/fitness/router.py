@@ -113,6 +113,7 @@ def build(*, db: Callable, db_insert: Callable, get_user: Callable, gemini_text:
         if latest and latest.get("weight_kg"):
             p["weight_kg"] = latest["weight_kg"]
         t = C.targets(p) if p.get("weight_kg") and p.get("height_cm") and p.get("age") else {}
+        p["calculated"] = dict(t)          # before the user's overrides, so the app can keep the calculated macro split
         t.update({k: v for k, v in (p["overrides"] or {}).items() if v not in (None, "")})
         p["targets"] = t
         return p
