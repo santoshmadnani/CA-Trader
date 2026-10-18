@@ -118,6 +118,11 @@ def _row_to_food(r: dict[str, Any]) -> dict[str, Any]:
     f = {k: r.get(k) for k in ("id", "source", "kind", "name", "brand", "serving_g", "serving_label", "barcode", "user_id")}
     f["per100"] = json.loads(r.get("per100") or "{}")
     f["portions"] = json.loads(r.get("portions") or "[]")
+    sg, kc = f.get("serving_g") or 0, (f["per100"].get("kcal") or 0)
+    if f.get("source") == "indb" and sg and (sg > 700 or kc * sg / 100 > 1500):
+        # INDB records the whole recipe batch as one "serving" for some dishes (e.g. kofta curries at 4,000+ kcal)
+        f["serving_g"], f["serving_label"] = None, None
+        f["note"] = "The source lists an unusually large serving for this dish, so log it by weight or katori."
     f["units"] = C.units_for(f)
     if r.get("meta"):
         try:

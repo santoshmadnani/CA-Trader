@@ -21,6 +21,12 @@
   const mins = (m) => { if (m == null) return "–"; m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`; };
   const clock = (sec) => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0"); };
 
+  // Accounts without a full name have only their email as the name; show "Santoshmadnani", not the address.
+  const displayName = () => {
+    const u = (S.me && S.me.user) || {}; let n = String(u.name || "").trim();
+    if (!n || n.includes("@")) { n = String(n || u.email || "").split("@")[0].split(/[._\-+]/)[0]; n = n ? n[0].toUpperCase() + n.slice(1) : ""; }
+    return n;
+  };
   const PUBLIC = (location.pathname.match(/^\/fitnesstracker\/w\/([\w-]+)/) || [])[1] || null;
   const S = { me: null, profile: {}, slots: [], day: today(), dayData: null, tab: "today", activeId: null, nutrients: [], foodDb: null, progDays: 30 };
   const ACTIVITY = [["sedentary", "Sedentary (desk job, little exercise)"], ["light", "Light (1 to 3 workouts a week)"], ["moderate", "Moderate (3 to 5 a week)"], ["active", "Active (6 to 7 a week)"], ["very_active", "Very active (hard training or physical job)"]];
@@ -216,16 +222,24 @@
     S.tab = t; store.set("fit_tab", t);
     $$(".screen").forEach((s) => (s.hidden = s.dataset.tab !== t));
     const btns = $$("#tabbar button");
-    btns.forEach((b, i) => { if (b.dataset.tab === t) { b.setAttribute("aria-current", "page"); $("#tabInk").style.transform = `translateX(${i * 100}%)`; } else b.removeAttribute("aria-current"); });
+    btns.forEach((b) => { if (b.dataset.tab === t) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    placeInk();
     RENDER[t] && RENDER[t]();
   }
+  // The highlight follows the active button, whether the nav is the phone tab bar or the desktop sidebar.
+  function placeInk() {
+    const b = $(`#tabbar button[aria-current="page"]`), ink = $("#tabInk"); if (!b || !ink) return;
+    ink.style.width = b.offsetWidth + "px"; ink.style.height = b.offsetHeight + "px";
+    ink.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`;
+  }
+  window.addEventListener("resize", debounce(placeInk, 80));
   $$("#tabbar button").forEach((b) => b.addEventListener("click", () => { buzz(6); setTab(b.dataset.tab); }));
 
   // ------------------------------------------------------------------ TODAY
   RENDER.today = () => {
     const el = $("#scr-today");
     const hr = Number(IST_HM.format(new Date()).slice(0, 2));
-    const first = ((S.me && S.me.user && S.me.user.name) || "").split(" ")[0];
+    const first = displayName().split(" ")[0];
     const hello = (hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening") + (first ? `, ${first}` : "");
     el.innerHTML = `<header class="head"><h1>${esc(hello)}</h1>${datebar("tdDate")}</header><div class="scroll" id="tdBody"><div class="card card-b"><span class="skel"></span><span class="skel" style="width:60%"></span><span class="skel"></span></div></div>`;
     bindDatebar(el, RENDER.today);
@@ -244,7 +258,7 @@
     const wTarget = t.water_ml || 3000, glasses = clamp(Math.round(wTarget / 250), 6, 16), filled = Math.floor((d.water_ml || 0) / 250);
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     body.innerHTML = `
-      ${S.activeId ? `<div class="wk-banner" id="tdResume">${ic("timer")}<div class="grow"><b>Workout in progress</b><span>Tap to continue logging sets</span></div>${ic("right")}</div>` : ""}
+      ${S.activeId ? `<div class="wk-banner wide" id="tdResume">${ic("timer")}<div class="grow"><b>Workout in progress</b><span>Tap to continue logging sets</span></div>${ic("right")}</div>` : ""}
       <div class="card">
         <div class="energy">
           <div class="ring ${left != null && left < 0 ? "over" : ""}" style="--p:${pct.toFixed(1)}"><div><b>${goal ? num(Math.abs(left)) : num(eaten)}</b><small>${goal ? (left < 0 ? "kcal over" : "kcal left") : "kcal eaten"}</small></div></div>
@@ -487,7 +501,7 @@
     const body = $("#dtBody"); const d = S.dayData;
     if (!body || !d || d.day !== S.day) return;
     const t = d.targets || {}, tot = d.totals || {};
-    body.innerHTML = `<div class="card"><div class="mbig">
+    body.innerHTML = `<div class="card wide"><div class="mbig">
         <div><b>${num(tot.kcal)}</b><span>kcal${t.kcal ? "<br>of " + num(t.kcal) : ""}</span></div>
         ${MAC.slice(0, 3).map(([k, l, c]) => `<div><b style="color:${c}">${num(tot[k])}</b><span>${l}${t[k] ? "<br>of " + num(t[k]) + " g" : " g"}</span></div>`).join("")}</div></div>
       ${(d.meals || []).map((m) => `<div class="card" data-slot="${m.id ?? ""}">
@@ -636,6 +650,7 @@
         <label class="field full" style="margin-top:10px">Meal<select id="fdSlot">${slotOptions(slot)}</select></label>
       </div>
       <div class="mbig" id="fdMac"></div>
+      ${food.note && !(food.sources || []).length ? `<p class="small muted" style="padding:0 18px;margin:8px 0 0">${esc(food.note)}</p>` : ""}
       ${(food.sources || []).length ? `<div class="sh-b"><div class="card" style="margin:6px 0;box-shadow:none;background:var(--surface-2)"><div class="card-b" style="padding-top:12px">
         <b class="small" style="font-weight:800">${ic("search").replace("<svg", '<svg style="width:14px;height:14px;vertical-align:-2px"')} Found on the web by Gemini</b>
         ${food.note ? `<p class="small muted" style="margin:4px 0">${esc(food.note)}</p>` : ""}
@@ -775,8 +790,8 @@
     const byWeek = {};
     ws.items.forEach((w) => { const d = new Date(w.day + "T12:00:00Z"); const mon = addDays(w.day, -((d.getUTCDay() + 6) % 7)); (byWeek[mon] = byWeek[mon] || []).push(w); });
     body.innerHTML = `
-      ${S.activeId ? `<div class="wk-banner" id="wkResume">${ic("timer")}<div class="grow"><b>Workout in progress</b><span>Tap to continue</span></div>${ic("right")}</div>` :
-      `<div style="padding:8px 14px 0"><button type="button" class="btn primary block" id="wkStart">${ic("plus")}Start an empty workout</button></div>`}
+      ${S.activeId ? `<div class="wk-banner wide" id="wkResume">${ic("timer")}<div class="grow"><b>Workout in progress</b><span>Tap to continue</span></div>${ic("right")}</div>` :
+      `<div class="wide" style="padding:8px 14px 0"><button type="button" class="btn primary block" id="wkStart">${ic("plus")}Start an empty workout</button></div>`}
       <div class="card"><div class="card-h"><h3>Routines</h3><button type="button" class="pill acc" id="wkNewR">New routine</button></div>
         ${rs.items.length ? `<ul class="list">${rs.items.map((r) => `<li class="li" data-r="${r.id}"><span class="thumb">📋</span><div class="t"><b>${esc(r.name)}</b><span>${esc(r.items.map((i) => i.name).join(", "))}</span></div><button type="button" class="icon-btn" data-rm="${r.id}" aria-label="Routine options">${ic("more")}</button></li>`).join("")}</ul>`
         : `<div class="empty" style="padding:4px 16px 18px">Save a routine (e.g. Push day) to start it in one tap with last time's weights filled in.</div>`}</div>
@@ -1102,7 +1117,7 @@
     const weeks = d.weekly_sets.slice(-6);
     const heatC = (n) => (n ? `color-mix(in srgb, var(--accent) ${clamp(Math.round((n / 20) * 100), 12, 100)}%, var(--surface-2))` : "var(--surface-2)");
     const wpts = (d.weight || []).map((x) => ({ day: x.day, v: x.weight_kg }));
-    body.innerHTML = `<div class="card"><div class="mbig" style="padding-top:14px">
+    body.innerHTML = `<div class="card wide"><div class="mbig" style="padding-top:14px">
         <div><b>${num(a.kcal)}</b><span>avg kcal</span></div><div><b style="color:var(--p)">${num(a.protein_g)}</b><span>avg protein</span></div>
         <div><b>${num(a.workouts)}</b><span>workouts</span></div><div><b>${num(a.days_logged)}</b><span>days logged</span></div></div></div>
       <div class="card"><div class="card-h"><h3>Calories</h3><span class="muted small">days you logged</span></div><div class="card-b">${barsSvg(d.series, "kcal", "var(--accent)", t.kcal)}</div></div>
@@ -1139,7 +1154,7 @@
     const rest = store.get("fit_rest", 90);
     const fdb = S.foodDb || {};
     el.innerHTML = `<header class="head"><h1>Me</h1></header><div class="scroll">
-      <div class="card"><div class="card-h"><div class="row"><span class="thumb" style="border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:800">${esc((u.name || "?").slice(0, 1).toUpperCase())}</span><div><b style="font:700 17px var(--f-display)">${esc(u.name || "")}</b><div class="small muted">${esc(u.email || "")}</div></div></div></div>
+      <div class="card"><div class="card-h"><div class="row"><span class="thumb" style="border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:800">${esc((displayName() || "?").slice(0, 1).toUpperCase())}</span><div><b style="font:700 17px var(--f-display)">${esc(displayName())}</b><div class="small muted">${esc(u.email || "")}</div></div></div></div>
         <div class="form" id="meForm">
           <div class="field full">Sex (for the calorie formula)<div class="seg" id="meSex" style="margin-top:4px"><button type="button" data-v="male" aria-pressed="${p.sex !== "female"}">Male</button><button type="button" data-v="female" aria-pressed="${p.sex === "female"}">Female</button></div></div>
           <label class="field">Age<input name="age" type="number" inputmode="numeric" value="${p.age ?? ""}"></label>
