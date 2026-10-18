@@ -525,6 +525,49 @@ def build(*, db: Callable, db_insert: Callable, get_user: Callable, gemini_text:
         favs = {x["food_id"] for x in (db("SELECT food_id FROM fit_favs WHERE user_id=?", [user["id"]], "all") or [])}
         return {"items": items, "fav_ids": list(favs)}
 
+    WEB_PROMPT = """Find the nutrition facts for this food as it is usually made or sold in India: "{q}".
+Search the web and use reliable sources only: food composition tables (IFCT/NIN, USDA FoodData Central), restaurant or brand
+nutrition pages, packaged-food labels, or recipe sites that publish a nutrition analysis. Prefer sources that give values per 100 g
+or per piece with the piece weight. If sources disagree, use the typical value and say so in "basis".
+Return ONLY a JSON object, no prose:
+{{"found": true|false, "name": "<common name, e.g. Paneer frankie (paneer kathi roll)>", "aka": "<other names, space separated>",
+ "serving_label": "<e.g. roll, piece, plate, bowl, glass>", "serving_g": <grams in one typical serving, or null>,
+ "per100": {{"kcal": n, "protein_g": n, "carb_g": n, "fat_g": n, "fibre_g": n|null, "sugar_g": n|null, "sfa_g": n|null, "chol_mg": n|null,
+   "sodium_mg": n|null, "potassium_mg": n|null, "calcium_mg": n|null, "iron_mg": n|null, "vitc_mg": n|null, "vita_ug": n|null}},
+ "confidence": "high|medium|low", "basis": "<one sentence: which sources, and how per-serving values were converted to per 100 g>"}}
+All values per 100 g of the food as eaten. Use null for any nutrient no source reports; never guess one. If this is not a real food
+or you cannot find any source with calories, protein, carbs and fat, return {{"found": false, "basis": "<why>"}}."""
+
+    @r.post("/foods/web")
+    async def food_web(request: Request, user: dict = Depends(me)) -> dict[str, Any]:
+        """Look a food up on the web (Gemini + Google Search) when no database has it. Only answers that cite sources and pass the
+        calorie/macro consistency check are saved; the saved food (with its sources) then shows up in everyone's search."""
+        b = await request.json()
+        q = re.sub(r"\s+", " ", str(b.get("q") or "")).strip()[:80]
+        if len(q) < 3:
+            raise HTTPException(422, detail={"code": "QUERY_SHORT", "message": "Type the food's name first"})
+        hit = F.web_cached(db, q)
+        if hit:
+            return {"food": hit, "cached": True}
+        ai_budget(user["id"])
+        res = gemini_text(WEB_PROMPT.format(q=q.replace('"', "'")), budget_s=45.0, web_search=True)
+        if not res.get("available"):
+            raise HTTPException(503, detail={"code": "AI_UNAVAILABLE", "message": res.get("reason") or "Web lookup is unavailable right now"})
+        m = re.search(r"\{.*\}", res.get("text") or "", re.S)
+        try:
+            data = json.loads(m.group(0)) if m else {}
+        except Exception:
+            data = {}
+        sources = res.get("sources") or []
+        if not data.get("found"):
+            raise HTTPException(404, detail={"code": "NOT_FOUND", "message": f"Couldn't find reliable nutrition data for \"{q}\". {str(data.get('basis') or '')[:160]} You can add it as a custom food from its label.".strip()})
+        if not sources:
+            raise HTTPException(404, detail={"code": "NO_SOURCES", "message": "The web search returned no sources, so nothing was saved. Try a more specific name."})
+        per100, why = F.check_web_food(data)
+        if not per100:
+            raise HTTPException(422, detail={"code": "IMPLAUSIBLE", "message": f"The values found didn't pass checks ({why}), so nothing was saved. Try again or a more specific name."})
+        return {"food": F.save_web_food(db, q, data, per100, sources), "cached": False}
+
     @r.get("/foods/barcode/{code}")
     def food_barcode(code: str, user: dict = Depends(me)) -> dict[str, Any]:
         f = F.barcode(db, code)

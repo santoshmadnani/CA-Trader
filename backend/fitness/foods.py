@@ -2,9 +2,13 @@
 
 Sources, all stored per 100 g in one nutrient schema (see catalog.NUTRIENTS):
 - indb:  Indian Nutrient Databank (1,014 Indian recipes + raw ingredients), bundled in data/fitness/foods_indb.json.
-- usda:  USDA FoodData Central SR Legacy (~7,800 everyday foods with household portions). The server downloads the
-         official CSV release once in the background and builds a local table; until then, and if that fails, single
-         foods are looked up on the FDC API (USDA_API_KEY, else the rate-limited DEMO_KEY) and cached.
+- usda:  USDA FoodData Central: SR Legacy (~7,800 everyday foods) and FNDDS (~5,400 prepared dishes and meals: wraps,
+         sandwiches, curries, naan...), both with household portions. The server downloads the official CSV releases once
+         in the background; until then, and if that fails, foods are looked up on the FDC API (USDA_API_KEY, else the
+         rate-limited DEMO_KEY) and cached.
+- web:   a dish none of the above has (e.g. "paneer frankie"), looked up on request by Gemini with Google Search grounding.
+         Saved only when the answer cites web sources and its calories agree with its own macros; the sources are stored
+         with the food and shown to the user, and the food then appears in everyone's search.
 - off:   Open Food Facts for packaged foods and barcodes, looked up on demand and cached.
 - user:  foods a user creates.
 Values are never invented: a food without data from one of these sources is not offered.
@@ -29,7 +33,15 @@ from backend.fitness import catalog as C
 
 log = logging.getLogger("ca-trader.fitness.foods")
 DATA = Path(__file__).resolve().parents[2] / "data" / "fitness"
-SR_URLS = ["https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip"]
+_FDC = "https://fdc.nal.usda.gov/fdc-datasets/"
+# Each dataset: tried in order until one URL downloads. FNDDS prefers the small 2019-2020 release (the 2021-2023 one is 200 MB).
+USDA_DATASETS = {
+    "sr": {"types": ("sr_legacy_food",), "urls": [_FDC + "FoodData_Central_sr_legacy_food_csv_2018-04.zip"]},
+    "fndds": {"types": ("survey_fndds_food",), "urls": [_FDC + "FoodData_Central_survey_food_csv_2022-10-28.zip",
+                                                        _FDC + "FoodData_Central_survey_food_csv_2021-10-28.zip",
+                                                        _FDC + "FoodData_Central_survey_food_csv_2024-10-31.zip"]},
+}
+SR_URLS = USDA_DATASETS["sr"]["urls"]
 UA = {"User-Agent": "CATrader-Fitness/1.0 (https://catrader.site)"}
 
 # USDA legacy nutrient numbers -> our keys
@@ -51,6 +63,10 @@ def ensure_tables(db: Callable) -> None:
     db("CREATE INDEX IF NOT EXISTS idx_fit_foods_barcode ON fit_foods(barcode)")
     db("CREATE TABLE IF NOT EXISTS fit_meta (key TEXT PRIMARY KEY, value TEXT)")
     try:
+        db("ALTER TABLE fit_foods ADD COLUMN meta TEXT")      # {"sources": [{title,url}], "note": ..., "query": ...} for web foods
+    except Exception:
+        pass
+    try:
         db("CREATE VIRTUAL TABLE IF NOT EXISTS fit_foods_fts USING fts5(name, search, tokenize='unicode61 remove_diacritics 2')")
         _FTS["ok"] = True
     except Exception as exc:
@@ -69,12 +85,12 @@ def _rowid(db: Callable, fid: str) -> int | None:
 
 def upsert(db: Callable, f: dict[str, Any]) -> None:
     search = _search_text(f["name"], " ".join(filter(None, [f.get("brand"), f.get("alt")])))
-    db("""INSERT INTO fit_foods(id,user_id,source,kind,name,brand,per100,serving_g,serving_label,portions,barcode,search,created_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+    db("""INSERT INTO fit_foods(id,user_id,source,kind,name,brand,per100,serving_g,serving_label,portions,barcode,search,meta,created_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
           ON CONFLICT(id) DO UPDATE SET name=excluded.name, brand=excluded.brand, per100=excluded.per100, serving_g=excluded.serving_g,
-          serving_label=excluded.serving_label, portions=excluded.portions, barcode=excluded.barcode, search=excluded.search""",
+          serving_label=excluded.serving_label, portions=excluded.portions, barcode=excluded.barcode, search=excluded.search, meta=excluded.meta""",
        [f["id"], f.get("user_id"), f["source"], f.get("kind", "food"), f["name"], f.get("brand"), json.dumps(f["per100"]), f.get("serving_g"),
-        f.get("serving_label"), json.dumps(f.get("portions") or []), f.get("barcode"), search])
+        f.get("serving_label"), json.dumps(f.get("portions") or []), f.get("barcode"), search, json.dumps(f["meta"]) if f.get("meta") else None])
     if _FTS["ok"]:
         rid = _rowid(db, f["id"])
         db("DELETE FROM fit_foods_fts WHERE rowid=?", [rid])
@@ -103,6 +119,12 @@ def _row_to_food(r: dict[str, Any]) -> dict[str, Any]:
     f["per100"] = json.loads(r.get("per100") or "{}")
     f["portions"] = json.loads(r.get("portions") or "[]")
     f["units"] = C.units_for(f)
+    if r.get("meta"):
+        try:
+            m = json.loads(r["meta"])
+            f["sources"], f["note"] = m.get("sources") or [], m.get("note")
+        except Exception:
+            pass
     return f
 
 
@@ -111,7 +133,7 @@ def get(db: Callable, fid: str, user_id: int | None = None) -> dict[str, Any] | 
     return _row_to_food(r) if r else None
 
 
-SOURCE_RANK = {"user": 0, "indb": 1, "usda": 2, "indb-us": 3, "indb-uk": 3, "off": 4}
+SOURCE_RANK = {"user": 0, "indb": 1, "usda": 2, "web": 3, "indb-us": 3, "indb-uk": 3, "off": 4}
 
 
 def search(db: Callable, q: str, user_id: int | None, limit: int = 30) -> list[dict[str, Any]]:
@@ -151,8 +173,16 @@ def import_status(db: Callable) -> dict[str, Any]:
     return {**_IMPORT, "usda_foods": usda_count(db)}
 
 
+def _ds_done(db: Callable, ds: str) -> bool:
+    r = db("SELECT value FROM fit_meta WHERE key=?", ["usda_ds_" + ds], "one")
+    if r and r.get("value"):
+        return True
+    # the SR Legacy import ran before per-dataset tracking existed
+    return ds == "sr" and usda_count(db) > 5000
+
+
 def start_usda_import(db: Callable) -> None:
-    if _IMPORT["state"] == "running" or usda_count(db) > 5000:
+    if _IMPORT["state"] == "running" or all(_ds_done(db, d) for d in USDA_DATASETS):
         return
     last = db("SELECT value FROM fit_meta WHERE key='usda_import_failed_at'", [], "one")
     if last and time.time() - float(last["value"] or 0) < 6 * 3600:
@@ -161,37 +191,50 @@ def start_usda_import(db: Callable) -> None:
     threading.Thread(target=_usda_import, args=(db,), daemon=True, name="fit-usda-import").start()
 
 
-def _usda_import(db: Callable) -> None:
-    tmp = DATA / "sr_legacy.zip"
-    try:
-        ok = False
-        for url in SR_URLS:
-            try:
-                with requests.get(url, stream=True, timeout=60, headers=UA) as r:
-                    if r.status_code != 200:
-                        continue
-                    with open(tmp, "wb") as fh:
-                        for chunk in r.iter_content(1 << 16):
-                            fh.write(chunk)
-                ok = True
-                break
-            except Exception as exc:
-                log.info("USDA download %s failed: %s", url, exc)
-        if not ok:
-            raise RuntimeError("could not download the USDA SR Legacy dataset")
-        _IMPORT["detail"] = "parsing"
-        n = import_sr_zip(db, tmp)
-        _IMPORT.update(state="done", detail=f"{n} USDA foods loaded")
-        log.info("USDA SR Legacy import: %s foods", n)
-    except Exception as exc:
-        _IMPORT.update(state="failed", detail=str(exc)[:200])
-        db("INSERT INTO fit_meta(key,value) VALUES('usda_import_failed_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [str(time.time())])
-        log.warning("USDA import failed: %s", exc)
-    finally:
+def _download(urls: list[str], tmp: Path) -> bool:
+    for url in urls:
         try:
-            tmp.unlink()
-        except OSError:
-            pass
+            with requests.get(url, stream=True, timeout=60, headers=UA) as r:
+                if r.status_code != 200:
+                    continue
+                with open(tmp, "wb") as fh:
+                    for chunk in r.iter_content(1 << 16):
+                        fh.write(chunk)
+            if zipfile.is_zipfile(tmp):
+                return True
+        except Exception as exc:
+            log.info("USDA download %s failed: %s", url, exc)
+    return False
+
+
+def _usda_import(db: Callable) -> None:
+    done, failed = [], []
+    for ds, spec in USDA_DATASETS.items():
+        if _ds_done(db, ds):
+            continue
+        tmp = DATA / f"usda_{ds}.zip"
+        try:
+            _IMPORT["detail"] = f"downloading {ds}"
+            if not _download(spec["urls"], tmp):
+                raise RuntimeError(f"could not download the USDA {ds} dataset")
+            _IMPORT["detail"] = f"parsing {ds}"
+            n = import_sr_zip(db, tmp, spec["types"])
+            db("INSERT INTO fit_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", ["usda_ds_" + ds, str(n)])
+            done.append(f"{n} {ds}")
+            log.info("USDA %s import: %s foods", ds, n)
+        except Exception as exc:
+            failed.append(str(exc)[:120])
+            log.warning("USDA %s import failed: %s", ds, exc)
+        finally:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+    if failed:
+        db("INSERT INTO fit_meta(key,value) VALUES('usda_import_failed_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [str(time.time())])
+        _IMPORT.update(state="failed", detail="; ".join(done + failed)[:200])
+    else:
+        _IMPORT.update(state="done", detail=("loaded " + ", ".join(done)) if done else "up to date")
 
 
 def _open_member(z: zipfile.ZipFile, base: str):
@@ -201,8 +244,8 @@ def _open_member(z: zipfile.ZipFile, base: str):
     return io.TextIOWrapper(z.open(name), encoding="utf-8", newline="")
 
 
-def import_sr_zip(db: Callable, path: Path) -> int:
-    """Parse the SR Legacy CSV release (streamed; low memory) into fit_foods."""
+def import_sr_zip(db: Callable, path: Path, types: tuple[str, ...] = ("sr_legacy_food",)) -> int:
+    """Parse a FoodData Central CSV release (SR Legacy or FNDDS; streamed, low memory) into fit_foods."""
     with zipfile.ZipFile(path) as z:
         nut_key = {}
         for r in csv.DictReader(_open_member(z, "nutrient.csv")):
@@ -210,7 +253,7 @@ def import_sr_zip(db: Callable, path: Path) -> int:
             if k:
                 nut_key[r["id"]] = k
         foods = {r["fdc_id"]: {"name": r["description"].strip(), "per100": {}, "portions": []}
-                 for r in csv.DictReader(_open_member(z, "food.csv")) if r.get("data_type", "sr_legacy_food") in ("sr_legacy_food", "")}
+                 for r in csv.DictReader(_open_member(z, "food.csv")) if (r.get("data_type") or types[0]) in types}
         for r in csv.DictReader(_open_member(z, "food_nutrient.csv")):
             k = nut_key.get(r.get("nutrient_id"))
             f = foods.get(r.get("fdc_id"))
@@ -237,7 +280,12 @@ def import_sr_zip(db: Callable, path: Path) -> int:
                 continue
             unit = units.get(r.get("measure_unit_id") or "", "")
             desc = " ".join(x for x in [(r.get("modifier") or "").strip(), (r.get("portion_description") or "").strip()] if x and x != "undetermined")
-            label = f"{amt:g} {unit if unit and unit != 'undetermined' else ''} {desc}".replace("  ", " ").strip()
+            if re.match(r"\d|quantity", desc, re.I) or not unit or unit == "undetermined":
+                label = desc if re.match(r"\d|quantity", desc, re.I) else f"{amt:g} {desc}".strip()   # FNDDS: "1 wrap", "Quantity not specified"
+            else:
+                label = f"{amt:g} {unit} {desc}".replace("  ", " ").strip()
+            if not label or label.lower().startswith("quantity not"):
+                label = label or "serving"
             f["portions"].append({"label": label[:60], "g": round(g, 1)})
     n = 0
     for fdc_id, f in foods.items():
@@ -245,7 +293,7 @@ def import_sr_zip(db: Callable, path: Path) -> int:
             continue
         portions = f["portions"][:8]
         upsert(db, {"id": f"usda:{fdc_id}", "user_id": None, "source": "usda", "kind": "food", "name": f["name"], "per100": f["per100"],
-                    "serving_g": portions[0]["g"] if portions else None, "serving_label": portions[0]["label"] if portions else None,
+                    "serving_g": portions[0]["g"] if portions else None, "serving_label": re.sub(r"^1\s+", "", portions[0]["label"]) if portions else None,
                     "portions": portions[1:]})
         n += 1
     return n
@@ -256,7 +304,7 @@ def usda_api_search(db: Callable, q: str, limit: int = 8) -> list[dict[str, Any]
     key = os.getenv("USDA_API_KEY") or "DEMO_KEY"
     try:
         r = requests.get("https://api.nal.usda.gov/fdc/v1/foods/search", timeout=8, headers=UA,
-                         params={"api_key": key, "query": q, "pageSize": limit, "dataType": "SR Legacy,Foundation"})
+                         params={"api_key": key, "query": q, "pageSize": limit, "dataType": "Survey (FNDDS),SR Legacy,Foundation"})
         if r.status_code != 200:
             return []
         out = []
@@ -346,3 +394,64 @@ def off_search(db: Callable, q: str, limit: int = 8) -> list[dict[str, Any]]:
             upsert(db, f)
             out.append(get(db, f["id"]))
     return [f for f in out if f]
+
+
+# ------------------------------------------------------------------ web lookup (Gemini + Google Search), validated before saving
+WEB_KEYS = ["kcal", "protein_g", "carb_g", "fat_g", "fibre_g", "sugar_g", "sfa_g", "chol_mg", "sodium_mg", "potassium_mg", "calcium_mg",
+            "iron_mg", "vitc_mg", "vita_ug"]
+
+
+def slug(q: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (q or "").lower()).strip("-")[:60]
+
+
+def check_web_food(data: dict[str, Any]) -> tuple[dict[str, float] | None, str]:
+    """Plausibility checks on a web-sourced nutrition answer. Returns (per100, "") or (None, reason)."""
+    raw = data.get("per100") or {}
+    per100: dict[str, float] = {}
+    for k in WEB_KEYS:
+        v = raw.get(k)
+        try:
+            if v is not None and v != "":
+                fv = float(v)
+                if fv < 0:
+                    return None, f"negative {k}"
+                per100[k] = round(fv, 3)
+        except (TypeError, ValueError):
+            continue
+    kcal = per100.get("kcal")
+    p, c, f = per100.get("protein_g"), per100.get("carb_g"), per100.get("fat_g")
+    if kcal is None or p is None or c is None or f is None:
+        return None, "the sources didn't give calories and all three macros"
+    if not (0 < kcal <= 902):
+        return None, "calories per 100 g are out of range"
+    if p + c + f > 101:
+        return None, "macros add up to more than 100 g per 100 g"
+    est = 4 * p + 4 * c + 9 * f + 2 * per100.get("fibre_g", 0)
+    if abs(est - kcal) > max(0.25 * kcal, 40):
+        return None, f"calories ({kcal:.0f}) don't match the macros (~{est:.0f})"
+    return per100, ""
+
+
+def save_web_food(db: Callable, query: str, data: dict[str, Any], per100: dict[str, float], sources: list[dict[str, str]]) -> dict[str, Any]:
+    name = str(data.get("name") or query).strip()[:90]
+    sg = data.get("serving_g")
+    try:
+        sg = float(sg) if sg not in (None, "") else None
+    except (TypeError, ValueError):
+        sg = None
+    if sg is not None and not (3 <= sg <= 1500):
+        sg = None
+    fid = "web:" + slug(name)
+    upsert(db, {"id": fid, "user_id": None, "source": "web", "kind": "recipe", "name": name, "brand": None, "per100": per100,
+                "serving_g": sg, "serving_label": str(data.get("serving_label") or "serving")[:30] if sg else None, "portions": [],
+                "alt": " ".join([query, str(data.get("aka") or "")]),
+                "meta": {"sources": sources[:6], "note": str(data.get("basis") or "")[:300], "query": query, "confidence": data.get("confidence")}})
+    db("INSERT INTO fit_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", ["web_q:" + slug(query), fid])
+    return get(db, fid)
+
+
+def web_cached(db: Callable, query: str) -> dict[str, Any] | None:
+    r = db("SELECT value FROM fit_meta WHERE key=?", ["web_q:" + slug(query)], "one")
+    return get(db, r["value"]) if r and r.get("value") else None
+

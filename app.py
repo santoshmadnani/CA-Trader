@@ -1798,8 +1798,9 @@ GEMINI_CHAT_MODELS = list(dict.fromkeys([m for m in [os.getenv("GEMINI_MODEL", "
 
 
 def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] | None = None,
-                history: list[dict[str, str]] | None = None, budget_s: float = 35.0) -> dict[str, Any]:
-    """Call Gemini with a total time budget. `history` = prior turns [{"role": "user"|"model", "text": ...}]."""
+                history: list[dict[str, str]] | None = None, budget_s: float = 35.0, web_search: bool = False) -> dict[str, Any]:
+    """Call Gemini with a total time budget. `history` = prior turns [{"role": "user"|"model", "text": ...}].
+    web_search=True grounds the answer in Google Search; the pages it used come back as `sources` [{title, url}]."""
     if not GEMINI_API_KEY:
         return {"available": False, "reason": "Gemini API key is not configured"}
     headers = {"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"}
@@ -1815,7 +1816,9 @@ def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] 
         if txt:
             contents.append({"role": "model" if turn.get("role") in ("model", "assistant", "ai") else "user", "parts": [{"text": txt[:4000]}]})
     contents.append({"role": "user", "parts": parts})
-    body = {"contents": contents}
+    body: dict[str, Any] = {"contents": contents}
+    if web_search:
+        body["tools"] = [{"google_search": {}}]
     deadline = time.monotonic() + budget_s
     reasons = []
     for i, model in enumerate(GEMINI_CHAT_MODELS):
@@ -1835,7 +1838,18 @@ def gemini_text(prompt: str, max_chars: int = 18000, image_data: dict[str, str] 
             t = "".join(p.get("text", "") for p in (candidates[0].get("content", {}).get("parts", []) if candidates else []) if isinstance(p, dict))
             if t:
                 provider_ok("gemini")
-                return {"available": True, "text": t, "model": model, "timestamp": now_iso()}
+                out = {"available": True, "text": t, "model": model, "timestamp": now_iso()}
+                if web_search:
+                    gm = (candidates[0].get("groundingMetadata") or {}) if candidates else {}
+                    srcs, seen = [], set()
+                    for ch in gm.get("groundingChunks") or []:
+                        w = (ch or {}).get("web") or {}
+                        if w.get("uri") and w["uri"] not in seen:
+                            seen.add(w["uri"])
+                            srcs.append({"title": str(w.get("title") or "")[:120], "url": w["uri"]})
+                    out["sources"] = srcs
+                    out["queries"] = gm.get("webSearchQueries") or []
+                return out
             reasons.append(f"{model}: empty response ({(candidates[0].get('finishReason') if candidates else 'no candidates')})")
         except requests.Timeout:
             reasons.append(f"{model}: timed out after {per_call:.0f}s")

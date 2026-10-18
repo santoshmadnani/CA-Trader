@@ -155,7 +155,15 @@
   const scaleN = (per100, g) => { const o = {}; for (const k in per100 || {}) if (per100[k] != null) o[k] = (per100[k] * g) / 100; return o; };
   const unitG = (units, u) => ((units || []).find((x) => x.u === u) || { g: 1 }).g;
   const pcf = (n) => `<span class="pcf"><i class="p">P</i> ${num(n.protein_g, 1)} · <i class="c">C</i> ${num(n.carb_g, 1)} · <i class="f">F</i> ${num(n.fat_g, 1)}</span>`;
-  const srcLabel = { indb: "INDB", "indb-uk": "UK", "indb-us": "US", usda: "USDA", off: "OFF", user: "Mine" };
+  const srcLabel = { indb: "INDB", "indb-uk": "UK", "indb-us": "US", usda: "USDA", off: "OFF", user: "Mine", web: "Web" };
+  // Gemini searches the web for a food no database has; the server saves it only with sources and consistent numbers.
+  async function webLookup(q, btn) {
+    const old = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.innerHTML = `${ic("search")}Searching the web…`; }
+    try { const r = await post("/foods/web", { q }); if (!r.cached) toast(`Found ${r.food.name} · ${r.food.sources.length} source${r.food.sources.length === 1 ? "" : "s"}`); return r.food; }
+    catch (e) { fail(e); return null; }
+    finally { if (btn && document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = old; } }
+  }
   const exThumb = (e) => (e.image ? `<img class="thumb" src="${esc(e.image)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'thumb',textContent:'🏋'}))">` : `<span class="thumb">${e.kind === "cardio" ? "🏃" : "🏋"}</span>`);
   const exMeta = (e) => [e.part, e.equipment ? (e.equipment === "body only" ? "Bodyweight" : e.equipment) : null].filter(Boolean).join(" · ");
   function setSummary(sets) {
@@ -396,6 +404,7 @@
         return `<div class="dr ${f.keep ? "" : "off"}"><div class="dr-top"><input type="checkbox" data-f="${i}" data-k="keep" ${f.keep ? "checked" : ""} ${f.food_id ? "" : "disabled"} aria-label="Keep">
           <div class="t"><b>${esc(f.name || f.query)}</b><span>${f.food_id ? `${f.source ? `<span class="src">${esc(srcLabel[f.source] || f.source)}</span> ` : ""}${num(g)} g · <strong style="color:var(--ink)">${num(k)} kcal</strong> · ${num(f.ppg * g, 1)} g protein` : `<span class="warn">No match for "${esc(f.query)}"</span>`}</span></div>
           <button type="button" class="icon-btn" data-f="${i}" data-act="pick" aria-label="Choose a different food">${ic("search")}</button></div>
+          ${!f.food_id ? `<div class="alt"><button type="button" data-f="${i}" data-act="web" style="border-style:solid;color:var(--accent)">✦ Look up "${esc(f.query)}" on the web</button></div>` : ""}
           ${f.food_id ? `<div class="dr-ctl"><input type="number" inputmode="decimal" step="0.5" min="0" value="${f.qty}" data-f="${i}" data-k="qty" aria-label="Quantity">
             <select data-f="${i}" data-k="unit">${f.units.map((u) => `<option value="${esc(u.u)}" ${u.u === f.unit ? "selected" : ""}>${esc(u.label)}${u.u !== "g" && u.u !== "ml" ? ` (${num(u.g)} g)` : ""}</option>`).join("")}</select>${slotSel(f, i)}</div>` : ""}
           ${f.alts.length ? `<div class="alt">${f.alts.map((a, j) => `<button type="button" data-f="${i}" data-alt="${j}">${esc(a.name)}</button>`).join("")}</div>` : ""}</div>`;
@@ -429,6 +438,7 @@
       if (b.dataset.f != null) {
         const f = st.foods[b.dataset.f];
         if (b.dataset.act === "pick") { openFoodSearch({ pick: (food) => useFood(f, food), query: f.query }); return; }
+        if (b.dataset.act === "web") { const food = await webLookup(f.query, b); if (food) useFood(f, food); return; }
         if (b.dataset.alt != null) { const a = f.alts[b.dataset.alt]; try { const r = await api("/foods/" + encodeURIComponent(a.food_id)); f.alts[b.dataset.alt] = { food_id: f.food_id, name: f.name, source: f.source }; useFood(f, r.food); } catch (er) { fail(er); } }
       }
       if (b.dataset.e != null) {
@@ -572,6 +582,11 @@
       } else {
         res.innerHTML = (d.items || []).length ? `<div class="card"><ul class="list">${d.items.map((f) => row(f, favs)).join("")}</ul></div>` : `<div class="empty"><b>No match for "${esc(query)}"</b>Try a simpler name, or add it yourself.</div>`;
       }
+      const few = query.length >= 3 && (d.items || []).length < 4;
+      res.insertAdjacentHTML(few ? "afterbegin" : "beforeend", query.length >= 3 ? `<div class="card"><div class="card-b" style="padding-top:14px">
+          <b style="font:700 15px var(--f-display)">${few ? `Not finding "${esc(query)}"?` : "Not the right one?"}</b>
+          <p class="small muted" style="margin:4px 0 10px">Gemini searches the web (IFCT, USDA, restaurant and brand nutrition pages) and adds it with its sources.</p>
+          <button type="button" class="btn ${few ? "primary" : ""} block" data-web>${ic("sparkle")}Search the web for "${esc(query)}"</button></div></div>` : "");
       res.insertAdjacentHTML("beforeend", `<div style="padding:4px 14px 10px;display:grid;gap:8px"><button type="button" class="btn block" data-custom>${ic("plus")}Create a custom food</button></div>`);
     };
     const run = async () => {
@@ -581,7 +596,13 @@
       try { const d = await api("/foods/search?q=" + encodeURIComponent(query)); if (my === seq) show(d, query); } catch (e) { if (my === seq) fail(e); }
     };
     q.addEventListener("input", debounce(run, 260));
-    res.addEventListener("click", (e) => {
+    res.addEventListener("click", async (e) => {
+      const wb = e.target.closest("[data-web]");
+      if (wb) {
+        const food = await webLookup(q.value.trim(), wb); if (!food) return;
+        if (opts.pick) { p.close(); opts.pick(food); } else openFood(food.id, { slotId: opts.slotId, after: p.close });
+        return;
+      }
       if (e.target.closest("[data-custom]")) { customFood(opts.slotId, (food) => { if (opts.pick) { p.close(); opts.pick(food); } else openFood(food.id, { slotId: opts.slotId, after: p.close }); }, q.value.trim()); return; }
       const li = e.target.closest("[data-id]"); if (!li) return;
       const f = cache[li.dataset.id];
@@ -615,6 +636,11 @@
         <label class="field full" style="margin-top:10px">Meal<select id="fdSlot">${slotOptions(slot)}</select></label>
       </div>
       <div class="mbig" id="fdMac"></div>
+      ${(food.sources || []).length ? `<div class="sh-b"><div class="card" style="margin:6px 0;box-shadow:none;background:var(--surface-2)"><div class="card-b" style="padding-top:12px">
+        <b class="small" style="font-weight:800">${ic("search").replace("<svg", '<svg style="width:14px;height:14px;vertical-align:-2px"')} Found on the web by Gemini</b>
+        ${food.note ? `<p class="small muted" style="margin:4px 0">${esc(food.note)}</p>` : ""}
+        <ul class="small" style="margin:6px 0 4px;padding-left:18px">${food.sources.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-weight:700">${esc(x.title || "source")}</a></li>`).join("")}</ul>
+        <p class="small muted" style="margin:0">An estimate compiled from these pages. If you have the pack or menu label, a custom food is more accurate.</p></div></div></div>` : ""}
       <div class="sh-b"><details><summary class="small" style="font-weight:800;cursor:pointer;padding:6px 0">All nutrients</summary><div id="fdTab"></div></details></div>
       <div class="sh-f"><button type="button" class="btn primary block" id="fdOk">${lg ? "Save changes" : `${ic("plus")}Add`}</button>
         ${lg ? `<button type="button" class="btn block danger" id="fdDel">${ic("trash")}Remove</button>` : ""}</div>`);
