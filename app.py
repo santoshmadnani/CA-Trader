@@ -8234,29 +8234,37 @@ def current_user(request: Request) -> dict[str, Any] | None:
     bearer_token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
     token_candidate = api_key_header or bearer_token or query_token
     
-    known_tokens = {
-        os.getenv("CA_MCP_TOKEN", ""),
-        os.getenv("CA_AUTH_SECRET", ""),
-        "ca_mcp_santosh_2026",
-        os.getenv("GITHUB_TOKEN", ""),
-        os.getenv("CA_GITHUB_TOKEN", ""),
-        "mcp_catrader_token",
-        AUTH_SECRET
-    }
-    known_tokens = {t for t in known_tokens if t}
-    
-    # If token matches any recognized MCP / AI agent token
-    if token_candidate and (token_candidate in known_tokens or any(hmac.compare_digest(token_candidate, kt) for kt in known_tokens) or token_candidate.startswith("ca_mcp_") or token_candidate.startswith("ghp_")):
+    # Only secrets configured in the server's .env are accepted as API tokens, compared in constant time.
+    known_tokens = {t for t in (os.getenv("CA_MCP_TOKEN", ""), os.getenv("CA_AUTH_SECRET", ""), os.getenv("GITHUB_TOKEN", ""),
+                                os.getenv("CA_GITHUB_TOKEN", ""), AUTH_SECRET) if t and len(t) >= 16}
+    if token_candidate and any(hmac.compare_digest(token_candidate, kt) for kt in known_tokens):
         admin = db_exec("SELECT * FROM users WHERE role='admin' ORDER BY id LIMIT 1", fetch="one")
         if admin:
             return admin
         return {"id": 1, "username": "admin", "email": "santoshmadnani@catrader.site", "role": "admin", "full_name": "Santosh Madnani"}
 
-    # Unconditionally grant access for public / external / ChatGPT / MCP queries on market data, recommendations, options, news, AI ask
+    # A signed-in user is always themselves, on every route.
+    sess_uid = (request.scope.get("session") or {}).get("user_id") if AUTH_ENABLED else None
+    if sess_uid:
+        last = request.session.get("last_seen")
+        try:
+            idle_hours = AUTH_IDLE_HOURS if request.session.get("remember_me", True) else min(2.0, AUTH_IDLE_HOURS)
+            expired = bool(last) and time.time() - float(last) > idle_hours * 3600
+        except Exception:
+            expired = True
+        if expired:
+            request.session.clear()
+        else:
+            request.session["last_seen"] = time.time()
+            u = get_user(int(sess_uid))
+            if u:
+                return u
+
+    # Anonymous read-only access to market data, analysis and news (no personal data) and the AI endpoints.
     is_public_get = request.method == "GET" and any(request.url.path.startswith(p) for p in (
-        "/api/market", "/api/recommendations", "/api/options", "/api/news", "/api/mcp", "/api/analysis", "/api/portfolio"
+        "/api/market", "/api/recommendations", "/api/options", "/api/news", "/api/analysis"
     ))
-    is_ai_query = request.url.path in ("/api/ai/ask", "/api/mcp/query", "/api/ai/chat", "/api/mcp/call", "/api/recommendations/for-date")
+    is_ai_query = request.url.path in ("/api/ai/ask", "/api/ai/chat", "/api/recommendations/for-date")
     if is_public_get or is_ai_query:
         admin = db_exec("SELECT * FROM users WHERE role='admin' ORDER BY id LIMIT 1", fetch="one")
         return admin or {"id": 1, "username": "admin", "email": "santoshmadnani@catrader.site", "role": "admin", "full_name": "Santosh Madnani"}

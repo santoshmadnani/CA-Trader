@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - CA-Trader-Bifurcated
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -14,14 +15,21 @@ jobs:
 
       - name: Deploy to Oracle Cloud VM & Arrange Server Directory Structure
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_FETCH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.ORACLE_HOST }}
           username: ubuntu
           key: ${{ secrets.ORACLE_SSH_KEY }}
+          envs: GH_FETCH_TOKEN,GH_REPO,GH_SHA
           script: |
             cd /home/ubuntu/CA-Trader
-            git fetch origin CA-Trader-Bifurcated
-            git reset --hard origin/CA-Trader-Bifurcated
+            # The repo is private: fetch with this job's short-lived token (never stored on the server), and stop if it fails.
+            git fetch "https://x-access-token:${GH_FETCH_TOKEN}@github.com/${GH_REPO}.git" CA-Trader-Bifurcated || { echo "[ERROR] git fetch failed"; exit 1; }
+            git reset --hard FETCH_HEAD
+            if [ "$(git rev-parse HEAD)" != "$GH_SHA" ]; then echo "[ERROR] server is at $(git rev-parse HEAD), expected $GH_SHA"; exit 1; fi
 
             mkdir -p data backups logs
             find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
