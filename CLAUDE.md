@@ -19,7 +19,7 @@ There is no linter or unit-test suite. To hit authenticated endpoints locally wi
 
 ## Deploy pipeline
 
-`git push origin CA-Trader-Bifurcated` triggers `.github/workflows/deploy_to_oracle.yml`. It SSHes to the Oracle VM (secrets `ORACLE_HOST`, `ORACLE_SSH_KEY`), runs `git reset --hard` in `/home/ubuntu/CA-Trader`, takes one SQLite online backup per day into `backups/` (keeps 2), runs `pip install -r requirements.txt`, restarts systemd `catrader`, and fails the job unless `/health` answers within 30 s. Public traffic reaches uvicorn (127.0.0.1:8000) through a Cloudflare tunnel (systemd `cloudflared`).
+`git push origin CA-Trader-Bifurcated` triggers `.github/workflows/deploy_to_oracle.yml`. It SSHes to the Oracle VM (secrets `ORACLE_HOST`, `ORACLE_SSH_KEY`), runs `git reset --hard` in `/home/ubuntu/CA-Trader`, takes one SQLite online backup per day into `backups/` (keeps 2), runs `pip install -r requirements.txt`, restarts systemd `catrader`, and fails the job unless `/health` answers within 120 s. Public traffic reaches uvicorn (127.0.0.1:8000) through a Cloudflare tunnel (systemd `cloudflared`).
 
 - Untracked runtime state lives only on the host and deploys never touch it: `.env`, `ca_trader.sqlite3`, `catrader_telegram.session`, `backups/`, `ca-trader.log`, `data/candles_cache.json`, `data/ui_customization.json`.
 - A new dependency must go into `requirements.txt`; the server only gets what the workflow installs.
