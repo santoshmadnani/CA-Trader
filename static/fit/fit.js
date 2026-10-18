@@ -231,21 +231,22 @@
   // ------------------------------------------------------------------ tabs
   const RENDER = {};
   function setTab(t) {
+    if (!RENDER[t]) return;                 // only real tabs; other sidebar buttons (theme) must not blank the screen
     S.tab = t; store.set("fit_tab", t);
     $$(".screen").forEach((s) => (s.hidden = s.dataset.tab !== t));
-    const btns = $$("#tabbar button");
+    const btns = $$("#tabbar button[data-tab]");
     btns.forEach((b) => { if (b.dataset.tab === t) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     placeInk();
     RENDER[t] && RENDER[t]();
   }
   // The highlight follows the active button, whether the nav is the phone tab bar or the desktop sidebar.
   function placeInk() {
-    const b = $(`#tabbar button[aria-current="page"]`), ink = $("#tabInk"); if (!b || !ink) return;
+    const b = $(`#tabbar button[data-tab][aria-current="page"]`), ink = $("#tabInk"); if (!b || !ink) return;
     ink.style.width = b.offsetWidth + "px"; ink.style.height = b.offsetHeight + "px";
     ink.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`;
   }
   window.addEventListener("resize", debounce(placeInk, 80));
-  $$("#tabbar button").forEach((b) => b.addEventListener("click", () => { buzz(6); setTab(b.dataset.tab); }));
+  $$("#tabbar button[data-tab]").forEach((b) => b.addEventListener("click", () => { buzz(6); setTab(b.dataset.tab); }));
 
   // ------------------------------------------------------------------ TODAY
   RENDER.today = () => {
