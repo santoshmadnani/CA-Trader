@@ -48,6 +48,8 @@ There is no linter or unit-test suite. To hit authenticated endpoints locally wi
 
 ## Rules that bite
 
+- **Sync with GitHub before every task.** Santosh also edits this repo directly on GitHub (through the Claude GitHub connector). Before changing anything, fetch every branch (`git fetch origin '+refs/heads/*:refs/remotes/origin/*'`), compare `origin/CA-Trader-Bifurcated` (the deployed branch) with the local copy, and bring local files up to date first (fast-forward or merge, keeping both sides' changes). Only then start the work.
+
 - **Never fabricate market data.** No synthetic candles, chains, depth, prices or canned "analysis". When Upstox has no data, return an empty or `unavailable` payload and let the UI show "No data". Earlier fabricated features were removed for this reason.
 - **Never `SELECT *` from `recommendations`.** `technical_basis`, `news_basis` and `option_basis` hold about 60 KB of JSON per row. Project explicit columns: `id, symbol, recommendation, entry, target, stop_loss, final_pnl, status, created_at`. `recommendations` has no `updated_at` column.
 - **Classic-UI mobile safety:** only reassign `canvas.width`/`height` when the size actually changes, cap `devicePixelRatio` at 2, and never force a reflow (`void el.offsetWidth`) inside tick handlers.

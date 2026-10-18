@@ -1,198 +1,85 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#081015">
-  <title>Choose your terminal — CA Trader</title>
-  <style>
-    :root {
-      --bg: #081015;
-      --panel: #0d1a20;
-      --line: #24434b;
-      --text: #eef7f7;
-      --muted: #88a4aa;
-      --teal: #42c8ba;
-      --orange: #ff855c;
-      --gold: #f59e0b;
-      --accent: #38bdf8;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: radial-gradient(circle at 20% 0, #16323b, #081015 55%);
-      color: var(--text);
-      font-family: Inter, system-ui, sans-serif;
-      display: grid;
-      place-items: center;
-      padding: 18px;
-    }
-    .wrap { width: min(640px, 100%); }
-    .top { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-    .logo {
-      width: 38px;
-      height: 38px;
-      border-radius: 12px;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(135deg, var(--teal), #238c88);
-      color: #031413;
-      font-weight: 800;
-    }
-    .muted { color: var(--muted); }
-    h1 { font-size: 28px; margin: 0 0 7px; }
-    p { color: var(--muted); line-height: 1.5; }
-    .grid { display: grid; gap: 12px; margin-top: 18px; }
-    .card {
-      border: 1px solid var(--line);
-      background: rgba(13, 26, 32, 0.95);
-      border-radius: 20px;
-      padding: 18px;
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      align-items: center;
-      transition: .2s;
-      box-shadow: 0 22px 55px rgba(0,0,0,.26);
-    }
-    .card:hover { transform: translateY(-2px); border-color: #3d7982; }
-    .icon { font-size: 32px; flex-shrink: 0; }
-    .title { font-weight: 800; font-size: 17px; }
-    .desc { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
-    .btn {
-      border: 0;
-      border-radius: 12px;
-      padding: 11px 18px;
-      font-weight: 800;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .primary { background: var(--teal); color: #041311; }
-    .primary:hover { opacity: 0.92; }
-    .secondary {
-      background: #163039;
-      color: #b9e6e2;
-      border: 1px solid #2d5861;
-    }
-    .foot {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 18px;
-      font-size: 11px;
-    }
-    .tag {
-      padding: 5px 10px;
-      border-radius: 999px;
-      background: #123038;
-      color: #a8d8d4;
-      font-weight: 600;
-    }
-    .admin-pill {
-      font-size: 9.5px;
-      background: rgba(245,158,11,0.2);
-      color: #fbbf24;
-      border: 1px solid rgba(245,158,11,0.45);
-      border-radius: 999px;
-      padding: 2px 7px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef1f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>Choose an app · CA Trader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Manrope:wght@500;600;700;800&display=swap">
+<script>try{var t=JSON.parse(localStorage.getItem("cam_theme")||"null");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+:root{--bg:#eef1f8;--bg2:#e4e8f3;--surface:#fff;--ink:#0f1a33;--muted:#7a839a;--line:#e2e6ef;--accent:#3d3bf3;--accent-ink:#fff;--fit:#00a86b;
+  --shadow:0 2px 6px rgba(15,26,51,.08),0 18px 48px rgba(15,26,51,.14);color-scheme:light}
+:root[data-theme="dark"]{--bg:#000;--bg2:#050505;--surface:#0c0c0e;--ink:#f2f2f4;--muted:#8b8b94;--line:#212124;--accent:#8f8dff;--accent-ink:#000;--fit:#2fd796;
+  --shadow:0 2px 8px rgba(0,0,0,.6),0 24px 60px rgba(0,0,0,.65);color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000;--bg2:#050505;--surface:#0c0c0e;--ink:#f2f2f4;--muted:#8b8b94;--line:#212124;--accent:#8f8dff;--accent-ink:#000;--fit:#2fd796;
+  --shadow:0 2px 8px rgba(0,0,0,.6),0 24px 60px rgba(0,0,0,.65);color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(900px 420px at 50% -160px,var(--bg2),var(--bg));color:var(--ink);font:15px/1.45 "Manrope",system-ui,sans-serif;
+  display:grid;place-items:center;padding:24px 16px}
+.wrap{width:min(560px,100%)}
+h1{font:800 30px/1.1 "Bricolage Grotesque","Manrope",sans-serif;letter-spacing:-.02em;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 22px}
+.apps{display:grid;gap:12px}
+.app{--c:var(--accent);display:grid;grid-template-columns:58px 1fr auto;gap:14px;align-items:center;padding:16px;border-radius:24px;background:var(--surface);
+  border:1px solid var(--line);box-shadow:var(--shadow);cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%;
+  transition:transform .25s cubic-bezier(.34,1.4,.5,1),border-color .2s;animation:in .5s cubic-bezier(.2,.8,.2,1) both}
+.app:nth-child(2){animation-delay:.07s}
+.app:hover{border-color:var(--c)}.app:active{transform:scale(.97)}
+.app.fit{--c:var(--fit)}
+.app .ic{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c)}
+.app .ic svg{width:30px;height:30px}
+.app b{display:block;font:700 19px/1.2 "Bricolage Grotesque","Manrope",sans-serif}
+.app span{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.app .go{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:var(--c);color:#fff}
+.app .go svg{width:18px;height:18px}
+.app.last::after{content:"Last used";position:absolute}
+.tag{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c)}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;color:var(--muted);font-size:13px}
+.foot a{color:var(--muted);font-weight:700;text-decoration:none}
+@keyframes in{from{opacity:0;transform:translateY(12px)}}
+@media (prefers-reduced-motion:reduce){.app{animation:none;transition:none}}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top">
-      <div class="logo">CA</div>
-      <div>
-        <div style="font-weight:800">Terminal Switcher</div>
-        <div class="muted" style="font-size:11px">Select your active workstation.</div>
-      </div>
-    </div>
-
-    <div>
-      <h1>Where do you want to work?</h1>
-      <p id="hello">Choose a terminal. You can switch later from the top navigation bar.</p>
-    </div>
-
-    <div class="grid">
-      <!-- 1. CA Trader -->
-      <div class="card">
-        <div style="display:flex;gap:14px;align-items:center">
-          <div class="icon">📈</div>
-          <div>
-            <div class="title">CA Trader</div>
-            <div class="desc">Markets, watchlists, technical charts, orders and CA AI.</div>
-          </div>
-        </div>
-        <button class="btn primary" onclick="choose('trading')">Open</button>
-      </div>
-
-      <!-- 2. CA Fitness Tracker -->
-      <div class="card">
-        <div style="display:flex;gap:14px;align-items:center">
-          <div class="icon">🏋️</div>
-          <div>
-            <div class="title">CA Fitness Tracker</div>
-            <div class="desc">Nutrition, workout progress, No Smoking and Mike Mentzer.AI.</div>
-          </div>
-        </div>
-        <button class="btn primary" onclick="choose('fitness')">Open</button>
-      </div>
-      <!-- 3. backcovers.ai -->
-      <div class="card">
-        <div style="display:flex;gap:14px;align-items:center">
-          <div class="icon">🎨</div>
-          <div>
-            <div class="title">backcovers.ai</div>
-            <div class="desc">AI-powered phone back cover designer & customizer studio.</div>
-          </div>
-        </div>
-        <button class="btn primary" onclick="choose('backcovers')">Open</button>
-      </div>
-
-    </div>
-
-    <div class="foot">
-      <span class="tag" id="accessTag">Allowlisted account</span>
-      <button class="btn secondary" onclick="location.href='/logout'">Sign out</button>
-    </div>
+<main class="wrap">
+  <h1 id="hello">Where to?</h1>
+  <p class="sub">Pick an app. You can switch any time from inside either one.</p>
+  <div class="apps">
+    <button class="app" data-app="trading" type="button">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M7 15l3-4 3 2 4-6"/></svg></span>
+      <span><b>CA Trader</b><span>Markets, watchlists, signals, charts and orders</span><span class="tag" data-last hidden>Last used</span></span>
+      <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </button>
+    <button class="app fit" data-app="fitness" type="button">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg></span>
+      <span><b>Fitness Tracker</b><span>Workouts, diet, macros and "log my day" with AI</span><span class="tag" data-last hidden>Last used</span></span>
+      <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </button>
   </div>
-
-  <script>
-    async function choose(t) {
-      const r = await fetch('/api/auth/select-terminal', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ terminal: t })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        alert(d?.detail?.message || d?.error?.message || 'Could not select terminal');
-        return;
-      }
-      if (t === 'fitness') {
-        location.href = '/fitness';
-      } else if (t === 'backcovers') {
-        location.href = '/backcovers';
-      } else {
-        location.href = '/terminal';
-      }
-    }
-
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        document.getElementById('hello').textContent = 'Welcome ' + (d.user?.full_name || d.user?.email || 'back') + '. Choose your terminal.';
-        if (d.is_admin) {
-          document.getElementById('accessTag').textContent = 'Administrator Privileges';
-          document.getElementById('accessTag').style.background = 'rgba(245,158,11,0.2)';
-          document.getElementById('accessTag').style.color = '#fbbf24';
-        }
-      })
-      .catch(() => {});
-  </script>
+  <div class="foot"><span id="who"></span><a href="/logout">Sign out</a></div>
+</main>
+<script>
+(() => {
+  let last = null; try { last = localStorage.getItem("ca_last_app"); } catch (e) {}
+  document.querySelectorAll(".app").forEach((b) => {
+    if (b.dataset.app === last) b.querySelector("[data-last]").hidden = false;
+    b.addEventListener("click", async () => {
+      try { localStorage.setItem("ca_last_app", b.dataset.app); } catch (e) {}
+      let to = b.dataset.app === "fitness" ? "/fitnesstracker" : "/terminal";
+      try { const r = await fetch("/api/auth/select-terminal", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ terminal: b.dataset.app }) });
+        const d = await r.json(); if (d.redirect) to = d.redirect; } catch (e) {}
+      location.href = to;
+    });
+  });
+  fetch("/api/auth/me", { credentials: "include" }).then((r) => r.json()).then((d) => {
+    const u = d.user || {}; const first = (u.full_name || "").split(" ")[0];
+    if (first) document.getElementById("hello").textContent = `Hi ${first}, where to?`;
+    if (u.email) document.getElementById("who").textContent = u.email;
+  }).catch(() => {});
+})();
+</script>
 </body>
 </html>

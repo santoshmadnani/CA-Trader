@@ -8181,6 +8181,15 @@ try:
 except Exception as _ai_err:
     log.warning("Could not mount AI/MCP connector router: %s", _ai_err)
 
+try:   # fitness tracker API (/api/fit/*), scoped to the signed-in session only
+    from backend.fitness import router as FIT_ROUTER, foods as FIT_FOODS
+    app.include_router(FIT_ROUTER.build(db=db_exec, db_insert=db_insert, get_user=get_user, gemini_text=gemini_text,
+                                        auth_enabled=AUTH_ENABLED, idle_hours=AUTH_IDLE_HOURS))
+    if os.getenv("FIT_USDA_IMPORT", "1") == "1":
+        FIT_FOODS.start_usda_import(db_exec)
+except Exception as _fit_err:
+    log.warning("Could not mount fitness router: %s", _fit_err)
+
 
 
 
@@ -8318,6 +8327,7 @@ INTEGRATION_BRIDGE = r"""
 # and HTTP 500 even though the login HTML file itself existed.
 LOGIN_BRIDGE = r"""
 <script>
+window.__CA_POST_LOGIN__ = '/post-login';   // the server sends the user on to ?next= (e.g. /fitnesstracker) or the app selector
 (() => {
   const api = async (url, options={}) => {
     const res = await fetch(url, {credentials:'include', headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options});
@@ -8360,7 +8370,7 @@ LOGIN_BRIDGE = r"""
     busy(signupButton, true);
     try {
       await api('/api/auth/signup', {method:'POST', body:JSON.stringify({full_name,email,password})});
-      window.location.replace('/');
+      window.location.replace('/post-login');
     } catch(e) { notify(e.message); busy(signupButton, false); }
   });
 
@@ -8393,10 +8403,25 @@ async def index(request: Request) -> Response:
     user = current_user(request)
     if AUTH_ENABLED and not user:
         return await login_page(request)
-    return await terminal_page(request)
+    return RedirectResponse("/select", status_code=302)   # signed in: let the user pick Trading or Fitness
+
+def _reset_session(request: Request) -> None:
+    nxt = request.session.get("post_login_next")
+    request.session.clear()
+    if nxt:
+        request.session["post_login_next"] = nxt
+
+
+def _safe_next(v: str | None) -> str | None:
+    v = str(v or "").strip()
+    return v if re.fullmatch(r"/(?!/)[A-Za-z0-9/_\-.?=&%]*", v) and not v.startswith("/login") else None
+
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request) -> Response:
+    nxt = _safe_next(request.query_params.get("next"))
+    if nxt:
+        request.session["post_login_next"] = nxt
     if LOGIN_HTML_PATH and LOGIN_HTML_PATH.exists():
         html = LOGIN_HTML_PATH.read_text(encoding="utf-8")
         marker = "</body>"
@@ -8421,14 +8446,45 @@ async def force_login(request: Request) -> Response:
 
 @app.get("/post-login", response_class=HTMLResponse)
 async def post_login_page(request: Request) -> Response:
+    """After sign-in: go where the user was heading (e.g. /fitnesstracker), otherwise to the app selector."""
     user = current_user(request)
     if AUTH_ENABLED and not user:
         return RedirectResponse("/login", status_code=302)
-    return RedirectResponse("/terminal", status_code=302)
+    nxt = _safe_next(request.session.pop("post_login_next", None))
+    return RedirectResponse(nxt or "/select", status_code=302)
+
+
+@app.get("/select", response_class=HTMLResponse)
+async def app_selector_page(request: Request) -> Response:
+    user = current_user(request)
+    if AUTH_ENABLED and not user:
+        return RedirectResponse("/login?next=/select", status_code=302)
+    return HTMLResponse(TERMINAL_SELECTOR_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+
 
 @app.post("/api/auth/select-terminal")
 async def auth_select_terminal(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    return {"ok": True, "terminal": "trading"}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    t = "fitness" if str(body.get("terminal") or "") == "fitness" else "trading"
+    return {"ok": True, "terminal": t, "redirect": "/fitnesstracker" if t == "fitness" else "/terminal"}
+
+
+FITNESS_HTML_PATH = BASE_DIR / "fitness.html"
+
+
+@app.get("/fitnesstracker", response_class=HTMLResponse)
+@app.get("/fitness", response_class=HTMLResponse)
+@app.get("/fitnesstracker/w/{token}", response_class=HTMLResponse)
+async def fitness_page(request: Request, token: str | None = None) -> Response:
+    """The fitness tracker. A shared-workout link (/fitnesstracker/w/<token>) opens without signing in."""
+    if token is None and AUTH_ENABLED and not request.session.get("user_id"):
+        return RedirectResponse("/login?next=/fitnesstracker", status_code=302)
+    if not FITNESS_HTML_PATH.exists():
+        return error_json("UI_NOT_FOUND", "fitness.html is missing", 500)
+    return HTMLResponse(FITNESS_HTML_PATH.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
 
 @app.get("/guide", response_class=HTMLResponse)
 @app.get("/tutorial", response_class=HTMLResponse)
@@ -8893,7 +8949,7 @@ async def auth_login(payload: LoginIn, request: Request) -> dict[str, Any]:
     if not row or not row.get("password_hash") or not verify_password(payload.password, row["password_hash"]):
         record_error("authentication_failure", "Invalid email/password")
         raise HTTPException(status_code=401, detail={"code": "INVALID_CREDENTIALS", "message": "Invalid email or password"})
-    request.session.clear()
+    _reset_session(request)   # keeps ?next= (e.g. /fitnesstracker) across the session-fixation reset
     request.session["user_id"] = row["id"]
     request.session["last_seen"] = time.time()
     request.session["remember_me"] = bool(payload.remember_me)
@@ -8925,7 +8981,7 @@ async def auth_signup(request: Request) -> dict[str, Any]:
     uid = db_insert("INSERT INTO users(username,password_hash,email,created_at,full_name,role) VALUES(?,?,?,?,?,?)", [email, hash_password(password), email, now_iso(), full_name, "user"])
     db_exec("INSERT INTO funds(user_id,available,trading_funds,testing_funds,auto_trade_funds,updated_at) VALUES(?,?,?,?,?,?)", [uid, 200000, 200000, 0, 200000, now_iso()])
     db_exec("INSERT OR IGNORE INTO auto_trade_configs(user_id,updated_at) VALUES(?,?)", [uid, now_iso()])
-    request.session.clear()
+    _reset_session(request)   # keeps ?next= (e.g. /fitnesstracker) across the session-fixation reset
     request.session["user_id"] = uid
     request.session["last_seen"] = time.time()
     request.session["remember_me"] = True
@@ -9012,11 +9068,11 @@ async def google_callback(request: Request, code: str | None = None, state: str 
         else:
             uid = db_insert("INSERT INTO users(username,password_hash,email,created_at,full_name) VALUES(?,?,?,?,?)", [email, None, email, now_iso(), name])
             db_exec("INSERT INTO funds(user_id,available,updated_at) VALUES(?,?,?)", [uid, 0, now_iso()])
-        request.session.clear()
+        _reset_session(request)   # keeps ?next= (e.g. /fitnesstracker) across the session-fixation reset
         request.session["user_id"] = uid
         request.session["last_seen"] = time.time()
         request.session["remember_me"] = True
-        return RedirectResponse("/terminal")
+        return RedirectResponse("/post-login")
     except Exception as exc:
         record_error("google_oauth_failure", safe_text(exc))
         return error_json("OAUTH_FAILED", "Google sign-in could not be completed", 502)
