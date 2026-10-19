@@ -8854,12 +8854,18 @@ async def terminal_page(request: Request) -> Response:
     choice = request.query_params.get("ui")
     choice = choice if choice in ("desktop", "mobile") else None
     ua = request.headers.get("user-agent", "")
-    want = choice or request.cookies.get("cat_ui") or ("mobile" if _MOBILE_UA.search(ua) else "desktop")
-    log.info("terminal ui=%s (choice=%s cookie=%s) ua=%s", want, choice, request.cookies.get("cat_ui"), ua[:140])
+    cookie = request.cookies.get("cat_ui")
+    is_phone = bool(_MOBILE_UA.search(ua))
+    # Phones always get the mobile app unless ?ui=desktop is on this very request, so a stale "desktop" cookie can never trap a phone.
+    # Other devices keep their remembered choice.
+    want = choice or ("mobile" if is_phone else (cookie or "desktop"))
+    log.info("terminal ui=%s (choice=%s cookie=%s phone=%s) ua=%s", want, choice, cookie, is_phone, ua[:140])
+    # Clear a leftover desktop cookie on phones: trade.html's own phone check honours it and would otherwise stay on the desktop page.
+    fix = choice or ("mobile" if (is_phone and cookie == "desktop") else None)
     if want == "mobile" and MOBILE_HTML_PATH.exists():
-        return _ui_response(MOBILE_HTML_PATH, choice)
+        return _ui_response(MOBILE_HTML_PATH, fix)
     if TRADE_HTML_PATH.exists():
-        return _ui_response(TRADE_HTML_PATH, choice)
+        return _ui_response(TRADE_HTML_PATH, fix)
     return await classic_terminal_page(request)
 
 
