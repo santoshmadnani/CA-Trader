@@ -12383,3 +12383,11 @@ async def get_admin_api_passbook(user: dict[str, Any] = Depends(require_user)) -
         ],
         "statement": ledger[:50]
     }
+
+
+# ---------------------------------------------------------------------------
+# Read-only MCP connector for Claude (enabled only when CA_TRADER_MCP_SECRET is set)
+# ---------------------------------------------------------------------------
+import sys as _sys
+from mcp_server import register_mcp as _register_mcp
+_register_mcp(app, _sys.modules[__name__])
