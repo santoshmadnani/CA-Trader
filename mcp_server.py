@@ -17,11 +17,14 @@ Registered from app.py with:  register_mcp(app, sys.modules[__name__])
 """
 from __future__ import annotations
 
+import contextlib
 import hmac
 import json
 import math
 import os
+import secrets
 from datetime import date, datetime
+from pathlib import Path
 from types import ModuleType
 from typing import Any, Awaitable, Callable
 
@@ -168,15 +171,45 @@ for _t in TOOLS:
 
 
 # ---------------------------------------------------------------------------
+# Secret handling
+# ---------------------------------------------------------------------------
+def _resolve_secret(core: ModuleType, log: Any) -> str:
+    """Env var wins; otherwise a random secret persisted next to the database
+    (on the data volume, so it survives redeploys). Never stored in the repo."""
+    env_secret = (os.getenv("CA_TRADER_MCP_SECRET") or "").strip()
+    if len(env_secret) >= 24:
+        return env_secret
+    try:
+        db_path = Path(str(getattr(core, "DB_PATH")))
+        secret_file = db_path.parent / "mcp_secret.txt"
+        if secret_file.exists():
+            saved = secret_file.read_text(encoding="utf-8").strip()
+            if len(saved) >= 24:
+                return saved
+        secret_file.parent.mkdir(parents=True, exist_ok=True)
+        fresh = secrets.token_urlsafe(32)
+        secret_file.write_text(fresh, encoding="utf-8")
+        with contextlib.suppress(Exception):
+            os.chmod(secret_file, 0o600)
+        if log:
+            log.info("Generated MCP connector secret at %s", secret_file)
+        return fresh
+    except Exception as exc:
+        if log:
+            log.warning("Could not create MCP secret file: %s", exc)
+        return ""
+
+
+# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 def register_mcp(app: FastAPI, core: ModuleType) -> None:
     """Mount the MCP endpoint on the FastAPI app. `core` is the app.py module."""
-    secret = (os.getenv("CA_TRADER_MCP_SECRET") or "").strip()
     log = getattr(core, "log", None)
-    if len(secret) < 24:
+    secret = _resolve_secret(core, log)
+    if not secret:
         if log:
-            log.info("MCP endpoint disabled (set CA_TRADER_MCP_SECRET, min 24 chars, to enable)")
+            log.warning("MCP endpoint disabled: no usable secret")
         return
 
     def _mcp_user() -> dict[str, Any]:
@@ -378,6 +411,24 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         if not _authorized(token):
             return JSONResponse({"error": "not found"}, status_code=404)
         return Response(status_code=405, headers={"Allow": "POST"})
+
+    @app.get("/api/admin/mcp-connector", include_in_schema=False)
+    async def mcp_connector_url(request: Request) -> Response:
+        """Admin-only: shows the full connector URL to paste into claude.ai."""
+        user = core.current_user(request)
+        if not user:
+            return JSONResponse({"error": "Log in to CA Trader first, then reopen this page."}, status_code=401)
+        if not core.is_admin(user):
+            return JSONResponse({"error": "Admin only"}, status_code=403)
+        proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[0].strip()
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+        if proto == "http" and not host.startswith(("localhost", "127.0.0.1")):
+            proto = "https"
+        return JSONResponse({
+            "connector_url": f"{proto}://{host}/mcp/{secret}",
+            "how_to": "claude.ai > Settings > Connectors > Add custom connector > paste connector_url. Keep this URL private.",
+            "tools": [t["name"] for t in TOOLS],
+        }, headers={"Cache-Control": "no-store"})
 
     if log:
         log.info("MCP endpoint enabled at /mcp/<secret> with %d read-only tools", len(TOOLS))
