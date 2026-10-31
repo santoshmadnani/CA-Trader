@@ -21,6 +21,7 @@ import base64
 import contextlib
 import hashlib
 import hmac
+import inspect
 import json
 import math
 import os
@@ -164,6 +165,11 @@ TOOLS: list[dict[str, Any]] = [
             "limit": {"type": "integer", "minimum": 10, "maximum": 200, "default": 40},
         }),
     },
+    {
+        "name": "get_model_signal",
+        "description": "CA Trader's backtested model call for a symbol at the latest daily close (live during market hours): BUY/SELL/HOLD, score, percentile, the 14 criteria with z-scores and weights, and the model's out-of-sample backtest stats.",
+        "inputSchema": _schema({"symbol": SYMBOL}, ["symbol"]),
+    },
     {"name": "get_watchlists", "description": "The user's CA Trader watchlists and their symbols.", "inputSchema": _schema({})},
     {"name": "get_positions", "description": "Open paper-trading positions with live mark-to-market P&L.", "inputSchema": _schema({})},
     {"name": "get_holdings", "description": "Paper-trading holdings.", "inputSchema": _schema({})},
@@ -210,6 +216,22 @@ def _resolve_secret(core: ModuleType, log: Any) -> str:
 def register_mcp(app: FastAPI, core: ModuleType) -> None:
     """Mount the MCP endpoint on the FastAPI app. `core` is the app.py module."""
     log = getattr(core, "log", None)
+
+    @app.get("/api/model/signal/{instrument}", include_in_schema=False)
+    async def model_signal_route(instrument: str, request: Request) -> Response:
+        """Backtested model call for the logged-in user (same result as the get_model_signal connector tool)."""
+        user = core.current_user(request)
+        if not user:
+            return JSONResponse({"error": {"code": "AUTH_REQUIRED", "message": "Authentication required"}}, status_code=401)
+        try:
+            import ca_model
+            data = await ca_model.model_signal(core, instrument if "|" in instrument else instrument.upper(), user)
+        except Exception as exc:
+            if log:
+                log.warning("model signal failed for %s: %s", instrument, exc)
+            return JSONResponse({"error": {"code": "MODEL_UNAVAILABLE", "message": "Model signal is unavailable right now"}}, status_code=503)
+        return JSONResponse(_clean(data), headers={"Cache-Control": "no-store"})
+
     secret = _resolve_secret(core, log)
     if not secret:
         if log:
@@ -275,8 +297,23 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
             res["candles_total"] = total
         return res
 
+    def _route_kwargs(fn: Callable[..., Any], **kwargs: Any) -> dict[str, Any]:
+        """Some app routes take a `request` argument and some builds don't; pass one only when the route asks for it."""
+        try:
+            params = inspect.signature(fn).parameters
+        except (TypeError, ValueError):
+            return kwargs
+        if "request" in params and "request" not in kwargs:
+            kwargs["request"] = _dummy_request()
+        return kwargs
+
     async def t_reco(args, user):
-        return await core.analysis_overall(_sym(args), timeframe=_tf(args, "5m"), desired_profit=_num(args, "desired_profit"), bearable_loss=_num(args, "bearable_loss"), user=user)
+        fn = core.analysis_overall
+        return await fn(_sym(args), **_route_kwargs(fn, timeframe=_tf(args, "5m"), desired_profit=_num(args, "desired_profit"), bearable_loss=_num(args, "bearable_loss"), user=user))
+
+    async def t_model(args, user):
+        import ca_model  # imported lazily so a missing file can never stop the app from starting
+        return await ca_model.model_signal(core, _sym(args), user)
 
     async def t_movers(args, user):
         cat = str(args.get("category") or "gainers")
@@ -320,6 +357,7 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         "get_quotes": t_quotes,
         "get_candles": t_candles,
         "get_recommendation": t_reco,
+        "get_model_signal": t_model,
         "get_market_movers": t_movers,
         "get_market_session": t_session,
         "get_option_chain": t_options,
