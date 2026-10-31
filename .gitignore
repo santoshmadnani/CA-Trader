@@ -5,3 +5,10 @@ __pycache__/
 *.sqlite3
 
 mcp_secret.txt
+
+# release packages, backups, local data
+*.zip
+*.bak
+*.bak[0-9]
+*.db
+scratch/

@@ -383,5 +383,46 @@
    "train": -0.052440441025946076,
    "test": 0.013079629770300976
   }
+ },
+ "intraday": {
+  "rule": "boll_rev",
+  "k": 1.0,
+  "a": 1.0,
+  "b": 1.5,
+  "H": 8,
+  "cost": 0.0003,
+  "first_entry_min": 555,
+  "last_entry_min": 900,
+  "exit_min": 915,
+  "note": "Fade a candle close beyond the 20-period 2-sigma Bollinger band. Entry = that close; target 1xATR14, stop 1.5xATR14 of the same timeframe; follow 8 candles; no entries from 15:00; square off 15:15; 0.03% cost per side.",
+  "stats": {
+   "15m": {
+    "tf": "15m",
+    "sessions": 80,
+    "symbols": 15,
+    "n_train": 957,
+    "train_win": 0.5517,
+    "n_test": 682,
+    "test_win": 0.5528,
+    "test_tgt": 0.4883,
+    "test_exp": -0.0462
+   },
+   "5m": {
+    "tf": "5m",
+    "sessions": 27,
+    "symbols": 6,
+    "n_train": 442,
+    "train_win": 0.4955,
+    "n_test": 314,
+    "test_win": 0.5892,
+    "test_tgt": 0.5701,
+    "test_exp": -0.04
+   }
+  }
+ },
+ "daily_call": {
+  "a": 1.5,
+  "b": 1.5,
+  "H": 10
  }
 }

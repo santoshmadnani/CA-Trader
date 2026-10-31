@@ -11,6 +11,7 @@ COPY app.py .
 COPY mcp_server.py .
 COPY ca_model.py .
 COPY ca_model_params.json .
+COPY ca_terminal.html .
 COPY terminal.html .
 COPY CA_Trader_Login.html .
 COPY fitness.html .

@@ -36,7 +36,9 @@ from typing import Any, Awaitable, Callable
 from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from starlette.requests import Request
-from starlette.responses import JSONResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+
+BASE_DIR = Path(__file__).resolve().parent
 
 SERVER_NAME = "ca-trader"
 SERVER_VERSION = "1.0.0"
@@ -232,12 +234,6 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
             return JSONResponse({"error": {"code": "MODEL_UNAVAILABLE", "message": "Model signal is unavailable right now"}}, status_code=503)
         return JSONResponse(_clean(data), headers={"Cache-Control": "no-store"})
 
-    secret = _resolve_secret(core, log)
-    if not secret:
-        if log:
-            log.warning("MCP endpoint disabled: no usable secret")
-        return
-
     def _mcp_user() -> dict[str, Any]:
         email = (os.getenv("CA_TRADER_MCP_USER_EMAIL") or "santoshmadnani553@gmail.com").strip().lower()
         row = core.db_exec("SELECT id FROM users WHERE LOWER(email)=? AND is_active=1", [email], "one")
@@ -368,6 +364,70 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         "get_holdings": t_holdings,
         "get_portfolio_snapshot": t_snapshot,
     }
+
+    # ---- the shared terminal page on the app itself: same page as the Claude artifact, fed by the same handlers ----
+    @app.post("/api/term/call", include_in_schema=False)
+    async def term_call(request: Request) -> Response:
+        """Run one read-only connector tool for the logged-in user. Body: {"tool": name, "args": {...}}."""
+        user = core.current_user(request)
+        if not user:
+            return JSONResponse({"detail": "Authentication required"}, status_code=401)
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        name = str((body or {}).get("tool") or "")
+        args = (body or {}).get("args") or {}
+        fn = handlers.get(name)
+        if fn is None or not isinstance(args, dict):
+            return JSONResponse({"detail": f"Unknown tool: {name}"}, status_code=400)
+        try:
+            data = _clean(await fn(args, user))
+        except Exception as exc:
+            msg = getattr(exc, "detail", None) or str(exc) or exc.__class__.__name__
+            if log:
+                log.warning("terminal tool %s failed: %s", name, msg)
+            return JSONResponse({"detail": f"{name} failed: {msg}"}, status_code=502)
+        return JSONResponse(data if isinstance(data, dict) else {"items": data}, headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/model/params", include_in_schema=False)
+    async def model_params_route(request: Request) -> Response:
+        if not core.current_user(request):
+            return JSONResponse({"detail": "Authentication required"}, status_code=401)
+        path = BASE_DIR / "ca_model_params.json"
+        if not path.exists():
+            return JSONResponse({"detail": "Model parameters are missing"}, status_code=404)
+        return JSONResponse(json.loads(path.read_text(encoding="utf-8")), headers={"Cache-Control": "no-store"})
+
+    async def shared_terminal(request: Request) -> Response:
+        """/terminal serves the shared terminal page; the previous screen stays at /classic."""
+        page = BASE_DIR / "ca_terminal.html"
+        if not page.exists():
+            return await core.terminal_page(request)
+        user = core.current_user(request)
+        if getattr(core, "AUTH_ENABLED", True) and not user:
+            return RedirectResponse("/login")
+        fitness_ok = getattr(core, "fitness_allowlisted", None)
+        selected = getattr(core, "selected_terminal", None)
+        if fitness_ok and selected and fitness_ok(user) and selected(request) == "fitness":
+            return RedirectResponse("/fitness")
+        headers = getattr(core, "HTML_PAGE_HEADERS", {"Cache-Control": "no-store"})
+        return HTMLResponse(page.read_text(encoding="utf-8"), headers=headers)
+
+    async def classic_terminal(request: Request) -> Response:
+        return await core.terminal_page(request)
+
+    # registered first so they take precedence over app.py's own /terminal route
+    for path, endpoint in (("/terminal", shared_terminal), ("/classic", classic_terminal)):
+        app.add_api_route(path, endpoint, methods=["GET"], include_in_schema=False, response_class=HTMLResponse)
+        app.router.routes.insert(0, app.router.routes.pop())
+
+    secret = _resolve_secret(core, log)
+    if not secret:
+        if log:
+            log.warning("MCP endpoint disabled: no usable secret")
+        return
+
 
     async def call_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
         fn = handlers.get(name)
