@@ -17,12 +17,16 @@ Registered from app.py with:  register_mcp(app, sys.modules[__name__])
 """
 from __future__ import annotations
 
+import base64
 import contextlib
+import hashlib
 import hmac
 import json
 import math
 import os
 import secrets
+import time
+import urllib.parse
 from datetime import date, datetime
 from pathlib import Path
 from types import ModuleType
@@ -31,7 +35,7 @@ from typing import Any, Awaitable, Callable
 from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
 
 SERVER_NAME = "ca-trader"
 SERVER_VERSION = "1.0.0"
@@ -383,10 +387,198 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
     def _authorized(token: str) -> bool:
         return hmac.compare_digest(token.encode("utf-8"), secret.encode("utf-8"))
 
+    # ------------------------------------------------------------------
+    # Minimal OAuth 2.1 (PKCE + dynamic client registration) so claude.ai's
+    # "Connect" flow completes. Access requires a logged-in CA Trader admin.
+    # Tokens are HMAC-signed with the connector secret, so they survive
+    # restarts and need no database.
+    # ------------------------------------------------------------------
+    ACCESS_TTL = 24 * 3600
+    REFRESH_TTL = 90 * 24 * 3600
+    CODE_TTL = 300
+    auth_codes: dict[str, dict[str, Any]] = {}
+
+    def _base_url(request: Request) -> str:
+        proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[0].strip()
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+        if proto == "http" and not host.startswith(("localhost", "127.0.0.1", "testserver")):
+            proto = "https"
+        return f"{proto}://{host}"
+
+    def _b64(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+    def _unb64(text: str) -> bytes:
+        return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+    def _sign(kind: str, ttl: int) -> str:
+        payload = _b64(json.dumps({"k": kind, "exp": int(time.time()) + ttl, "n": secrets.token_hex(8)}, separators=(",", ":")).encode())
+        sig = _b64(hmac.new(secret.encode(), f"{kind}.{payload}".encode(), hashlib.sha256).digest())
+        return f"{payload}.{sig}"
+
+    def _verify(token: str, kind: str) -> bool:
+        try:
+            payload, sig = token.split(".", 1)
+            expected = _b64(hmac.new(secret.encode(), f"{kind}.{payload}".encode(), hashlib.sha256).digest())
+            if not hmac.compare_digest(sig, expected):
+                return False
+            data = json.loads(_unb64(payload))
+            return data.get("k") == kind and int(data.get("exp", 0)) > time.time()
+        except Exception:
+            return False
+
+    def _redirect_ok(uri: str) -> bool:
+        try:
+            p = urllib.parse.urlparse(uri)
+        except Exception:
+            return False
+        host = (p.hostname or "").lower()
+        if p.scheme == "https" and (host in ("claude.ai", "claude.com") or host.endswith((".claude.ai", ".claude.com", ".anthropic.com"))):
+            return True
+        return p.scheme == "http" and host in ("localhost", "127.0.0.1")
+
+    def _token_pair() -> dict[str, Any]:
+        return {
+            "access_token": _sign("access", ACCESS_TTL),
+            "token_type": "Bearer",
+            "expires_in": ACCESS_TTL,
+            "refresh_token": _sign("refresh", REFRESH_TTL),
+            "scope": "mcp",
+        }
+
+    def _html(title: str, body: str, status: int = 200) -> Response:
+        page = (
+            "<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+            f"<title>{title}</title><style>body{{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;"
+            "display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:16px}"
+            ".c{max-width:420px;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px}"
+            "a,button{display:inline-block;margin:8px 8px 0 0;padding:10px 16px;border-radius:8px;border:0;"
+            "background:#238636;color:#fff;text-decoration:none;font-size:15px;cursor:pointer}"
+            "a.s{background:#30363d}</style></head>"
+            f"<body><div class=c><h2>{title}</h2>{body}</div></body></html>"
+        )
+        return Response(page, status_code=status, media_type="text/html", headers={"Cache-Control": "no-store"})
+
+    async def _read_params(request: Request) -> dict[str, str]:
+        raw = (await request.body()).decode("utf-8", "replace")
+        ctype = request.headers.get("content-type", "")
+        if "json" in ctype:
+            try:
+                data = json.loads(raw or "{}")
+                return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+            except Exception:
+                return {}
+        return {k: v[0] for k, v in urllib.parse.parse_qs(raw).items()}
+
+    @app.get("/.well-known/oauth-protected-resource/mcp/{token}", include_in_schema=False)
+    async def oauth_resource_meta(token: str, request: Request) -> Response:
+        if not _authorized(token):
+            return JSONResponse({"error": "not found"}, status_code=404)
+        base = _base_url(request)
+        return JSONResponse({
+            "resource": f"{base}/mcp/{token}",
+            "authorization_servers": [base],
+            "bearer_methods_supported": ["header"],
+            "scopes_supported": ["mcp"],
+        })
+
+    @app.get("/.well-known/oauth-authorization-server", include_in_schema=False)
+    async def oauth_server_meta(request: Request) -> Response:
+        base = _base_url(request)
+        return JSONResponse({
+            "issuer": base,
+            "authorization_endpoint": f"{base}/oauth/authorize",
+            "token_endpoint": f"{base}/oauth/token",
+            "registration_endpoint": f"{base}/oauth/register",
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code", "refresh_token"],
+            "code_challenge_methods_supported": ["S256"],
+            "token_endpoint_auth_methods_supported": ["none"],
+            "scopes_supported": ["mcp"],
+        })
+
+    @app.post("/oauth/register", include_in_schema=False)
+    @app.post("/register", include_in_schema=False)
+    async def oauth_register(request: Request) -> Response:
+        try:
+            meta = await request.json()
+            if not isinstance(meta, dict):
+                meta = {}
+        except Exception:
+            meta = {}
+        uris = [u for u in (meta.get("redirect_uris") or []) if isinstance(u, str)]
+        if not uris or not all(_redirect_ok(u) for u in uris):
+            return JSONResponse({"error": "invalid_redirect_uri", "error_description": "Only claude.ai redirect URIs are allowed"}, status_code=400)
+        return JSONResponse({
+            "client_id": "ca-" + secrets.token_urlsafe(12),
+            "client_id_issued_at": int(time.time()),
+            "client_name": str(meta.get("client_name") or "Claude"),
+            "redirect_uris": uris,
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+        }, status_code=201)
+
+    @app.get("/oauth/authorize", include_in_schema=False)
+    async def oauth_authorize(request: Request) -> Response:
+        q = request.query_params
+        redirect_uri = q.get("redirect_uri") or ""
+        if not _redirect_ok(redirect_uri):
+            return _html("Connection refused", "<p>This sign-in request did not come from Claude.</p>", 400)
+        if q.get("response_type") != "code" or not q.get("code_challenge") or (q.get("code_challenge_method") or "S256") != "S256":
+            return _html("Connection refused", "<p>Unsupported sign-in request.</p>", 400)
+        user = core.current_user(request)
+        if not user or not core.is_admin(user):
+            return _html(
+                "Log in to CA Trader first",
+                "<p>Claude wants read-only access to your CA Trader data. Log in to CA Trader in this browser "
+                "(as admin), then come back to this tab and tap <b>Try again</b>.</p>"
+                "<a href='/login' target='_blank' rel='noopener'>Open CA Trader login</a>"
+                "<button onclick='location.reload()' class=s>Try again</button>",
+                401,
+            )
+        now = time.time()
+        for k in [k for k, v in auth_codes.items() if v["exp"] < now]:
+            auth_codes.pop(k, None)
+        code = secrets.token_urlsafe(32)
+        auth_codes[code] = {"challenge": q.get("code_challenge"), "redirect_uri": redirect_uri, "exp": now + CODE_TTL}
+        params = {"code": code}
+        if q.get("state"):
+            params["state"] = q.get("state")
+        sep = "&" if "?" in redirect_uri else "?"
+        return RedirectResponse(f"{redirect_uri}{sep}{urllib.parse.urlencode(params)}", status_code=302)
+
+    @app.post("/oauth/token", include_in_schema=False)
+    async def oauth_token(request: Request) -> Response:
+        p = await _read_params(request)
+        grant = p.get("grant_type")
+        no_store = {"Cache-Control": "no-store"}
+        if grant == "authorization_code":
+            entry = auth_codes.pop(p.get("code") or "", None)
+            if not entry or entry["exp"] < time.time():
+                return JSONResponse({"error": "invalid_grant", "error_description": "Code expired or unknown"}, status_code=400, headers=no_store)
+            if p.get("redirect_uri") and p.get("redirect_uri") != entry["redirect_uri"]:
+                return JSONResponse({"error": "invalid_grant", "error_description": "redirect_uri mismatch"}, status_code=400, headers=no_store)
+            verifier = p.get("code_verifier") or ""
+            computed = _b64(hashlib.sha256(verifier.encode()).digest())
+            if not verifier or not hmac.compare_digest(computed, entry["challenge"]):
+                return JSONResponse({"error": "invalid_grant", "error_description": "PKCE check failed"}, status_code=400, headers=no_store)
+            return JSONResponse(_token_pair(), headers=no_store)
+        if grant == "refresh_token":
+            if not _verify(p.get("refresh_token") or "", "refresh"):
+                return JSONResponse({"error": "invalid_grant", "error_description": "Refresh token invalid or expired"}, status_code=400, headers=no_store)
+            return JSONResponse(_token_pair(), headers=no_store)
+        return JSONResponse({"error": "unsupported_grant_type"}, status_code=400, headers=no_store)
+
     @app.post("/mcp/{token}", include_in_schema=False)
     async def mcp_post(token: str, request: Request) -> Response:
         if not _authorized(token):
             return JSONResponse({"error": "not found"}, status_code=404)
+        auth = request.headers.get("authorization") or ""
+        if auth.lower().startswith("bearer ") and not _verify(auth[7:].strip(), "access"):
+            meta = f"{_base_url(request)}/.well-known/oauth-protected-resource/mcp/{token}"
+            return JSONResponse({"error": "invalid_token"}, status_code=401,
+                                headers={"WWW-Authenticate": f'Bearer error="invalid_token", resource_metadata="{meta}"'})
         try:
             body = await request.json()
         except Exception:
