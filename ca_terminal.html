@@ -1191,7 +1191,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     var conf = pc == null ? null : verdict === 'SELL' ? 100 - pc : verdict === 'BUY' ? pc : Math.round(100 - Math.abs(pc - 50) * 2);
     var changed = verdict !== S.verdict; S.verdict = verdict; S.conf = conf; S.pct = pc;
     Web.update(changed); Calls.onVerdict(verdict);
-    var key = [S.sel.id, verdict, sc == null ? '' : sc.toFixed(3), pc, Math.round(C.coverage * 20)].join('|');
+    var key = [S.sel.id, verdict, sc == null ? '' : sc.toFixed(3), pc, Math.round(C.coverage * 20), (S.daily[S.sel.id] || []).length].join('|');
     if (key === S.vKey) return; S.vKey = key;
     var b = $('vBadge'); b.textContent = verdict || '—'; b.className = 'vbadge ' + (verdict === 'BUY' ? 'buy' : verdict === 'SELL' ? 'sell' : 'hold');
     var m = $('vMeta'); m.replaceChildren();
