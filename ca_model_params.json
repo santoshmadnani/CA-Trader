@@ -420,9 +420,9 @@
   "experimental": true
  },
  "daily_call": {
-  "a": 1.5,
-  "b": 1.5,
-  "H": 10
+  "exit": "time",
+  "H": 10,
+  "note": "Hold to the close of the 10th session; no stop or target (2025-26 test: 10-day hold +0.11%/BUY after costs vs -0.12% with 1.5xATR exits)"
  },
  "validation_2015_2023": {
   "note": "Live daily model run on 2015 to mid-2023 data it never saw (23 large caps)",

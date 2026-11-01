@@ -29,7 +29,7 @@ import os
 import secrets
 import time
 import urllib.parse
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Awaitable, Callable
@@ -177,7 +177,7 @@ TOOLS: list[dict[str, Any]] = [
     {"name": "get_positions", "description": "Open paper-trading positions with live mark-to-market P&L.", "inputSchema": _schema({})},
     {"name": "get_holdings", "description": "Paper-trading holdings.", "inputSchema": _schema({})},
     {"name": "get_portfolio_snapshot", "description": "One-call snapshot of funds, positions, holdings and day P&L from the paper book.", "inputSchema": _schema({})},
-    {"name": "get_context_log", "description": "Logged live context (order-book imbalance, option PCR, news tone) recorded every 30 minutes during market hours, for backtesting. Returns rows for a symbol (or all) over the last N days.",
+    {"name": "get_context_log", "description": "Logged live context (order-book imbalance, option PCR, news tone; MCX front-month crude price as kind crude_fut) recorded every 30 minutes during market hours, for backtesting. Returns rows for a symbol (or all) over the last N days.",
      "inputSchema": _schema({"symbol": {"type": "string", "description": "Optional symbol, e.g. NIFTY"}, "days": {"type": "integer", "minimum": 1, "maximum": 365, "default": 30}})},
     {"name": "place_paper_order", "description": "Place a PAPER order in the CA Trader app's paper book (never a real broker). Market order at the live price, optional target and stop-loss which the app's paper risk engine enforces.",
      "inputSchema": _schema({
@@ -511,6 +511,29 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
             core.db_exec("INSERT INTO ca_context_log(ts, symbol, kind, value, extra) VALUES(?,?,?,?,?)", list(r), fetch=None)
         return len(rows)
 
+    async def _log_crude_once() -> int:
+        """MCX front-month CRUDEOIL futures price (rolls 3 days before expiry), so a continuous crude series builds up."""
+        user = _mcp_user()
+        res = _clean(await core.instrument_search(q="CRUDEOIL FUT", user=user))
+        cut = (datetime.now(timezone(timedelta(hours=5, minutes=30))) + timedelta(days=3)).date().isoformat()
+        futs = sorted((i for i in (res or {}).get("items") or []
+                       if i.get("exchange") == "MCX" and i.get("instrument_type") == "FUT"
+                       and str(i.get("symbol") or "").upper().startswith("CRUDEOIL FUT") and str(i.get("expiry") or "") > cut),
+                      key=lambda i: str(i.get("expiry")))
+        if not futs:
+            return 0
+        f = futs[0]
+        q = _clean(await core.market_quotes(instruments=f["instrument_key"], user=user))
+        it = ((q or {}).get("items") or [{}])[0]
+        ltp = it.get("ltp")
+        if not ltp:
+            return 0
+        extra = {"key": f["instrument_key"], "contract": f.get("symbol"), "expiry": f.get("expiry"),
+                 "prev_close": it.get("prev_close") or it.get("cp"), "volume": it.get("volume"), "oi": it.get("oi")}
+        core.db_exec("INSERT INTO ca_context_log(ts, symbol, kind, value, extra) VALUES(?,?,?,?,?)",
+                     [datetime.utcnow().timestamp(), "CRUDEOIL", "crude_fut", float(ltp), json.dumps(extra)], fetch=None)
+        return 1
+
     async def _context_loop() -> None:
         _ensure_context_table()
         while True:
@@ -522,6 +545,12 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
             except Exception as exc:
                 if log:
                     log.warning("context log failed: %s", exc)
+            try:
+                if (core.market_session("MCX") or {}).get("active"):
+                    await _log_crude_once()
+            except Exception as exc:
+                if log:
+                    log.warning("crude log failed: %s", exc)
             await asyncio.sleep(1800)
 
     _ctx_started = {"v": False}
