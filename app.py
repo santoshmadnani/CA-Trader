@@ -4705,18 +4705,51 @@ def _gnews_articles(query: str, limit: int) -> list[dict[str,Any]]:
     return [{"provider":"GNews","source":(a.get("publisher") or {}).get("name"),"title":a.get("title"),"summary":a.get("description") or a.get("content"),"published_at":a.get("publishedAt"),"url":a.get("url")} for a in (data.get("articles") or [])] if "_error" not in data else []
 
 
+# One copy of each feed every few minutes, over reused keep-alive connections. Every news refresh used to download
+# the same feeds again for each instrument (Nifty, Bank Nifty, crude, global, watchlist stocks) with a fresh TLS
+# handshake each time; on the 1/8-core VM that was most of the CPU right after a restart. Only the filtering differs.
+_RSS_SESSION = requests.Session()
+_RSS_SESSION.mount("https://", HTTPAdapter(pool_connections=64, pool_maxsize=8))
+_RSS_SESSION.mount("http://", HTTPAdapter(pool_connections=16, pool_maxsize=4))
+_RSS_ITEMS: dict[str, tuple[float, list[dict[str, str]] | None]] = {}
+_RSS_TTL = float(os.getenv("NEWS_RSS_TTL", "180"))
+
+
+def _rss_items(rss_url: str, timeout: float) -> list[dict[str, str]]:
+    now = time.time()
+    hit = _RSS_ITEMS.get(rss_url)
+    if hit and now - hit[0] < (_RSS_TTL if hit[1] is not None else 60):
+        if hit[1] is None:
+            raise RuntimeError("feed failed in the last minute")
+        return hit[1]
+    try:
+        r = _RSS_SESSION.get(rss_url, headers={"User-Agent": "CA-Trader/1.0 RSS reader"}, timeout=timeout); r.raise_for_status()
+        root = ET.fromstring(r.content)  # bytes: let the XML declaration pick the encoding (r.text guessed Latin-1 -> mojibake)
+    except Exception:
+        _RSS_ITEMS[rss_url] = (now, None)
+        raise
+    items: list[dict[str, str]] = []
+    for item in root.iter():
+        tag = item.tag.lower().split("}")[-1]
+        if tag not in {"item", "entry"}:
+            continue
+        vals: dict[str, str] = {}
+        for c in list(item):
+            ct = c.tag.lower().split("}")[-1]; txt = "".join(c.itertext()).strip()
+            if ct == "link": vals["url"] = c.attrib.get("href") or txt
+            elif ct in {"title", "description", "summary", "content", "pubdate", "published", "updated"}: vals[ct] = txt
+        items.append(vals)
+    _RSS_ITEMS[rss_url] = (now, items)
+    if len(_RSS_ITEMS) > 400:
+        for k in sorted(_RSS_ITEMS, key=lambda k: _RSS_ITEMS[k][0])[:100]:
+            _RSS_ITEMS.pop(k, None)
+    return items
+
+
 def _rss_articles(source_name: str, rss_url: str, target: str, limit: int=20, timeout: float | None = None) -> list[dict[str,Any]]:
     try:
-        r=requests.get(rss_url,headers={"User-Agent":"CA-Trader/1.0 RSS reader"},timeout=(NEWS_RSS_TIMEOUT if timeout is None else timeout)); r.raise_for_status()
-        root=ET.fromstring(r.content); out=[]; target_u=str(target or "GLOBAL").upper()  # bytes: let the XML declaration pick the encoding (r.text guessed Latin-1 -> mojibake)
-        for item in root.iter():
-            tag=item.tag.lower().split("}")[-1]
-            if tag not in {"item","entry"}: continue
-            vals={}
-            for c in list(item):
-                ct=c.tag.lower().split("}")[-1]; txt="".join(c.itertext()).strip()
-                if ct=="link": vals["url"]=c.attrib.get("href") or txt
-                elif ct in {"title","description","summary","content","pubdate","published","updated"}: vals[ct]=txt
+        out=[]; target_u=str(target or "GLOBAL").upper()
+        for vals in _rss_items(rss_url, NEWS_RSS_TIMEOUT if timeout is None else timeout):
             title=vals.get("title",""); summary=vals.get("description") or vals.get("summary") or vals.get("content",""); text=_news_text(title,summary)
             if target_u in {"GLOBAL","MARKET"}:
                 match=True
