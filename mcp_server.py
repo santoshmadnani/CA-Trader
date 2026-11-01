@@ -279,7 +279,7 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         return await core.instrument_search(q=str(args.get("query") or "").strip()[:50], user=user)
 
     async def t_quotes(args, user):
-        syms = [str(s).strip().upper() for s in (args.get("symbols") or []) if str(s).strip()][:50]
+        syms = [str(s).strip() if "|" in str(s) else str(s).strip().upper() for s in (args.get("symbols") or []) if str(s).strip()][:50]  # instrument keys keep their case (e.g. NSE_INDEX|India VIX)
         if not syms:
             raise ValueError("'symbols' must contain at least one symbol")
         return await core.market_quotes(instruments=",".join(syms), user=user)
