@@ -1085,13 +1085,24 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     var c = Number(x.confidence); if (isNaN(c)) c = 0.6; if (c > 1) c = c / 100;
     if (s.indexOf('BUY') >= 0) return c; if (s.indexOf('SELL') >= 0) return -c; if (s) return 0; return null;
   }
+  function missingWhy(k) {
+    var R = S.sel && S.daily[S.sel.id];
+    if (k === 'breadth') return S.movers.gainers ? 'movers not loaded' : 'waiting for movers';
+    if (k === 'vix_z' || k === 'vix_spike') return S.idx.VIX ? 'VIX history too short' : 'waiting for VIX';
+    if (k === 'mkt_regime' || k === 'sector') return S.idx.NIFTY ? 'Nifty history too short' : 'waiting for Nifty';
+    if (!R) return 'waiting for daily candles';
+    if (R.length <= 30) return 'only ' + R.length + ' days of history';
+    if (k === 'hi52') return 'needs 120 days, has ' + R.length;
+    if (k === 'volspike') return 'no volume (index)';
+    return 'n/a';
+  }
   function factors() {
     var F = []; if (!S.sel) return { F: F };
     var RC = rawCriteria(S.sel.id);
     Object.keys(P.criteria).forEach(function (k) {
       var m = CRIT_META[k] || { g: 0, feed: 'daily', label: k, long: k }; var p = P.criteria[k]; var raw = RC.raw[k];
       var z = raw == null || isNaN(raw) ? null : clamp((raw - p.mu) / p.sd, -3, 3) / 3;
-      F.push({ k: k, feed: m.feed, g: m.g, label: m.label, long: m.long, w: Math.abs(p.w), sw: p.w, z: z, s: z == null ? null : z * Math.sign(p.w), why: RC.why[k] || 'waiting for data', counted: true });
+      F.push({ k: k, feed: m.feed, g: m.g, label: m.label, long: m.long, w: Math.abs(p.w), sw: p.w, z: z, s: z == null ? null : z * Math.sign(p.w), why: RC.why[k] || missingWhy(k), counted: true });
     });
     // live context: shown, not counted (no history to backtest yet; the hourly runs are logging it)
     var d = S.depth; var tb = (d && d.total_buy_quantity) || 0, ts = (d && d.total_sell_quantity) || 0;
@@ -1184,8 +1195,15 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     if (key === S.vKey) return; S.vKey = key;
     var b = $('vBadge'); b.textContent = verdict || '—'; b.className = 'vbadge ' + (verdict === 'BUY' ? 'buy' : verdict === 'SELL' ? 'sell' : 'hold');
     var m = $('vMeta'); m.replaceChildren();
+    var DR = S.daily[S.sel.id];
+    if (sc == null && DR && DR.length <= 30) {
+      b.textContent = 'N/A'; b.className = 'vbadge hold';
+      m.append(el('span', null, 'Daily model can’t score ' + S.sel.label + ': only ' + DR.length + ' daily candles (needs 30+, ideally a year).'),
+        el('span', null, /FUT|CRUDE|GOLD|SILVER|NATURALGAS|COPPER|ZINC|NIFTY\d/i.test(S.sel.id + ' ' + S.sel.label) ? 'Futures contracts restart each expiry, so history is short. The model is built for NSE stocks; pick a stock for its call.' : 'Pick a stock with longer history.'));
+      return;
+    }
     if (sc == null) { m.appendChild(el('span', null, 'Daily model · loading history (' + Math.round(C.coverage * 100) + '% of inputs)…')); return; }
-    var l1 = el('span'); l1.append(el('b', null, 'Daily model'), document.createTextNode(' · score '), el('b', 'num ' + sgn(sc), (sc > 0 ? '+' : '') + sc.toFixed(3)), document.createTextNode(' · ' + pc + 'th pct'));
+    var l1 = el('span'); l1.append(el('b', null, 'Daily model'), document.createTextNode(' · score '), el('b', 'num ' + sgn(sc), (sc > 0 ? '+' : '') + sc.toFixed(3)), document.createTextNode(' · ' + pc + ([, 'st', 'nd', 'rd'][pc % 100 > 10 && pc % 100 < 14 ? 0 : pc % 10] || 'th') + ' percentile'));
     var t = P.stats.improved.test;
     var l2 = el('span', null, verdict === 'BUY' ? 'Unseen 2025–26: BUY calls rose within 5 days ' + Math.round(t.BUY.hit5 * 100) + '% of the time' : verdict === 'SELL' ? 'Unseen 2025–26: SELL calls fell within 5 days ' + Math.round(t.SELL.hit5 * 100) + '% of the time' : 'HOLD · BUY above ' + P.hi.toFixed(3) + ', SELL below ' + P.lo.toFixed(3));
     m.append(l1, l2);
