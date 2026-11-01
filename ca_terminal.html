@@ -147,6 +147,15 @@ svg.i{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .chart-msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px;z-index:2;background:var(--surface)}
 .ohlc-row{display:flex;gap:14px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
 .ohlc-row b{color:var(--fg);font-weight:500}
+.pat-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:7px 12px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.pat-tg,.pat-chip{font:inherit;font-size:11px;border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;padding:3px 9px;cursor:pointer}
+.pat-tg[aria-pressed=false]{color:var(--muted)}
+.pat-chip.up{color:var(--up)}.pat-chip.down{color:var(--down)}
+.pat-chip.ok{border-color:currentColor}
+.pat-chip[aria-pressed=true]{background:color-mix(in srgb,currentColor 12%,transparent)}
+.pat-st{padding:3px 4px}.pat-st.up{color:var(--up)}.pat-st.down{color:var(--down)}
+.pat-detail{flex-basis:100%;line-height:1.5;color:var(--fg);padding:4px 2px 0}
+.pat-detail span{color:var(--muted)}
 
 /* tables */
 .tbl-wrap{overflow-x:auto}
@@ -349,6 +358,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
           <div class="chart-msg" id="chartMsg"><div style="width:60%;display:grid;gap:10px"><div class="skel"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:85%"></div></div></div>
         </div>
         <div class="ohlc-row num" id="ohlc"></div>
+        <div class="pat-row" id="patRow" aria-label="Chart patterns"></div>
       </section>
 
       <section class="card sec-desk">
@@ -627,7 +637,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
       if (S.paused || document.hidden) { await sleep(300); continue; }
       var t0 = performance.now();
       var ids = S.list.map(function (w) { return w.id; });
-      ['NIFTY', 'BANKNIFTY', 'CRUDEOIL', VIXKEY].forEach(function (x) { if (ids.indexOf(x) < 0) ids.push(x); });
+      ['NIFTY', 'BANKNIFTY', S.crudeKey || 'CRUDEOIL', VIXKEY].forEach(function (x) { if (ids.indexOf(x) < 0) ids.push(x); });
       if (S.sel && ids.indexOf(S.sel.id) < 0) ids.push(S.sel.id);
       Calls.quoteSyms().concat(Paper.quoteSyms()).forEach(function (x) { if (ids.indexOf(x) < 0) ids.push(x); });
       try {
@@ -1038,7 +1048,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   }
   function rawCriteria(sym) {
     var q = quoteFor(sym); var R = withLive(S.daily[sym], q); var out = {}, why = {};
-    if (R && R.length > 30) {
+    if (R && R.length > 15) {
       var c = R.map(function (r) { return r.c; }), n = c.length, t = R[n - 1];
       var d = [], g = [], l = []; for (var i = 1; i < n; i++) { var x = c[i] - c[i - 1]; g.push(Math.max(x, 0)); l.push(Math.max(-x, 0)); }
       var ag = last(ewmP(g, { alpha: 1 / 14 })), al = last(ewmP(l, { alpha: 1 / 14 }));
@@ -1052,7 +1062,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
       out.clv = t.h > t.l ? ((t.c - t.l) - (t.h - t.c)) / (t.h - t.l) : null; why.clv = out.clv == null ? 'flat day' : 'closed ' + Math.round((t.c - t.l) / (t.h - t.l) * 100) + '% up the day’s range';
       var k = 0; while (k < n - 1 && c[n - 1 - k] < c[n - 2 - k]) k++; out.downstreak = k; why.downstreak = k + ' down day' + (k === 1 ? '' : 's') + ' in a row';
       out.gap = t.o / c[n - 2] - 1; why.gap = 'opened ' + pct(out.gap * 100);
-      if (n >= 120) { var hi = Math.max.apply(null, c.slice(-252)); out.hi52 = c[n - 1] / hi - 1; why.hi52 = pct(out.hi52 * 100) + ' from 52-week high'; }
+      if (n >= 20) { var hi = Math.max.apply(null, c.slice(-252)); out.hi52 = c[n - 1] / hi - 1; why.hi52 = pct(out.hi52 * 100) + (n >= 250 ? ' from 52-week high' : ' from ' + n + '-day high'); }
       var vols = R.slice(-20).map(function (r) { return r.v; });
       if (t.v > 0) {
         var vToday = t.live ? t.v / sessionFraction() : t.v; vols[vols.length - 1] = vToday;
@@ -1091,7 +1101,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     if (k === 'vix_z' || k === 'vix_spike') return S.idx.VIX ? 'VIX history too short' : 'waiting for VIX';
     if (k === 'mkt_regime' || k === 'sector') return S.idx.NIFTY ? 'Nifty history too short' : 'waiting for Nifty';
     if (!R) return 'waiting for daily candles';
-    if (R.length <= 30) return 'only ' + R.length + ' days of history';
+    if (R.length <= 15) return 'only ' + R.length + ' days of history';
     if (k === 'hi52') return 'needs 120 days, has ' + R.length;
     if (k === 'volspike') return 'no volume (index)';
     return 'n/a';
@@ -1113,6 +1123,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     F.push({ k: 'news', feed: 'news', g: 3, label: 'News', long: 'News sentiment', w: 0.25, s: ns == null ? null : tagged.length ? clamp(tagged.reduce(function (a, b) { return a + b; }, 0) / tagged.length, -1, 1) : 0, why: ns == null ? 'loading news' : ns.length ? tagged.length + ' of ' + ns.length + ' stories tagged' : 'no stories yet' });
     var rv = recSignal(S.rec);
     F.push({ k: 'engine', feed: 'engine', g: 3, label: 'Engine', long: 'CA Trader engine', w: 0.25, s: rv, why: S.recErr ? 'offline: engine error' : rv == null ? 'waiting' : 'engine says ' + (rv > 0 ? 'BUY' : rv < 0 ? 'SELL' : 'HOLD') });
+    var pt = S.pat; F.push({ k: 'patterns', feed: 'daily', g: 3, label: 'Patterns', long: 'Chart patterns', w: 0.25, s: pt ? pt.score : null, why: !pt ? 'waiting for candles' : pt.recent.length ? pt.recent.map(function (e) { return PAT.DEF[e.k].n; }).join(', ') + (pt.score ? '' : ' · no proven edge') : 'none in last 3 candles' });
     F.forEach(function (f) { if (f.g === 3) f.counted = false; });
     return { F: F, atr: dailyAtr(S.sel.id) };
   }
@@ -1151,6 +1162,234 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     watch('d_vix', 'get_candles', { symbol: VIXKEY, timeframe: '1D', days: 200, max_candles: 120 }, function (d) { S.idx.VIX = dailyRows(d); runEngine(); renderTicker(); }, function () {}, 300000, 'vix');
   }
   async function dailyLoop() { for (;;) { await sleep(300000); if (S.fatal) return; if (!S.paused && !document.hidden) loadDaily(); } }
+/* ===== Pattern detector: candlesticks, chart patterns, price action =====
+   One pure function shared by the page and the backtest (node), so the stats shown are for exactly this code.
+   Definitions follow Nison (Japanese Candlestick Charting Techniques) and Bulkowski (thepatternsite.com, Encyclopedia of
+   Chart Patterns). A pattern at bar i uses only bars <= i; chart-pattern pivots are confirmed K bars after they print. */
+var PAT = (function () {
+  var DEF = {
+    doji:        { n: 'Doji', d: 0, g: 'candle', m: 'Open ≈ close: buyers and sellers in balance. Indecision; matters only after a trend.' },
+    hammer:      { n: 'Hammer', d: 1, g: 'candle', m: 'After a fall, a long lower shadow: sellers pushed down, buyers took it back. Bullish reversal.' },
+    hangman:     { n: 'Hanging man', d: -1, g: 'candle', m: 'Hammer shape after a rise: selling showed up intraday. Bearish warning.' },
+    invhammer:   { n: 'Inverted hammer', d: 1, g: 'candle', m: 'After a fall, a long upper shadow: first attempt by buyers. Bullish if confirmed.' },
+    shootstar:   { n: 'Shooting star', d: -1, g: 'candle', m: 'After a rise, a long upper shadow: buyers rejected at the high. Bearish reversal.' },
+    bullengulf:  { n: 'Bullish engulfing', d: 1, g: 'candle', m: 'A green body wraps the prior red body after a fall. Bullish reversal.' },
+    bearengulf:  { n: 'Bearish engulfing', d: -1, g: 'candle', m: 'A red body wraps the prior green body after a rise. Bearish reversal.' },
+    piercing:    { n: 'Piercing line', d: 1, g: 'candle', m: 'Opens below the prior low, closes above the middle of the prior red body. Bullish reversal.' },
+    darkcloud:   { n: 'Dark cloud cover', d: -1, g: 'candle', m: 'Opens above the prior high, closes below the middle of the prior green body. Bearish reversal.' },
+    bullharami:  { n: 'Bullish harami', d: 1, g: 'candle', m: 'A small body inside the prior long red body: selling is drying up.' },
+    bearharami:  { n: 'Bearish harami', d: -1, g: 'candle', m: 'A small body inside the prior long green body: buying is drying up.' },
+    mornstar:    { n: 'Morning star', d: 1, g: 'candle', m: 'Long red, small star, long green closing into the first body. Three-bar bullish reversal.' },
+    evestar:     { n: 'Evening star', d: -1, g: 'candle', m: 'Long green, small star, long red closing into the first body. Three-bar bearish reversal.' },
+    soldiers:    { n: 'Three white soldiers', d: 1, g: 'candle', m: 'Three rising green candles closing near their highs. Strong buying.' },
+    crows:       { n: 'Three black crows', d: -1, g: 'candle', m: 'Three falling red candles closing near their lows. Strong selling.' },
+    bullmaru:    { n: 'Bullish marubozu', d: 1, g: 'candle', m: 'A long green candle with almost no shadows: buyers in control all bar.' },
+    bearmaru:    { n: 'Bearish marubozu', d: -1, g: 'candle', m: 'A long red candle with almost no shadows: sellers in control all bar.' },
+    tweezbot:    { n: 'Tweezer bottom', d: 1, g: 'candle', m: 'Two candles with matching lows after a fall: support held twice.' },
+    tweeztop:    { n: 'Tweezer top', d: -1, g: 'candle', m: 'Two candles with matching highs after a rise: resistance held twice.' },
+    breakout:    { n: '20-bar breakout', d: 1, g: 'action', m: 'Close above the highest high of the last 20 bars.' },
+    breakdown:   { n: '20-bar breakdown', d: -1, g: 'action', m: 'Close below the lowest low of the last 20 bars.' },
+    insidebar:   { n: 'Inside bar', d: 0, g: 'action', m: 'Range inside the previous bar: volatility contraction before the next move.' },
+    dblbottom:   { n: 'Double bottom', d: 1, g: 'chart', m: 'Two similar lows with a peak between; confirmed on a close above that peak.' },
+    dbltop:      { n: 'Double top', d: -1, g: 'chart', m: 'Two similar highs with a dip between; confirmed on a close below that dip.' },
+    hs:          { n: 'Head & shoulders', d: -1, g: 'chart', m: 'Three peaks, the middle highest; confirmed on a close below the neckline.' },
+    ihs:         { n: 'Inverse head & shoulders', d: 1, g: 'chart', m: 'Three troughs, the middle lowest; confirmed on a close above the neckline.' }
+  };
+  var K = 3; // pivot confirmation bars
+
+  function detect(B, from) {
+    var n = B.length, out = [];
+    if (n < 25) return out;
+    var o = [], h = [], l = [], c = [], i, j;
+    for (i = 0; i < n; i++) { o.push(+B[i].open); h.push(+B[i].high); l.push(+B[i].low); c.push(+B[i].close); }
+    var atr = new Array(n).fill(NaN), sma = new Array(n).fill(NaN), tr, a = 0, s = 0;
+    for (i = 0; i < n; i++) {
+      tr = i ? Math.max(h[i] - l[i], Math.abs(h[i] - c[i - 1]), Math.abs(l[i] - c[i - 1])) : h[i] - l[i];
+      a = i < 14 ? (a * i + tr) / (i + 1) : (a * 13 + tr) / 14; atr[i] = a;
+      s += c[i]; if (i >= 10) s -= c[i - 10]; if (i >= 9) sma[i] = s / 10;
+    }
+    function body(k) { return Math.abs(c[k] - o[k]); }
+    function rng(k) { return h[k] - l[k]; }
+    function up(k) { return h[k] - Math.max(o[k], c[k]); }
+    function lo(k) { return Math.min(o[k], c[k]) - l[k]; }
+    function grn(k) { return c[k] > o[k]; }
+    function red(k) { return c[k] < o[k]; }
+    function dn(k) { return k >= 10 && c[k] < sma[k] && c[k] < c[k - 5]; }   // prior downtrend at bar k
+    function upt(k) { return k >= 10 && c[k] > sma[k] && c[k] > c[k - 5]; }
+    function longb(k) { return body(k) >= 0.6 * atr[k]; }
+    function add(k, key) { out.push({ i: k, k: key, d: DEF[key].d }); }
+
+    // pivots (confirmed K bars later)
+    var ph = [], pl = [];
+    for (i = K; i < n - K; i++) {
+      var isH = true, isL = true;
+      for (j = 1; j <= K; j++) { if (!(h[i] > h[i - j] && h[i] >= h[i + j])) isH = false; if (!(l[i] < l[i - j] && l[i] <= l[i + j])) isL = false; }
+      if (isH) ph.push(i); if (isL) pl.push(i);
+    }
+    var nph = 0, npl = 0;
+    var usedDB = {}, usedDT = {}, usedHS = {}, usedIHS = {};
+    var start = Math.max(20, from || 0);
+    for (i = start; i < n; i++) {
+      var b = body(i), r = rng(i), p = i - 1;
+      if (r <= 0 || !(atr[i] > 0)) continue;
+      // ---- single candles
+      if (b <= 0.1 * r && r >= 0.5 * atr[i]) add(i, 'doji');
+      var hamShape = b > 0 && lo(i) >= 2 * b && up(i) <= Math.max(0.3 * b, 0.1 * r) && r >= 0.7 * atr[i];
+      var invShape = b > 0 && up(i) >= 2 * b && lo(i) <= Math.max(0.3 * b, 0.1 * r) && r >= 0.7 * atr[i];
+      if (hamShape && dn(p)) add(i, 'hammer');
+      if (hamShape && upt(p)) add(i, 'hangman');
+      if (invShape && dn(p)) add(i, 'invhammer');
+      if (invShape && upt(p)) add(i, 'shootstar');
+      if (b >= 0.9 * r && r >= 1.2 * atr[i]) add(i, grn(i) ? 'bullmaru' : 'bearmaru');
+      // ---- two candles
+      if (dn(p) && red(p) && grn(i) && c[i] >= o[p] && o[i] <= c[p] && b > body(p)) add(i, 'bullengulf');
+      if (upt(p) && grn(p) && red(i) && c[i] <= o[p] && o[i] >= c[p] && b > body(p)) add(i, 'bearengulf');
+      if (dn(p) && red(p) && longb(p) && grn(i) && o[i] < l[p] && c[i] > (o[p] + c[p]) / 2 && c[i] < o[p]) add(i, 'piercing');
+      if (upt(p) && grn(p) && longb(p) && red(i) && o[i] > h[p] && c[i] < (o[p] + c[p]) / 2 && c[i] > o[p]) add(i, 'darkcloud');
+      var inside = Math.max(o[i], c[i]) < Math.max(o[p], c[p]) && Math.min(o[i], c[i]) > Math.min(o[p], c[p]) && b <= 0.5 * body(p);
+      if (dn(p) && red(p) && longb(p) && inside) add(i, 'bullharami');
+      if (upt(p) && grn(p) && longb(p) && inside) add(i, 'bearharami');
+      if (dn(p) && red(p) && grn(i) && Math.abs(l[i] - l[p]) <= 0.1 * atr[i]) add(i, 'tweezbot');
+      if (upt(p) && grn(p) && red(i) && Math.abs(h[i] - h[p]) <= 0.1 * atr[i]) add(i, 'tweeztop');
+      if (h[i] < h[p] && l[i] > l[p]) add(i, 'insidebar');
+      // ---- three candles
+      var q = i - 2;
+      if (q >= 10) {
+        var star = body(p) <= 0.3 * body(q);
+        if (dn(q - 1) && red(q) && longb(q) && star && Math.max(o[p], c[p]) <= c[q] && grn(i) && c[i] > (o[q] + c[q]) / 2) add(i, 'mornstar');
+        if (upt(q - 1) && grn(q) && longb(q) && star && Math.min(o[p], c[p]) >= c[q] && red(i) && c[i] < (o[q] + c[q]) / 2) add(i, 'evestar');
+        var nearHi = function (k) { return h[k] - c[k] <= 0.25 * rng(k); }, nearLo = function (k) { return c[k] - l[k] <= 0.25 * rng(k); };
+        if (grn(q) && grn(p) && grn(i) && c[p] > c[q] && c[i] > c[p] && o[p] >= o[q] && o[p] <= c[q] && o[i] >= o[p] && o[i] <= c[p]
+            && nearHi(q) && nearHi(p) && nearHi(i) && longb(q) && longb(p) && longb(i)) add(i, 'soldiers');
+        if (red(q) && red(p) && red(i) && c[p] < c[q] && c[i] < c[p] && o[p] <= o[q] && o[p] >= c[q] && o[i] <= o[p] && o[i] >= c[p]
+            && nearLo(q) && nearLo(p) && nearLo(i) && longb(q) && longb(p) && longb(i)) add(i, 'crows');
+      }
+      // ---- price action: 20-bar breakout/breakdown (first close beyond)
+      var hh = -Infinity, ll = Infinity;
+      for (j = i - 20; j < i; j++) { if (h[j] > hh) hh = h[j]; if (l[j] < ll) ll = l[j]; }
+      if (c[i] > hh && c[p] <= hh) add(i, 'breakout');
+      if (c[i] < ll && c[p] >= ll) add(i, 'breakdown');
+      // ---- chart patterns from confirmed pivots, confirmed by a close through the trigger level
+      while (nph < ph.length && ph[nph] + K <= i) nph++;
+      while (npl < pl.length && pl[npl] + K <= i) npl++;
+      var PH = ph.slice(Math.max(0, nph - 3), nph), PL = pl.slice(Math.max(0, npl - 3), npl);
+      if (PL.length >= 2) {
+        var l2 = PL[PL.length - 1], l1 = PL[PL.length - 2];
+        if (!usedDB[l2] && l2 - l1 >= 8 && l2 - l1 <= 80 && Math.abs(l[l2] - l[l1]) <= 0.5 * atr[l2]) {
+          var mid = -Infinity; for (j = l1; j <= l2; j++) mid = Math.max(mid, h[j]);
+          if (mid - Math.max(l[l1], l[l2]) >= 1.5 * atr[l2] && c[i] > mid && c[p] <= mid && i - l2 <= 30) { add(i, 'dblbottom'); usedDB[l2] = 1; }
+        }
+      }
+      if (PH.length >= 2) {
+        var h2 = PH[PH.length - 1], h1 = PH[PH.length - 2];
+        if (!usedDT[h2] && h2 - h1 >= 8 && h2 - h1 <= 80 && Math.abs(h[h2] - h[h1]) <= 0.5 * atr[h2]) {
+          var mn = Infinity; for (j = h1; j <= h2; j++) mn = Math.min(mn, l[j]);
+          if (Math.min(h[h1], h[h2]) - mn >= 1.5 * atr[h2] && c[i] < mn && c[p] >= mn && i - h2 <= 30) { add(i, 'dbltop'); usedDT[h2] = 1; }
+        }
+      }
+      if (PH.length >= 3) {
+        var s1 = PH[PH.length - 3], hd = PH[PH.length - 2], s2 = PH[PH.length - 1];
+        if (!usedHS[s2] && s2 - s1 <= 120 && h[hd] - Math.max(h[s1], h[s2]) >= 1 * atr[hd] && Math.abs(h[s1] - h[s2]) <= 1 * atr[s2]) {
+          var t1 = Infinity, t2 = Infinity; for (j = s1; j <= hd; j++) t1 = Math.min(t1, l[j]); for (j = hd; j <= s2; j++) t2 = Math.min(t2, l[j]);
+          var neck = Math.min(t1, t2);
+          if (c[i] < neck && c[p] >= neck && i - s2 <= 30) { add(i, 'hs'); usedHS[s2] = 1; }
+        }
+      }
+      if (PL.length >= 3) {
+        var a1 = PL[PL.length - 3], hd2 = PL[PL.length - 2], a2 = PL[PL.length - 1];
+        if (!usedIHS[a2] && a2 - a1 <= 120 && Math.min(l[a1], l[a2]) - l[hd2] >= 1 * atr[hd2] && Math.abs(l[a1] - l[a2]) <= 1 * atr[a2]) {
+          var u1 = -Infinity, u2 = -Infinity; for (j = a1; j <= hd2; j++) u1 = Math.max(u1, h[j]); for (j = hd2; j <= a2; j++) u2 = Math.max(u2, h[j]);
+          var neck2 = Math.max(u1, u2);
+          if (c[i] > neck2 && c[p] <= neck2 && i - a2 <= 30) { add(i, 'ihs'); usedIHS[a2] = 1; }
+        }
+      }
+    }
+    return out;
+  }
+
+  // Market structure from the last two confirmed swing highs and lows
+  function structure(B) {
+    var n = B.length, ph = [], pl = [], i, j;
+    for (i = K; i < n - K; i++) {
+      var isH = true, isL = true;
+      for (j = 1; j <= K; j++) { if (!(+B[i].high > +B[i - j].high && +B[i].high >= +B[i + j].high)) isH = false; if (!(+B[i].low < +B[i - j].low && +B[i].low <= +B[i + j].low)) isL = false; }
+      if (isH) ph.push(+B[i].high); if (isL) pl.push(+B[i].low);
+    }
+    if (ph.length < 2 || pl.length < 2) return { k: 'none', t: 'Not enough swings yet', d: 0 };
+    var hh = ph[ph.length - 1] > ph[ph.length - 2], hl = pl[pl.length - 1] > pl[pl.length - 2];
+    if (hh && hl) return { k: 'up', t: 'Higher highs and higher lows (uptrend)', d: 1 };
+    if (!hh && !hl) return { k: 'down', t: 'Lower highs and lower lows (downtrend)', d: -1 };
+    return { k: 'range', t: hh ? 'Higher high but lower low (widening)' : 'Lower high but higher low (narrowing)', d: 0 };
+  }
+
+  return { DEF: DEF, detect: detect, structure: structure };
+})();
+PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2618,"hit":52.8,"edge":0.042,"t":0.64,"ttr":-0.99,"ok":0},"hammer":{"n":161,"hit":52.8,"edge":0.318,"t":1.08,"ttr":-0.72,"ok":0},"hangman":{"n":169,"hit":50.9,"edge":0.197,"t":0.8,"ttr":0.35,"ok":0},"invhammer":{"n":160,"hit":43.1,"edge":-0.476,"t":-1.69,"ttr":0.85,"ok":0},"shootstar":{"n":156,"hit":50.6,"edge":-0.032,"t":-0.12,"ttr":-0.92,"ok":0},"bullengulf":{"n":570,"hit":51.4,"edge":0.038,"t":0.27,"ttr":0.68,"ok":0},"bearengulf":{"n":853,"hit":47,"edge":0.015,"t":0.13,"ttr":0.27,"ok":0},"piercing":{"n":34,"hit":61.8,"edge":0.117,"t":0.25,"ttr":-1.8,"ok":0},"darkcloud":{"n":58,"hit":46.6,"edge":-0.016,"t":-0.04,"ttr":-1.83,"ok":0},"bullharami":{"n":610,"hit":53.1,"edge":0.404,"t":2.81,"ttr":0.12,"ok":0},"bearharami":{"n":405,"hit":46.7,"edge":-0.037,"t":-0.23,"ttr":1.09,"ok":0},"mornstar":{"n":17,"hit":52.9,"edge":0.016,"t":0.03,"ttr":0.74,"ok":0},"evestar":{"n":29,"hit":44.8,"edge":0.219,"t":0.3,"ttr":1.7,"ok":0},"soldiers":{"n":6,"hit":50,"edge":-1.596,"t":-0.98,"ttr":-5.68,"ok":0},"crows":{"n":18,"hit":38.9,"edge":-0.755,"t":-1.19,"ttr":0.55,"ok":0},"bullmaru":{"n":152,"hit":54.6,"edge":0.299,"t":1.01,"ttr":1.16,"ok":0},"bearmaru":{"n":166,"hit":51.2,"edge":0.492,"t":1.74,"ttr":0.66,"ok":0},"tweezbot":{"n":829,"hit":56.5,"edge":0.348,"t":3.03,"ttr":0.62,"ok":0},"tweeztop":{"n":1117,"hit":50,"edge":0.169,"t":1.75,"ttr":1.92,"ok":1},"breakout":{"n":1969,"hit":50.3,"edge":-0.158,"t":-2.25,"ttr":-4.74,"ok":1},"breakdown":{"n":1435,"hit":47.4,"edge":0.008,"t":0.09,"ttr":-1.68,"ok":0},"insidebar":{"n":3546,"hit":51.2,"edge":-0.05,"t":-0.91,"ttr":-0.89,"ok":0},"dblbottom":{"n":103,"hit":39.8,"edge":-0.53,"t":-1.73,"ttr":0.09,"ok":0},"dbltop":{"n":71,"hit":52.1,"edge":0.267,"t":0.62,"ttr":-1.23,"ok":0},"hs":{"n":29,"hit":44.8,"edge":-0.397,"t":-0.76,"ttr":1.31,"ok":0},"ihs":{"n":42,"hit":66.7,"edge":0.282,"t":0.66,"ttr":0.62,"ok":0}}},"15m":{"h":8,"split":"2024-07-01","base_te":-0.003,"p":{"doji":{"n":21260,"hit":47.9,"edge":0,"t":0.03,"ttr":-0.11,"ok":0},"hammer":{"n":1914,"hit":48.5,"edge":-0.004,"t":-0.27,"ttr":-3.53,"ok":0},"hangman":{"n":1826,"hit":50.7,"edge":-0.003,"t":-0.2,"ttr":0.33,"ok":0},"invhammer":{"n":1511,"hit":49.5,"edge":0.024,"t":1.53,"ttr":0.47,"ok":0},"shootstar":{"n":1588,"hit":49.8,"edge":-0.006,"t":-0.39,"ttr":-0.85,"ok":0},"bullengulf":{"n":8454,"hit":47.6,"edge":-0.001,"t":-0.14,"ttr":-1.14,"ok":0},"bearengulf":{"n":9061,"hit":51.4,"edge":0.004,"t":0.63,"ttr":-0.1,"ok":0},"piercing":{"n":50,"hit":44,"edge":-0.059,"t":-0.61,"ttr":0.19,"ok":0},"darkcloud":{"n":58,"hit":53.4,"edge":0.065,"t":0.88,"ttr":0.04,"ok":0},"bullharami":{"n":2331,"hit":48,"edge":-0.029,"t":-2.37,"ttr":-0.68,"ok":0},"bearharami":{"n":2076,"hit":50,"edge":-0.032,"t":-2.33,"ttr":-0.46,"ok":0},"mornstar":{"n":276,"hit":48.9,"edge":0.031,"t":0.7,"ttr":-0.12,"ok":0},"evestar":{"n":250,"hit":53.6,"edge":0.055,"t":1.65,"ttr":0.47,"ok":0},"soldiers":{"n":185,"hit":54.1,"edge":0.115,"t":2.47,"ttr":-0.23,"ok":0},"crows":{"n":165,"hit":43,"edge":-0.112,"t":-1.83,"ttr":-0.61,"ok":0},"bullmaru":{"n":1554,"hit":49.6,"edge":0.05,"t":2.78,"ttr":-1.01,"ok":0},"bearmaru":{"n":1616,"hit":49.9,"edge":-0.009,"t":-0.55,"ttr":0.33,"ok":0},"tweezbot":{"n":11021,"hit":48,"edge":-0.004,"t":-0.73,"ttr":0.65,"ok":0},"tweeztop":{"n":10334,"hit":50.6,"edge":-0.007,"t":-1.31,"ttr":-2.1,"ok":0},"breakout":{"n":12079,"hit":49.2,"edge":0.032,"t":4.94,"ttr":5.98,"ok":1},"breakdown":{"n":12834,"hit":49,"edge":-0.011,"t":-1.92,"ttr":-1.15,"ok":0},"insidebar":{"n":35595,"hit":48.5,"edge":-0.001,"t":-0.24,"ttr":-0.18,"ok":0},"dblbottom":{"n":671,"hit":47.7,"edge":0.011,"t":0.43,"ttr":0.11,"ok":0},"dbltop":{"n":736,"hit":50.8,"edge":-0.02,"t":-0.88,"ttr":1.55,"ok":0},"hs":{"n":254,"hit":48.4,"edge":-0.008,"t":-0.24,"ttr":-0.44,"ok":0},"ihs":{"n":231,"hit":43.3,"edge":-0.032,"t":-0.71,"ttr":1.68,"ok":0}}}};
+
+  // ---------- patterns on the chart: markers, a list with meanings and measured results, and a context input ----------
+  var Patterns = (function () {
+    var on = load('cat.pat') !== false, ev = [], rowsRef = null, pick = null, tfNow = '15m';
+    var ABBR = { doji: 'Doji', hammer: 'Ham', hangman: 'HMan', invhammer: 'InvH', shootstar: 'Star', bullengulf: 'Engulf', bearengulf: 'Engulf', piercing: 'Pierce',
+      darkcloud: 'DCloud', bullharami: 'Harami', bearharami: 'Harami', mornstar: 'MStar', evestar: 'EStar', soldiers: '3WS', crows: '3BC', bullmaru: 'Maru', bearmaru: 'Maru',
+      tweezbot: 'Tweez', tweeztop: 'Tweez', breakout: 'BO', breakdown: 'BD', insidebar: 'IB', dblbottom: 'W', dbltop: 'M', hs: 'H&S', ihs: 'iH&S' };
+    function T(tf) { return PAT.STATS && PAT.STATS[tf === '1D' ? '1D' : '15m']; }
+    function st(tf, k) { var t = T(tf); return t && t.p[k]; }
+    // what the backtest says this pattern does next (+1 up, −1 down), only when it held in both periods
+    function vote(tf, e) { var s = st(tf, e.k); if (!s || !s.ok) return 0; return Math.sign(s.edge) * (e.d || 1) * Math.min(1, Math.abs(s.t) / 3); }
+    function statTxt(tf, k) {
+      var s = st(tf, k), t = T(tf), d = PAT.DEF[k].d; if (!s) return 'Not enough cases in the backtest yet.';
+      var hz = tf === '1D' ? t.h + ' days' : t.h + ' candles (measured on 15m)';
+      var dirTxt = d > 0 ? 'rose' : d < 0 ? 'fell' : 'rose';
+      var head = 'Backtest, unseen ' + (tf === '1D' ? '2022–26' : 'Jul 2024–26') + ', 23 large caps: ' + s.n + ' cases, price ' + dirTxt + ' within ' + hz + ' ' + Math.round(s.hit) + '% of the time; ' +
+        (s.edge > 0 ? '+' : '') + s.edge.toFixed(2) + '% vs an average candle.';
+      if (s.ok) return head + ' Held in both test periods' + (s.edge * (d || 1) < 0 ? ', but in the OPPOSITE direction to the textbook meaning' : '') + ', so it feeds the Patterns input.';
+      return head + ' Not consistent across periods: shown for reading the chart, not used for calls.';
+    }
+    function closedRows(rows, tf) {
+      if (!rows || !rows.length) return [];
+      var n = rows.length, lastT = rows[n - 1].time;
+      var forming = tf === '1D' ? marketOpen() : (typeof lastT === 'number' && lastT + TF_SEC[tf] > nowSec());
+      return forming ? rows.slice(0, n - 1) : rows;
+    }
+    function update(rows, tf) {
+      tfNow = tf; var R = closedRows(rows, tf); rowsRef = R;
+      ev = R.length >= 25 ? PAT.detect(R, Math.max(20, R.length - 160)) : [];
+      var recent = ev.filter(function (e) { return e.i >= R.length - 3; });
+      var votes = recent.map(function (e) { return vote(tf, e); }).filter(function (v) { return v !== 0; });
+      var stc = R.length >= 30 ? PAT.structure(R.slice(-150)) : null;
+      S.pat = { tf: tf, recent: recent, score: votes.length ? clamp(votes.reduce(function (a, b) { return a + b; }, 0) / votes.length, -1, 1) : recent.length ? 0 : null, st: stc, n: R.length };
+      render();
+      var pk = S.sel && S.sel.id + '|' + tf + '|' + R.length + '|' + recent.map(function (e) { return e.k; }).join(',');
+      if (pk !== update.k) { update.k = pk; setTimeout(function () { S.vKey = ''; runEngine(); }, 0); }
+      return on ? markers(R, tf) : [];
+    }
+    function markers(R, tf) {
+      // common single-bar shapes (doji, inside bar) stay in the list only; markers for the last 12 others, labels for the last 30 candles
+      return ev.filter(function (e) { return e.k !== 'doji' && e.k !== 'insidebar'; }).slice(-12).map(function (e) {
+        var s = st(tf, e.k), col = s && s.ok ? (vote(tf, e) > 0 ? css('--up') : css('--down')) : css('--muted');
+        return { time: R[e.i].time, position: e.d > 0 ? 'belowBar' : 'aboveBar', color: col, shape: 'circle', text: e.i >= R.length - 30 || (s && s.ok) ? ABBR[e.k] || e.k : '', size: 0.6 };
+      });
+    }
+    function when(i) { var n = rowsRef ? rowsRef.length - 1 - i : 0; return n === 0 ? 'last candle' : n + ' candle' + (n > 1 ? 's' : '') + ' ago'; }
+    function render() {
+      var box = $('patRow'); if (!box) return; box.replaceChildren();
+      var tb = el('button', 'pat-tg', on ? 'Patterns on' : 'Patterns off'); tb.type = 'button'; tb.setAttribute('aria-pressed', String(on));
+      tb.addEventListener('click', function () { on = !on; store('cat.pat', on); Calls.paint(); });
+      box.appendChild(tb);
+      var sc = S.pat && S.pat.st; if (sc) box.appendChild(el('span', 'pat-st ' + (sc.d > 0 ? 'up' : sc.d < 0 ? 'down' : ''), sc.t));
+      var lastN = ev.slice(-6).reverse();
+      if (!lastN.length) box.appendChild(el('span', 'pat-none', rowsRef && rowsRef.length >= 25 ? 'No patterns in the last 160 candles.' : 'Waiting for candles.'));
+      lastN.forEach(function (e) {
+        var D = PAT.DEF[e.k], s = st(tfNow, e.k);
+        var b = el('button', 'pat-chip ' + (e.d > 0 ? 'up' : e.d < 0 ? 'down' : '') + (s && s.ok ? ' ok' : ''), (e.d > 0 ? '▲ ' : e.d < 0 ? '▼ ' : '◆ ') + D.n + ' · ' + when(e.i));
+        b.type = 'button'; b.title = D.m; b.setAttribute('aria-pressed', String(pick === e.k + e.i));
+        b.addEventListener('click', function () { pick = pick === e.k + e.i ? null : e.k + e.i; render(); });
+        box.appendChild(b);
+        if (pick === e.k + e.i) { var d = el('div', 'pat-detail'); d.append(el('b', null, D.n + '. '), document.createTextNode(D.m + ' '), el('span', null, statTxt(tfNow, e.k))); box.appendChild(d); }
+      });
+    }
+    return { update: update, render: render, statTxt: statTxt };
+  })();
   // ---------- storage: claude.ai keeps it per person (db); elsewhere this browser ----------
   var Store = (function () {
     var db = null, uid = null, cache = {}, timers = {}, writing = {}, again = {}, listeners = [];
@@ -1182,6 +1421,31 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   // no screen effects: the page stays calm; events show as notes and toasts
   var FX = { start: function () {}, onQuotes: function () {}, onVerdict: function () {}, onCall: function () {} };
 
+  // ---------- MCX: use the MCX front-month futures contract ----------
+  // A bare root like CRUDEOIL resolves to the thin NSE commodity contract in the app; MCX is where the volume is.
+  var MCX_ROOTS = /^(CRUDEOIL|CRUDEOILM|NATURALGAS|NATGASMINI|GOLD|GOLDM|GOLDGUINEA|GOLDPETAL|GOLDTEN|SILVER|SILVERM|SILVERMIC|COPPER|ZINC|ZINCMINI|ALUMINIUM|ALUMINI|LEAD|LEADMINI|NICKEL|MENTHAOIL|COTTONCNDY)$/;
+  async function mcxFront(root) {
+    var d = await call('search_instruments', { query: root + ' FUT' }, { staleTime: 3600000 });
+    var cut = new Date(Date.now() + IST * 1000 + 3 * 86400000).toISOString().slice(0, 10);   // roll 3 days before expiry
+    return ((d && d.items) || []).filter(function (i) { return i.exchange === 'MCX' && i.instrument_type === 'FUT' && String(i.symbol || '').toUpperCase().indexOf(root + ' FUT') === 0 && String(i.expiry || '') > cut; })
+      .sort(function (a, b) { return a.expiry < b.expiry ? -1 : 1; })[0] || null;
+  }
+  async function resolveMcx() {
+    if (!S.mcp || S.blocked.search_instruments) return;
+    var changed = false, selOld = S.sel && S.sel.id;
+    for (var i = 0; i < S.list.length; i++) {
+      var w = S.list[i], root = w.root || (MCX_ROOTS.test(w.id) ? w.id : null); if (!root) continue;
+      try {
+        var c = await mcxFront(root); if (!c || c.instrument_key === w.id) continue;
+        var was = w.id; w.root = root; w.id = c.instrument_key; w.label = c.symbol + ' · MCX'; w.name = 'MCX ' + (c.name || root) + ' · front month'; changed = true;
+        if (selOld === was) S.sel = w;
+      } catch (e) {}
+    }
+    try { var cr = await mcxFront('CRUDEOIL'); if (cr) { S.crudeKey = cr.instrument_key; var tk = document.querySelector('.tk[data-id="CRUDEOIL"]'); if (tk) tk.dataset.id = cr.instrument_key; } } catch (e) {}
+    if (changed) { saveList(); wlKey = ''; renderWatchlist(); if (S.sel && S.sel.id !== selOld) selectSym(S.sel.id); }
+    S.kick = true;
+  }
+
   // ---------- daily model verdict ----------
   function runEngine() {
     if (!S.sel) return;
@@ -1196,9 +1460,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     var b = $('vBadge'); b.textContent = verdict || '—'; b.className = 'vbadge ' + (verdict === 'BUY' ? 'buy' : verdict === 'SELL' ? 'sell' : 'hold');
     var m = $('vMeta'); m.replaceChildren();
     var DR = S.daily[S.sel.id];
-    if (sc == null && DR && DR.length <= 30) {
+    if (sc == null && DR && DR.length <= 15) {
       b.textContent = 'N/A'; b.className = 'vbadge hold';
-      m.append(el('span', null, 'Daily model can’t score ' + S.sel.label + ': only ' + DR.length + ' daily candles (needs 30+, ideally a year).'),
+      m.append(el('span', null, 'Daily model can’t score ' + S.sel.label + ': only ' + DR.length + ' daily candles (needs 16+, ideally a year).'),
         el('span', null, /FUT|CRUDE|GOLD|SILVER|NATURALGAS|COPPER|ZINC|NIFTY\d/i.test(S.sel.id + ' ' + S.sel.label) ? 'Futures contracts restart each expiry, so history is short. The model is built for NSE stocks; pick a stock for its call.' : 'Pick a stock with longer history.'));
       return;
     }
@@ -1488,7 +1752,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
       var mk = src.map(function (c) {
         var t = tf === '1D' ? new Date(c.made * 1000).toISOString().slice(0, 10) : c.bar; if (!times[String(t)]) return null;
         return { time: t, position: c.side > 0 ? 'belowBar' : 'aboveBar', color: c.side > 0 ? css('--up') : css('--down'), shape: c.side > 0 ? 'arrowUp' : 'arrowDown', text: sideTxt(c.side) + (c.status === 'open' ? '' : c.status === 'target' ? ' ✓' : c.status === 'sl' ? ' ✗' : ' ·') };
-      }).filter(Boolean).sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
+      }).filter(Boolean).concat(Patterns.update(S.candles, tf).filter(function (m) { return times[String(m.time)]; }))
+        .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
       try { cSeries.setMarkers(mk); } catch (e) {}
     }
     function quoteSyms() { var out = []; list.forEach(function (c) { if (c.status === 'open' && out.indexOf(c.sym) < 0) out.push(c.sym); }); return out; }
@@ -1989,6 +2254,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
       $('liveTxt').textContent = 'Offline'; $('beat').className = 'dot off'; if (!S.candles.length) chartMsg('No live data in this view.'); return;
     }
     S.mcp = mcp;
+    resolveMcx();
     quoteLoop(); watchGlobal(); watchModelData(); loadCandles(); loadDepth(); loadDaily(); watchSelected(); depthLoop(); candleLoop(); dailyLoop();
     if (!load('cat.list')) {
       call('get_watchlists').then(function (wl) {
