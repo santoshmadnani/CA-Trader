@@ -1367,6 +1367,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     // CA Trader's own recommendations (its engine, and the ones the app saved)
     function ingest(r) {
       if (!r || typeof r !== 'object') return false;
+      if (r.signal_model && r.signal_model.decision === 'NO_TRADE') return false;   // the engine itself says no trade
+      if (r.qualifies === false) return false;
       var side = String(r.recommendation || r.action || r.signal || '').toUpperCase(); side = side.indexOf('BUY') >= 0 ? 1 : side.indexOf('SELL') >= 0 ? -1 : 0;
       var entry = Number(r.entry != null ? r.entry : r.entry_price), tgt = Number(r.target != null ? r.target : (r.targets && r.targets[0])), sl = Number(r.stop_loss != null ? r.stop_loss : r.sl);
       if (!side || !(entry > 0)) return false;
