@@ -2,7 +2,7 @@
   "name": "CA Trader",
   "short_name": "CA Trader",
   "description": "Signals, charts and paper trading on live Upstox data",
-  "start_url": "/terminal?ui=mobile",
+  "start_url": "/terminal",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

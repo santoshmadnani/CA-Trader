@@ -8841,6 +8841,7 @@ def _ui_response(path: Path, choice: str | None) -> Response:
     resp = HTMLResponse(path.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
     if choice:
         resp.set_cookie("cat_ui", choice, max_age=365 * 86400, samesite="lax")
+        resp.set_cookie("cat_ui2", choice, max_age=365 * 86400, samesite="lax")
     return resp
 
 
@@ -8851,7 +8852,16 @@ async def terminal_page(request: Request) -> Response:
     user=current_user(request)
     if AUTH_ENABLED and not user:
         return RedirectResponse("/login", status_code=302)
+    # Default trading screen: the signal terminal (ca_terminal.html, the same page as the Claude artifact) on every device.
+    # The earlier screens stay one click away: ?ui=mobile (phone app) or ?ui=desktop (trade page); ?ui=signals switches back.
     choice = request.query_params.get("ui")
+    pick = choice if choice in ("signals", "desktop", "mobile") else request.cookies.get("cat_ui2")
+    signals_page = BASE_DIR / "ca_terminal.html"
+    if pick not in ("desktop", "mobile") and signals_page.exists():
+        resp = HTMLResponse(signals_page.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+        if choice == "signals":
+            resp.delete_cookie("cat_ui2")
+        return resp
     choice = choice if choice in ("desktop", "mobile") else None
     ua = request.headers.get("user-agent", "")
     cookie = request.cookies.get("cat_ui")
