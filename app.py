@@ -8114,7 +8114,8 @@ async def lifespan(app: FastAPI):
     tg_bot_task = asyncio.create_task(_telegram_bot_service_loop())
     sm_telethon_task = asyncio.create_task(_stockmantra_live_telethon_loop())
     reco_sender_task = asyncio.create_task(_recommendation_sender_agent_loop())
-    skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop())
+    # Canned Telegram feature-review prompts: replaced by the Model Lab's daily review. Set CA_SKILL_AGENT=1 to bring it back.
+    skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop() if os.getenv("CA_SKILL_AGENT") == "1" else asyncio.sleep(0))
     plan_tracker_task = asyncio.create_task(_signal_plan_tracker_loop())
 
     async def _warm_page_caches() -> None:
@@ -9620,15 +9621,44 @@ try:
 except Exception:
     _LAST_GOOD_CANDLES = {}
 
+_LAST_GOOD_TOUCH: dict[str, float] = {k: time.time() for k in _LAST_GOOD_CANDLES}
+_LAST_GOOD_STATE = {"dirty": False, "saved": time.time(), "writing": False}
+_LAST_GOOD_LOCK = threading.Lock()
+
+
+def _flush_last_good_candles() -> None:
+    """Write the fallback candle file. Keeps the 160 most recently used series (anything untouched for 3 days goes),
+    so the file and the start-up load stay small."""
+    try:
+        with _LAST_GOOD_LOCK:
+            cut = time.time() - 3 * 86400
+            keep = sorted((k for k in _LAST_GOOD_CANDLES if _LAST_GOOD_TOUCH.get(k, 0) >= cut), key=lambda k: -_LAST_GOOD_TOUCH.get(k, 0))[:160]
+            for k in [k for k in _LAST_GOOD_CANDLES if k not in set(keep)]:
+                _LAST_GOOD_CANDLES.pop(k, None); _LAST_GOOD_TOUCH.pop(k, None)
+            snap = dict(_LAST_GOOD_CANDLES)
+            _LAST_GOOD_STATE["dirty"] = False
+        tmp = _CANDLES_CACHE_FILE.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as _f:
+            json.dump(snap, _f, separators=(",", ":"))
+        os.replace(tmp, _CANDLES_CACHE_FILE)
+    except Exception:
+        pass
+    finally:
+        _LAST_GOOD_STATE["saved"] = time.time(); _LAST_GOOD_STATE["writing"] = False
+
+
 def _save_last_good_candles(key: str, val: list[dict[str, Any]]) -> None:
+    """Remember the last good series in memory at once; write the disk copy (only a fallback for Upstox outages)
+    at most every 10 minutes in the background. Rewriting the whole file on every refresh used most of the CPU
+    of each signal calculation."""
     if not val:
         return
     _LAST_GOOD_CANDLES[key] = val
-    try:
-        with open(_CANDLES_CACHE_FILE, "w", encoding="utf-8") as _f:
-            json.dump(_LAST_GOOD_CANDLES, _f)
-    except Exception:
-        pass
+    _LAST_GOOD_TOUCH[key] = time.time()
+    _LAST_GOOD_STATE["dirty"] = True
+    if not _LAST_GOOD_STATE["writing"] and time.time() - _LAST_GOOD_STATE["saved"] > 600:
+        _LAST_GOOD_STATE["writing"] = True
+        threading.Thread(target=_flush_last_good_candles, name="ca-candle-backup", daemon=True).start()
 
 def analysis_candles_robust(instrument: str, timeframe: str, days: int) -> list[dict[str, Any]]:
     """Fetch a fresh, range-appropriate Upstox candle series with minimal upstream calls."""
@@ -9683,7 +9713,7 @@ def analysis_candles_robust(instrument: str, timeframe: str, days: int) -> list[
             probe=_previous_weekday(probe)
 
     if out:
-        _save_last_good_candles(f"{instrument}:{tf}", copy.deepcopy(out))
+        _save_last_good_candles(f"{instrument}:{tf}", [dict(r) for r in out])
 
     # Fallback for Futures contracts (e.g. CRUDEOIL FUT 19 OCT 26, BANKNIFTY FUT, etc.)
     if not out and ("FUT" in instrument.upper() or any(k in instrument.upper() for k in ("CRUDE", "GOLD", "SILVER", "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"))):
@@ -9693,7 +9723,7 @@ def analysis_candles_robust(instrument: str, timeframe: str, days: int) -> list[
                 und_candles = analysis_candles_robust(und_candidate, tf, days)
                 if und_candles:
                     out = copy.deepcopy(und_candles)
-                    _save_last_good_candles(f"{instrument}:{tf}", copy.deepcopy(out))
+                    _save_last_good_candles(f"{instrument}:{tf}", [dict(r) for r in out])
             except Exception as ef:
                 log.warning("Futures candle fallback failed for %s -> %s: %s", instrument, und_candidate, safe_text(ef))
 
@@ -9706,7 +9736,7 @@ def analysis_candles_robust(instrument: str, timeframe: str, days: int) -> list[
                     opt_q = UPSTOX.quote(instrument)
                     out = synthesize_option_candles(instrument, opt_info, und_candles, float(opt_q.get("ltp") or 0))
                     if out:
-                        _save_last_good_candles(f"{instrument}:{tf}", copy.deepcopy(out))
+                        _save_last_good_candles(f"{instrument}:{tf}", [dict(r) for r in out])
             except Exception as e:
                 log.warning("Option candle fallback failed for %s: %s", instrument, safe_text(e))
 
@@ -11022,9 +11052,22 @@ async def api_next_session(instrument: str, user: dict[str, Any] = Depends(requi
     cached = CACHE.get(key)
     if cached is not None:
         return cached
-    res = await asyncio.wait_for(asyncio.to_thread(_compute_next_session, instrument), timeout=90)
-    CACHE.set(key, res, 1800.0)
-    return res
+    # One calculation per instrument at a time. A timed-out request used to leave its thread running and the
+    # retry started another, stacking CPU-heavy runs; now the run finishes and fills the cache for the next poll.
+    fut = _SIGNALS_INFLIGHT.get(key)
+    if fut is None or fut.done():
+        fut = asyncio.ensure_future(asyncio.to_thread(_compute_next_session, instrument))
+        _SIGNALS_INFLIGHT[key] = fut
+
+        def _store(f: "asyncio.Future[Any]", k: str = key) -> None:
+            _SIGNALS_INFLIGHT.pop(k, None)
+            if not f.cancelled() and f.exception() is None:
+                CACHE.set(k, f.result(), 1800.0)
+        fut.add_done_callback(_store)
+    try:
+        return await asyncio.wait_for(asyncio.shield(fut), timeout=60)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, "The next-session outlook is still being calculated; it will appear on the next refresh.")
 
 db_exec("""CREATE TABLE IF NOT EXISTS signal_plans (
     id TEXT PRIMARY KEY, user_id INTEGER, symbol TEXT, horizon TEXT, timeframe TEXT, side TEXT, score REAL,
