@@ -28,6 +28,7 @@ jobs:
             cd /home/ubuntu/CA-Trader
             # The repo is private: fetch with this job's short-lived token (never stored on the server), and stop if it fails.
             git fetch "https://x-access-token:${GH_FETCH_TOKEN}@github.com/${GH_REPO}.git" CA-Trader-Bifurcated || { echo "[ERROR] git fetch failed"; exit 1; }
+            rm -f ca_claude_connector.py app.py.bak-*   # was hand-copied before it was tracked; the repo copy replaces it
             git reset --hard FETCH_HEAD
             if [ "$(git rev-parse HEAD)" != "$GH_SHA" ]; then echo "[ERROR] server is at $(git rev-parse HEAD), expected $GH_SHA"; exit 1; fi
 

@@ -19262,3 +19262,9 @@ async def post_learn_ai_explain(request: Request, user: dict[str, Any] = Depends
 
 
 
+
+
+# Claude connector (MCP), shared signal terminal at /signals, model and context-log routes
+import sys as _sys
+from ca_claude_connector import register_mcp as _register_mcp
+_register_mcp(app, _sys.modules[__name__])

@@ -36,3 +36,6 @@ data/tradebook-*
 # Editor
 .vscode/
 
+
+mcp_secret.txt
+app.py.bak-*
