@@ -8845,6 +8845,26 @@ def _ui_response(path: Path, choice: str | None) -> Response:
     return resp
 
 
+_TERMINAL_HEAD = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                  '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+                  '<meta name="theme-color" content="#06080d"><meta name="apple-mobile-web-app-capable" content="yes">'
+                  '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+                  '<link rel="manifest" href="/static/m/manifest.json"><link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+                  '<style>body{margin:0}</style></head><body>')
+
+
+def terminal_page_html() -> str | None:
+    """ca_terminal.html is the Claude artifact's page body (the artifact host adds the document shell and viewport).
+    Served here, it gets the same shell so phones use the mobile layout instead of a zoomed-out desktop page."""
+    page = BASE_DIR / "ca_terminal.html"
+    if not page.exists():
+        return None
+    html = page.read_text(encoding="utf-8")
+    if 'name="viewport"' not in html:
+        html = _TERMINAL_HEAD + html + "\n</body></html>"
+    return html
+
+
 @app.get("/terminal", response_class=HTMLResponse)
 async def terminal_page(request: Request) -> Response:
     """Trading screen: the mobile app on phones, the desktop terminal elsewhere (?ui=desktop|mobile switches and is remembered).
@@ -8856,9 +8876,9 @@ async def terminal_page(request: Request) -> Response:
     # The earlier screens stay one click away: ?ui=mobile (phone app) or ?ui=desktop (trade page); ?ui=signals switches back.
     choice = request.query_params.get("ui")
     pick = choice if choice in ("signals", "desktop", "mobile") else request.cookies.get("cat_ui2")
-    signals_page = BASE_DIR / "ca_terminal.html"
-    if pick not in ("desktop", "mobile") and signals_page.exists():
-        resp = HTMLResponse(signals_page.read_text(encoding="utf-8"), headers=HTML_PAGE_HEADERS)
+    signals_html = terminal_page_html() if pick not in ("desktop", "mobile") else None
+    if signals_html:
+        resp = HTMLResponse(signals_html, headers=HTML_PAGE_HEADERS)
         if choice == "signals":
             resp.delete_cookie("cat_ui2")
         return resp

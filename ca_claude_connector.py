@@ -467,7 +467,8 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         if getattr(core, "AUTH_ENABLED", True) and not core.current_user(request):
             return RedirectResponse("/login")
         headers = getattr(core, "HTML_PAGE_HEADERS", {"Cache-Control": "no-store"})
-        return HTMLResponse(page.read_text(encoding="utf-8"), headers=headers)
+        wrap = getattr(core, "terminal_page_html", None)
+        return HTMLResponse((wrap() if wrap else None) or page.read_text(encoding="utf-8"), headers=headers)
 
     # ---- context logger: order-book imbalance, PCR and news tone every 30 min in market hours ----
     def _ensure_context_table() -> None:
