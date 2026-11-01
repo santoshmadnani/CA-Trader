@@ -4715,7 +4715,18 @@ _RSS_ITEMS: dict[str, tuple[float, list[dict[str, str]] | None]] = {}
 _RSS_TTL = float(os.getenv("NEWS_RSS_TTL", "180"))
 
 
+_RSS_LOCKS: dict[str, threading.Lock] = {}
+_RSS_LOCKS_G = threading.Lock()
+
+
 def _rss_items(rss_url: str, timeout: float) -> list[dict[str, str]]:
+    with _RSS_LOCKS_G:
+        lk = _RSS_LOCKS.setdefault(rss_url, threading.Lock())
+    with lk:  # one fetch per feed even when many instruments ask at once
+        return _rss_items_locked(rss_url, timeout)
+
+
+def _rss_items_locked(rss_url: str, timeout: float) -> list[dict[str, str]]:
     now = time.time()
     hit = _RSS_ITEMS.get(rss_url)
     if hit and now - hit[0] < (_RSS_TTL if hit[1] is not None else 60):
@@ -4827,13 +4838,14 @@ def _strip_news_boilerplate(summary: str) -> str:
     t=re.sub(r"\b(?:with|from)\s+[A-Z][A-Za-z .-]{2,60}\b", " ", t)
     return re.sub(r"\s+", " ", t).strip()[:900]
 
+_NIFTY50_RE = None
+
 def _nifty50_news_match(text: str) -> bool:
-    t=_norm_news(text)
-    for sym in NIFTY50_SYMBOLS:
-        aliases=NIFTY50_NEWS_ALIASES.get(sym, [sym.lower()])
-        if any(re.search(r"\b"+re.escape(a.lower())+r"\b", t) for a in aliases):
-            return True
-    return False
+    global _NIFTY50_RE
+    if _NIFTY50_RE is None:
+        al = {a.lower() for sym in NIFTY50_SYMBOLS for a in NIFTY50_NEWS_ALIASES.get(sym, [sym.lower()]) if a}
+        _NIFTY50_RE = re.compile(r"\b(?:" + "|".join(re.escape(a) for a in sorted(al, key=len, reverse=True)) + r")\b")
+    return bool(_NIFTY50_RE.search(_norm_news(text)))
 
 def _news_classify_v6(title: str, summary: str, target: str) -> dict[str, Any]:
     raw_title=_clean_news_summary(title)
