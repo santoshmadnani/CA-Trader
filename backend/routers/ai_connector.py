@@ -720,31 +720,6 @@ async def mcp_get_diagnostics(request: Request):
         "recommendation": "Everything operating normally" if all_clean else "Code syntax or diff markers require attention"
     }
 
-@router.post("/deploy")
-async def mcp_deploy(request: Request):
-    """Allows ChatGPT, Gemini, or an MCP client to trigger a hot-reload deployment from GitHub."""
-    verify_ai_auth(
-        x_api_key=request.headers.get("x-api-key"),
-        authorization=request.headers.get("authorization")
-    )
-    
-    app_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    cmd = (
-        "git fetch origin CA-Trader-Bifurcated && "
-        "git reset --hard origin/CA-Trader-Bifurcated && "
-        "sudo systemctl restart catrader"
-    )
-    try:
-        proc = subprocess.run(cmd, shell=True, cwd=app_dir, capture_output=True, text=True, timeout=30)
-        return {
-            "success": proc.returncode == 0,
-            "stdout": proc.stdout.strip(),
-            "stderr": proc.stderr.strip(),
-            "message": "Deployment completed successfully" if proc.returncode == 0 else "Deploy encountered errors"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": str(e)})
-
 @router.post("/sql")
 async def mcp_sql(payload: SqlQueryIn, request: Request):
     """Allows AI agents to execute safe read-only SELECT queries on the SQLite database."""
@@ -763,7 +738,17 @@ async def mcp_sql(payload: SqlQueryIn, request: Request):
         raise HTTPException(status_code=500, detail={"error": f"Database not found at {db_path}"})
         
     try:
+        if ";" in q.rstrip().rstrip(";") or re.search(r"\b(attach|pragma|load_extension)\b", q, re.I):
+            raise HTTPException(status_code=400, detail={"error": "Single plain SELECT only."})
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
+        _deny = {"users", "settings", "login_sessions", "password_reset_tokens", "user_passbooks", "user_notification_settings"}
+        def _auth(action, a1, a2, db, src):
+            if action == sqlite3.SQLITE_READ and (a1 or "").lower() in _deny:
+                return sqlite3.SQLITE_DENY
+            if action in (sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ, sqlite3.SQLITE_FUNCTION):
+                return sqlite3.SQLITE_OK
+            return sqlite3.SQLITE_DENY
+        conn.set_authorizer(_auth)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(q)
@@ -910,14 +895,10 @@ async def mcp_get_historical(
     request: Request = None
 ):
     """Returns official historical OHLC prices, closing prices, and trading volumes from exchange."""
-    if request:
-        try:
-            verify_ai_auth(
-                x_api_key=request.headers.get("x-api-key"),
-                authorization=request.headers.get("authorization")
-            )
-        except Exception:
-            pass
+    verify_ai_auth(
+        x_api_key=request.headers.get("x-api-key"),
+        authorization=request.headers.get("authorization")
+    )
     return await fetch_historical_prices_data(instrument, date=date, timeframe=timeframe, days=days)
 
 def extract_symbol_and_date(text: str, default_sym: str | None = None, default_date: str | None = None) -> tuple[str, str | None]:
@@ -1191,14 +1172,10 @@ async def mcp_universal_query_get(
     request: Request = None
 ):
     """GET variant of the universal gateway endpoint."""
-    if request:
-        try:
-            verify_ai_auth(
-                x_api_key=request.headers.get("x-api-key"),
-                authorization=request.headers.get("authorization")
-            )
-        except Exception:
-            pass
+    verify_ai_auth(
+        x_api_key=request.headers.get("x-api-key"),
+        authorization=request.headers.get("authorization")
+    )
     payload = UniversalQueryIn(query=query, action=action, symbol=symbol, date=date)
     return await execute_universal_query(payload, request=request)
 

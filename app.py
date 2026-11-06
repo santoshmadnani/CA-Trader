@@ -8302,6 +8302,9 @@ async def request_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
     if request.url.path.startswith("/static/"):
         response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=3600"
     scope = "API" if request.url.path.startswith("/api/") else "APP"
@@ -8347,6 +8350,8 @@ def current_user(request: Request) -> dict[str, Any] | None:
     is_public_get = request.method == "GET" and any(request.url.path.startswith(p) for p in (
         "/api/market", "/api/recommendations", "/api/options", "/api/news", "/api/analysis"
     ))
+    if request.url.path.startswith("/api/market/query"):
+        is_public_get = False   # can reach broker positions/funds: never anonymous
     is_ai_query = request.url.path in ("/api/ai/ask", "/api/ai/chat", "/api/recommendations/for-date")
     if is_public_get or is_ai_query:
         admin = db_exec("SELECT * FROM users WHERE role='admin' ORDER BY id LIMIT 1", fetch="one")
@@ -8577,7 +8582,7 @@ async def multi_agent_harness_page(request: Request) -> Response:
 
 
 @app.get("/api/agents/telemetry")
-async def agents_telemetry(request: Request) -> dict[str, Any]:
+async def agents_telemetry(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Returns real server-side agent telemetry, market state, and live recommendation counts."""
     try:
         now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
@@ -8666,7 +8671,7 @@ async def agents_telemetry(request: Request) -> dict[str, Any]:
 
 
 @app.get("/api/agents/recommendation-history")
-async def agents_recommendation_history(request: Request) -> dict[str, Any]:
+async def agents_recommendation_history(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Dedicated endpoint returning SQLite recommendation history filterable by timeframe."""
     try:
         tf = str(request.query_params.get("timeframe") or "5m").lower().strip()
@@ -9050,13 +9055,42 @@ async def update_profile(request: Request, user: dict[str, Any] = Depends(requir
     updated = get_user(user["id"])
     return {"authenticated": True, "user": {"id": updated["id"], "username": updated["username"], "email": updated.get("email"), "full_name": updated.get("full_name"), "role": updated.get("role","user")}}
 
+_LOGIN_FAILS: dict[str, list[float]] = {}
+_LOGIN_MAX_FAILS, _LOGIN_WINDOW_S = 8, 900.0
+
+
+def _login_keys(request: Request, email: str) -> list[str]:
+    ip = (request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "") or "?").strip()
+    return [f"ip:{ip}", f"em:{email}"]
+
+
+def _login_blocked(keys: list[str]) -> bool:
+    cutoff = time.time() - _LOGIN_WINDOW_S
+    for k in keys:
+        hits = [t for t in _LOGIN_FAILS.get(k, []) if t > cutoff]
+        if hits:
+            _LOGIN_FAILS[k] = hits
+        else:
+            _LOGIN_FAILS.pop(k, None)
+        if len(hits) >= _LOGIN_MAX_FAILS:
+            return True
+    return False
+
+
 @app.post("/api/auth/login")
 async def auth_login(payload: LoginIn, request: Request) -> dict[str, Any]:
     if not AUTH_ENABLED:
         return {"authenticated": True, "mode": "disabled"}
     email = payload.email.strip().lower()
+    keys = _login_keys(request, email)
+    if _login_blocked(keys):
+        raise HTTPException(status_code=429, detail={"code": "TOO_MANY_ATTEMPTS", "message": "Too many failed sign-ins. Try again in 15 minutes."})
     row = db_exec("SELECT * FROM users WHERE email=? AND is_active=1", [email], "one")
     if not row or not row.get("password_hash") or not verify_password(payload.password, row["password_hash"]):
+        for k in keys:
+            _LOGIN_FAILS.setdefault(k, []).append(time.time())
+        if len(_LOGIN_FAILS) > 5000:
+            _LOGIN_FAILS.clear()
         record_error("authentication_failure", "Invalid email/password")
         raise HTTPException(status_code=401, detail={"code": "INVALID_CREDENTIALS", "message": "Invalid email or password"})
     _reset_session(request)   # keeps ?next= (e.g. /fitnesstracker) across the session-fixation reset
@@ -9075,6 +9109,8 @@ async def auth_logout(request: Request) -> dict[str, Any]:
 
 @app.post("/api/auth/signup")
 async def auth_signup(request: Request) -> dict[str, Any]:
+    if os.getenv("CA_ALLOW_SIGNUP", "1").strip().lower() in ("0", "false", "no", "off"):
+        raise HTTPException(status_code=403, detail={"code": "SIGNUP_DISABLED", "message": "Sign-up is disabled"})
     body = await request.json()
     full_name = str(body.get("full_name", "")).strip()
     email = str(body.get("email", "")).strip().lower()
@@ -9499,7 +9535,7 @@ async def market_historical(
     date: str | None = Query(None, description="Specific historical date in YYYY-MM-DD format (e.g. 2026-09-24)"),
     timeframe: str = Query("1D", description="Candle timeframe: 1D (daily), 15m, 5m, 1m, 60m"),
     days: int = Query(30, ge=1, le=365, description="Number of historical days to fetch"),
-    user: dict[str, Any] | None = Depends(current_user)
+    user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
     from backend.routers.ai_connector import fetch_historical_prices_data
     return await fetch_historical_prices_data(instrument, date=date, timeframe=timeframe, days=days)
@@ -9507,7 +9543,7 @@ async def market_historical(
 
 @app.post("/api/market/query")
 @app.get("/api/market/query")
-async def market_query_gateway(request: Request):
+async def market_query_gateway(request: Request, user: dict[str, Any] = Depends(require_user)):
     from backend.routers.ai_connector import UniversalQueryIn, execute_universal_query
     if request.method == "POST":
         try:
@@ -9859,7 +9895,7 @@ def _merge_live_quote_into_candles(instrument: str, timeframe: str, candles: lis
         return candles, None
 
 @app.get("/api/market/candles/{instrument}")
-async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=r"^(1m|2m|3m|4m|5m|10m|15m|30m|60m|120m|180m|240m|1D|1W|1M)$"), days: int = Query(7, ge=1, le=3650), user: dict[str, Any] | None = Depends(current_user)) -> dict[str, Any]:
+async def market_candles(instrument: str, timeframe: str = Query("15m", pattern=r"^(1m|2m|3m|4m|5m|10m|15m|30m|60m|120m|180m|240m|1D|1W|1M)$"), days: int = Query(7, ge=1, le=3650), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     ck = f"candles:{instrument}:{timeframe}:{days}"
     cached = CACHE.get(ck)
     if cached:
@@ -11951,6 +11987,8 @@ async def api_global_prices(user: dict[str, Any] = Depends(require_user)) -> dic
 
 @app.get("/api/events")
 async def api_events(since_id: int = 0, limit: int = 60, kind: str = "", symbol: str = "", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail={"code": "ADMIN_ONLY", "message": "Admin only"})
     kinds = [k for k in kind.split(",") if k in EVENTS.KINDS] or None
     items = await asyncio.to_thread(EVENTS.recent, db_exec, limit, since_id, kinds, symbol.upper() or None)
     return {"events": items, "kinds": {k: {"icon": v[0], "label": v[1]} for k, v in EVENTS.KINDS.items()}, "timestamp": now_iso()}
@@ -11958,6 +11996,8 @@ async def api_events(since_id: int = 0, limit: int = 60, kind: str = "", symbol:
 
 @app.get("/api/agents")
 async def api_agents(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail={"code": "ADMIN_ONLY", "message": "Admin only"})
     now = datetime.now(timezone.utc)
     out = []
     for name, what in _AGENT_INFO.items():
@@ -12021,6 +12061,8 @@ User asks: {msg}"""
 @app.post("/api/agents/chat")
 async def api_agents_chat(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     body = await request.json()
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail={"code": "ADMIN_ONLY", "message": "Admin only"})
     return await agent_chat(body.get("agent"), body.get("message"), body.get("history"))
 
 
@@ -12547,8 +12589,6 @@ def fetch_global_market_quotes() -> dict[str, Any]:
     quotes = {}
     import urllib.request, json, ssl
     ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
 
     from concurrent.futures import ThreadPoolExecutor
     def _fetch_one(t_info):
@@ -18317,96 +18357,6 @@ async def reports_trades(
     }
 
 
-@app.get("/api/newspaper/feed")
-async def newspaper_feed(date: str | None = None) -> dict[str, Any]:
-    """Delivers daily and historical e-newspaper editions from genuine financial sources."""
-    now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    today_str = now_ist.strftime("%Y-%m-%d")
-
-    editions = {
-        "current": {
-            "date": today_str,
-            "title": f"The Financial Daily — {now_ist.strftime('%A, %d %B %Y')}",
-            "headline": "Nifty Consolidates Around Key 23,500 Pivots as Institutional Accumulation Drives Domestic Equities",
-            "editorial": "Domestic benchmark indices experienced orderly price discovery between structural Fibonacci support and pivot resistance. Foreign institutional flows showed measured positioning in frontline energy and banking majors while mid-caps witnessed stock-specific momentum.",
-            "market_snapshot": [
-                {"instrument": "NIFTY 50", "value": "23,477.80", "change": "+31.20 (+0.13%)", "sentiment": "Bullish"},
-                {"instrument": "SENSEX", "value": "77,340.50", "change": "+112.40 (+0.15%)", "sentiment": "Bullish"},
-                {"instrument": "BANK NIFTY", "value": "50,180.25", "change": "-42.10 (-0.08%)", "sentiment": "Neutral"},
-                {"instrument": "CRUDE OIL", "value": "₹6,180/bbl", "change": "+1.2%", "sentiment": "Bullish"},
-                {"instrument": "GOLD 24K", "value": "₹71,450/10g", "change": "+0.45%", "sentiment": "Bullish"},
-                {"instrument": "USD/INR", "value": "₹83.92", "change": "-0.04", "sentiment": "Neutral"}
-            ],
-            "articles": [
-                {
-                    "title": "Reliance Industries Advances Strategic Energy & Retail Roadmap Following Robust Quarterly Performance",
-                    "source": "Economic Times",
-                    "category": "Corporate",
-                    "read_time": "3 min",
-                    "summary": "Reliance Industries demonstrated sustained margin resilience across its oil-to-chemicals and consumer businesses. Brokerages maintain positive bias highlighting steady subscriber additions in telecom and accelerated new energy capacity rollout.",
-                    "url": "https://economictimes.indiatimes.com/markets",
-                    "impact": "Bullish for RELIANCE (₹1,274 support firm)"
-                },
-                {
-                    "title": "Reserve Bank of India Monetary Policy Committee Emphasizes Durable Inflation Alignment and Resilient GDP Growth",
-                    "source": "Financial Express",
-                    "category": "Macro Economy",
-                    "read_time": "4 min",
-                    "summary": "The RBI MPC reiterated its commitment to aligning headline inflation with the 4% target on a durable basis while supporting sustained economic activity. High-frequency indicators indicate robust urban demand and rising rural consumption.",
-                    "url": "https://www.financialexpress.com/market/",
-                    "impact": "Constructive for Financials & Public Sector Banks"
-                },
-                {
-                    "title": "IT Sector Order Inflows Rebound Driven by Generative AI and Cloud Modernization Engagements",
-                    "source": "Mint",
-                    "category": "Technology",
-                    "read_time": "3 min",
-                    "summary": "Top tier Indian IT services companies reported sequential improvement in Total Contract Value (TCV) for enterprise generative AI pilots and core cloud modernization programs in North America and Europe.",
-                    "url": "https://www.livemint.com/market",
-                    "impact": "Positive for TCS, INFY, and HCLTECH"
-                },
-                {
-                    "title": "Capital Goods & Infrastructure Majors Report Record Order Books on Public Sector Capex Push",
-                    "source": "Reuters India",
-                    "category": "Industry",
-                    "read_time": "2 min",
-                    "summary": "Manufacturing, defence and engineering order books hit multi-year highs as government budgetary allocation towards railway electrification, renewables, and domestic industrial corridors gains execution velocity.",
-                    "url": "https://www.reuters.com/markets/",
-                    "impact": "Bullish for BHEL, L&T, and SIEMENS"
-                }
-            ]
-        },
-        "historical_archive": [
-            {
-                "date": "2024-02-01",
-                "title": "Union Budget 2024 Special — Fiscal Deficit Pegged at 5.1%, Capital Expenditure Scaled to ₹11.11 Lakh Crore",
-                "headline": "Historic Capex Commitment Anchors Long-Term Industrial Expansion without Inflationary Slippage",
-                "summary": "The interim budget set an aggressive fiscal consolidation roadmap while boosting infrastructure spending by 11.1% to ₹11.11 trillion, triggering massive rallies in railway, defence, and infrastructure equities."
-            },
-            {
-                "date": "2024-06-05",
-                "title": "General Election Special Edition — Market Rebounds Record 730 Points as Policy Continuity Confirmed",
-                "headline": "Equities Stash Historic Recovery Post-Election Volatility as Coalition Pledges Reform Momentum",
-                "summary": "Following single-day volatility, benchmark indices recorded their strongest one-day turnaround in four years as key government leaders confirmed commitment to structural reforms and economic stability."
-            },
-            {
-                "date": "2023-04-06",
-                "title": "RBI MPC Pivot — Central Bank Holds Repo Rate at 6.50% in Surprise Unanimous Pause",
-                "headline": "Governor Announces Tactical Pause to Assess Cumulative 250 bps Transmission",
-                "summary": "The monetary policy committee held rates steady against consensus expectations, catalyzing a sustained multi-month bull rally across real estate, auto, and rate-sensitive stocks."
-            },
-            {
-                "date": "2020-03-24",
-                "title": "Covid-19 Emergency Edition — Global Central Banks Unleash Unprecedented Liquidity Buffers",
-                "headline": "Severe Market Dislocation Meets Unlimited Quantitative Easing and Fiscal Stimulus Globally",
-                "summary": "Historic selloff marked long-term generational market bottom as the US Federal Reserve, RBI, and global authorities introduced unprecedented emergency credit guarantees and rate slashes."
-            }
-        ]
-    }
-
-    return editions
-
-
 @app.get("/api/quiz/questions")
 async def quiz_questions(category: str | None = None) -> dict[str, Any]:
     """Delivers categorized multiple-choice trading quizzes with institutional explanations."""
@@ -18580,6 +18530,7 @@ async def log_client_error(request: Request) -> dict[str, Any]:
     except Exception:
         data = {}
     if data and isinstance(data, dict):
+        data = {str(k)[:40]: (str(v)[:500] if not isinstance(v, (int, float)) else v) for k, v in list(data.items())[:12]}
         data["received_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
         CLIENT_ERRORS_LOG.appendleft(data)
         log.warning("Client UI Error: %s at %s:%s", data.get("message"), data.get("source"), data.get("lineno"))
@@ -20201,7 +20152,9 @@ async def serve_learn_ai_page() -> HTMLResponse:
 
 
 @app.get("/api/learn-ai/directory")
-async def get_learn_ai_directory() -> dict[str, Any]:
+async def get_learn_ai_directory(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="Admin only")
     """Returns the comprehensive code index mapping app.py and terminal.html."""
     idx_path = Path(__file__).resolve().parent / "learn_ai" / "code_index.json"
     if idx_path.exists():
@@ -20214,7 +20167,9 @@ async def get_learn_ai_directory() -> dict[str, Any]:
 
 
 @app.get("/api/learn-ai/code-slice")
-async def get_learn_ai_code_slice(file: str = "app.py", start: int = 1, end: int = 100) -> dict[str, Any]:
+async def get_learn_ai_code_slice(file: str = "app.py", start: int = 1, end: int = 100, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="Admin only")
     """Safely retrieves a line-numbered slice of app.py or terminal.html."""
     safe_name = "app.py" if "app" in file.lower() else "terminal.html"
     target_path = Path(__file__).resolve().parent / safe_name
