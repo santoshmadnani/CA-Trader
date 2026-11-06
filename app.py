@@ -157,6 +157,7 @@ from backend.services import next_session as NEXT_SESSION
 from backend.services import alerts as ALERTS
 from backend.services import events as EVENTS
 from backend.services import news_quality as NEWS_QUALITY
+from backend.services import market_structure as MARKET_STRUCTURE
 from backend.services import news_topics as NEWS_TOPICS
 from backend.services.telegram_service import (
     mask_token,
@@ -11333,6 +11334,7 @@ _AGENT_INFO = {
     "Plan tracker": "Builds the scalp / intraday / swing plans, records each call and grades it against real 1-minute candles",
     "Live P&L watcher": "Marks every filled call to the live price and reports open profit or loss",
     "Run detector": "Spots bullish and bearish runs as they form",
+    "Pattern scanner": "Reads candlestick patterns, chart patterns and the option chain on every tracked symbol",
     "Market clock": "Market open/close notices, the pre-market brief and the day summary",
     "Telegram dispatcher": "Sends each event to Telegram, respecting market hours, quiet hours and a flood limit",
     "News worker": "Keeps the news cache fresh for the indices, crude, global and the watchlist",
@@ -11700,6 +11702,8 @@ async def _live_engine_loop() -> None:
                 if tick % 2 == 0:
                     f = await asyncio.to_thread(_run_scan)
                     _beat("Run detector", f"{f} new run(s)" if f else "scanning")
+                    pcount = await asyncio.to_thread(_pattern_scan)
+                    _beat("Pattern scanner", f"{pcount} new pattern(s)" if pcount else "scanning candles and the option chain")
                 await asyncio.to_thread(_grade_recommendations)
                 _beat("Recommendation recorder", "graded saved recommendations")
         except Exception as exc:
@@ -11766,6 +11770,87 @@ def _grade_recommendations() -> int:
     return changed
 
 
+_PACK_DAYS = {"1m": 3, "3m": 5, "5m": 12, "15m": 30, "30m": 45, "60m": 90, "1D": 420}
+_CHAIN_BIAS: dict[str, str] = {}
+
+
+def _closed_arrays(sym: str, tf: str) -> dict[str, list]:
+    """Closed candles only (the candle still forming is dropped), as parallel lists for backend/services/market_structure.py."""
+    s = TRADE_PLAN.Series(analysis_candles_robust(sym, tf, _PACK_DAYS.get(tf, 12)) or [], tf)
+    n = len(s)
+    if n and tf != "1D" and s.t[-1] + timedelta(minutes=TRADE_PLAN.TF_MIN[tf]) > datetime.now(IST):
+        n -= 1
+    return {"t": [x.isoformat() for x in s.t[:n]], "o": s.o[:n], "h": s.h[:n], "l": s.l[:n], "c": s.c[:n], "v": s.v[:n]}
+
+
+def _analysis_pack_sync(sym: str, tf: str = "5m") -> dict[str, Any]:
+    root = extract_root_symbol(sym).upper()
+    ck = f"pack:{root}:{tf}"
+    hit = CACHE.get(ck)
+    if hit is not None:
+        return hit
+    d = _closed_arrays(root, tf)
+    chain = None
+    try:
+        chain = UPSTOX.option_chain(root)
+    except Exception:
+        chain = None
+    out = MARKET_STRUCTURE.pack(d, chain, d["c"][-1] if d["c"] else None)
+    out.update({"symbol": root, "timeframe": tf, "candles_used": len(d["c"]), "last_candle": d["t"][-1] if d["t"] else None, "timestamp": now_iso()})
+    CACHE.set(ck, out, 20.0)
+    return out
+
+
+def _pattern_scan() -> int:
+    """Reliable candlestick patterns, confirmed chart patterns and option-chain shifts on the tracked symbols become events."""
+    syms = _tracked_symbols(bool(market_session("NSE_EQ").get("active")))
+    if market_session("MCX").get("active"):
+        syms = list(dict.fromkeys(list(syms) + ["CRUDEOIL"]))
+    sent = 0
+    for sym in syms[:6]:
+        root = extract_root_symbol(sym).upper()
+        seg = "MCX" if get_symbol_segment(root) == "MCX" else "NSE_EQ"
+        if not market_session(seg).get("active"):
+            continue
+        try:
+            p = _analysis_pack_sync(root, "5m")
+        except Exception as exc:
+            log.debug("pattern scan %s failed: %s", root, safe_text(exc))
+            continue
+        last = (p.get("last_candle") or "")[:16]
+        price = (p.get("indicators") or {}).get("price")
+        for c in ((p.get("candles") or {}).get("live") or []):
+            if c["bars_ago"] == 0 and c["direction"] != "neutral" and c["reliable"]:
+                bull = c["direction"] == "bullish"
+                if _emit("pattern", {"name": c["pattern"], "symbol": root, "timeframe": "5m", "bias": c["direction"], "meaning": c["meaning"], "price": price,
+                                     "confirm": ("a close above the pattern's high" if bull else "a close below the pattern's low") + " on the next candle",
+                                     "advice": "Only a hint. Act on a published call, not on a pattern alone."}, symbol=root, dedupe=f"pat:{root}:{c['pattern']}:{last}"):
+                    sent += 1
+        for c in ((p.get("chart") or {}).get("patterns") or []):
+            if c["direction"] != "neutral" and str(c["status"]).startswith("confirmed") and c["starts_bars_ago"] <= 60:
+                if _emit("pattern", {"name": c["pattern"], "symbol": root, "timeframe": "5m", "bias": c["direction"], "meaning": c["why"], "price": price,
+                                     "confirm": f"already confirmed at {c['level']}", "advice": f"Pattern target {c['target']}; it fails if price returns to {c['invalidates_at']}. Only a hint; act on a published call."},
+                         symbol=root, dedupe=f"chart:{root}:{c['pattern']}:{c['level']}"):
+                    sent += 1
+        oc = p.get("options") or {}
+        if oc.get("available"):
+            prev, now_b = _CHAIN_BIAS.get(root), oc["bias"]
+            _CHAIN_BIAS[root] = now_b
+            if prev is not None and prev != now_b and now_b != "neutral":
+                if _emit("option_flow", {"symbol": root, "headline": f"Option chain turned {now_b}", "points": oc.get("notes", [])[:5],
+                                         "reading": f"PCR {oc.get('pcr_oi')}, support {oc.get('put_wall')}, resistance {oc.get('call_wall')}, max pain {oc.get('max_pain')}"},
+                         symbol=root, dedupe=f"oc:{root}:{now_b}:{datetime.now(IST):%Y%m%d%H}"):
+                    sent += 1
+    return sent
+
+
+@app.get("/api/analysis/pack/{symbol}")
+async def api_analysis_pack(symbol: str, tf: str = "5m", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if tf not in _PACK_DAYS:
+        raise HTTPException(400, f"tf must be one of {', '.join(_PACK_DAYS)}")
+    return await asyncio.to_thread(_analysis_pack_sync, symbol, tf)
+
+
 @app.get("/api/events")
 async def api_events(since_id: int = 0, limit: int = 60, kind: str = "", symbol: str = "", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     kinds = [k for k in kind.split(",") if k in EVENTS.KINDS] or None
@@ -11790,6 +11875,7 @@ _AGENT_PERSONA = {
     "Plan tracker": ("Tracker Tara", "keeps every published call and checks it against real 1-minute candles"),
     "Live P&L watcher": ("Penny", "watches the live profit or loss of every filled call"),
     "Run detector": ("Radar Ravi", "spots bullish and bearish runs"),
+    "Pattern scanner": ("Pattern Pia", "reads candlestick patterns, chart patterns and the option chain"),
     "Market clock": ("Clock Kabir", "announces market open/close, the morning brief and the day summary"),
     "Telegram dispatcher": ("Postman Pappu", "delivers each event to Telegram within the market-hours rules"),
     "News worker": ("Newsie Nina", "collects news and keeps only what affects the selected stock"),
