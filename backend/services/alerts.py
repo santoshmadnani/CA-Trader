@@ -130,6 +130,9 @@ def qualifies(plan: dict[str, Any], cfg: dict[str, Any]) -> tuple[bool, list[str
     side = plan.get("decision")
     if side not in ("BUY", "SELL") or plan.get("expired") or not plan.get("available", True):
         return False, ["not a live BUY/SELL plan"]
+    edge = plan.get("edge") or {}
+    if edge.get("grade") in ("FAILING", "NEGATIVE"):   # automatic demotion: a horizon that is losing money stops alerting
+        return False, [f"horizon graded {edge['grade']}: {edge.get('why', '')}".strip()]
     want = 1 if side == "BUY" else -1
     htf = plan.get("higher_timeframes") or []
     tr = plan.get("track_record") or {}

@@ -25,6 +25,7 @@ backups/
 logs/
 data/candles_cache*.json
 data/ui_customization.json
+data/runtime/
 data/videos/
 server_host/
 

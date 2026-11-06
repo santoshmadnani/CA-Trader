@@ -1,0 +1,25 @@
+name: Weekly model self-review
+
+# Saturday 05:00 IST (Friday 23:30 UTC), when every market is closed. Runs scripts/auto_improve.py on the Oracle VM:
+# grades the plans the app issued, writes a factor-weight proposal, re-runs the gated parameter tuner and appends one line
+# to data/runtime/model_journal.jsonl. It never edits tracked files, never changes factor weights and never places orders.
+on:
+  schedule:
+    - cron: "30 23 * * 5"
+  workflow_dispatch:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the self-review on the server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          command_timeout: 40m
+          script: |
+            cd /home/ubuntu/CA-Trader
+            test -f scripts/auto_improve.py || { echo "scripts/auto_improve.py is not on the server yet; deploy first"; exit 1; }
+            /home/ubuntu/venv/bin/python scripts/auto_improve.py 2>&1 | tail -80

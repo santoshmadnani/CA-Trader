@@ -10952,6 +10952,24 @@ def _atm_contract(chain: dict[str, Any] | None, spot: float, side: str) -> dict[
     return best[1] if best else None
 
 
+def _forward_stats(root: str, horizon: str, days: int = 30) -> dict[str, Any]:
+    """Live record of the plans this app issued and graded against 1-minute candles (gross R, before costs)."""
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        rows = db_exec("SELECT status, r FROM signal_plans WHERE symbol=? AND horizon=? AND created_at >= ?", [root, horizon, since], "all") or []
+    except Exception as exc:
+        log.debug("forward stats %s %s failed: %s", root, horizon, safe_text(exc))
+        rows = []
+    closed = [r for r in rows if r["status"] in ("T1", "T2", "SL", "TIME")]
+    hits = [r for r in closed if r["status"] in ("T1", "T2")]
+    rs = [float(r["r"] or 0) for r in closed]
+    lo, hi = TRADE_PLAN.wilson(len(hits), len(closed)) if closed else (None, None)
+    return {"days": days, "issued": len(rows), "expired_unfilled": sum(1 for r in rows if r["status"] == "EXPIRED"),
+            "open": sum(1 for r in rows if r["status"] in ("PENDING", "OPEN")), "closed": len(closed), "hits": len(hits),
+            "hit_pct": round(len(hits) / len(closed) * 100, 1) if closed else None, "ci_low": lo, "ci_high": hi,
+            "avg_r": round(sum(rs) / len(rs), 3) if rs else None, "basis": "gross R, before costs"}
+
+
 def _compute_signals(instrument: str) -> dict[str, Any]:
     root = extract_root_symbol(instrument).upper()
     mcx = get_symbol_segment(root) == "MCX"
@@ -10979,6 +10997,12 @@ def _compute_signals(instrument: str) -> dict[str, Any]:
         bt = _SIGNAL_BT.get(f"{root}:{h}")
         if bt:
             p["track_record"] = {k: bt.get(k) for k in _TRACK_KEYS}
+        if p.get("available"):
+            fwd = _forward_stats(root, h)
+            p["forward"] = fwd
+            p["edge"] = TRADE_PLAN.edge_grade(p.get("track_record"), fwd)
+            if p.get("decision") in ("BUY", "SELL") and not p.get("expired"):
+                p["confidence"] = TRADE_PLAN.confidence_estimate(p, p.get("track_record"))
         plans.append(p)
     active = market_session("MCX" if mcx else "NSE_EQ").get("active")
     return {"instrument": instrument, "root": root, "market_open": bool(active), "plans": plans, "news": news,
@@ -11121,6 +11145,10 @@ db_exec("""CREATE TABLE IF NOT EXISTS signal_plans (
     status TEXT, fill_price REAL, filled_at TEXT, exit_price REAL, closed_at TEXT, r REAL, updated_at TEXT)""")
 db_exec("CREATE INDEX IF NOT EXISTS idx_signal_plans_created ON signal_plans(created_at)")
 ALERTS.ensure_tables(db_exec)
+try:
+    db_exec("ALTER TABLE signal_plans ADD COLUMN factors_json TEXT")   # factor scores at issue time, so weights can be learned from outcomes
+except Exception:
+    pass   # column exists
 _PLAN_OPEN_STATES = ("PENDING", "OPEN")
 
 
@@ -11138,13 +11166,20 @@ def _record_plans(res: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         if live:
             continue
         pid = secrets.token_hex(10)
-        db_exec("""INSERT INTO signal_plans(id, user_id, symbol, horizon, timeframe, side, score, entry_low, entry_high, stop_loss,
-                   target_1, target_2, valid_until, time_stop_bars, time_stop_at_latest, option_json, instructions, created_at, status, updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                [pid, 1, res["root"], p["horizon"], p["timeframe"], p["decision"], p["score"], p["entry_low"],
-                 p["entry_high"], p["stop_loss"], p["target_1"], p["target_2"], p["valid_until"], p["time_stop_bars"],
-                 p["time_stop_at_latest"], json.dumps(p.get("option")) if p.get("option") else None, p.get("instructions"),
-                 now_iso(), "PENDING", now_iso()])
+        base_args = [pid, 1, res["root"], p["horizon"], p["timeframe"], p["decision"], p["score"], p["entry_low"],
+                     p["entry_high"], p["stop_loss"], p["target_1"], p["target_2"], p["valid_until"], p["time_stop_bars"],
+                     p["time_stop_at_latest"], json.dumps(p.get("option")) if p.get("option") else None, p.get("instructions"),
+                     now_iso(), "PENDING", now_iso()]
+        snapshot = json.dumps({"factors": p.get("factors"), "weights": p.get("weights"), "raw_score": p.get("raw_score"),
+                               "news_bias": p.get("news_bias"), "context": p.get("context"),
+                               "htf": [h.get("bias") for h in (p.get("higher_timeframes") or [])],
+                               "confidence_pct": (p.get("confidence") or {}).get("pct"), "edge": (p.get("edge") or {}).get("grade")})
+        cols = """id, user_id, symbol, horizon, timeframe, side, score, entry_low, entry_high, stop_loss,
+                   target_1, target_2, valid_until, time_stop_bars, time_stop_at_latest, option_json, instructions, created_at, status, updated_at"""
+        try:
+            db_exec(f"INSERT INTO signal_plans({cols}, factors_json) VALUES({','.join('?' * 21)})", base_args + [snapshot])
+        except Exception:
+            db_exec(f"INSERT INTO signal_plans({cols}) VALUES({','.join('?' * 20)})", base_args)
         added.append((pid, p))
     return added
 
@@ -11357,6 +11392,7 @@ async def api_signals_history(days: int = Query(7, ge=1, le=90), symbol: str | N
     rows = db_exec(sql + " ORDER BY created_at DESC LIMIT 500", args, "all") or []
     for r in rows:
         r["option"] = json.loads(r.pop("option_json")) if r.get("option_json") else None
+        r.pop("factors_json", None)   # internal: used by scripts/auto_improve.py, not needed by clients
     stats = {}
     for h in TRADE_PLAN.HORIZONS:
         hs = [r for r in rows if r["horizon"] == h]

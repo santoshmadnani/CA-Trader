@@ -88,8 +88,11 @@ def main() -> None:
         print(f"{h}: tuned={best} train={best_train} test tuned={avg(test_best, 'expectancy_r')}R "
               f"default={avg(test_def, 'expectancy_r')}R accept={accept}", flush=True)
 
-    TP.CONFIG_PATH.write_text(json.dumps(out, indent=2), encoding="utf-8")
-    print(f"wrote {TP.CONFIG_PATH} in {time.time() - t0:.0f}s")
+    TP.RUNTIME_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)   # untracked: a deploy's git reset must not revert it
+    tmp = TP.RUNTIME_CONFIG_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    tmp.replace(TP.RUNTIME_CONFIG_PATH)   # atomic: a crash mid-write never leaves a broken config
+    print(f"wrote {TP.RUNTIME_CONFIG_PATH} in {time.time() - t0:.0f}s")
 
 
 if __name__ == "__main__":

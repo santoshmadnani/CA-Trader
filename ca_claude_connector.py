@@ -173,6 +173,21 @@ TOOLS: list[dict[str, Any]] = [
         "description": "CA Trader's backtested model call for a symbol at the latest daily close (live during market hours): BUY/SELL/HOLD, score, percentile, the 14 criteria with z-scores and weights, and the model's out-of-sample backtest stats.",
         "inputSchema": _schema({"symbol": SYMBOL}, ["symbol"]),
     },
+    {
+        "name": "get_trade_plans",
+        "description": "CA Trader's official time-bound trade plans for a symbol: scalp (1m), intraday (5m) and swing (15m), each with BUY/SELL/NO_TRADE, entry zone, stop-loss, targets T1/T2, expiry, the factor scores and levels arithmetic behind it, the measured confidence (with sample size and 95% interval), the backtest track record, the live graded record and an edge grade.",
+        "inputSchema": _schema({"symbol": SYMBOL}, ["symbol"]),
+    },
+    {
+        "name": "get_plan_history",
+        "description": "Plans CA Trader issued in the last N days and how each ended (T1, T2, stop-loss, time exit, expired), with hit rate and average R per horizon.",
+        "inputSchema": _schema({
+            "symbol": {"type": "string", "description": "Optional symbol filter, e.g. NIFTY"},
+            "days": {"type": "integer", "minimum": 1, "maximum": 90, "default": 7},
+            "horizon": {"type": "string", "enum": ["scalp", "intraday", "swing"], "description": "Optional horizon filter"},
+        }),
+    },
+    {"name": "get_model_health", "description": "Latest weekly self-review of the trade-plan model (parameter tuning outcome, factor study, notes) and the live graded record per symbol and horizon over the last 30 days.", "inputSchema": _schema({})},
     {"name": "get_watchlists", "description": "The user's CA Trader watchlists and their symbols.", "inputSchema": _schema({})},
     {"name": "get_positions", "description": "Open paper-trading positions with live mark-to-market P&L.", "inputSchema": _schema({})},
     {"name": "get_holdings", "description": "Paper-trading holdings.", "inputSchema": _schema({})},
@@ -326,6 +341,21 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         import ca_model  # imported lazily so a missing file can never stop the app from starting
         return await ca_model.model_signal(core, _sym(args), user)
 
+    async def t_plans(args, user):
+        return await core.api_signals(_sym(args), user=user)
+
+    async def t_plan_history(args, user):
+        hz = str(args.get("horizon") or "").strip().lower() or None
+        if hz is not None and hz not in ("scalp", "intraday", "swing"):
+            raise ValueError("horizon must be scalp, intraday or swing")
+        sym = str(args.get("symbol") or "").strip() or None
+        return await core.api_signals_history(days=_int(args, "days", 7, 1, 90), symbol=sym, horizon=hz, user=user)
+
+    async def t_model_health(args, user):
+        from backend.services import model_health as mh   # lazy: a missing file can never stop the app from starting
+        fwd = await asyncio.to_thread(mh.forward_table, core.db_exec, 30)
+        return {"latest_review": mh.latest_journal(), "forward_30d": fwd}
+
     async def t_movers(args, user):
         cat = str(args.get("category") or "gainers")
         if cat not in MOVER_CATEGORIES:
@@ -409,6 +439,9 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         "get_candles": t_candles,
         "get_recommendation": t_reco,
         "get_model_signal": t_model,
+        "get_trade_plans": t_plans,
+        "get_plan_history": t_plan_history,
+        "get_model_health": t_model_health,
         "get_market_movers": t_movers,
         "get_market_session": t_session,
         "get_option_chain": t_options,

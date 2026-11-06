@@ -39,17 +39,20 @@ GATE = 35.0
 
 # Tunable rule parameters (per horizon); data/trade_plan_config.json (written by scripts/tune_trade_plans.py) overrides them.
 DEFAULT_PARAMS = {"gate": 35.0, "strict_htf": False, "t1_r": 1.0, "t2_r": 2.0, "sl_min_atr": 0.8, "sl_max_atr": 2.2, "pullback_only": False}
-CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "trade_plan_config.json"
-_CONFIG_CACHE: dict[str, Any] = {"mtime": None, "data": {}}
+CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "trade_plan_config.json"   # tracked baseline
+# Written on the host by scripts/auto_improve.py / scripts/tune_trade_plans.py. It is untracked, so a deploy never reverts it.
+RUNTIME_CONFIG_PATH = CONFIG_PATH.parent / "runtime" / "trade_plan_config.json"
+_CONFIG_CACHE: dict[str, Any] = {"mtime": None, "path": None, "data": {}}
 
 
 def params_for(horizon: str) -> dict[str, Any]:
     try:
-        mtime = CONFIG_PATH.stat().st_mtime
-        if mtime != _CONFIG_CACHE["mtime"]:
-            _CONFIG_CACHE.update(mtime=mtime, data=json.loads(CONFIG_PATH.read_text(encoding="utf-8")))
+        path = RUNTIME_CONFIG_PATH if RUNTIME_CONFIG_PATH.exists() else CONFIG_PATH
+        mtime = path.stat().st_mtime
+        if mtime != _CONFIG_CACHE["mtime"] or str(path) != _CONFIG_CACHE["path"]:
+            _CONFIG_CACHE.update(mtime=mtime, path=str(path), data=json.loads(path.read_text(encoding="utf-8")))
     except Exception:
-        _CONFIG_CACHE.update(mtime=None, data={})
+        _CONFIG_CACHE.update(mtime=None, path=None, data={})
     tuned = ((_CONFIG_CACHE["data"].get("horizons") or {}).get(horizon) or {}).get("params") or {}
     return {**DEFAULT_PARAMS, **tuned}
 
@@ -258,12 +261,16 @@ def _levels(s: Series, i: int, side: str, prm: dict[str, Any] | None = None) -> 
             entry_lo = entry_hi - 0.25 * atr
         ref = (entry_lo + entry_hi) / 2
         below = [x for x in lows if x < entry_lo]
-        sl = (max(below) if below else entry_lo - 0.6 * atr) - 0.1 * atr
-        risk = min(max(ref - sl, sl_lo * atr), sl_hi * atr)
+        struct_sl = (max(below) if below else entry_lo - 0.6 * atr) - 0.1 * atr
+        raw_risk = ref - struct_sl
+        risk = min(max(raw_risk, sl_lo * atr), sl_hi * atr)
         sl = ref - risk
         res = [x for x in highs if x > ref + 0.8 * risk]
-        t1 = min(ref + t1_r * risk, min(res)) if res else ref + t1_r * risk
+        t1_plain = ref + t1_r * risk
+        t1_cap = min(res) if res and min(res) < t1_plain else None
+        t1 = t1_cap if t1_cap is not None else t1_plain
         t2 = ref + t2_r * risk
+        anchor = support
     else:
         resist = [x for x in [s.vwap[i] if s.tf != "1D" else None, s.e21[i]] + highs if x is not None and x > px and x - px <= 2.0 * atr]
         resistance = min(resist) if resist else px + 0.6 * atr
@@ -274,14 +281,22 @@ def _levels(s: Series, i: int, side: str, prm: dict[str, Any] | None = None) -> 
             entry_hi = entry_lo + 0.25 * atr
         ref = (entry_lo + entry_hi) / 2
         above = [x for x in highs if x > entry_hi]
-        sl = (min(above) if above else entry_hi + 0.6 * atr) + 0.1 * atr
-        risk = min(max(sl - ref, sl_lo * atr), sl_hi * atr)
+        struct_sl = (min(above) if above else entry_hi + 0.6 * atr) + 0.1 * atr
+        raw_risk = struct_sl - ref
+        risk = min(max(raw_risk, sl_lo * atr), sl_hi * atr)
         sl = ref + risk
         sup = [x for x in lows if x < ref - 0.8 * risk]
-        t1 = max(ref - t1_r * risk, max(sup)) if sup else ref - t1_r * risk
+        t1_plain = ref - t1_r * risk
+        t1_cap = max(sup) if sup and max(sup) > t1_plain else None
+        t1 = t1_cap if t1_cap is not None else t1_plain
         t2 = ref - t2_r * risk
+        anchor = resistance
+    clamp = "min" if raw_risk < sl_lo * atr else "max" if raw_risk > sl_hi * atr else None
     return {"entry_low": entry_lo, "entry_high": entry_hi, "entry": ref, "stop_loss": sl, "target_1": t1, "target_2": t2,
-            "risk": risk, "atr": atr, "wait_for_pullback": extended}
+            "risk": risk, "atr": atr, "wait_for_pullback": extended,
+            # how the levels were derived (shown on screen so every number can be traced)
+            "anchor": anchor, "struct_sl": struct_sl, "raw_risk": raw_risk, "risk_atr": risk / atr if atr else None,
+            "risk_clamp": clamp, "t1_uncapped": t1_plain, "t1_capped_at": t1_cap}
 
 
 def build_plan(horizon: str, series: dict[str, Series], at_index: int | None = None, mcx: bool = False,
@@ -323,6 +338,11 @@ def build_plan(horizon: str, series: dict[str, Series], at_index: int | None = N
         "decision": decision, "score": round(total, 1), "gate": gate, "factors": sc["scores"], "inputs": sc["inputs"],
         "context": bar_context(s, i),
         "higher_timeframes": htf, "as_of": t.isoformat(), "reason": reason,
+        # the arithmetic behind the score, so the screen can show it line by line
+        "raw_score": sc["total"], "news_bias": round(max(-100.0, min(100.0, news_bias)), 1),
+        "news_points": round(0.1 * max(-100.0, min(100.0, news_bias)), 2),
+        "weights": {k: (0.0 if (k == "vwap" and s.tf == "1D") else v) for k, v in WEIGHTS.items()},
+        "params": {k: prm[k] for k in ("gate", "strict_htf", "t1_r", "t2_r", "sl_min_atr", "sl_max_atr", "pullback_only")},
     }
     if decision in ("BUY", "SELL"):
         lv = _levels(s, i, decision, prm)
@@ -420,6 +440,100 @@ def context_stats(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             groups.setdefault(str(r[dim]), []).append(r)
         out[dim] = {k: _bucket_stats(v) for k, v in sorted(groups.items())}
     return out
+
+
+SHRINK_K = 20   # a context bucket counts as much as this many "average" past trades before its own record dominates
+MIN_N_GRADE = 30   # fewer filled backtest signals than this can never be called an edge
+MIN_EDGE_R = 0.05  # net expectancy (R per trade, after costs) below this is not separable from noise and costs
+MIN_FWD_N = 20     # live-graded closed plans needed before the forward record can confirm or refute the backtest
+
+
+def wilson(hits: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% Wilson score interval for a hit rate, in percent. Honest about small samples."""
+    if n <= 0:
+        return 0.0, 100.0
+    p = hits / n
+    d = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / d
+    half = z * (p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5 / d
+    return round(max(0.0, centre - half) * 100, 1), round(min(1.0, centre + half) * 100, 1)
+
+
+def _plan_buckets(plan: dict[str, Any]) -> dict[str, str]:
+    want = 1 if plan.get("decision") == "BUY" else -1
+    htf = plan.get("higher_timeframes") or []
+    ctx = plan.get("context") or {}
+    return {"band": score_band(float(plan.get("score") or 0)),
+            "htf": "all" if htf and all((h.get("bias") or 0) * want > 0 for h in htf) else "mixed",
+            "tod": str(ctx.get("tod", "late")), "vol": str(ctx.get("vol", "normal"))}
+
+
+BUCKET_LABELS = {"band": "Score strength", "htf": "Higher timeframes", "tod": "Time of day", "vol": "Volatility"}
+
+
+def confidence_estimate(plan: dict[str, Any], track: dict[str, Any] | None) -> dict[str, Any]:
+    """Probability (in %) that this plan reaches T1 before its stop, once filled, from the plan's own backtest.
+
+    Start from the overall T1-before-SL rate of every filled backtest signal of this horizon. For each situation the plan
+    is in (score strength, higher-timeframe agreement, time of day, volatility) look up how past signals in that same
+    situation did, shrink that record toward the overall rate (so a bucket with few trades cannot swing the answer), and
+    nudge the overall rate by the average shrunk difference. The interval is the 95% Wilson interval of the overall rate:
+    the real uncertainty is at least that wide. This is a measured frequency, not a prediction guarantee."""
+    tr = track or {}
+    n0 = int(tr.get("filled") or 0)
+    h0 = tr.get("t1_hit_rate")
+    if n0 < 1 or h0 is None:
+        return {"available": False, "reason": "The backtest for this plan has not produced filled signals yet."}
+    p0 = float(h0) / 100.0
+    e0 = tr.get("expectancy_r_net") if tr.get("expectancy_r_net") is not None else tr.get("expectancy_r")
+    e0 = float(e0) if e0 is not None else None
+    ctx = tr.get("context") or {}
+    rows, d_p, d_e = [], [], []
+    for dim, bucket in _plan_buckets(plan).items():
+        st = (ctx.get(dim) or {}).get(bucket) or {}
+        n = int(st.get("n") or 0)
+        row: dict[str, Any] = {"dim": dim, "label": BUCKET_LABELS[dim], "bucket": bucket, "n": n}
+        if n > 0 and st.get("hit") is not None:
+            hits = float(st["hit"]) / 100.0 * n
+            shrunk = (hits + SHRINK_K * p0) / (n + SHRINK_K)
+            row.update({"raw_pct": round(float(st["hit"]), 1), "shrunk_pct": round(shrunk * 100, 1), "delta_pp": round((shrunk - p0) * 100, 1),
+                        "weight_pct": round(n / (n + SHRINK_K) * 100)})
+            d_p.append(shrunk - p0)
+            en = st.get("exp_net") if st.get("exp_net") is not None else st.get("exp")
+            if en is not None and e0 is not None:
+                d_e.append((float(en) * n + SHRINK_K * e0) / (n + SHRINK_K) - e0)
+        rows.append(row)
+    est = min(0.99, max(0.01, p0 + (sum(d_p) / len(d_p) if d_p else 0.0)))
+    lo, hi = wilson(int(round(p0 * n0)), n0)
+    exp_est = round(e0 + (sum(d_e) / len(d_e) if d_e else 0.0), 3) if e0 is not None else None
+    return {"available": True, "pct": round(est * 100, 1), "base_pct": round(p0 * 100, 1), "n": n0, "ci_low": lo, "ci_high": hi,
+            "fill_pct": tr.get("fill_rate"), "expectancy_net_r": exp_est, "base_expectancy_net_r": round(e0, 3) if e0 is not None else None,
+            "k": SHRINK_K, "rows": rows, "from": tr.get("from"), "to": tr.get("to")}
+
+
+def edge_grade(track: dict[str, Any] | None, forward: dict[str, Any] | None) -> dict[str, Any]:
+    """Plain-language verdict on whether this horizon has shown an edge, from measured results only.
+
+    NEGATIVE: lost money per trade after costs in the backtest.   FAILING: lost money in live-graded plans.
+    UNPROVEN: too few signals, or an average too small to separate from costs and noise.
+    BACKTEST_EDGE: positive after costs in the backtest, live record still short.   CONFIRMED: also positive live."""
+    tr, fw = track or {}, forward or {}
+    n = int(tr.get("filled") or 0)
+    e = tr.get("expectancy_r_net") if tr.get("expectancy_r_net") is not None else tr.get("expectancy_r")
+    fn, fe = int(fw.get("closed") or 0), fw.get("avg_r")
+    if n < 1 or e is None:
+        return {"grade": "UNPROVEN", "label": "No track record yet", "why": "The backtest for this horizon has not finished."}
+    if fn >= MIN_FWD_N and fe is not None and fe < 0:
+        return {"grade": "FAILING", "label": "Failing live", "why": f"{fn} live-graded plans averaged {fe:+.2f}R (before costs). Treat new plans as paper-only."}
+    if n >= MIN_N_GRADE and e < 0:
+        return {"grade": "NEGATIVE", "label": "No edge", "why": f"Backtest over {n} filled signals averaged {e:+.2f}R per trade after costs."}
+    if n < MIN_N_GRADE:
+        return {"grade": "UNPROVEN", "label": "Unproven", "why": f"Only {n} filled backtest signals; at least {MIN_N_GRADE} are needed before the numbers mean anything."}
+    if e < MIN_EDGE_R:
+        return {"grade": "UNPROVEN", "label": "Unproven", "why": f"Backtest average {e:+.2f}R per trade after costs is under {MIN_EDGE_R:.2f}R, too small to tell apart from costs and noise."}
+    if fn >= MIN_FWD_N and fe is not None and fe > 0:
+        return {"grade": "CONFIRMED", "label": "Edge confirmed live", "why": f"Backtest {e:+.2f}R after costs over {n} signals, and {fn} live-graded plans averaged {fe:+.2f}R."}
+    return {"grade": "BACKTEST_EDGE", "label": "Backtest edge", "why": f"Backtest {e:+.2f}R per trade after costs over {n} signals. Live record is still short ({fn} closed plans)."}
 
 
 def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:

@@ -6,13 +6,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-/* Layout: fixed app shell with slim chrome. Desktop: 46px header | watchlist rail + workspace (signal web + calls, chart + feed, desk).
+/* Layout: fixed app shell with slim chrome. Desktop: 46px header | watchlist rail + workspace (trade call + calculations, calls log, chart + feed, desk).
    Phone: 46px header | one view | 52px tab bar. One theme for every surface. */
 :root{
   --bg:#eef1f6; --surface:#ffffff; --surface-2:#f4f6fa; --surface-3:#e8ecf3; --line:#dfe4ec; --fg:#111827; --muted:#667085;
   --accent:#2f6bf0; --accent-2:#7c5cff; --accent-soft:rgba(47,107,240,.12);
   --up:#0a9d7a; --down:#e5384a; --warn:#c98200; --up-soft:rgba(10,157,122,.13); --down-soft:rgba(229,56,74,.12);
-  --web-bg:#f7f9fc; --shadow:0 1px 2px rgba(16,24,40,.06);
+  --shadow:0 1px 2px rgba(16,24,40,.06);
   --font-ui:"Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
   --font-num:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
   color-scheme:light;
@@ -21,12 +21,12 @@
   --bg:#06080d; --surface:#0d1119; --surface-2:#121824; --surface-3:#19202e; --line:#1d2533; --fg:#e5e9f2; --muted:#7f8aa0;
   --accent:#5b8cff; --accent-2:#9b7bff; --accent-soft:rgba(91,140,255,.15);
   --up:#22c39a; --down:#ff5468; --warn:#f0b43c; --up-soft:rgba(34,195,154,.15); --down-soft:rgba(255,84,104,.14);
-  --web-bg:#05070c; --shadow:none; color-scheme:dark;}}
+  --shadow:none; color-scheme:dark;}}
 :root[data-theme="dark"]{
   --bg:#06080d; --surface:#0d1119; --surface-2:#121824; --surface-3:#19202e; --line:#1d2533; --fg:#e5e9f2; --muted:#7f8aa0;
   --accent:#5b8cff; --accent-2:#9b7bff; --accent-soft:rgba(91,140,255,.15);
   --up:#22c39a; --down:#ff5468; --warn:#f0b43c; --up-soft:rgba(34,195,154,.15); --down-soft:rgba(255,84,104,.14);
-  --web-bg:#05070c; --shadow:none; color-scheme:dark;}
+  --shadow:none; color-scheme:dark;}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%;overflow:hidden}
@@ -63,9 +63,9 @@ svg.i{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-widt
 
 .content{min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr);gap:10px;padding:10px max(12px,env(safe-area-inset-right,0px)) 10px max(12px,env(safe-area-inset-left,0px))}
 .pane{min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
-.main{display:grid;gap:10px;align-content:start;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"web web" "recs recs" "chart feed" "desk feed";grid-template-rows:repeat(4,max-content)}
-.sec-web{grid-area:web} .sec-chart{grid-area:chart} .sec-feed{grid-area:feed;display:flex;flex-direction:column;gap:10px;min-width:0} .sec-desk{grid-area:desk}
-@media (max-width:1240px){.main{grid-template-columns:minmax(0,1fr);grid-template-areas:"web" "recs" "chart" "desk" "feed";grid-template-rows:repeat(5,max-content)}.sec-feed{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}}
+.main{display:grid;gap:10px;align-content:start;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"hero hero" "recs recs" "chart feed" "desk feed";grid-template-rows:repeat(4,max-content)}
+.sec-hero{grid-area:hero} .sec-chart{grid-area:chart} .sec-feed{grid-area:feed;display:flex;flex-direction:column;gap:10px;min-width:0} .sec-desk{grid-area:desk}
+@media (max-width:1240px){.main{grid-template-columns:minmax(0,1fr);grid-template-areas:"hero" "recs" "chart" "desk" "feed";grid-template-rows:repeat(5,max-content)}.sec-feed{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}}
 @media (max-width:980px){.content{grid-template-columns:230px minmax(0,1fr)}}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:0;overflow:clip}
@@ -100,18 +100,7 @@ svg.i{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .wrow:hover .x{opacity:1}
 .flash-up{background:var(--up-soft)!important} .flash-down{background:var(--down-soft)!important}
 
-/* signal web + calls */
-.web-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px}
-@media (max-width:1100px){.web-grid{grid-template-columns:minmax(0,1fr)}}
-.web-wrap{position:relative;height:440px;background:var(--web-bg);border-top:1px solid var(--line)}
-#web{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
-.web-tools{position:absolute;right:8px;top:8px;z-index:3;display:flex;gap:6px}
-.web-tools .seg{background:var(--surface);border:1px solid var(--line)}
-.web-foot{position:absolute;left:10px;bottom:8px;z-index:3;font-family:var(--font-num);font-size:10px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;pointer-events:none;white-space:nowrap;overflow:hidden;max-width:calc(100% - 20px)}
-.tip{position:absolute;pointer-events:none;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:0 10px 28px rgba(0,0,0,.25);padding:7px 9px;font-size:11.5px;max-width:250px}
-.tip b{display:block;font-size:12px;margin-bottom:2px}
-.side{border-left:1px solid var(--line);border-top:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
-@media (max-width:1100px){.side{border-left:0}}
+/* decision + call panel (daily model tab) */
 .model{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
 .vbadge{font-size:15px;font-weight:700;letter-spacing:.04em;padding:5px 11px;border-radius:8px;min-width:64px;text-align:center}
 .vbadge.buy{background:var(--up-soft);color:var(--up)} .vbadge.sell{background:var(--down-soft);color:var(--down)} .vbadge.hold{background:var(--surface-2);color:var(--muted)}
@@ -196,12 +185,11 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   .main{display:block;height:100%}
   .app[data-view="watch"] .main,.app:not([data-view="watch"]) .wl-pane{display:none}
   .main>section{display:none;margin-bottom:10px}
-  .app[data-view="signal"] .sec-web,.app[data-view="chart"] .sec-chart,.app[data-view="desk"] .sec-desk,.app[data-view="recs"] .sec-recs{display:block}
+  .app[data-view="signal"] .sec-hero,.app[data-view="chart"] .sec-chart,.app[data-view="desk"] .sec-desk,.app[data-view="recs"] .sec-recs{display:block}
   .app[data-view="feed"] .sec-feed{display:flex}
   .app[data-view="chart"] .main{display:flex;flex-direction:column}
   .app[data-view="chart"] .sec-chart{display:flex;flex-direction:column;flex:1;min-height:380px;margin:0}
   .app[data-view="chart"] .chart-wrap{flex:1;height:auto;min-height:280px}
-  .web-wrap{height:min(58vh,520px)}
   .tabbar{display:grid;grid-template-columns:repeat(6,1fr);height:calc(52px + env(safe-area-inset-bottom,0px));padding:4px max(6px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(6px,env(safe-area-inset-left,0px));background:var(--surface);border-top:1px solid var(--line)}
   .tabbar button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer}
   .tabbar button[aria-selected="true"]{color:var(--accent)}
@@ -212,13 +200,76 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
 @keyframes tickUp{0%{transform:translateY(5px);opacity:.4;color:var(--up)}}
 @keyframes tickDn{0%{transform:translateY(-5px);opacity:.4;color:var(--down)}}
 
-/* signal web full screen */
-.app.webfs .sec-web{position:fixed;inset:0;z-index:95;border-radius:0;display:flex;flex-direction:column}
-.app.webfs .sec-web .web-grid{flex:1;min-height:0}
-.app.webfs .web-wrap{height:100%}
-.app.webfs .side{overflow:auto}
-@media (max-width:760px){.app.webfs .sec-web{display:flex!important}.app.webfs .web-grid{grid-template-rows:minmax(0,1fr) auto}.app.webfs .side{max-height:40vh}}
-.web-tools .icon-btn{width:30px;height:30px}
+/* trade call hero */
+.hero-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px}
+.hero-top .sym{font-size:18px;font-weight:700}
+.hero-top .ltp{font-size:18px;font-weight:600}
+.hero-tabs{margin-left:auto}
+.hero-tabs button{padding:6px 12px;font-size:12.5px}
+.hero-tabs .dotc{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:var(--muted);vertical-align:1px}
+.hero-tabs .dotc.buy{background:var(--up)} .hero-tabs .dotc.sell{background:var(--down)}
+.hero-body{border-top:1px solid var(--line);padding:14px}
+.hero-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.hero-side{font-size:26px;font-weight:800;letter-spacing:.03em;padding:6px 16px;border-radius:10px}
+.hero-side.buy{background:var(--up-soft);color:var(--up)} .hero-side.sell{background:var(--down-soft);color:var(--down)} .hero-side.none{background:var(--surface-2);color:var(--muted)}
+.hero-sub{font-size:12px;color:var(--muted);display:grid;gap:2px}
+.hero-conf{margin-left:auto;text-align:right}
+.hero-conf .big{font-family:var(--font-num);font-size:34px;font-weight:700;line-height:1}
+.hero-conf .cap{font-size:11px;color:var(--muted)}
+.big-lvls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.bl{background:var(--surface-2);border-radius:12px;padding:12px 14px;min-width:0;border-top:3px solid var(--line)}
+.bl.entry{border-top-color:var(--accent)} .bl.tgt{border-top-color:var(--up)} .bl.sl{border-top-color:var(--down)}
+.bl .k{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.bl .v{font-family:var(--font-num);font-weight:700;font-size:clamp(26px,3.6vw,46px);line-height:1.1;margin-top:4px;overflow-wrap:anywhere}
+.bl.entry .v{color:var(--accent)} .bl.tgt .v{color:var(--up)} .bl.sl .v{color:var(--down)}
+.bl .z{font-family:var(--font-num);font-size:13px;color:var(--muted);margin-top:2px}
+.bl .d{font-size:13px;margin-top:6px;font-family:var(--font-num)}
+.bl.dim .v{color:var(--muted)}
+.hero-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.chip{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--fg);font-family:var(--font-num)}
+.chip.good{background:var(--up-soft);color:var(--up)} .chip.bad{background:var(--down-soft);color:var(--down)} .chip.warn{background:rgba(201,130,0,.15);color:var(--warn)}
+.hero-ins{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:13px;line-height:1.5}
+.hero-acts{margin-top:12px}
+.hero-acts .btn{padding:9px 16px;font-size:13px}
+.hero-msg{padding:6px 0 2px;font-size:14px;line-height:1.5}
+.scorebar{position:relative;height:10px;border-radius:5px;background:var(--surface-3);margin:14px 0 6px}
+.scorebar i{position:absolute;top:-3px;width:4px;height:16px;border-radius:2px;background:var(--fg);transform:translateX(-2px)}
+.scorebar b{position:absolute;top:0;bottom:0;width:2px;background:var(--muted)}
+.scorebar-l{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--font-num)}
+/* calculation panels */
+.calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:10px}
+.calc-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;min-width:0;overflow:clip}
+.calc-card.wide{grid-column:1/-1}
+.calc-card h3{margin:0;font-size:13px;font-weight:700;padding:10px 14px 2px}
+.calc-card .why{font-size:12px;color:var(--muted);padding:0 14px 8px;line-height:1.5}
+.calc-card table{font-size:12.5px}
+.calc-card td,.calc-card th{padding:6px 10px;white-space:normal;vertical-align:top}
+.calc-card th:nth-child(-n+2),.calc-card td:nth-child(-n+2){text-align:left}
+.calc-card .eq{font-family:var(--font-num);font-size:12.5px;padding:8px 14px;background:var(--surface-2);border-top:1px solid var(--line);line-height:1.6;overflow-wrap:anywhere}
+.calc-card .eq b{font-weight:700}
+.calc-card .foot{font-size:11.5px;color:var(--muted);padding:8px 14px;border-top:1px solid var(--line);line-height:1.5}
+.calc-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:14px 2px 8px}
+.bar-cell{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px;min-width:2px}
+.grade{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+.grade.CONFIRMED,.grade.BACKTEST_EDGE{background:var(--up-soft);color:var(--up)} .grade.UNPROVEN{background:rgba(201,130,0,.15);color:var(--warn)} .grade.NEGATIVE,.grade.FAILING{background:var(--down-soft);color:var(--down)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;padding:4px 14px 10px;font-size:12.5px}
+.kv .k{color:var(--muted)} .kv .v{font-family:var(--font-num);text-align:right}
+.hero-daily .model{border-top:0}
+.hero-daily .call{padding:12px 14px}
+.hero-daily .lvls .lv{padding:12px 14px}
+.hero-daily .lv .k{font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.hero-daily .lv .v{font-family:var(--font-num);font-size:clamp(24px,3.2vw,40px);font-weight:700;line-height:1.1}
+.hero-daily .lv .p{font-size:13px}
+.hero-daily .cbadge{font-size:14px}
+@media (max-width:760px){
+  .big-lvls{grid-template-columns:minmax(0,1fr)}
+  .bl{display:grid;grid-template-columns:auto 1fr;gap:0 12px;align-items:baseline}
+  .bl .k{grid-column:1} .bl .v{grid-column:2;text-align:right;font-size:34px}
+  .bl .z,.bl .d{grid-column:1/-1}
+  .hero-conf{margin-left:0;text-align:left}
+  .hero-tabs{margin-left:0;width:100%} .hero-tabs button{flex:1;padding:6px 4px;font-size:11.5px} .hero-tabs .dotc{margin-right:4px}
+  .hero-daily .lvls{grid-template-columns:minmax(0,1fr)}
+}
 
 /* buttons */
 .btn{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -299,16 +350,14 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     </aside>
 
     <div class="pane main" id="main">
-      <section class="card sec-web">
-        <div class="card-h"><h2>Signal web</h2><span class="sub" id="webSub"></span></div>
-        <div class="web-grid">
-          <div class="web-wrap" id="webWrap">
-            <canvas id="web" aria-label="Signal web: CA Trader data points wired to backtested criteria, models and the final call. Hover a node for details."></canvas>
-            <div class="web-tools"><button class="icon-btn" id="webFs" type="button" aria-label="Full screen" title="Full screen (Esc to close)"><svg class="i" id="webFsIco" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
-            <div class="web-foot" id="webStats">building network…</div>
-            <div class="tip" id="tip" hidden></div>
-          </div>
-          <div class="side">
+      <section class="card sec-hero" id="hero">
+        <div class="hero-top">
+          <span class="sym" id="heroSym">—</span><span class="ltp num" id="heroLtp">—</span><span class="num" id="heroChg"></span>
+          <div class="seg hero-tabs" id="heroTabs" role="group" aria-label="Trade call horizon"></div>
+        </div>
+        <div class="hero-body">
+          <div id="heroPlan"></div>
+          <div id="heroDaily" class="hero-daily" hidden>
             <div class="model">
               <div class="vbadge hold" id="vBadge">—</div>
               <div class="vmeta" id="vMeta"><span>Waiting for data…</span></div>
@@ -322,6 +371,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
               <div class="note" id="callNote"></div>
             </div>
           </div>
+          <div id="heroCalc"></div>
+          <div id="heroHealth" style="margin-top:10px"></div>
         </div>
       </section>
 
@@ -395,8 +446,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   <nav class="tabbar" id="tabbar" role="tablist" aria-label="Views">
     <button role="tab" data-view="watch" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Watchlist</button>
     <button role="tab" data-view="chart" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M3 20h18M6 16V9M10 16V5M14 16v-4M18 16V8"/></svg>Chart</button>
-    <button role="tab" data-view="signal" aria-selected="true" type="button"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="3"/><path d="M7 6.8 10.3 11M7 17.2l3.3-4.2M14 12h2"/></svg>Signal</button>
-    <button role="tab" data-view="recs" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg>Calls</button>
+    <button role="tab" data-view="signal" aria-selected="true" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Trade</button>
+    <button role="tab" data-view="recs" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg>Log</button>
     <button role="tab" data-view="desk" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>Desk</button>
     <button role="tab" data-view="feed" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M9 9h6M9 13h6"/></svg>Feed</button>
   </nav>
@@ -507,7 +558,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   function setView(v) {
     $('app').setAttribute('data-view', v); store('cat.view', v);
     document.querySelectorAll('#tabbar button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.view === v)); });
-    requestAnimationFrame(function () { Web.resize(); });
+    Hero.render(true);
   }
   $('tabbar').addEventListener('click', function (ev) { var b = ev.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
   function isPhone() { try { return matchMedia('(max-width: 760px)').matches; } catch (e) { return false; } }
@@ -593,15 +644,15 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   function selectSym(id) {
     var w = S.list.find(function (x) { return x.id === id; }) || { id: id, label: id, name: '' };
     S.sel = w; store('cat.sel', id);
-    S.depth = null; S.depthErr = null; S.chain = null; S.chainErr = null; S.rec = null; S.recErr = null; S.news = null; S.newsErr = null;
+    S.depth = null; S.depthErr = null; S.chain = null; S.chainErr = null; S.rec = null; S.recErr = null; S.news = null; S.newsErr = null; S.plans = null; S.plansErr = null; S.plansStamp = (S.plansStamp || 0) + 1;
     renderWatchlist(); renderSymHead(); renderDepth(); renderChain(); renderNews(); renderOhlc();
-    showCandles(); runEngine(); Calls.render(true); Recs.render(true);
+    showCandles(); runEngine(); Calls.render(true); Recs.render(true); Hero.render(true);
     if (S.mcp) { loadCandles(); loadDepth(); loadDaily(); watchSelected(); }
   }
   function tfLabel(tf) { return tf === '60m' ? '1H' : tf; }
   function renderSymHead() {
     var w = S.sel; if (!w) return; var q = quoteFor(w.id);
-    $('symName').textContent = w.label; $('webSub').textContent = w.label + ' · ' + tfLabel(S.tf) + ' · live CA Trader data flowing into one call'; $('newsSub').textContent = newsSymbol() + ' + market';
+    $('symName').textContent = w.label; Hero.head(); $('newsSub').textContent = newsSymbol() + ' + market';
     $('symLtp').textContent = q ? n2(q.ltp) : '—'; $('symLtp').className = 'ltp num ' + sgn(q && q.change_pct);
     $('symChg').textContent = q ? (q.change > 0 ? '+' : '') + n2(q.change) + ' (' + pct(q.change_pct) + ')' : '';
     $('symChg').className = 'num ' + sgn(q && q.change_pct);
@@ -643,9 +694,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
       Calls.quoteSyms().concat(Paper.quoteSyms()).forEach(function (x) { if (ids.indexOf(x) < 0) ids.push(x); });
       try {
         onQuotes(await call('get_quotes', { symbols: ids.slice(0, 50) }));
-        S.lat = performance.now() - t0; S.lastTick = Date.now(); beat(); Web.feed('quotes', true); runEngine();
+        S.lat = performance.now() - t0; S.lastTick = Date.now(); beat(); runEngine();
       } catch (e) {
-        if (S.fatal) return; Web.feed('quotes', false);
+        if (S.fatal) return; 
         if (S.blocked.get_quotes) { $('liveTxt').textContent = 'Quotes blocked'; $('beat').className = 'dot off'; return; }
         $('liveTxt').textContent = 'Quotes retrying'; $('beat').className = 'dot idle';
         await sleep(Math.min((e && e.retryAfterMs) || 3000, 30000));
@@ -717,7 +768,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     if (!S.mcp || !S.sel || S.fatal) return; var seq = ++candleSeq; var sym = S.sel.id, tf = S.tf, label = S.sel.label;
     try {
       var d = await call('get_candles', { symbol: sym, timeframe: tf, days: TF_DAYS[tf], max_candles: tf === '1D' ? 300 : 400 }, { staleTime: fresh ? 0 : 10000, gcTime: 300000 });
-      var rows = toRows(d, tf); S.cc[ckey(sym, tf)] = rows; Web.feed('daily', true); Calls.onCandles(sym, label, tf, rows); var hk = ckey(sym, tf); if (seq === candleSeq) Hist.drop(hk);
+      var rows = toRows(d, tf); S.cc[ckey(sym, tf)] = rows; Calls.onCandles(sym, label, tf, rows); var hk = ckey(sym, tf); if (seq === candleSeq) Hist.drop(hk);
       saveCandleCache(ckey(sym, tf), rows);
       if (seq !== candleSeq) return;
       S.candles = Hist.merge(hk, rows).map(function (r) { return Object.assign({}, r); }); drawChart(!Hist.has(hk));
@@ -816,8 +867,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   var depthSeq = 0;
   async function loadDepth() {
     if (!S.mcp || !S.sel || S.fatal) return; var seq = ++depthSeq;
-    try { var d = await call('get_market_depth', { symbol: S.sel.id }); if (seq !== depthSeq) return; S.depth = d; S.depthErr = null; Web.feed('depth', true); }
-    catch (e) { if (seq !== depthSeq) return; S.depthErr = errText(e); Web.feed('depth', false); }
+    try { var d = await call('get_market_depth', { symbol: S.sel.id }); if (seq !== depthSeq) return; S.depth = d; S.depthErr = null; }
+    catch (e) { if (seq !== depthSeq) return; S.depthErr = errText(e); }
     renderDepth(); runEngine();
   }
   async function depthLoop() { for (;;) { await sleep(marketOpen() ? 2000 : 30000); if (S.fatal) return; if (!S.paused && !document.hidden) loadDepth(); } }
@@ -960,10 +1011,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   // ---------- watches ----------
   function watch(key, tool, input, onData, onErr, every, feedName) {
     stopWatch(key);
-    if (S.blocked[tool]) { onErr({ code: S.blocked[tool], message: 'Blocked in your CA Trader connector settings' }); if (feedName) Web.feed(feedName, false); return; }
+    if (S.blocked[tool]) { onErr({ code: S.blocked[tool], message: 'Blocked in your CA Trader connector settings' }); return; }
     S.watches[key] = S.mcp.watchTool(SERVER, tool, input, function (ev) {
-      if (ev.type === 'data') { onData(parse(ev.result)); if (feedName) Web.feed(feedName, true); }
-      else { if (isFatal(ev.error)) setFatal(ev.error); else if (ev.error && TOOL_BLOCK[ev.error.code]) { noteBlocked(tool, ev.error); stopWatch(key); } onErr(ev.error); if (feedName) Web.feed(feedName, false); }
+      if (ev.type === 'data') { onData(parse(ev.result)); }
+      else { if (isFatal(ev.error)) setFatal(ev.error); else if (ev.error && TOOL_BLOCK[ev.error.code]) { noteBlocked(tool, ev.error); stopWatch(key); } onErr(ev.error); }
     }, { refetchInterval: every || 30000 });
   }
   function watchGlobal() {
@@ -974,6 +1025,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     watch('pf', 'get_portfolio_snapshot', null, function (d) { S.pf = d; S.pfErr = null; renderPortfolio(); Calls.ingestMany(d && d.recommendations); }, function (e) { S.pfErr = errText(e); renderPortfolio(); });
     watch('pos', 'get_positions', null, function (d) { S.positions = d; renderPortfolio(); }, function (e) { S.pfErr = errText(e); renderPortfolio(); });
     watch('hold', 'get_holdings', null, function (d) { S.holdings = d; renderPortfolio(); }, function (e) { S.pfErr = errText(e); renderPortfolio(); });
+    watch('health', 'get_model_health', null, function (d) { S.health = d; S.healthErr = null; S.healthStamp = (S.healthStamp || 0) + 1; Hero.render(true); }, function (e) { S.healthErr = errText(e); S.healthStamp = (S.healthStamp || 0) + 1; Hero.render(true); }, 600000);
     watch('news_mkt', 'get_news', { symbol: 'NIFTY', limit: 20 }, function (d) { newsParts.mkt = (d && (d.events || d.items)) || []; mergeNews(); }, function (e) { newsParts.mkt = []; mergeNews(); }, 60000, 'news');
   }
   function watchRec() {
@@ -989,7 +1041,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
       if (S.watches.news) { S.watches.news(); delete S.watches.news; }
       newsParts.sym = []; mergeNews();
     }
-    watchRec();
+    watchPlans(); watchRec();
+  }
+  function watchPlans() {
+    watch('plans', 'get_trade_plans', { symbol: S.sel.id }, function (d) { S.plans = d; S.plansErr = null; S.plansStamp = (S.plansStamp || 0) + 1; Hero.render(true); }, function (e) { S.plans = null; S.plansErr = errText(e); S.plansStamp = (S.plansStamp || 0) + 1; Hero.render(true); }, 30000);
   }
   function renderSession() {
     var d = S.session; var p = $('sess'); p.replaceChildren();
@@ -1155,8 +1210,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     if (!S.mcp || !S.sel || S.fatal) return; var sym = S.sel.id, seq = ++dailySeq;
     try {
       var d = await call('get_candles', { symbol: sym, timeframe: '1D', days: 420, max_candles: 300 }, { staleTime: 60000, gcTime: 600000 });
-      S.daily[sym] = dailyRows(d); Web.feed('daily', true); if (seq === dailySeq) runEngine();
-    } catch (e) { Web.feed('daily', false); }
+      S.daily[sym] = dailyRows(d); if (seq === dailySeq) runEngine();
+    } catch (e) { }
   }
   function watchModelData() {
     watch('d_nifty', 'get_candles', { symbol: 'NIFTY', timeframe: '1D', days: 420, max_candles: 300 }, function (d) { S.idx.NIFTY = dailyRows(d); runEngine(); }, function () {}, 300000, 'indices');
@@ -1511,9 +1566,9 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
     var pc = sc == null ? null : percentile(sc);
     var conf = pc == null ? null : verdict === 'SELL' ? 100 - pc : verdict === 'BUY' ? pc : Math.round(100 - Math.abs(pc - 50) * 2);
     var changed = verdict !== S.verdict; S.verdict = verdict; S.conf = conf; S.pct = pc;
-    Web.update(changed); Calls.onVerdict(verdict);
+    Calls.onVerdict(verdict);
     var key = [S.sel.id, verdict, sc == null ? '' : sc.toFixed(3), pc, Math.round(C.coverage * 20), (S.daily[S.sel.id] || []).length].join('|');
-    if (key === S.vKey) return; S.vKey = key;
+    if (key === S.vKey) return; S.vKey = key; Hero.render(false);
     var b = $('vBadge'); b.textContent = verdict || '—'; b.className = 'vbadge ' + (verdict === 'BUY' ? 'buy' : verdict === 'SELL' ? 'sell' : 'hold');
     var m = $('vMeta'); m.replaceChildren();
     var DR = S.daily[S.sel.id];
@@ -1662,12 +1717,12 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
           note(c, sideTxt(c.side) + ' at ' + n2(c.entry) + ': the ' + tf + ' close was ' + Math.abs(r.bp).toFixed(2) + '× beyond the Bollinger band, so the rule fades it. Target ' + fmtPts(c.side * (c.tgt - c.entry)) + ' pts, stop ' + fmtPts(c.side * (c.sl - c.entry)) + ' pts. Levels are locked.', 'info', r.made);
           if (r.status !== 'open') note(c, (r.status === 'target' ? 'Target hit' : r.status === 'sl' ? 'Stop-loss hit' : 'Time exit') + ' at ' + n2(r.exit) + ' (' + fmtPts(r.pts) + ' pts)', r.status === 'target' ? 'good' : r.status === 'sl' ? 'bad' : 'info', r.exitAt);
           list.push(c); changed = true;
-          if (fresh && r.status === 'open') { var nb = 'Entry ' + n2(c.entry) + ' · target ' + n2(c.tgt) + ' · stop-loss ' + n2(c.sl) + '. Entry valid until ' + hhmm(c.validTo) + '. (Experimental intraday rule.)'; toast('New ' + sideTxt(c.side) + ' call · ' + label + ' ' + tf, nb, c.side > 0 ? 'good' : 'bad'); Alerts.send(c.id + '|new', 'New ' + sideTxt(c.side) + ' call · ' + label + ' ' + tf, nb, 'info'); }
+          if (fresh && r.status === 'open') { var nb = 'Entry ' + n2(c.entry) + ' · target ' + n2(c.tgt) + ' · stop-loss ' + n2(c.sl) + '. Entry valid until ' + hhmm(c.validTo) + '. (Experimental intraday rule.)'; toast('New ' + sideTxt(c.side) + ' call · ' + label + ' ' + tf, nb, c.side > 0 ? 'good' : 'bad'); }
         }
         c.best = r.best; c.worst = r.worst; c.bars = r.bars;
         if (r.flipAt && !c.flipAt && c.status === 'open') {
           c.flipAt = r.flipAt; var msg = 'The ' + tf + ' candle that closed ' + hhmm(r.flipAt) + ' now signals ' + sideTxt(r.flipSide) + ', against this ' + sideTxt(c.side) + '. Consider exiting.';
-          note(c, msg, 'warn'); toast('Signal changed · ' + label + ' ' + tf, msg, 'warn'); Alerts.send(c.id + '|flip', 'Consider exiting · ' + label + ' ' + tf, msg, 'warning'); changed = true;
+          note(c, msg, 'warn'); toast('Signal changed · ' + label + ' ' + tf, msg, 'warn'); changed = true;
         }
         if (c.status === 'open' && r.status !== 'open') { closeLive(c, r.status, r.exit, r.why); changed = true; }
       });
@@ -1746,7 +1801,7 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
       var lean = null;
       if (!c && tf === '1D' && S.C && S.C.score != null) { var q0 = quoteFor(S.sel.id); if (q0 && q0.ltp != null) { var s0 = S.C.score >= 0 ? 1 : -1; lean = { side: s0, entry: q0.ltp, tgt: null, sl: null, made: now, H: D.H }; } }
       var key = (c ? c.id + c.status + (c.notes || []).length + past : 'none') + '|' + S.sel.id + tf + (setup[S.sel.id + '|' + tf] || {}).time + (lean ? lean.side : '') + S.verdict;
-      $('callTitle').textContent = tf === '1D' ? 'Swing call · 1D' : 'Experimental call · ' + tfLabel(tf);
+      $('callTitle').textContent = tf === '1D' ? 'Daily model call · 1D' : 'Experimental rule · ' + tfLabel(tf) + ' (no proven edge)';
       var bd = $('callBadge'), cd = $('callCd'), active = c && c.status === 'open' && !past;
       var bt, bc;
       if (active) { bt = sideTxt(c.side); bc = c.side > 0 ? 'buy' : 'sell'; }
@@ -1819,7 +1874,8 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
       if (typeof cSeries === 'undefined' || !cSeries || !S.sel) return;
       var tf = S.tf, sym = S.sel.id, o = openCall(sym, tf), lr = !o && lastReplay();
       if (!o && lr && lr.status === 'open') o = lr;
-      setPriceLines(o ? { entry: o.entry, tgt: o.tgt, sl: o.sl } : null);
+      var hl = (typeof Hero !== 'undefined' && Hero) ? Hero.lines() : null;
+      setPriceLines(hl || (o ? { entry: o.entry, tgt: o.tgt, sl: o.sl } : null));
       var times = {}; S.candles.forEach(function (r) { times[String(r.time)] = 1; });
       var src = tf === '1D' ? list.filter(function (c) { return c.sym === sym && c.tf === '1D'; }) : (replays[sym + '|' + tf] || []);
       var mk = src.map(function (c) {
@@ -2045,226 +2101,250 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
     return { init: init, open: open, ready: function () { return !!sample; } };
   })();
 
-  // ---------- signal web: neural view (optimised) ----------
-  // L0 raw data points from each CA Trader feed -> L1 backtested criteria (+ live context) -> L2 models -> OUT.
-  // Cheap to run: cached glow sprites, at most 30 fps, capped particles, paused when off screen or the tab is hidden.
-  var FEEDS = [
-    { id: 'quotes', label: 'Quotes' }, { id: 'daily', label: 'Daily bars' }, { id: 'indices', label: 'Indices' },
-    { id: 'vix', label: 'India VIX' }, { id: 'movers', label: 'Movers' }, { id: 'depth', label: 'Depth' },
-    { id: 'options', label: 'Options' }, { id: 'news', label: 'News' }, { id: 'engine', label: 'Engine' }
-  ];
-  var PALETTES = {
-    dark: { bull: ['#ffe066', '#ffb703', '#ff8a00', '#ff5d2b', '#ff2e63'], bear: ['#4cc9f0', '#4895ef', '#4361ee', '#7b5cff', '#b5179e'], flat: ['#8ecae6', '#5d6a85'], out: { BUY: '#ffb703', SELL: '#4cc9f0', HOLD: '#c9d1e3' }, idle: 'rgba(120,130,160,0.10)', text: [230, 236, 248], dim: [140, 150, 172], core: '#ffffff' },
-    light: { bull: ['#e08a00', '#f06a00', '#e5484d', '#d9480f', '#c2410c'], bear: ['#0b84c6', '#2563eb', '#4f46e5', '#7c3aed', '#0e7490'], flat: ['#64748b', '#a3adbd'], out: { BUY: '#e46a00', SELL: '#2563eb', HOLD: '#64748b' }, idle: 'rgba(100,116,139,0.16)', text: [17, 24, 39], dim: [120, 130, 150], core: '#ffffff' }
-  };
-  var webStill = false; // the web keeps its data flow animation; it is flat (no 3D)
-  var Web = (function () {
-    var cv = $('web'), ctx = cv.getContext('2d'), wrap = $('webWrap'), tip = $('tip');
-    var W = 0, H = 0, dpr = 1, narrow = false, visible = true;
-    var nodes = [], byId = {}, edges = [], edgeById = {}, parts = [], sparks = [], feedState = {};
-    var PAL = PALETTES.dark, darkMode = true, sprites = {};
-    var lastT = 0, lastDraw = 0, running = false;
-    var dirty = true, lastBuild = 0, flashOut = false;
-    var MONO = '"JetBrains Mono", ui-monospace, monospace';
-    var MAXP = 260;
-
-    function hash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; }
-    function pick(list, s) { return list[Math.floor(hash(s) * list.length) % list.length]; }
-    function rgb(hex) { var n = parseInt(hex.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
-    function rgba(hex, a) { var c = rgb(hex); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
-    function tc(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
-    function colFor(v, seed) { return v == null ? PAL.flat[1] : v > 0.04 ? pick(PAL.bull, seed) : v < -0.04 ? pick(PAL.bear, seed) : PAL.flat[0]; }
-    // one pre-rendered soft glow per colour, stamped with drawImage instead of building gradients every frame
-    function sprite(hex) {
-      var k = hex + (darkMode ? 'd' : 'l'); if (sprites[k]) return sprites[k];
-      var s = document.createElement('canvas'); s.width = s.height = 64; var g = s.getContext('2d');
-      var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-      gr.addColorStop(0, rgba(hex, darkMode ? 0.9 : 0.55)); gr.addColorStop(0.3, rgba(hex, darkMode ? 0.35 : 0.22)); gr.addColorStop(1, rgba(hex, 0));
-      g.fillStyle = gr; g.fillRect(0, 0, 64, 64); sprites[k] = s; return s;
+  // ---------- trade call hero: the official time-bound plans, with every number traced ----------
+  // Plans come from the app's trade-plan engine (get_trade_plans). Nothing here is estimated in the browser except the
+  // daily model's table, which uses the same maths as runEngine(). The screen shows the arithmetic, not just the answer.
+  var Hero = (function () {
+    var HZ = ['scalp', 'intraday', 'swing'], TFMAP = { scalp: '1m', intraday: '5m', swing: '15m' };
+    var active = load('cat.hz'); if (HZ.concat('daily').indexOf(active) < 0) active = 'intraday';
+    var lastKey = '', built = false;
+    function planFor(hz) { var ps = S.plans && S.plans.plans; if (!ps) return null; for (var i = 0; i < ps.length; i++) if (ps[i].horizon === hz) return ps[i]; return null; }
+    function isLive(p) { return !!(p && p.available !== false && (p.decision === 'BUY' || p.decision === 'SELL') && !p.expired); }
+    function sgnd(x, dp) { return x == null || isNaN(x) ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(dp == null ? 1 : dp); }
+    function istTime(iso) { var t = Date.parse(iso); if (isNaN(t)) return '—'; var d = new Date(t + IST * 1000); return p2(d.getUTCHours()) + ':' + p2(d.getUTCMinutes()); }
+    function table(heads, rows) {
+      var t = el('table', 'num'), th = el('thead'), tr = el('tr'); heads.forEach(function (h) { tr.appendChild(el('th', null, h)); }); th.appendChild(tr); t.appendChild(th);
+      var tb = el('tbody'); rows.forEach(function (r) { var x = el('tr'); r.forEach(function (c) { x.appendChild(c && c.nodeType ? c : el('td', null, c == null ? '—' : String(c))); }); tb.appendChild(x); });
+      t.appendChild(tb); var w = el('div', 'tbl-wrap'); w.appendChild(t); return w;
     }
-    function glow(hex, x, y, r) { ctx.drawImage(sprite(hex), x - r, y - r, r * 2, r * 2); }
+    function card(title, why, wide) { var c = el('div', 'calc-card' + (wide ? ' wide' : '')); c.appendChild(el('h3', null, title)); if (why) c.appendChild(el('div', 'why', why)); return c; }
+    function eq(lines) { var d = el('div', 'eq'); lines.forEach(function (l, i) { if (i) d.appendChild(document.createElement('br')); d.appendChild(document.createTextNode(l)); }); return d; }
+    function kv(pairs) { var d = el('div', 'kv'); pairs.forEach(function (p) { d.append(el('div', 'k', p[0]), el('div', 'v', p[1] == null ? '—' : String(p[1]))); }); return d; }
+    function cell(txt, cls) { return el('td', cls || null, txt); }
+    function foot(txt) { return el('div', 'foot', txt); }
+    function tile(cls, k, v, z, d, dcls) { var t = el('div', 'bl ' + cls); t.append(el('div', 'k', k), el('div', 'v', v)); if (z) t.appendChild(el('div', 'z', z)); if (d) t.appendChild(el('div', 'd ' + (dcls || ''), d)); return t; }
+    function setTf(tf) { var b = document.querySelector('#tfs button[data-tf="' + tf + '"]'); if (b && S.tf !== tf) b.click(); }
 
-    function rawPoints() {
-      var out = {}, q, i;
-      var sym = S.sel && S.sel.id;
-      var R = sym ? withLive(S.daily[sym], quoteFor(sym)) : null;
-      out.daily = [];
-      if (R && R.length > 2) for (i = Math.max(1, R.length - 20); i < R.length; i++) { var r = R[i].c / R[i - 1].c - 1; out.daily.push({ v: clamp(r / 0.02, -1, 1), label: R[i].d + '  ' + pct(r * 100) }); }
-      out.indices = [];
-      [['NIFTY', 8], ['BANKNIFTY', 5]].forEach(function (p) { var X = withLive(S.idx[p[0]], quoteFor(p[0])); if (!X || X.length < 3) return; for (var j = Math.max(1, X.length - p[1]); j < X.length; j++) { var rr = X[j].c / X[j - 1].c - 1; out.indices.push({ v: clamp(rr / 0.012, -1, 1), label: p[0] + ' ' + X[j].d + '  ' + pct(rr * 100) }); } });
-      out.vix = [];
-      var VX = S.idx.VIX; if (VX && VX.length > 20) { var vc = VX.map(function (r) { return r.c; }); var m = mean(vc.slice(-60)), sd = std(vc.slice(-60)) || 1; vc.slice(-8).forEach(function (v) { out.vix.push({ v: clamp(-(v - m) / sd / 2, -1, 1), label: 'VIX ' + v.toFixed(2) }); }); }
-      out.movers = []; var seen = {};
-      ['gainers', 'losers', 'high_volume'].forEach(function (k) { ((S.movers[k] && S.movers[k].items) || []).forEach(function (it) { if (seen[it.symbol] || out.movers.length >= 14) return; seen[it.symbol] = 1; out.movers.push({ v: clamp((it.change_pct || 0) / 2, -1, 1), label: it.symbol + '  ' + pct(it.change_pct) }); }); });
-      out.depth = []; var d = S.depth;
-      if (d) { var tot = (d.total_buy_quantity || 0) + (d.total_sell_quantity || 0) || 1; (d.bids || []).slice(0, 4).forEach(function (b) { out.depth.push({ v: clamp(b.quantity / tot * 4, 0, 1), label: 'Bid ' + n2(b.price) + ' × ' + f0.format(b.quantity) }); }); (d.asks || []).slice(0, 4).forEach(function (a) { out.depth.push({ v: -clamp(a.quantity / tot * 4, 0, 1), label: 'Offer ' + n2(a.price) + ' × ' + f0.format(a.quantity) }); }); }
-      out.options = [];
-      if (S.chain && S.chain.strikes) { var st = S.chain.strikes.slice().sort(function (a, b) { return a.strike - b.strike; }); var ai = st.findIndex(function (s) { return s.strike === S.chain.atm_strike; }); if (ai < 0) ai = Math.floor(st.length / 2); st.slice(Math.max(0, ai - 4), ai + 5).forEach(function (s) { var c = (s.call && s.call.oi) || 0, p = (s.put && s.put.oi) || 0; out.options.push({ v: c + p ? clamp((p - c) / (p + c), -1, 1) : 0, label: f0.format(s.strike) + '  PCR ' + (c ? (p / c).toFixed(2) : '—') }); }); }
-      out.news = (S.news || []).slice(0, 6).map(function (e) { return { v: sentOf(e), label: String(e.title || e.headline || 'story').slice(0, 48) }; });
-      out.quotes = []; S.list.slice(0, 10).forEach(function (w) { q = quoteFor(w.id); if (q && q.change_pct != null) out.quotes.push({ v: clamp(q.change_pct / 2, -1, 1), label: w.label + '  ' + pct(q.change_pct) }); });
-      var rv = recSignal(S.rec); out.engine = [{ v: rv, label: S.recErr ? 'Engine offline' : rv == null ? 'Engine waiting' : 'Engine ' + (rv > 0 ? 'BUY' : rv < 0 ? 'SELL' : 'HOLD') }];
-      FEEDS.forEach(function (f) { if (!out[f.id] || !out[f.id].length) out[f.id] = [{ v: null, label: f.label + ': waiting' }]; });
-      return out;
+    // ----- the call itself -----
+    function buildPlan(p) {
+      var box = $('heroPlan'); box.replaceChildren();
+      if (!p) { box.appendChild(el('div', 'hero-msg', S.plansErr ? 'Trade plans are unavailable for ' + S.sel.label + ': ' + S.plansErr : 'Loading the trade plans…')); if (!S.plansErr) box.appendChild(skel(3)); return; }
+      if (p.available === false) { box.appendChild(el('div', 'hero-msg', (p.reason || 'Not enough candles to build this plan.') + ' No call is made without data.')); return; }
+      var live = p.decision === 'BUY' || p.decision === 'SELL', exp = !!p.expired, side = p.decision === 'BUY' ? 1 : -1, ok = live && !exp;
+      var head = el('div', 'hero-head');
+      head.appendChild(el('div', 'hero-side ' + (ok ? (side > 0 ? 'buy' : 'sell') : 'none'), ok ? p.decision : exp ? 'EXPIRED' : 'NO TRADE'));
+      var sub = el('div', 'hero-sub');
+      sub.append(el('span', null, p.label + ' · ' + p.timeframe + ' candles · typical hold ' + p.hold), el('span', 'num', 'Score ' + sgnd(p.score) + ' · gate ±' + p.gate + ' · built ' + istTime(p.as_of) + ' IST'));
+      head.appendChild(sub);
+      var cb = el('div', 'hero-conf'), cf = p.confidence;
+      if (ok && cf && cf.available) {
+        cb.append(el('div', 'big', Math.round(cf.pct) + '%'), el('div', 'cap', 'chance T1 is hit before the stop'), el('div', 'cap num', 'base-rate 95% range ' + cf.ci_low + '–' + cf.ci_high + '% · n=' + cf.n));
+      } else if (ok) { cb.append(el('div', 'big', '—'), el('div', 'cap', (cf && cf.reason) || 'Confidence needs a finished backtest')); }
+      head.appendChild(cb); box.appendChild(head);
+
+      if (!ok) {
+        box.appendChild(el('div', 'hero-msg', exp ? p.reason : (p.reason || 'No setup right now').replace(/\.$/, '') + '. The engine only issues a call when the score clears the gate and the higher timeframes agree; otherwise standing aside is the answer.'));
+        var pos = clamp((p.score + 100) / 2, 0, 100), g = p.gate;
+        var bar = el('div', 'scorebar'); bar.appendChild(el('b')); bar.lastChild.style.left = (50 - g / 2) + '%'; bar.appendChild(el('b')); bar.lastChild.style.left = (50 + g / 2) + '%'; bar.appendChild(el('i')); bar.lastChild.style.left = pos + '%'; box.appendChild(bar);
+        var bl = el('div', 'scorebar-l'); bl.append(el('span', null, 'SELL ≤ −' + g), el('span', null, 'score ' + sgnd(p.score)), el('span', null, 'BUY ≥ +' + g)); box.appendChild(bl);
+      }
+      if (live) {
+        var e = p.entry, dim = exp ? ' dim' : '', t1 = p.target_1, t2 = p.target_2, sl = p.stop_loss;
+        var lv = el('div', 'big-lvls');
+        lv.appendChild(tile('entry' + dim, 'Entry', n2(e), 'zone ' + n2(p.entry_low) + ' – ' + n2(p.entry_high), p.wait_for_pullback ? 'wait for a pullback into the zone' : (side > 0 ? 'buy inside the zone' : 'sell inside the zone')));
+        lv.appendChild(tile('tgt' + dim, 'Target', n2(t1), 'T2 ' + n2(t2), sgnd(Math.abs(t1 - e), 2) + ' pts · ' + sgnd(Math.abs(t1 - e) / e * 100, 2) + '% · ' + (p.rr_t1 != null ? p.rr_t1 + 'R' : ''), 'up'));
+        lv.appendChild(tile('sl' + dim, 'Stop-loss', n2(sl), 'risk ' + n2(p.risk) + ' pts = ' + (p.risk_atr != null ? p.risk_atr.toFixed(2) : '—') + '× ATR', sgnd(-Math.abs(e - sl), 2) + ' pts · ' + sgnd(-Math.abs(e - sl) / e * 100, 2) + '%', 'down'));
+        box.appendChild(lv);
+        var meta = el('div', 'hero-meta');
+        if (ok) { var cd = el('span', 'chip good'); cd.id = 'heroCd'; meta.appendChild(cd); }
+        meta.appendChild(el('span', 'chip', 'Exit after ' + p.time_stop_bars + ' × ' + p.timeframe + ' bars if T1 is not hit'));
+        if (ok && p.confidence && p.confidence.available && p.confidence.expectancy_net_r != null) meta.appendChild(el('span', 'chip ' + (p.confidence.expectancy_net_r > 0 ? 'good' : 'bad'), 'avg ' + sgnd(p.confidence.expectancy_net_r, 2) + 'R per trade after costs'));
+        if (p.edge) meta.appendChild(el('span', 'grade ' + p.edge.grade, p.edge.label));
+        if (p.edge && (p.edge.grade === 'FAILING' || p.edge.grade === 'NEGATIVE')) meta.appendChild(el('span', 'chip warn', 'paper only'));
+        box.appendChild(meta);
+        if (p.edge && p.edge.why) box.appendChild(el('div', 'note', p.edge.why));
+        if (ok && p.instructions) box.appendChild(el('div', 'hero-ins', p.instructions));
+        if (ok && p.option) { var o = p.option; box.appendChild(el('div', 'hero-ins', 'Option ' + (o.symbol || '') + ' (' + (o.strike || '') + ' ' + (o.option_type || '') + '): entry ' + n2(o.entry_low) + '–' + n2(o.entry_high) + ' · stop ' + n2(o.stop_loss) + ' · T1 ' + n2(o.target_1) + ' · T2 ' + n2(o.target_2) + '. ' + (o.basis || ''))); }
+        if (ok) {
+          var acts = el('div', 'call-actions hero-acts');
+          var pb = el('button', 'btn ' + (side > 0 ? 'buy' : 'sell'), 'Paper ' + (side > 0 ? 'buy' : 'sell') + ' this call'); pb.type = 'button';
+          pb.addEventListener('click', function () { Paper.ticket(side, { tgt: t1, sl: sl, callId: null }); }); acts.appendChild(pb);
+          if (AI.ready()) { var ab = el('button', 'btn', 'Ask Claude about this call'); ab.type = 'button'; ab.addEventListener('click', function () { AI.open('Explain the ' + p.label + ' ' + p.decision + ' plan on ' + S.sel.label + ': how the score and the confidence were calculated, and whether the risk is acceptable.'); }); acts.appendChild(ab); }
+          box.appendChild(acts);
+        }
+      }
     }
 
-    function build() {
-      var F = S.F || [], G = (S.C && S.C.G) || GROUPS.map(function (g) { return { label: g.label, ctx: !!g.ctx, w: 0, s: null }; });
-      var raw = rawPoints(); var old = byId; var oldAcc = edgeById;
-      nodes = []; byId = {}; edges = []; edgeById = {};
-      function add(n) { n.flash = old[n.id] ? old[n.id].flash : 0; nodes.push(n); byId[n.id] = n; return n; }
-      var total = 0; FEEDS.forEach(function (f) { total += raw[f.id].length; }); var slots = total + (FEEDS.length - 1) * 1.6; var k = 0;
-      FEEDS.forEach(function (f) {
-        raw[f.id].forEach(function (p, i) {
-          var y = -1 + 2 * (k + 0.5) / slots; k++;
-          add({ id: 'r_' + f.id + '_' + i, layer: 0, feed: f.id, x: -1.32, y: y, z: 0.22 * Math.sin(k * 0.55) + (hash(f.id + i) - 0.5) * 0.12, v: p.v, label: p.label, first: i === 0, feedLabel: f.label, count: raw[f.id].length });
-        });
-        k += 1.6;
+    // ----- how it was calculated -----
+    function calcPlan(p) {
+      var out = $('heroCalc'); out.replaceChildren();
+      if (!p || p.available === false) return;
+      var live = p.decision === 'BUY' || p.decision === 'SELL', side = p.decision === 'BUY' ? 1 : -1;
+      out.appendChild(el('div', 'calc-title', 'How this ' + (live ? p.decision + ' call' : 'result') + ' was calculated'));
+      var grid = el('div', 'calc');
+      // 1 score
+      var W = p.weights || {}, F = p.factors || {}, I = p.inputs || {}, sumW = Object.keys(W).reduce(function (a, k) { return a + W[k]; }, 0) || 1;
+      var desc = {
+        trend: 'EMA9 ' + n2(I.ema9) + ' · EMA21 ' + n2(I.ema21) + ' · EMA50 ' + n2(I.ema50),
+        vwap: W.vwap ? 'Price ' + n2(I.price) + ' vs VWAP ' + n2(I.vwap) + ' (ATR ' + n2(I.atr) + ')' : 'Not used on daily bars',
+        momentum: 'RSI ' + n2(I.rsi) + ' · MACD histogram ' + n2(I.macd_hist),
+        structure: 'Price ' + n2(I.price) + ' vs swing high ' + n2(I.last_pivot_high) + ' / swing low ' + n2(I.last_pivot_low)
+      };
+      var names = { trend: 'Trend', vwap: 'VWAP', momentum: 'Momentum', structure: 'Structure' };
+      var c1 = card('1 · Signal score', 'Four factors, each scored from −100 (bearish) to +100 (bullish) on closed ' + p.timeframe + ' candles, then weighted.');
+      var rows = ['trend', 'vwap', 'momentum', 'structure'].map(function (k) {
+        var contrib = (F[k] || 0) * (W[k] || 0) / sumW;
+        return [names[k], desc[k], sgnd(F[k]), Math.round((W[k] || 0) / sumW * 100) + '%', cell(sgnd(contrib), sgn(contrib))];
       });
-      F.forEach(function (f, i) { add({ id: 'c_' + f.k, layer: 1, f: f, x: -0.3, y: -0.92 + 1.84 * (i + 0.5) / F.length, z: 0.16 * Math.cos(i * 0.8), v: f.s, label: f.long }); });
-      G.forEach(function (g, i) { add({ id: 'g' + i, layer: 2, g: g, x: 0.55, y: -0.62 + 1.24 * (i + 0.5) / G.length, z: 0.1 * Math.sin(i * 1.7), v: g.s, label: g.label }); });
-      add({ id: 'out', layer: 3, x: 1.12, y: 0, z: 0, v: S.C && S.C.score != null ? S.C.score * 4 : null, label: 'Final call' });
-      function link(a, b, v, w, ctx_) { if (!a || !b) return; var id = a.id + '>' + b.id; var e = { id: id, a: a, b: b, v: v, w: w, ctx: !!ctx_, col: colFor(v, id), acc: oldAcc[id] ? oldAcc[id].acc : Math.random() }; edges.push(e); edgeById[id] = e; }
-      nodes.forEach(function (n) { if (n.layer !== 0) return; F.forEach(function (f) { if (f.feed === n.feed) link(n, byId['c_' + f.k], n.v, n.v == null ? 0 : 0.15 + Math.abs(n.v) * 0.85, f.g === 3); }); });
-      F.forEach(function (f) { link(byId['c_' + f.k], byId['g' + f.g], f.s, f.s == null ? 0 : 0.25 + Math.abs(f.s) * (f.counted ? 1.6 : 0.6), !f.counted); });
-      G.forEach(function (g, i) { link(byId['g' + i], byId.out, g.s, g.s == null ? 0 : g.ctx ? 0.3 : 0.6 + Math.abs(g.s) * g.w * 6, g.ctx); });
-      parts = parts.filter(function (p) { return !!edgeById[p.eid]; });
-      lastBuild = performance.now(); dirty = false;
-      var lb = $('webStats'); if (lb) lb.textContent = 'LIVE FEED · ' + nodes.length + ' nodes · ' + edges.length + ' wires · ' + FEEDS.filter(function (f) { return feedState[f.id] && feedState[f.id].ok; }).length + '/' + FEEDS.length + ' feeds' + (S.lat ? ' · ' + (S.lat / 1000).toFixed(1) + 's trip' : '');
+      c1.appendChild(table(['Factor', 'What it read', 'Score', 'Weight', 'Adds'], rows));
+      c1.appendChild(eq(['Raw = Σ (score × weight) ÷ Σ weights = ' + sgnd(p.raw_score),
+        'News nudge = news tone ' + sgnd(p.news_bias, 0) + ' × 0.10 = ' + sgnd(p.news_points, 2) + ' (can move the score at most ±10)',
+        'Final score = ' + sgnd(p.score) + '   →   BUY needs ≥ +' + p.gate + ', SELL needs ≤ −' + p.gate]));
+      c1.appendChild(foot('Each factor is rounded to 0.1 for display, so the column can differ from the total by ±0.1. The total shown is the engine’s own.'));
+      grid.appendChild(c1);
+      // 2 higher timeframes
+      var c2 = card('2 · Higher-timeframe check', (p.params && p.params.strict_htf ? 'Every higher timeframe must point the same way as the trade.' : 'The higher timeframes must lean the same way as the trade and none may oppose it.') + ' A strong score against the bigger trend is skipped.');
+      c2.appendChild(table(['Timeframe', 'Reading', 'Bias', live ? 'Agrees?' : ''], (p.higher_timeframes || []).map(function (h) {
+        var ag = !live ? '' : h.bias * side > 0 ? cell('✓ yes', 'up') : h.bias === 0 ? cell('~ neutral', 'muted') : cell('✗ no', 'down');
+        return [h.tf, h.text, h.bias > 0 ? 'Up' : h.bias < 0 ? 'Down' : 'Mixed', ag];
+      })));
+      c2.appendChild(foot(p.expired ? 'This plan has expired; the table shows how the higher timeframes read when it was built.' : p.reason ? 'Result: ' + p.reason.replace(/\.$/, '') + '.' : 'Result: confirmed, so the call stands.'));
+      grid.appendChild(c2);
+      // 3 levels
+      if (live) {
+        var a = p.atr, pr = p.params || {}, r = p.risk, e = p.entry, dir = side;
+        var c3 = card('3 · Where entry, stop and targets come from', 'All levels are measured from the ' + p.timeframe + ' chart in units of ATR (the typical candle range) and swing points.');
+        c3.appendChild(kv([
+          ['ATR(14) on ' + p.timeframe, n2(a)],
+          [side > 0 ? 'Nearest support (VWAP / EMA21 / swing low)' : 'Nearest resistance (VWAP / EMA21 / swing high)', n2(p.anchor)],
+          ['Entry zone', n2(p.entry_low) + ' – ' + n2(p.entry_high) + (p.wait_for_pullback ? ' (price is stretched: wait)' : '')],
+          ['Entry reference (zone middle)', n2(e)],
+          ['Structure stop (beyond the swing ± 0.1 ATR)', n2(p.struct_sl)],
+          ['Raw risk = |entry − structure stop|', n2(p.raw_risk) + ' = ' + (a ? (p.raw_risk / a).toFixed(2) : '—') + '× ATR'],
+          ['Allowed risk range', (pr.sl_min_atr != null ? pr.sl_min_atr : '—') + '–' + (pr.sl_max_atr != null ? pr.sl_max_atr : '—') + '× ATR' + (p.risk_clamp ? ' → clamped to the ' + p.risk_clamp + 'imum' : ' (inside)')],
+          ['Risk used (1R)', n2(r) + ' = ' + (p.risk_atr != null ? p.risk_atr.toFixed(2) : '—') + '× ATR'],
+          ['Stop-loss = entry ' + (dir > 0 ? '−' : '+') + ' 1R', n2(p.stop_loss)],
+          ['T1 = entry ' + (dir > 0 ? '+' : '−') + ' ' + pr.t1_r + 'R' + (p.t1_capped_at != null ? ', capped at the next swing level' : ''), n2(p.target_1) + (p.t1_capped_at != null ? '  (uncapped ' + n2(p.t1_uncapped) + ')' : '')],
+          ['T2 = entry ' + (dir > 0 ? '+' : '−') + ' ' + pr.t2_r + 'R', n2(p.target_2)],
+          ['Reward : risk to T1', p.rr_t1 != null ? p.rr_t1 + ' : 1' : '—']
+        ]));
+        grid.appendChild(c3);
+      }
+      // 4 confidence
+      var cf = p.confidence;
+      if (live && cf && cf.available) {
+        var c4 = card('4 · Where the ' + Math.round(cf.pct) + '% comes from', 'It is a measured frequency: how often past ' + p.label.toLowerCase() + ' signals reached T1 before their stop once filled, adjusted for the situation this call is in. It is not a promise.');
+        c4.appendChild(table(['Situation', 'Now', 'Past n', 'Hit % then', 'Shrunk %', 'vs base', 'Trust'], (cf.rows || []).map(function (r) {
+          var dl = r.delta_pp == null ? '—' : sgnd(r.delta_pp, 1) + ' pp';
+          return [r.label, r.bucket, r.n, r.raw_pct != null ? r.raw_pct + '%' : '—', r.shrunk_pct != null ? r.shrunk_pct + '%' : '—', cell(dl, r.delta_pp == null ? 'muted' : sgn(r.delta_pp)), r.weight_pct != null ? r.weight_pct + '%' : '—'];
+        })));
+        var adj = Math.round((cf.pct - cf.base_pct) * 10) / 10;
+        c4.appendChild(eq(['Base rate = T1 before stop in ' + cf.n + ' filled signals (' + (cf.from || '?') + ' → ' + (cf.to || '?') + ') = ' + cf.base_pct + '%',
+          'Situation adjustment = average of the “vs base” column = ' + sgnd(adj, 1) + ' pp',
+          'Confidence = ' + cf.base_pct + '% ' + (adj < 0 ? '−' : '+') + ' ' + Math.abs(adj) + ' pp = ' + cf.pct + '%',
+          '95% interval of the base rate (Wilson, n=' + cf.n + '): ' + cf.ci_low + '% – ' + cf.ci_high + '%']));
+        c4.appendChild(foot('Shrunk % = (hits + ' + cf.k + ' × base) ÷ (n + ' + cf.k + '): a situation with few past trades barely moves the answer (Trust = n ÷ (n + ' + cf.k + ')). Orders fill only ' + (cf.fill_pct != null ? cf.fill_pct + '%' : '—') + ' of the time in the backtest; expectancy after costs is ' + sgnd(cf.expectancy_net_r, 2) + 'R per filled trade (base ' + sgnd(cf.base_expectancy_net_r, 2) + 'R).'));
+        grid.appendChild(c4);
+      } else if (live) {
+        var c4b = card('4 · Confidence', 'No percentage is shown because the numbers behind it are not available.'); c4b.appendChild(foot((cf && cf.reason) || (p.expired ? 'This plan has expired.' : 'The backtest for this plan has not produced filled signals yet.'))); grid.appendChild(c4b);
+      }
+      // 5 record
+      var tr = p.track_record, fw = p.forward, c5 = card('5 · Track record and edge', 'What this horizon has actually done on ' + S.sel.label + ', before and after the plans were published.');
+      if (p.edge) { var gb = el('div'); gb.style.cssText = 'padding:0 14px 6px'; gb.appendChild(el('span', 'grade ' + p.edge.grade, p.edge.label)); gb.appendChild(el('span', 'note', '  ' + p.edge.why)); c5.appendChild(gb); }
+      if (tr) c5.appendChild(kv([
+        ['Backtest period', (tr.from || '?') + ' → ' + (tr.to || '?')], ['Signals · filled', (tr.signals != null ? tr.signals : '—') + ' · ' + (tr.filled != null ? tr.filled : '—') + (tr.fill_rate != null ? ' (' + tr.fill_rate + '%)' : '')],
+        ['T1 hit · T2 hit', (tr.t1_hit_rate != null ? tr.t1_hit_rate + '%' : '—') + ' · ' + (tr.t2_hit_rate != null ? tr.t2_hit_rate + '%' : '—')], ['Stopped · time exits', (tr.stopped != null ? tr.stopped : '—') + ' · ' + (tr.time_exits != null ? tr.time_exits : '—')],
+        ['Average result', sgnd(tr.expectancy_r, 2) + 'R gross · ' + sgnd(tr.expectancy_r_net, 2) + 'R after costs (' + (tr.cost_r_avg != null ? tr.cost_r_avg + 'R' : '—') + ' per trade)']]));
+      else c5.appendChild(foot('No backtest has been stored for this symbol and horizon yet.'));
+      if (fw) c5.appendChild(kv([
+        ['Live, last 30 days', fw.issued + ' plans issued · ' + fw.closed + ' graded · ' + fw.open + ' open · ' + fw.expired_unfilled + ' never filled'],
+        ['Live hit rate', fw.closed ? fw.hit_pct + '% (95%: ' + fw.ci_low + '–' + fw.ci_high + '%)' : '—'], ['Live average', fw.avg_r != null ? sgnd(fw.avg_r, 2) + 'R (before costs)' : '—']]));
+      c5.appendChild(foot('A horizon is only called an edge when it is positive after costs on at least 30 backtest signals and not negative in live grading. Until then it is unproven.'));
+      grid.appendChild(c5);
+      out.appendChild(grid);
     }
 
-    function resize() {
-      var r = wrap.getBoundingClientRect(); if (!r.width || !r.height) { W = 0; return; }
-      dpr = Math.min(1.5, window.devicePixelRatio || 1); W = r.width; H = r.height; narrow = W < 640;
-      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (webStill) draw(0);
+    function calcDaily() {
+      var out = $('heroCalc'); out.replaceChildren();
+      out.appendChild(el('div', 'calc-title', 'How the daily model call was calculated'));
+      var grid = el('div', 'calc'), c = el('div'); c = card('Daily model · 14 backtested criteria', 'Each criterion is converted to a z-score against its training history (clamped to ±3, scaled to −1…+1) and multiplied by the weight found in training. Weights come from information coefficients on 2023–24 data.', true);
+      var F = (S.F || []).filter(function (f) { return f.counted; }), act = F.filter(function (f) { return f.z != null; }), ws = act.reduce(function (a, f) { return a + f.w; }, 0);
+      var rows = F.map(function (f) { var ct = f.z == null ? null : f.z * f.sw / ws; return [f.long || f.label, f.why || '', f.z == null ? '—' : sgnd(f.z, 2), (f.sw > 0 ? '+' : '−') + (f.w * 100).toFixed(1), cell(ct == null ? '—' : sgnd(ct * 100, 1), ct == null ? 'muted' : sgn(ct))]; });
+      c.appendChild(table(['Criterion', 'Reading', 'z (−1…+1)', 'Weight ×100', 'Adds ×100'], rows));
+      var sc = S.C && S.C.score;
+      if (sc != null) {
+        var pc = S.pct;
+        c.appendChild(eq(['Score = Σ (z × signed weight) ÷ Σ |weights| = ' + sgnd(sc, 3) + '   (inputs present: ' + Math.round(S.C.coverage * 100) + '%)',
+          'BUY above ' + P.hi.toFixed(3) + ' · SELL below ' + P.lo.toFixed(3) + '   →   ' + (S.verdict || '—'),
+          'Percentile of this score among ' + P.quantiles.length + ' training scores = ' + pc + '   →   confidence ' + (S.conf != null ? S.conf + '%' : '—') + (S.verdict === 'SELL' ? ' (100 − percentile)' : S.verdict === 'BUY' ? ' (= percentile)' : ' (distance from the middle)')]));
+      } else c.appendChild(foot('Not enough inputs yet for a score (needs at least 60% of the weight).'));
+      var t = P.stats.improved.test;
+      c.appendChild(foot('The confidence here is a rank, not a probability. Unseen 2025–26 results: BUY rose within 5 days ' + Math.round(t.BUY.hit5 * 100) + '% of the time (' + t.BUY.n + ' calls), SELL fell ' + Math.round(t.SELL.hit5 * 100) + '% (' + t.SELL.n + '), average 10-day move ' + (t.BUY.avg10 * 100).toFixed(2) + '% / ' + (t.SELL.avg10 * 100).toFixed(2) + '%. The edge is small; the time-based exit is part of the backtest.'));
+      grid.appendChild(c); out.appendChild(grid);
     }
-    function project() {
-      var padL = narrow ? 16 : 150, padR = narrow ? 44 : 78;
-      var sx = (W - padL - padR) / 2.44, sy = H * 0.41, cx = padL + 1.32 * sx, cy = H * 0.53, f = 3.2;
-      for (var i = 0; i < nodes.length; i++) { var n = nodes[i]; n.px = cx + n.x * sx; n.py = cy + n.y * sy; n.ps = 1; }
-      for (var j = 0; j < edges.length; j++) { var e = edges[j], ax = e.a.px, ay = e.a.py, bx = e.b.px, by = e.b.py, dx = (bx - ax) * 0.55; e.c = [ax, ay, ax + dx, ay, bx - dx, by, bx, by]; }
-    }
-    function at(c, t) { var u = 1 - t; return [u * u * u * c[0] + 3 * u * u * t * c[2] + 3 * u * t * t * c[4] + t * t * t * c[6], u * u * u * c[1] + 3 * u * u * t * c[3] + 3 * u * t * t * c[5] + t * t * t * c[7]]; }
 
-    function spawn(e, o) {
-      if (!e || parts.length >= MAXP) return; o = o || {};
-      parts.push({ eid: e.id, t: 0, v: (o.v || (0.35 + Math.random() * 0.4)) * (e.a.layer === 0 ? 1 : 0.8), c: o.c || e.col, sz: o.sz || (0.9 + e.w * 1.3), chain: !!o.chain, burst: !!o.burst });
+    function calcHealth() {
+      var out = $('heroHealth'); out.replaceChildren();
+      var h = S.health, rv = h && h.latest_review, f = (h && h.forward_30d) || [];
+      var c = card('Model health · self-review', 'The app checks itself every Saturday with nobody involved: it grades every plan it issued, pauses alerts for failing horizons, and re-tests its settings on data they were not fitted on.', true);
+      if (!h) { c.appendChild(foot(S.healthErr ? 'Model health unavailable: ' + S.healthErr : 'Loading…')); out.appendChild(c); return; }
+      var kvs = [['Last review', rv ? new Date(rv.ts).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'none yet (the first one runs on the next Saturday)']];
+      if (rv && rv.tuner) { var tn = rv.tuner; kvs.push(['Setting re-tune', tn.ran ? (tn.ok === false ? 'failed or timed out; previous settings kept' : 'ran' + (tn.secs ? ' in ' + tn.secs + 's' : '')) : (tn.reason || 'skipped')]);
+        Object.keys(tn.horizons || {}).forEach(function (k) { var x = tn.horizons[k]; kvs.push(['  ' + k, (x.kept_tuned ? 'new settings adopted' : 'defaults kept') + ' · unseen-data result ' + sgnd(x.tuned_r, 2) + 'R vs ' + sgnd(x.default_r, 2) + 'R']); }); }
+      if (rv && rv.factors) kvs.push(['Factor study', rv.factors.note || (rv.factors.n + ' graded plans')]);
+      (rv && rv.notes || []).forEach(function (n) { kvs.push(['Note', n]); });
+      c.appendChild(kv(kvs));
+      if (f.length) c.appendChild(table(['Symbol', 'Horizon', 'Issued', 'Graded', 'Hit %', 'Avg R', 'Verdict'], f.map(function (r) { return [r.symbol, r.horizon, r.issued, r.closed, r.hit_pct != null ? r.hit_pct + '%' : '—', r.avg_r != null ? sgnd(r.avg_r, 2) : '—', cell(r.verdict === 'FAILING' ? 'Failing: alerts paused' : r.verdict === 'POSITIVE' ? 'Positive' : 'Too few to judge', r.verdict === 'FAILING' ? 'down' : r.verdict === 'POSITIVE' ? 'up' : 'muted')]; })));
+      else c.appendChild(foot('No plans have been graded in the last 30 days yet. Live results build up as the market is open.'));
+      c.appendChild(foot('The loop never changes factor weights or places orders by itself: it only measures, pauses what is failing, and proposes. Exact predictions do not exist; this makes the uncertainty visible.'));
+      out.appendChild(c);
     }
-    function sparkAt(x, y, c, n) { for (var i = 0; i < n; i++) { var a = Math.random() * 6.283, sp = 20 + Math.random() * 70; sparks.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, c: c }); } if (sparks.length > 160) sparks.splice(0, sparks.length - 160); }
-    function arrive(p) {
-      var e = edgeById[p.eid]; if (!e) return; var b = e.b; b.flash = Math.min(1, (b.flash || 0) + (b.layer === 3 ? 0.25 : 0.4));
-      if (p.burst) sparkAt(b.px, b.py, p.c, b.layer === 3 ? 6 : 2);
-      if (!p.chain) return;
-      for (var i = 0; i < edges.length; i++) { var x = edges[i]; if (x.a === b && x.w > 0 && Math.random() < 0.5) spawn(x, { c: p.c, v: 0.7, sz: 1.7, chain: x.b.layer < 3, burst: true }); }
-    }
-    function feed(id, ok) {
-      var was = feedState[id] && feedState[id].ok; feedState[id] = { ok: ok, at: performance.now() };
-      if (was !== ok) dirty = true;
-      if (webStill || !W || !visible) return;
-      var mine = edges.filter(function (e) { return e.a.layer === 0 && e.a.feed === id && e.w > 0; });
-      var step = Math.max(1, Math.floor(mine.length / 12));
-      for (var i = 0; i < mine.length; i += step) spawn(mine[i], { c: ok ? PAL.core : PAL.bear[3], v: 0.9, sz: 1.8, chain: ok, burst: ok });
-      nodes.forEach(function (n) { if (n.layer === 0 && n.feed === id) n.flash = 1; });
-    }
-    function update(changed) { dirty = true; if (changed && S.verdict) flashOut = true; if (webStill && W) { build(); draw(0); } }
 
-    function draw(dt) {
-      if (!W) return; project();
-      var t = performance.now() / 1000, i;
-      ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, W, H);
-      var add = darkMode ? 'lighter' : 'source-over';
-      ctx.globalCompositeOperation = add;
-      for (i = 0; i < edges.length; i++) {
-        var e = edges[i], c = e.c, depth = (e.a.ps + e.b.ps) / 2;
-        ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.bezierCurveTo(c[2], c[3], c[4], c[5], c[6], c[7]);
-        if (e.w === 0) { ctx.strokeStyle = PAL.idle; ctx.lineWidth = 0.6; ctx.stroke(); continue; }
-        var lay = e.a.layer, base = lay === 0 ? 0.12 : lay === 1 ? 0.3 : 0.5;
-        var a = Math.min(0.9, (base + e.w * (lay === 0 ? 0.22 : 0.25)) * depth) * (darkMode ? 1 : 0.85);
-        if (e.ctx) ctx.setLineDash([2, 5]);
-        if (lay > 0) { ctx.strokeStyle = rgba(e.col, a * 0.3); ctx.lineWidth = (lay === 2 ? 6 : 3.5) * e.w; ctx.stroke(); }
-        ctx.strokeStyle = rgba(e.col, a); ctx.lineWidth = (lay === 0 ? 0.7 : lay === 1 ? 1.2 : 2.2) * (0.6 + e.w) * depth; ctx.stroke();
-        if (e.ctx) ctx.setLineDash([]);
-      }
-      for (var j = parts.length - 1; j >= 0; j--) {
-        var p = parts[j], pe = edgeById[p.eid]; if (!pe) { parts.splice(j, 1); continue; }
-        p.t += p.v * dt; if (p.t >= 1) { parts.splice(j, 1); arrive(p); continue; }
-        var h = at(pe.c, p.t), tl = at(pe.c, Math.max(0, p.t - 0.03));
-        glow(p.c, h[0], h[1], p.sz * 6);
-        ctx.fillStyle = rgba(p.c, 0.45); ctx.beginPath(); ctx.arc(tl[0], tl[1], p.sz * 0.7, 0, 6.283); ctx.fill();
-        ctx.fillStyle = darkMode ? 'rgba(255,255,255,0.95)' : rgba(p.c, 1); ctx.beginPath(); ctx.arc(h[0], h[1], p.sz, 0, 6.283); ctx.fill();
-      }
-      for (var s = sparks.length - 1; s >= 0; s--) { var sp = sparks[s]; sp.life -= dt * 1.6; if (sp.life <= 0) { sparks.splice(s, 1); continue; } sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vx *= 0.93; sp.vy *= 0.93; ctx.fillStyle = rgba(sp.c, sp.life); ctx.fillRect(sp.x - 1, sp.y - 1, 2.2, 2.2); }
-      for (i = 0; i < nodes.length; i++) {
-        var n = nodes[i]; n.flash = Math.max(0, (n.flash || 0) - dt * 1.3); if (n.layer === 3) continue;
-        var col = colFor(n.v, n.id), r = (n.layer === 0 ? 1.7 : n.layer === 1 ? 4 : 7) * n.ps * (1 + n.flash * 0.6);
-        if (n.layer > 0 || n.flash > 0.05 || n.v != null) glow(n.v == null ? PAL.flat[1] : col, n.px, n.py, r * (n.layer === 0 ? 3 + n.flash * 3 : 4 + n.flash * 2));
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = n.v == null ? tc(PAL.dim, 0.6) : (darkMode ? 'rgba(255,255,255,0.92)' : col); ctx.beginPath(); ctx.arc(n.px, n.py, r, 0, 6.283); ctx.fill();
-        if (n.layer > 0) { ctx.strokeStyle = darkMode ? rgba(col, 0.9) : 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.2; ctx.stroke(); }
-        ctx.globalCompositeOperation = add;
-      }
-      drawOrb(byId.out, t);
-      ctx.globalCompositeOperation = 'source-over'; ctx.textBaseline = 'middle';
-      ctx.font = '600 ' + (narrow ? 8 : 9.5) + 'px ' + MONO;
-      var g0 = byId.g0, c0 = S.F && S.F[0] && byId['c_' + S.F[0].k]; var shortLab = narrow || !g0 || !c0 || (g0.px - c0.px) < 250;
-      for (i = 0; i < nodes.length; i++) {
-        var m = nodes[i];
-        if (m.layer === 0 && m.first && !narrow) { ctx.textAlign = 'right'; ctx.fillStyle = feedState[m.feed] && feedState[m.feed].ok ? tc(PAL.text, 0.85) : tc(PAL.dim, 0.7); ctx.fillText(m.feedLabel.toUpperCase() + ' · ' + m.count, m.px - 10, m.py); }
-        else if (m.layer === 1) { ctx.textAlign = 'left'; ctx.fillStyle = m.v == null ? tc(PAL.dim, 0.7) : tc(PAL.text, 0.9); ctx.fillText((shortLab ? m.f.label : m.label) + (m.v == null ? '  · ' + String(m.f.why || 'n/a').slice(0, shortLab ? 14 : 26) : '  ' + (m.v > 0 ? '+' : '') + m.v.toFixed(2)) + (m.f.counted ? '' : '  ·ctx'), m.px + 8, m.py); }
-        else if (m.layer === 2) { ctx.textAlign = 'center'; ctx.fillStyle = tc(PAL.text, 0.92); ctx.fillText(m.label.toUpperCase() + (m.v == null ? '' : ' ' + (m.v > 0 ? '+' : '') + m.v.toFixed(2)), m.px, m.py - 16 * m.ps); }
-      }
-      ctx.font = '700 ' + (narrow ? 8 : 9) + 'px ' + MONO; ctx.textAlign = 'center'; ctx.fillStyle = tc(PAL.dim, 0.9);
-      var n0 = 0; for (i = 0; i < nodes.length; i++) if (nodes[i].layer === 0) n0++;
-      var caps = [['r_quotes_0', 'L0 · RAW (' + n0 + ')'], ['c_' + ((S.F && S.F[0] && S.F[0].k) || ''), 'L1 · CRITERIA (' + (S.F || []).length + ')'], ['g0', 'L2 · MODELS'], ['out', 'OUT · CALL']];
-      caps.forEach(function (c) { var x = byId[c[0]]; if (x) ctx.fillText(c[1], x.px, 14); });
+    // ----- shell -----
+    function buildTabs() {
+      var t = $('heroTabs'); t.replaceChildren();
+      HZ.concat('daily').forEach(function (hz) {
+        var p = hz === 'daily' ? null : planFor(hz), b = el('button'); b.type = 'button'; b.dataset.hz = hz; b.setAttribute('aria-pressed', String(hz === active));
+        var dot = el('span', 'dotc' + (isLive(p) ? (p.decision === 'BUY' ? ' buy' : ' sell') : hz === 'daily' && (S.verdict === 'BUY' || S.verdict === 'SELL') ? (S.verdict === 'BUY' ? ' buy' : ' sell') : ''));
+        b.append(dot, document.createTextNode(hz === 'daily' ? 'Daily model' : (HZ_LABEL[hz] || hz))); t.appendChild(b);
+      });
     }
-    function drawOrb(n, t) {
-      if (!n) return; var c = S.verdict ? PAL.out[S.verdict] : PAL.flat[1]; var R = (narrow ? 22 : 30) * n.ps * (1 + n.flash * 0.18); var pulse = 0.5 + 0.5 * Math.sin(t * 2.2);
-      glow(c, n.px, n.py, R * (3 + pulse * 0.4 + n.flash));
-      ctx.globalCompositeOperation = 'source-over';
-      for (var i = 0; i < 3; i++) { var rot = t * (0.5 + i * 0.3) * (i % 2 ? -1 : 1); ctx.strokeStyle = rgba(c, 0.4 - i * 0.1); ctx.lineWidth = 1; ctx.setLineDash([3 + i * 2, 7 + i * 3]); ctx.beginPath(); ctx.arc(n.px, n.py, R + 8 + i * 7, rot, rot + 6.283); ctx.stroke(); } ctx.setLineDash([]);
-      ctx.fillStyle = darkMode ? 'rgba(6,8,14,0.92)' : 'rgba(255,255,255,0.96)'; ctx.beginPath(); ctx.arc(n.px, n.py, R, 0, 6.283); ctx.fill();
-      ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.stroke();
-      if (S.conf != null) { ctx.lineWidth = 3.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(n.px, n.py, R + 4, -Math.PI / 2, -Math.PI / 2 + 6.283 * S.conf / 100); ctx.stroke(); ctx.lineCap = 'butt'; }
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = c; ctx.font = '700 ' + (narrow ? 11 : 14) + 'px "Plus Jakarta Sans", sans-serif'; ctx.fillText(S.verdict || '…', n.px, n.py - (narrow ? 3 : 5));
-      ctx.fillStyle = tc(PAL.dim, 0.95); ctx.font = '600 ' + (narrow ? 8 : 9.5) + 'px ' + MONO; ctx.fillText(S.conf != null ? S.conf + '%' : '', n.px, n.py + (narrow ? 8 : 10));
+    var HZ_LABEL = { scalp: 'Scalp', intraday: 'Intraday', swing: 'Swing' };
+    function render(full) {
+      if (!S.sel) return;
+      var p = active === 'daily' ? null : planFor(active);
+      var key = [S.sel.id, active, S.plansStamp || 0, S.healthStamp || 0, active === 'daily' ? S.vKey : '', S.tf].join('|');
+      if (!full && key === lastKey) return; lastKey = key;
+      buildTabs();
+      $('heroPlan').hidden = active === 'daily'; $('heroDaily').hidden = active !== 'daily';
+      if (active === 'daily') calcDaily(); else { buildPlan(p); calcPlan(p); }
+      calcHealth(); tickCd();
+      try { Calls.paint(); } catch (e) {}
     }
-    function frame(ts) {
-      if (!running) return; requestAnimationFrame(frame);
-      if (document.hidden || !visible) { lastT = 0; return; }
-      if (!W) { resize(); if (!W) return; }
-      if (ts - lastDraw < 32) return; // ~30 fps is plenty for this and halves the work
-      var dt = lastT ? Math.min(0.06, (ts - lastT) / 1000) : 0.033; lastT = ts; lastDraw = ts;
-      if (dirty && ts - lastBuild > 700) build();
-      if (flashOut && byId.out) { flashOut = false; byId.out.flash = 1; sparkAt(byId.out.px || 0, byId.out.py || 0, PAL.out[S.verdict] || PAL.flat[0], 24); }
-      for (var i = 0; i < edges.length; i++) { var e = edges[i]; if (e.w <= 0) continue; e.acc += dt * (e.a.layer === 0 ? 0.03 + e.w * 0.12 : 0.2 + e.w * 0.9); if (e.acc >= 1) { e.acc -= 1; spawn(e); } }
-      draw(dt);
+    function tickCd() {
+      var c = $('heroCd'); if (!c) return; var p = planFor(active); if (!isLive(p)) return;
+      var left = (Date.parse(p.valid_until) - nowMs()) / 1000;
+      var t = left > 0 ? 'Entry valid for ' + mmss(left) + ' (until ' + istTime(p.valid_until) + ')' : 'Entry window closed ' + istTime(p.valid_until);
+      if (c.textContent !== t) c.textContent = t; c.className = 'chip ' + (left > 0 ? 'good' : 'warn');
     }
-    function hit(x, y) { var best = null, bd = 12; nodes.forEach(function (n) { var r = n.layer === 3 ? 34 : n.layer === 0 ? 5 : 10; var d = Math.hypot(x - n.px, y - n.py); if (d < Math.max(bd, r) && (!best || d < bd)) { best = n; bd = d; } }); return best; }
-    function showTip(n, x, y) {
-      if (!n) { tip.hidden = true; return; } tip.replaceChildren(); var b, d;
-      var totW = Object.keys(P.criteria).reduce(function (a, k) { return a + Math.abs(P.criteria[k].w); }, 0);
-      if (n.layer === 0) { b = n.feedLabel + ' · data point'; d = n.label + (n.v == null ? '' : ' · signal ' + (n.v > 0 ? '+' : '') + n.v.toFixed(2)); }
-      else if (n.layer === 1) { var f = n.f; b = f.long + ' · ' + (f.s == null ? 'inactive' : (f.s > 0 ? '+' : '') + f.s.toFixed(2)); d = f.why + '. ' + (f.counted && P.ic10[f.k] ? 'Backtested: ' + (f.w / totW * 100).toFixed(1) + '% of the score; 10-day IC ' + P.ic10[f.k].train.toFixed(3) + ' train, ' + P.ic10[f.k].test.toFixed(3) + ' test.' : 'Context only, not counted yet.'); }
-      else if (n.layer === 2) { b = n.g.label + ' model · ' + (n.g.s == null ? 'no inputs' : (n.g.s > 0 ? '+' : '') + n.g.s.toFixed(2)); d = n.g.ctx ? 'Shown for context, not counted: no history yet to backtest these.' : 'Weighted average of its live criteria. Carries ' + Math.round(n.g.w * 100) + '% of the call.'; }
-      else { b = 'Daily model · ' + (S.verdict || 'pending'); d = S.C && S.C.score != null ? 'Score ' + S.C.score.toFixed(3) + '. BUY above ' + P.hi.toFixed(3) + ', SELL below ' + P.lo.toFixed(3) + '.' : 'Waiting for inputs.'; }
-      tip.append(el('b', null, b), el('span', null, d)); tip.hidden = false;
-      var tw = tip.offsetWidth, th = tip.offsetHeight; tip.style.left = clamp(x + 14, 6, Math.max(6, W - tw - 6)) + 'px'; tip.style.top = clamp(y + 14, 6, Math.max(6, H - th - 6)) + 'px';
+    function lines() { var p = active === 'daily' ? null : planFor(active); return isLive(p) ? { entry: p.entry, tgt: p.target_1, sl: p.stop_loss } : null; }
+    function start() {
+      $('heroTabs').addEventListener('click', function (ev) {
+        var b = ev.target.closest('button[data-hz]'); if (!b) return; active = b.dataset.hz; store('cat.hz', active);
+        setTf(active === 'daily' ? '1D' : TFMAP[active]); render(true);
+      });
+      setTf(active === 'daily' ? '1D' : TFMAP[active]); render(true); setInterval(tickCd, 1000);
     }
-    cv.addEventListener('pointermove', function (ev) {
-      var r = cv.getBoundingClientRect(); var x = ev.clientX - r.left, y = ev.clientY - r.top;
-      var hv = hit(x, y); cv.style.cursor = hv ? 'help' : 'default'; showTip(hv, x, y);
-    });
-    cv.addEventListener('pointerleave', function () { tip.hidden = true; });
-    function theme() { darkMode = isDark(); PAL = darkMode ? PALETTES.dark : PALETTES.light; dirty = true; if (webStill && W) { build(); draw(0); } }
-    function start() { theme(); build(); resize(); if (!webStill && !running) { running = true; requestAnimationFrame(frame); } }
-    try { new ResizeObserver(function () { resize(); }).observe(wrap); } catch (e) { window.addEventListener('resize', resize); }
-    try { new IntersectionObserver(function (en) { visible = en[0].isIntersecting; }).observe(wrap); } catch (e) {}
-    return { start: start, resize: resize, update: update, feed: feed, theme: theme };
+    function head() {
+      var q = S.sel && quoteFor(S.sel.id);
+      $('heroSym').textContent = S.sel ? S.sel.label : '—'; $('heroLtp').textContent = q ? n2(q.ltp) : '—'; $('heroLtp').className = 'ltp num ' + sgn(q && q.change_pct);
+      $('heroChg').textContent = q ? (q.change > 0 ? '+' : '') + n2(q.change) + ' (' + pct(q.change_pct) + ')' : ''; $('heroChg').className = 'num ' + sgn(q && q.change_pct);
+    }
+    return { start: start, render: render, head: head, lines: lines, active: function () { return active; } };
   })();
 
   // ---------- theme reactions ----------
-  function onTheme() { syncThemeBtn(); Web.theme(); themeChart(); drawChart(false); lastLinesKey = 'x'; S.vKey = ''; runEngine(); Calls.render(true); Recs.render(true); renderDepth(); renderChain(); }
+  function onTheme() { syncThemeBtn(); themeChart(); drawChart(false); lastLinesKey = 'x'; S.vKey = ''; runEngine(); Calls.render(true); Recs.render(true); renderDepth(); renderChain(); Hero.render(true); }
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme); } catch (e) {}
   new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
@@ -2307,18 +2387,10 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
   var savedSel = load('cat.sel'); S.sel = S.list.find(function (w) { return w.id === savedSel; }) || S.list[0] || DEFAULT_LIST[0];
   var savedView = load('cat.view'); if (savedView) setView(savedView);
   renderSession(); renderTicker(); renderPortfolio(); renderMovers(); renderNews();
-  Web.start(); selectSym(S.sel.id); renderPortfolio(); Recs.render(true);
+  Hero.start(); selectSym(S.sel.id); renderPortfolio(); Recs.render(true);
   if (/debug/.test(location.hash)) window.__CAT__ = S;
   Store.init(); AI.init();
 
-  // signal web full screen (Esc closes)
-  function setFs(on) {
-    $('app').classList.toggle('webfs', on); $('webFs').setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
-    $('webFsIco').innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
-    requestAnimationFrame(function () { Web.resize(); });
-  }
-  $('webFs').addEventListener('click', function () { setFs(!$('app').classList.contains('webfs')); });
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && $('app').classList.contains('webfs') && $('ticket').hidden) setFs(false); });
   if (!window.LightweightCharts) chartMsg('Chart library didn’t load. Check your connection and reload.');
 
   (window.claude && window.claude.use ? window.claude.use('mcp') : Promise.resolve(onServer ? restAdapter() : null)).then(function (mcp) {
