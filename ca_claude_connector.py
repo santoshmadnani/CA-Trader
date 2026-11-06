@@ -188,6 +188,9 @@ TOOLS: list[dict[str, Any]] = [
         }),
     },
     {"name": "get_model_health", "description": "Latest weekly self-review of the trade-plan model (parameter tuning outcome, factor study, notes) and the live graded record per symbol and horizon over the last 30 days.", "inputSchema": _schema({})},
+    {"name": "get_events", "description": "The app's live event feed: new calls, entry fills, live P&L, exits, runs, agent actions, market status (newest first).", "inputSchema": _schema({"since_id": {"type": "integer", "minimum": 0, "default": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 40}})},
+    {"name": "get_agents", "description": "Every background agent: what it does, when it last ran, its state, and the NSE/MCX session.", "inputSchema": _schema({})},
+    {"name": "agent_chat", "description": "Ask an agent (or Coco, the guide) what it is doing. Answers come from real app state only.", "inputSchema": _schema({"agent": {"type": "string"}, "message": {"type": "string"}, "history": {"type": "array", "items": {"type": "object"}}}, ["message"])},
     {"name": "get_watchlists", "description": "The user's CA Trader watchlists and their symbols.", "inputSchema": _schema({})},
     {"name": "get_positions", "description": "Open paper-trading positions with live mark-to-market P&L.", "inputSchema": _schema({})},
     {"name": "get_holdings", "description": "Paper-trading holdings.", "inputSchema": _schema({})},
@@ -356,6 +359,15 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         fwd = await asyncio.to_thread(mh.forward_table, core.db_exec, 30)
         return {"latest_review": mh.latest_journal(), "forward_30d": fwd}
 
+    async def t_events(args, user):
+        return await core.api_events(since_id=_int(args, "since_id", 0, 0, 10**9), limit=_int(args, "limit", 40, 1, 100), user=user)
+
+    async def t_agents(args, user):
+        return await core.api_agents(user=user)
+
+    async def t_agent_chat(args, user):
+        return await core.agent_chat(args.get("agent") or "Coco", args.get("message"), args.get("history"))
+
     async def t_movers(args, user):
         cat = str(args.get("category") or "gainers")
         if cat not in MOVER_CATEGORIES:
@@ -442,6 +454,9 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         "get_trade_plans": t_plans,
         "get_plan_history": t_plan_history,
         "get_model_health": t_model_health,
+        "get_events": t_events,
+        "get_agents": t_agents,
+        "agent_chat": t_agent_chat,
         "get_market_movers": t_movers,
         "get_market_session": t_session,
         "get_option_chain": t_options,

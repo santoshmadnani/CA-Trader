@@ -11776,9 +11776,64 @@ async def api_agents(user: dict[str, Any] = Depends(require_user)) -> dict[str, 
     for name, what in _AGENT_INFO.items():
         b = _AGENT_BEATS.get(name)
         age = (now - datetime.fromisoformat(b["at"])).total_seconds() if b else None
-        out.append({"name": name, "does": what, "last": b["at"] if b else None, "note": b["note"] if b else "waiting for the next market session", "ok": (b["ok"] if b else True),
+        out.append({"name": name, "nick": _AGENT_PERSONA.get(name, (name,))[0], "does": what, "last": b["at"] if b else None, "note": b["note"] if b else "waiting for the next market session", "ok": (b["ok"] if b else True),
                     "state": "idle" if not b else ("error" if not b["ok"] else "running" if age is not None and age < 180 else "idle")})
     return {"agents": out, "nse": market_session("NSE_EQ"), "mcx": market_session("MCX"), "timestamp": now_iso()}
+
+
+_AGENT_PERSONA = {
+    "Coco": ("Coco", "the friendly guide of the app who explains everything happening in the market and the app to a complete beginner"),
+    "Plan tracker": ("Tracker Tara", "keeps every published call and checks it against real 1-minute candles"),
+    "Live P&L watcher": ("Penny", "watches the live profit or loss of every filled call"),
+    "Run detector": ("Radar Ravi", "spots bullish and bearish runs"),
+    "Market clock": ("Clock Kabir", "announces market open/close, the morning brief and the day summary"),
+    "Telegram dispatcher": ("Postman Pappu", "delivers each event to Telegram within the market-hours rules"),
+    "News worker": ("Newsie Nina", "collects news and keeps only what affects the selected stock"),
+    "Recommendation recorder": ("Scribe Sam", "saves recommendations and grades them honestly"),
+    "Housekeeper": ("Handy Hari", "keeps the server's memory and disk healthy"),
+    "Self-review": ("Prof. Meera", "reviews every issued call each week and proposes improvements, never changing weights by herself"),
+}
+_AGENT_CHAT_TIMES: collections.deque = collections.deque(maxlen=60)
+
+
+async def agent_chat(agent: str, msg: str, history: list[dict[str, str]] | None = None) -> dict[str, Any]:
+    """Talk to one agent (or Coco, the guide). Gemini answers in the agent's voice, but only from the real state and events given to it."""
+    agent = str(agent or "Coco")
+    msg = str(msg or "").strip()[:600]
+    if agent not in _AGENT_PERSONA:
+        raise HTTPException(400, "Unknown agent")
+    if not msg:
+        raise HTTPException(400, "Message cannot be empty")
+    t = time.time()
+    while _AGENT_CHAT_TIMES and t - _AGENT_CHAT_TIMES[0] > 60:
+        _AGENT_CHAT_TIMES.popleft()
+    if len(_AGENT_CHAT_TIMES) >= 12:
+        return {"available": False, "reason": "Too many questions in a minute. Try again shortly."}
+    _AGENT_CHAT_TIMES.append(t)
+    name, role = _AGENT_PERSONA[agent]
+    ev = await asyncio.to_thread(EVENTS.recent, db_exec, 14, 0, None, None)
+    ctx = [f"{e['ts'][11:19]}Z {e['kind']}: {e['title']} | {(e.get('body') or '')[:220]}" for e in ev]
+    beat = _AGENT_BEATS.get(agent) or {}
+    plans = await asyncio.to_thread(lambda: db_exec("SELECT symbol, horizon, side, status, entry_low, entry_high, stop_loss, target_1, fill_price, r FROM signal_plans ORDER BY created_at DESC LIMIT 6", [], "all") or [])
+    nse, mcx = market_session("NSE_EQ"), market_session("MCX")
+    prompt = f"""You are {name}, an agent inside the CA Trader app. You are {role}. Speak in first person, warm and short (max 5 sentences), simple words for a beginner, a light touch of personality, at most one emoji.
+STRICT RULES: use ONLY the facts below. Never invent prices, calls, news or results. If the answer is not in the facts, say you do not know and what you would check. Never promise profit. You are not a financial adviser.
+Your last activity: {beat.get('at') or 'not active yet'} {beat.get('note') or ''}
+NSE market open: {bool(nse.get('active'))}; MCX open: {bool(mcx.get('active'))}
+Recent app events (newest first):
+{chr(10).join(ctx) or 'none yet'}
+Latest calls: {json.dumps(plans, default=str)[:1500]}
+User asks: {msg}"""
+    res = await asyncio.to_thread(gemini_text, prompt, 6000, None, history or [], 25.0)
+    if not res.get("available"):
+        return {"available": False, "reason": res.get("reason") or "Gemini did not answer", "agent": name}
+    return {"available": True, "agent": name, "text": res["text"].strip(), "timestamp": now_iso()}
+
+
+@app.post("/api/agents/chat")
+async def api_agents_chat(request: Request, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    body = await request.json()
+    return await agent_chat(body.get("agent"), body.get("message"), body.get("history"))
 
 
 @app.post("/api/telegram/samples")
