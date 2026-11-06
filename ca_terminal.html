@@ -63,9 +63,9 @@ svg.i{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-widt
 
 .content{min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr);gap:10px;padding:10px max(12px,env(safe-area-inset-right,0px)) 10px max(12px,env(safe-area-inset-left,0px))}
 .pane{min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
-.main{display:grid;gap:10px;align-content:start;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"hero hero" "recs recs" "chart feed" "desk feed";grid-template-rows:repeat(4,max-content)}
+.main{display:grid;gap:10px;align-content:start;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"hero hero" "office office" "recs recs" "chart feed" "desk feed";grid-template-rows:repeat(5,max-content)}
 .sec-hero{grid-area:hero} .sec-chart{grid-area:chart} .sec-feed{grid-area:feed;display:flex;flex-direction:column;gap:10px;min-width:0} .sec-desk{grid-area:desk}
-@media (max-width:1240px){.main{grid-template-columns:minmax(0,1fr);grid-template-areas:"hero" "recs" "chart" "desk" "feed";grid-template-rows:repeat(5,max-content)}.sec-feed{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}}
+@media (max-width:1240px){.main{grid-template-columns:minmax(0,1fr);grid-template-areas:"hero" "office" "recs" "chart" "desk" "feed";grid-template-rows:repeat(6,max-content)}.sec-feed{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}}
 @media (max-width:980px){.content{grid-template-columns:230px minmax(0,1fr)}}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:0;overflow:clip}
@@ -185,12 +185,12 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   .main{display:block;height:100%}
   .app[data-view="watch"] .main,.app:not([data-view="watch"]) .wl-pane{display:none}
   .main>section{display:none;margin-bottom:10px}
-  .app[data-view="signal"] .sec-hero,.app[data-view="chart"] .sec-chart,.app[data-view="desk"] .sec-desk,.app[data-view="recs"] .sec-recs{display:block}
+  .app[data-view="office"] .sec-office,.app[data-view="signal"] .sec-hero,.app[data-view="chart"] .sec-chart,.app[data-view="desk"] .sec-desk,.app[data-view="recs"] .sec-recs{display:block}
   .app[data-view="feed"] .sec-feed{display:flex}
   .app[data-view="chart"] .main{display:flex;flex-direction:column}
   .app[data-view="chart"] .sec-chart{display:flex;flex-direction:column;flex:1;min-height:380px;margin:0}
   .app[data-view="chart"] .chart-wrap{flex:1;height:auto;min-height:280px}
-  .tabbar{display:grid;grid-template-columns:repeat(6,1fr);height:calc(52px + env(safe-area-inset-bottom,0px));padding:4px max(6px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(6px,env(safe-area-inset-left,0px));background:var(--surface);border-top:1px solid var(--line)}
+  .tabbar{display:grid;grid-template-columns:repeat(7,1fr);height:calc(52px + env(safe-area-inset-bottom,0px));padding:4px max(6px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(6px,env(safe-area-inset-left,0px));background:var(--surface);border-top:1px solid var(--line)}
   .tabbar button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer}
   .tabbar button[aria-selected="true"]{color:var(--accent)}
 }
@@ -270,6 +270,90 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
   .hero-tabs{margin-left:0;width:100%} .hero-tabs button{flex:1;padding:6px 4px;font-size:11.5px} .hero-tabs .dotc{margin-right:4px}
   .hero-daily .lvls{grid-template-columns:minmax(0,1fr)}
 }
+
+/* office: agents at work, live events, chat; Coco the guide; dismissible toasts */
+.sec-office{grid-area:office}
+.off-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;padding:10px 12px 12px}
+@media (max-width:1100px){.off-wrap{grid-template-columns:minmax(0,1fr)}}
+.off-floor{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start;padding:12px;border-radius:12px;background:repeating-linear-gradient(0deg,var(--surface-2) 0 38px,var(--surface-3) 38px 39px)}
+.desk{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px 10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);cursor:pointer;text-align:center;font:inherit;color:inherit;min-width:0}
+.desk:hover,.desk:focus-visible{border-color:var(--accent);outline:none;transform:translateY(-1px)}
+.desk .nm{font-size:12.5px;font-weight:700}
+.desk .rl{font-size:10.5px;color:var(--muted);line-height:1.25;min-height:26px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.desk .st{font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.desk.running .st{background:var(--up-soft);color:var(--up)} .desk.error .st{background:var(--down-soft);color:var(--down)}
+.desk .say{font-size:11px;line-height:1.3;background:var(--surface-2);border-radius:8px;padding:4px 7px;margin-top:2px;max-width:100%;overflow-wrap:anywhere}
+.av{width:62px;height:62px;overflow:visible}
+.av .blink{animation:blink 5s infinite;transform-origin:center;transform-box:fill-box}
+.av .arm{transform-box:fill-box;transform-origin:50% 0}
+.desk.running .av .arm.l{animation:type .5s ease-in-out infinite alternate}
+.desk.running .av .arm.r{animation:type .5s ease-in-out .25s infinite alternate}
+.desk.idle .av{animation:breathe 4s ease-in-out infinite}
+.av .zzz{opacity:0}.desk.idle .av .zzz{opacity:1;animation:zz 3s ease-in-out infinite}
+.av .sweat{opacity:0}.desk.error .av .sweat{opacity:1}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes type{from{transform:translateY(-1px) rotate(-6deg)}to{transform:translateY(2px) rotate(6deg)}}
+@keyframes breathe{50%{transform:translateY(1.5px)}}
+@keyframes zz{0%{opacity:0;transform:translateY(3px)}50%{opacity:1}100%{opacity:0;transform:translateY(-6px)}}
+.off-log{display:flex;flex-direction:column;gap:6px;max-height:480px;overflow:auto;padding-right:2px}
+.off-log h3{margin:0 0 2px;font-size:12px;color:var(--muted);font-weight:700}
+.ev{display:grid;grid-template-columns:22px 1fr;gap:6px;padding:7px 8px;border-radius:9px;background:var(--surface-2);border-left:3px solid var(--line);font-size:12px;animation:tin .25s ease-out}
+.ev.good{border-left-color:var(--up)} .ev.bad{border-left-color:var(--down)} .ev.warn{border-left-color:var(--warn)}
+.ev b{display:block;font-size:12px}.ev .bd{color:var(--muted);white-space:pre-line;overflow-wrap:anywhere;max-height:5.2em;overflow:hidden}
+.ev .tm{font-size:10px;color:var(--muted)}
+.off-empty{padding:18px;text-align:center;color:var(--muted);font-size:12.5px}
+/* chat sheet */
+.chat{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:92px;z-index:60;width:min(370px,calc(100vw - 24px));height:min(440px,calc(100vh - 150px));display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.chat[hidden]{display:none}
+.chat-h{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.chat-h .t{flex:1;min-width:0}.chat-h b{display:block;font-size:13px}.chat-h span{font-size:11px;color:var(--muted)}
+.chat-h button,.toast .x,.bub .x{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:4px 6px;border-radius:6px}
+.chat-h button:hover,.toast .x:hover,.bub .x:hover{color:var(--fg);background:var(--surface-2)}
+.chat-m{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:7px}
+.msg{max-width:88%;padding:7px 10px;border-radius:12px;font-size:12.5px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:var(--accent);color:#fff}.msg.bot{align-self:flex-start;background:var(--surface-2)}
+.chat-q{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 8px}
+.chat-q button{font:inherit;font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.chat-q button:hover{border-color:var(--accent)}
+.chat-f{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--line)}
+.chat-f input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--fg);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.chat-f button{border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;padding:0 14px;cursor:pointer}
+.chat-f button:disabled{opacity:.5}
+/* dismissible toasts (visible on phones too) */
+.toasts{z-index:70}
+@media (max-width:760px){.toasts{display:grid!important;top:54px;bottom:auto;right:8px;left:8px;width:auto}}
+.toast{position:relative;padding-right:28px;touch-action:pan-y;transition:transform .18s,opacity .18s}
+.toast .x{position:absolute;top:4px;right:4px}
+/* Coco */
+.coco{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:max(64px,calc(60px + env(safe-area-inset-bottom,0px)));z-index:55;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none}
+@media (min-width:761px){.coco{bottom:18px}.chat{bottom:104px}}
+.coco>*{pointer-events:auto}
+.bub{position:relative;max-width:min(270px,calc(100vw - 40px));background:var(--surface);border:1px solid var(--line);border-radius:14px 14px 4px 14px;padding:9px 28px 9px 11px;font-size:12.5px;line-height:1.4;box-shadow:0 10px 28px rgba(0,0,0,.28);animation:pop .25s ease-out;touch-action:pan-y;transition:transform .18s,opacity .18s}
+.bub[hidden]{display:none}.bub .x{position:absolute;top:3px;right:3px}.bub b{display:block;margin-bottom:2px}
+.coco-btn{width:68px;height:68px;border:0;background:transparent;cursor:pointer;padding:0;border-radius:50%;filter:drop-shadow(0 6px 10px rgba(0,0,0,.3))}
+.coco-btn svg{width:100%;height:100%;overflow:visible}
+.coco .mouth,.coco .eyes-o,.coco .eyes-z,.coco .tear,.coco .spark,.coco .zz,.coco .brow-a{display:none}
+.coco .mouth.happy{display:inline}
+.coco.excited .mouth.happy,.coco.sad .mouth.happy,.coco.alert .mouth.happy,.coco.sleepy .mouth.happy{display:none}
+.coco.excited .mouth.big,.coco.sad .mouth.sad,.coco.alert .mouth.o{display:inline}
+.coco.sleepy .eyes-c{display:none}.coco.sleepy .eyes-z,.coco.sleepy .zz{display:inline}
+.coco.excited .spark{display:inline;animation:spk .8s ease-in-out infinite alternate}
+.coco.sad .tear{display:inline;animation:tear 1.6s ease-in infinite}
+.coco.alert .brow-a{display:inline}
+.coco .body{transform-box:fill-box;transform-origin:50% 100%;animation:float 3.2s ease-in-out infinite}
+.coco.excited .body{animation:jump .55s ease-in-out infinite}
+.coco.sad .body{animation:droop 2.4s ease-in-out infinite}
+.coco.alert .body{animation:shake .45s ease-in-out 3}
+.coco.sleepy .body{animation:float 5s ease-in-out infinite}
+.coco .eyes-c{transform-box:fill-box;transform-origin:center;animation:blink 5s infinite}
+@keyframes float{50%{transform:translateY(-3px)}}
+@keyframes jump{0%,100%{transform:translateY(0) scale(1.02,.96)}50%{transform:translateY(-12px) scale(.97,1.04)}}
+@keyframes droop{0%,100%{transform:translateY(2px) scaleY(.96)}50%{transform:translateY(4px) scaleY(.93)}}
+@keyframes shake{25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+@keyframes spk{from{opacity:.3;transform:scale(.7)}to{opacity:1;transform:scale(1.15)}}
+@keyframes tear{0%{transform:translateY(0);opacity:1}100%{transform:translateY(10px);opacity:0}}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.av,.av *,.coco *,.ev,.bub{animation:none!important}}
 
 /* buttons */
 .btn{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -376,6 +460,14 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
         </div>
       </section>
 
+      <section class="card sec-office" id="office">
+        <div class="card-h"><h2>Office · agents at work</h2><span class="sub" id="offSub">Tap an agent to ask what it is doing</span></div>
+        <div class="off-wrap">
+          <div class="off-floor" id="offFloor"><div class="off-empty">Agents are clocking in…</div></div>
+          <div class="off-log" id="offLog"><h3>What is happening now</h3><div class="off-empty">Nothing yet. Events appear here as they happen.</div></div>
+        </div>
+      </section>
+
       <section class="card sec-recs">
         <div class="card-h"><h2>Recommendations</h2><span class="sub" id="recsSub">Every call with its LTP, result and live P&amp;L</span>
           <div class="seg" id="recsTabs" style="margin-left:auto">
@@ -448,6 +540,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     <button role="tab" data-view="chart" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M3 20h18M6 16V9M10 16V5M14 16v-4M18 16V8"/></svg>Chart</button>
     <button role="tab" data-view="signal" aria-selected="true" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Trade</button>
     <button role="tab" data-view="recs" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg>Log</button>
+    <button role="tab" data-view="office" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9.5" r="2.2"/><path d="M17 14c2.5.2 4 2 4 4.5"/></svg>Office</button>
     <button role="tab" data-view="desk" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>Desk</button>
     <button role="tab" data-view="feed" aria-selected="false" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M9 9h6M9 13h6"/></svg>Feed</button>
   </nav>
@@ -1026,6 +1119,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
     watch('pos', 'get_positions', null, function (d) { S.positions = d; renderPortfolio(); }, function (e) { S.pfErr = errText(e); renderPortfolio(); });
     watch('hold', 'get_holdings', null, function (d) { S.holdings = d; renderPortfolio(); }, function (e) { S.pfErr = errText(e); renderPortfolio(); });
     watch('health', 'get_model_health', null, function (d) { S.health = d; S.healthErr = null; S.healthStamp = (S.healthStamp || 0) + 1; Hero.render(true); }, function (e) { S.healthErr = errText(e); S.healthStamp = (S.healthStamp || 0) + 1; Hero.render(true); }, 600000);
+    Office.start();
     watch('news_mkt', 'get_news', { symbol: 'NIFTY', limit: 20 }, function (d) { newsParts.mkt = (d && (d.events || d.items)) || []; mergeNews(); }, function (e) { newsParts.mkt = []; mergeNews(); }, 60000, 'news');
   }
   function watchRec() {
@@ -1604,10 +1698,20 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
   function fmtPts(x) { return x == null || isNaN(x) ? '—' : (x > 0 ? '+' : '') + n2(x); }
   function sideTxt(s) { return s > 0 ? 'BUY' : 'SELL'; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function swipeAway(node, done) {
+    var x0 = null, dx = 0;
+    node.addEventListener('pointerdown', function (e) { if (e.target.closest('button')) return; x0 = e.clientX; dx = 0; node.style.transition = 'none'; });
+    node.addEventListener('pointermove', function (e) { if (x0 == null) return; dx = e.clientX - x0; node.style.transform = 'translateX(' + dx + 'px)'; node.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 220)); });
+    function end() { if (x0 == null) return; x0 = null; node.style.transition = ''; if (Math.abs(dx) > 70) { node.style.transform = 'translateX(' + (dx > 0 ? 400 : -400) + 'px)'; node.style.opacity = '0'; setTimeout(done, 160); } else { node.style.transform = ''; node.style.opacity = ''; } }
+    node.addEventListener('pointerup', end); node.addEventListener('pointercancel', end);
+  }
+  // every on-screen notice can be removed with the cross or by swiping it away; none is stuck on screen
   function toast(title, txt, kind) {
-    var box = $('toasts'); var t = el('div', 'toast ' + (kind || '')); t.append(el('b', null, title), el('span', null, txt)); box.prepend(t);
-    while (box.children.length > 3) box.lastChild.remove();
-    setTimeout(function () { t.remove(); }, kind === 'warn' || kind === 'bad' ? 14000 : 8000);
+    var box = $('toasts'); var t = el('div', 'toast ' + (kind || '')); var x = el('button', 'x', '✕'); x.type = 'button'; x.setAttribute('aria-label', 'Dismiss');
+    function gone() { t.remove(); }
+    x.addEventListener('click', gone); t.append(el('b', null, title), el('span', null, txt), x); box.prepend(t); swipeAway(t, gone);
+    while (box.children.length > 4) box.lastChild.remove();
+    setTimeout(gone, kind === 'warn' || kind === 'bad' ? 14000 : 8000);
   }
 
   // app notifications + Telegram for live call events (needs the send_alert tool; silently skipped without it)
@@ -2343,6 +2447,183 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
     return { start: start, render: render, head: head, lines: lines, active: function () { return active; } };
   })();
 
+  // ---------- office: agents, live events, chat, Coco ----------
+  var Office = (function () {
+    var PAL = ['#f4a261', '#2a9d8f', '#e76f51', '#6a8cff', '#b68cf0', '#e9c46a', '#4cc9a0', '#ef8fb0', '#8ab17d'];
+    var SHIRT = ['#2f6bf0', '#0a9d7a', '#c98200', '#7c5cff', '#e5384a', '#0891b2', '#9333ea', '#ea580c', '#475569'];
+    var BADGE = { 'Plan tracker': '📋', 'Live P&L watcher': '💹', 'Run detector': '📡', 'Market clock': '⏰', 'Telegram dispatcher': '✉️', 'News worker': '📰', 'Recommendation recorder': '🗂️', 'Housekeeper': '🧹', 'Self-review': '🎓' };
+    var QUICK = ['What are you doing right now?', 'Anything I should know?', 'Explain it like I am new to trading'];
+    var st = { agents: [], events: [], lastId: 0, first: true, chatAgent: null, hist: [], busy: false };
+
+    function avatar(i, badge) {
+      var skin = PAL[i % PAL.length], shirt = SHIRT[i % SHIRT.length];
+      return '<svg class="av" viewBox="0 0 64 64" aria-hidden="true">' +
+        '<rect x="14" y="40" width="36" height="22" rx="10" fill="' + shirt + '"/>' +
+        '<rect class="arm l" x="9" y="42" width="9" height="15" rx="4.5" fill="' + shirt + '"/><rect class="arm r" x="46" y="42" width="9" height="15" rx="4.5" fill="' + shirt + '"/>' +
+        '<circle cx="32" cy="26" r="15" fill="' + skin + '"/><path d="M17 24a15 15 0 0 1 30 0c-6-5-24-5-30 0z" fill="#3b2f2f" opacity=".85"/>' +
+        '<g class="blink"><circle cx="26" cy="27" r="2" fill="#222"/><circle cx="38" cy="27" r="2" fill="#222"/></g>' +
+        '<path class="mo" d="M27 34q5 4 10 0" stroke="#222" stroke-width="1.8" fill="none" stroke-linecap="round"/>' +
+        '<path class="sweat" d="M48 18q3 5 0 7q-3-2 0-7z" fill="#5bc0ff"/>' +
+        '<text class="zzz" x="46" y="14" font-size="10" font-weight="700" fill="#8aa">z z</text>' +
+        '<text x="32" y="63" text-anchor="middle" font-size="13">' + badge + '</text></svg>';
+    }
+    function fmtT(iso) { try { return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }); } catch (e) { return ''; } }
+    function ago(iso) { if (!iso) return ''; var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000); return s < 90 ? 'just now' : s < 5400 ? Math.round(s / 60) + ' min ago' : s < 129600 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; }
+
+    function renderFloor() {
+      var box = $('offFloor'); if (!box) return;
+      if (!st.agents.length) { box.replaceChildren(el('div', 'off-empty', st.err || 'Agents are clocking in…')); return; }
+      var frag = document.createDocumentFragment();
+      st.agents.forEach(function (a, i) {
+        var d = el('button', 'desk ' + (a.state || 'idle')); d.type = 'button'; d.dataset.agent = a.name;
+        d.setAttribute('aria-label', 'Talk to ' + (a.nick || a.name));
+        d.innerHTML = avatar(i, BADGE[a.name] || '🤖');
+        d.append(el('span', 'nm', a.nick || a.name), el('span', 'rl', a.does || ''), el('span', 'st', a.state === 'running' ? 'Working' : a.state === 'error' ? 'Needs a look' : 'Resting'));
+        var mo = d.querySelector('.mo'); if (mo && a.state === 'error') mo.setAttribute('d', 'M27 37q5-4 10 0');
+        d.append(el('span', 'say', (a.note ? a.note : 'Waiting for the next market session') + (a.last ? ' · ' + ago(a.last) : '')));
+        frag.append(d);
+      });
+      box.replaceChildren(frag);
+      var run = st.agents.filter(function (a) { return a.state === 'running'; }).length;
+      $('offSub').textContent = run + ' of ' + st.agents.length + ' agents working · tap one to talk';
+    }
+    function evClass(e) { return /call_target|call_t1/.test(e.kind) || (e.kind === 'call_pnl' && e.data && e.data.pnl_rupees > 0) ? 'good' : /call_sl|risk/.test(e.kind) || (e.kind === 'call_pnl' && e.data && e.data.pnl_rupees < 0) ? 'bad' : /run|news|call_new/.test(e.kind) ? 'warn' : ''; }
+    function evNode(e) {
+      var d = el('div', 'ev ' + evClass(e)), meta = (st.kinds && st.kinds[e.kind]) || { icon: '•' };
+      d.append(el('span', null, meta.icon));
+      var r = el('div'); r.append(el('b', null, String(e.title || '').replace(/<[^>]+>/g, '')), el('span', 'bd', String(e.body || '').replace(/<[^>]+>/g, '').slice(0, 260)),
+        el('span', 'tm', fmtT(e.ts) + ' IST' + (e.tg === 'SENT' ? ' · sent to Telegram' : '')));
+      d.append(r); return d;
+    }
+    function renderLog() {
+      var box = $('offLog'); if (!box) return;
+      var h = el('h3', null, 'What is happening now'); var frag = document.createDocumentFragment(); frag.append(h);
+      if (!st.events.length) frag.append(el('div', 'off-empty', 'Nothing yet. Events appear here as they happen.'));
+      st.events.slice(0, 40).forEach(function (e) { frag.append(evNode(e)); });
+      box.replaceChildren(frag);
+    }
+
+    // ---- chat ----
+    function chatEl() {
+      var c = $('chat'); if (c) return c;
+      c = el('div', 'chat'); c.id = 'chat'; c.hidden = true; c.setAttribute('role', 'dialog');
+      c.innerHTML = '<div class="chat-h"><div class="t"><b id="chatName"></b><span id="chatRole"></span></div><button type="button" id="chatX" aria-label="Close chat">✕</button></div><div class="chat-m" id="chatM"></div><div class="chat-q" id="chatQ"></div><form class="chat-f" id="chatF"><input id="chatI" autocomplete="off" maxlength="500" placeholder="Ask anything…" aria-label="Your message"><button type="submit" id="chatS">Send</button></form>';
+      document.body.append(c);
+      $('chatX').addEventListener('click', function () { c.hidden = true; });
+      $('chatF').addEventListener('submit', function (ev) { ev.preventDefault(); var v = $('chatI').value.trim(); if (v) { $('chatI').value = ''; ask(v); } });
+      $('chatQ').addEventListener('click', function (ev) { var b = ev.target.closest('button'); if (b) ask(b.textContent); });
+      document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') c.hidden = true; });
+      return c;
+    }
+    function say(cls, text) { var m = el('div', 'msg ' + cls, text); $('chatM').append(m); $('chatM').scrollTop = 1e9; return m; }
+    function open(agentKey, nick, role, greet) {
+      var c = chatEl(); st.chatAgent = agentKey; st.hist = [];
+      $('chatName').textContent = nick; $('chatRole').textContent = role || ''; $('chatM').replaceChildren();
+      say('bot', greet || ('Hi! I am ' + nick + '. Ask me what I am doing, or anything about the market.'));
+      var q = $('chatQ'); q.replaceChildren(); QUICK.forEach(function (t) { var b = el('button', null, t); b.type = 'button'; q.append(b); });
+      c.hidden = false; setTimeout(function () { $('chatI').focus(); }, 50);
+    }
+    async function ask(text) {
+      if (st.busy || !st.chatAgent) return; st.busy = true; $('chatS').disabled = true;
+      say('me', text); var wait = say('bot', '…');
+      try {
+        var r = await call('agent_chat', { agent: st.chatAgent, message: text, history: st.hist.slice(-6) });
+        if (r && r.available) { wait.textContent = r.text; st.hist.push({ role: 'user', text: text }, { role: 'model', text: r.text }); Coco.mood('happy', 4000); }
+        else wait.textContent = (r && r.reason) || 'I could not answer just now. Please try again in a moment.';
+      } catch (e) { wait.textContent = 'I could not reach the server just now. Please try again.'; }
+      st.busy = false; $('chatS').disabled = false; $('chatM').scrollTop = 1e9;
+    }
+
+    // ---- data ----
+    function ingest(d) {
+      if (!d || !d.events) return;
+      st.kinds = d.kinds || st.kinds;
+      var fresh = d.events.filter(function (e) { return e.id > st.lastId; });
+      if (!fresh.length) return;
+      st.lastId = Math.max(st.lastId, d.events[0].id);
+      st.events = fresh.concat(st.events).slice(0, 80);
+      renderLog();
+      if (st.first) { st.first = false; return; }          // the first load is history: no popups for old events
+      fresh.slice().reverse().forEach(function (e) { Coco.react(e); });
+    }
+    function start() {
+      if (!S.mcp || S.fatal) return;
+      watch('agents', 'get_agents', null, function (d) { st.agents = (d && d.agents) || []; st.err = null; renderFloor(); }, function (e) { st.err = 'Agents are not reachable right now (' + errText(e) + ')'; renderFloor(); }, 15000);
+      watch('events', 'get_events', { since_id: 0, limit: 40 }, ingest, function () {}, 8000);
+    }
+    document.addEventListener('click', function (ev) { var d = ev.target.closest && ev.target.closest('.desk'); if (!d) return; var a = st.agents.filter(function (x) { return x.name === d.dataset.agent; })[0]; if (a) open(a.name, a.nick || a.name, a.does, 'Hi, I am ' + (a.nick || a.name) + '. My job: ' + (a.does || 'working in the background').replace(/^./, function (c) { return c.toLowerCase(); }) + '. Ask me anything.'); });
+    return { start: start, open: open, ago: ago };
+  })();
+
+  // ---------- Coco: the guide who reacts to everything ----------
+  var Coco = (function () {
+    var root, bub, moodT, bubT, lastIdx = {};
+    function build() {
+      root = el('div', 'coco'); root.id = 'coco';
+      bub = el('div', 'bub'); bub.hidden = true; bub.setAttribute('role', 'status');
+      var x = el('button', 'x', '✕'); x.type = 'button'; x.setAttribute('aria-label', 'Dismiss message'); x.addEventListener('click', hide); bub.append(el('b', null, ''), el('span', null, ''), x);
+      swipeAway(bub, hide);
+      var b = el('button', 'coco-btn'); b.type = 'button'; b.setAttribute('aria-label', 'Talk to Coco');
+      b.innerHTML = '<svg viewBox="0 0 80 80" aria-hidden="true"><g class="body">' +
+        '<path d="M16 30 14 8l18 12z" fill="#ffb347"/><path d="M64 30 66 8 48 20z" fill="#ffb347"/>' +
+        '<ellipse cx="40" cy="46" rx="29" ry="26" fill="#ffc86b"/><ellipse cx="40" cy="55" rx="17" ry="13" fill="#fff1d6"/>' +
+        '<g class="eyes-c"><circle cx="29" cy="42" r="4.2" fill="#2b2118"/><circle cx="51" cy="42" r="4.2" fill="#2b2118"/><circle cx="30.4" cy="40.6" r="1.4" fill="#fff"/><circle cx="52.4" cy="40.6" r="1.4" fill="#fff"/></g>' +
+        '<g class="eyes-z"><path d="M25 43q4 3 8 0M47 43q4 3 8 0" stroke="#2b2118" stroke-width="2.2" fill="none" stroke-linecap="round"/></g>' +
+        '<ellipse cx="22" cy="52" rx="4.5" ry="3" fill="#ff8f8f" opacity=".55"/><ellipse cx="58" cy="52" rx="4.5" ry="3" fill="#ff8f8f" opacity=".55"/>' +
+        '<path d="M37 49h6l-3 3z" fill="#c4642b"/>' +
+        '<path class="mouth happy" d="M33 55q7 7 14 0" stroke="#2b2118" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
+        '<path class="mouth big" d="M32 54q8 12 16 0z" fill="#8b2e2e" stroke="#2b2118" stroke-width="1.6"/>' +
+        '<path class="mouth sad" d="M33 61q7-7 14 0" stroke="#2b2118" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
+        '<ellipse class="mouth o" cx="40" cy="58" rx="4" ry="5" fill="#8b2e2e"/>' +
+        '<path class="brow-a" d="M23 34l10 3M57 34l-10 3" stroke="#2b2118" stroke-width="2.4" stroke-linecap="round"/>' +
+        '<path class="tear" d="M26 48q3 5 0 7q-3-2 0-7z" fill="#5bc0ff"/>' +
+        '<g class="spark" fill="#fff6a8" stroke="#f0b43c" stroke-width="1"><path d="M10 14l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path d="M68 10l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6z"/></g>' +
+        '<text class="zz" x="58" y="24" font-size="13" font-weight="700" fill="#8aa">z z</text></g></svg>';
+      b.addEventListener('click', function () { hide(); Office.open('Coco', 'Coco', 'Your guide to the app and the market', 'Hi, I am Coco! I explain what is happening in the market and in this app, in simple words. Ask me anything, like "what should I do now?"'); });
+      root.append(bub, b); document.body.append(root); mood('happy');
+    }
+    function mood(m, back) {
+      if (!root) return; root.className = 'coco ' + m; clearTimeout(moodT);
+      if (back) moodT = setTimeout(function () { mood(calm()); }, back);
+    }
+    function calm() { var m = (S.session && S.session.active === false) ? 'sleepy' : 'happy'; return m; }
+    function speak(title, text, m, ms) {
+      if (!root) return; mood(m || 'happy', ms || 9000);
+      bub.firstChild.textContent = title; bub.children[1].textContent = text; bub.style.transform = ''; bub.style.opacity = ''; bub.hidden = false;
+      clearTimeout(bubT); bubT = setTimeout(hide, Math.max(9000, ms || 9000) + 3000);
+    }
+    function hide() { if (bub) { bub.hidden = true; clearTimeout(bubT); } }
+    var MONEY = function (v) { return v == null || isNaN(v) ? '' : (v >= 0 ? '+₹' : '−₹') + Math.abs(Math.round(v)).toLocaleString('en-IN'); };
+    // what each event means for a beginner, in plain words (no model call: instant and always true to the event)
+    function react(e) {
+      var d = e.data || {}, sym = e.symbol || d.symbol || '', k = e.kind, side = d.side === 'BUY' ? 'buy' : 'sell';
+      if (k === 'call_new') { speak('New call: ' + (d.side || '') + ' ' + sym, 'Do not rush. Wait until the price comes into the entry zone ' + (d.entry_low != null ? '(' + d.entry_low + ' to ' + d.entry_high + ')' : '') + ', and always place the stop-loss ' + (d.stop_loss != null ? 'at ' + d.stop_loss : '') + '.', 'alert', 12000); toast('New call · ' + sym, (d.side || '') + ' · entry ' + (d.entry != null ? d.entry : '') + ' · target ' + (d.target_1 != null ? d.target_1 : '') + ' · stop-loss ' + (d.stop_loss != null ? d.stop_loss : ''), d.side === 'BUY' ? 'good' : 'bad'); }
+      else if (k === 'call_filled') { speak('Your entry price was reached', sym + ' ' + side + ' is now running. Keep the stop-loss in place and do not add more.', 'happy', 10000); toast('Entry filled · ' + sym, 'The trade is live at ' + (d.fill_price != null ? d.fill_price : ''), 'good'); }
+      else if (k === 'call_t1') { speak('Target 1 hit! 🎉', 'Book half of the position and move your stop-loss to your entry price. Now you cannot lose on the rest.', 'excited', 12000); toast('Target 1 hit · ' + sym, MONEY(d.pnl_rupees) + ' on half', 'good'); }
+      else if (k === 'call_target' || k === 'call_partial') { speak('Target reached 🎯', sym + ' closed in profit ' + MONEY(d.pnl_rupees) + '. Close the position and relax. Wait for the next call.', 'excited', 12000); toast('Target hit · ' + sym, MONEY(d.pnl_rupees), 'good'); }
+      else if (k === 'call_sl') { speak('Stop-loss hit', sym + ' closed with a small planned loss ' + MONEY(d.pnl_rupees) + '. This is part of trading. Do not chase it; wait for the next call.', 'sad', 14000); toast('Stop-loss · ' + sym, MONEY(d.pnl_rupees), 'bad'); }
+      else if (k === 'call_time' || k === 'call_expired') { speak(k === 'call_time' ? 'Time is up for this trade' : 'This call expired', k === 'call_time' ? 'Close it now at market price. The idea did not work in time.' : 'Price never reached the entry, so no trade was taken. Nothing to do.', 'sleepy', 9000); }
+      else if (k === 'call_pnl') { var up = (d.pnl_rupees || 0) >= 0; mood(up ? 'happy' : 'sad', 8000); }
+      else if (k === 'run') { var u = d.direction === 'up'; speak((u ? 'Bullish run in ' : 'Bearish run in ') + sym, (u ? 'Price is rising fast' : 'Price is falling fast') + ' (' + (d.move_pct > 0 ? '+' : '') + d.move_pct + '% in ' + d.minutes + ' min). ' + (u ? 'Do not chase it at the top. Wait for a small dip or a published call.' : 'Do not buy to catch the fall. Wait for a published call.'), u ? 'excited' : 'alert', 12000); toast((u ? 'Bullish run · ' : 'Bearish run · ') + sym, (d.move_pct > 0 ? '+' : '') + d.move_pct + '% in ' + d.minutes + ' min', u ? 'good' : 'bad'); }
+      else if (k === 'news') { speak('News: ' + sym, String(d.headline || e.title || '').slice(0, 140) + (d.why ? ' · ' + d.why : ''), 'alert', 11000); toast('News · ' + sym, String(d.headline || e.title || '').slice(0, 120), 'warn'); }
+      else if (k === 'market') { var open = /open/i.test(e.title || ''); speak(e.title || 'Market update', e.body || '', open ? 'happy' : 'sleepy', 9000); }
+      else if (k === 'brief') { speak('Good morning!', 'Your pre-market brief is in the Office feed. No trades before the first candles settle after 09:15.', 'happy', 10000); }
+      else if (k === 'summary') { speak('Day summary is ready', 'Check the Office feed for how today went.', 'happy', 9000); }
+      else if (k === 'risk') { speak(e.title || 'Heads up', e.body || '', 'alert', 12000); toast(e.title || 'Heads up', e.body || '', 'warn'); }
+    }
+    // index moves: Coco leans happy when the market rises and worried when it falls
+    var lastBand = null;
+    function watchIndex() {
+      try {
+        var q = quoteFor('NIFTY'); if (!q || q.change_pct == null) return;
+        var band = q.change_pct >= 0.5 ? 'up' : q.change_pct <= -0.5 ? 'down' : 'flat';
+        if (band !== lastBand) { if (lastBand != null) { if (band === 'up') speak('Market is rising', 'NIFTY is up ' + q.change_pct.toFixed(2) + '% today.', 'excited', 8000); else if (band === 'down') speak('Market is falling', 'NIFTY is down ' + Math.abs(q.change_pct).toFixed(2) + '% today. Stay calm and follow only the published calls.', 'sad', 9000); } lastBand = band; }
+      } catch (e) {}
+    }
+    function start() { build(); setInterval(watchIndex, 20000); }
+    return { start: start, react: react, mood: mood, speak: speak };
+  })();
+
   // ---------- theme reactions ----------
   function onTheme() { syncThemeBtn(); themeChart(); drawChart(false); lastLinesKey = 'x'; S.vKey = ''; runEngine(); Calls.render(true); Recs.render(true); renderDepth(); renderChain(); Hero.render(true); }
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme); } catch (e) {}
@@ -2387,7 +2668,7 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
   var savedSel = load('cat.sel'); S.sel = S.list.find(function (w) { return w.id === savedSel; }) || S.list[0] || DEFAULT_LIST[0];
   var savedView = load('cat.view'); if (savedView) setView(savedView);
   renderSession(); renderTicker(); renderPortfolio(); renderMovers(); renderNews();
-  Hero.start(); selectSym(S.sel.id); renderPortfolio(); Recs.render(true);
+  Hero.start(); Coco.start(); selectSym(S.sel.id); renderPortfolio(); Recs.render(true);
   if (/debug/.test(location.hash)) window.__CAT__ = S;
   Store.init(); AI.init();
 
