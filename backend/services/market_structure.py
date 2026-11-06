@@ -291,7 +291,14 @@ def candle_patterns_at(d: dict[str, list], i: int, atr: float) -> list[str]:
     return [p for p in out if p]
 
 
-def candle_scan(d: dict[str, list], atr_series: list[float], horizon: int = 5, min_n: int = 8) -> dict[str, Any]:
+def _wilson_low(w: int, n: int, z: float = 1.645) -> float:
+    if n <= 0:
+        return 0.0
+    p = w / n
+    return (p + z * z / (2 * n) - z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n)
+
+
+def candle_scan(d: dict[str, list], atr_series: list[float], horizon: int = 5, min_n: int = 15) -> dict[str, Any]:
     """Live patterns on the last 3 closed candles plus a back-test of each pattern on the same series:
     after a pattern, did price move in its direction within `horizon` candles before moving 1 ATR against it?"""
     n = len(d["c"])
@@ -330,7 +337,7 @@ def candle_scan(d: dict[str, list], atr_series: list[float], horizon: int = 5, m
             hit = round(100 * s["win"] / (s["win"] + s["loss"]), 1) if s and (s["win"] + s["loss"]) else None
             solid = bool(s and s["n"] >= min_n)
             live.append({"pattern": p, "direction": _bias(direction), "bars_ago": n - 1 - i, "meaning": meaning, "backtest_n": s["n"] if s else 0, "hit_pct": hit,
-                         "reliable": solid and hit is not None and hit >= 55, "note": ("Back-tested: " + (f"{hit}% of {s['n']} past cases moved 1 ATR your way before 1 ATR against" if solid and hit is not None else "too few past cases to trust")) if direction != 0 else "Neutral pattern: it signals indecision, not direction"})
+                         "reliable": bool(solid and s and _wilson_low(s["win"], s["win"] + s["loss"]) > 0.5), "note": ("Back-tested: " + (f"{hit}% of {s['n']} past cases moved 1 ATR your way before 1 ATR against" if solid and hit is not None else "too few past cases (need 15) to trust")) if direction != 0 else "Neutral pattern: it signals indecision, not direction"})
     table = [{"pattern": p, "direction": _bias(CANDLE_PATTERNS[p][0]), "n": s["n"], "win": s["win"], "loss": s["loss"], "hit_pct": round(100 * s["win"] / (s["win"] + s["loss"]), 1) if (s["win"] + s["loss"]) else None}
              for p, s in sorted(stats.items(), key=lambda kv: -kv[1]["n"])]
     return {"available": True, "live": live, "backtest": table, "horizon_bars": horizon, "bars": n,

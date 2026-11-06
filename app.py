@@ -11851,6 +11851,48 @@ async def api_analysis_pack(symbol: str, tf: str = "5m", user: dict[str, Any] = 
     return await asyncio.to_thread(_analysis_pack_sync, symbol, tf)
 
 
+_GLOBAL_SET = [
+    ("US", "Dow Jones", "^DJI"), ("US", "S&P 500", "^GSPC"), ("US", "Nasdaq", "^IXIC"),
+    ("Europe", "FTSE 100", "^FTSE"), ("Europe", "DAX", "^GDAXI"),
+    ("Asia", "Nikkei 225", "^N225"), ("Asia", "Hang Seng", "^HSI"), ("Asia", "Shanghai", "000001.SS"),
+    ("Commodities", "Brent crude", "BZ=F"), ("Commodities", "WTI crude", "CL=F"), ("Commodities", "Gold", "GC=F"), ("Commodities", "Silver", "SI=F"), ("Commodities", "Natural gas", "NG=F"),
+    ("Currency & rates", "USD/INR", "INR=X"), ("Currency & rates", "Dollar index", "DX-Y.NYB"), ("Currency & rates", "US 10-yr yield", "^TNX"),
+]
+
+
+def _global_prices_sync() -> dict[str, Any]:
+    """World indices, commodities, currency and yields from Yahoo Finance (delayed). A global cue only: never used as Indian price data."""
+    hit = CACHE.get("global_prices_v2")
+    if hit is not None:
+        return hit
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(item: tuple[str, str, str]) -> dict[str, Any]:
+        grp, name, tk = item
+        try:
+            r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(tk, safe='')}", params={"interval": "1d", "range": "5d"},
+                             headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+            r.raise_for_status()
+            meta = r.json()["chart"]["result"][0]["meta"]
+            price = float(meta["regularMarketPrice"])
+            prev = float(meta.get("chartPreviousClose") or meta.get("previousClose") or 0) or None
+            return {"group": grp, "name": name, "symbol": tk, "price": round(price, 2), "prev_close": prev, "change": round(price - prev, 2) if prev else None,
+                    "pct": round((price / prev - 1) * 100, 2) if prev else None, "as_of": meta.get("regularMarketTime")}
+        except Exception:
+            return {"group": grp, "name": name, "symbol": tk, "price": None}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        rows = list(ex.map(one, _GLOBAL_SET))
+    out = {"items": rows, "available": any(x["price"] is not None for x in rows), "source": "Yahoo Finance (delayed)", "timestamp": now_iso()}
+    if out["available"]:
+        CACHE.set("global_prices_v2", out, 60.0)
+    return out
+
+
+@app.get("/api/global/prices")
+async def api_global_prices(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    return await asyncio.to_thread(_global_prices_sync)
+
+
 @app.get("/api/events")
 async def api_events(since_id: int = 0, limit: int = 60, kind: str = "", symbol: str = "", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     kinds = [k for k in kind.split(",") if k in EVENTS.KINDS] or None

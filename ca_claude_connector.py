@@ -189,6 +189,7 @@ TOOLS: list[dict[str, Any]] = [
     },
     {"name": "get_model_health", "description": "Latest weekly self-review of the trade-plan model (parameter tuning outcome, factor study, notes) and the live graded record per symbol and horizon over the last 30 days.", "inputSchema": _schema({})},
     {"name": "get_analysis_pack", "description": "Full technical pack for one symbol: 17+ indicators with plain readings, candlestick patterns (live and back-tested hit rates), chart patterns with targets, option-chain walls/PCR/max pain/greeks, and one combined lean.", "inputSchema": _schema({"symbol": SYMBOL, "timeframe": {"type": "string", "enum": ["1m", "3m", "5m", "15m", "30m", "60m", "1D"], "default": "5m"}}, ["symbol"])},
+    {"name": "get_global_prices", "description": "World indices, crude, gold, silver, USD/INR, dollar index and US yields (Yahoo Finance, delayed). A global cue only.", "inputSchema": _schema({})},
     {"name": "get_events", "description": "The app's live event feed: new calls, entry fills, live P&L, exits, runs, agent actions, market status (newest first).", "inputSchema": _schema({"since_id": {"type": "integer", "minimum": 0, "default": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 40}})},
     {"name": "get_agents", "description": "Every background agent: what it does, when it last ran, its state, and the NSE/MCX session.", "inputSchema": _schema({})},
     {"name": "agent_chat", "description": "Ask an agent (or Coco, the guide) what it is doing. Answers come from real app state only.", "inputSchema": _schema({"agent": {"type": "string"}, "message": {"type": "string"}, "history": {"type": "array", "items": {"type": "object"}}}, ["message"])},
@@ -363,6 +364,9 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
     async def t_pack(args, user):
         return await core.api_analysis_pack(str(args.get("symbol") or "NIFTY"), str(args.get("timeframe") or "5m"), user=user)
 
+    async def t_global(args, user):
+        return await core.api_global_prices(user=user)
+
     async def t_events(args, user):
         return await core.api_events(since_id=_int(args, "since_id", 0, 0, 10**9), limit=_int(args, "limit", 40, 1, 100), user=user)
 
@@ -459,6 +463,7 @@ def register_mcp(app: FastAPI, core: ModuleType) -> None:
         "get_plan_history": t_plan_history,
         "get_model_health": t_model_health,
         "get_analysis_pack": t_pack,
+        "get_global_prices": t_global,
         "get_events": t_events,
         "get_agents": t_agents,
         "agent_chat": t_agent_chat,
