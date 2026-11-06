@@ -8173,7 +8173,7 @@ async def lifespan(app: FastAPI):
     # Canned Telegram feature-review prompts: replaced by the Model Lab's daily review. Set CA_SKILL_AGENT=1 to bring it back.
     skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop() if os.getenv("CA_SKILL_AGENT") == "1" else asyncio.sleep(0))
     plan_tracker_task = asyncio.create_task(_signal_plan_tracker_loop())
-    engine_tasks = [asyncio.create_task(f()) for f in (_live_engine_loop, _event_dispatcher_loop, _market_clock_loop, _housekeeping_loop, _news_scan_loop, _send_samples_once)]
+    engine_tasks = [asyncio.create_task(f()) for f in (_live_engine_loop, _event_dispatcher_loop, _market_clock_loop, _housekeeping_loop, _news_scan_loop, _review_agent_loop, _send_samples_once)]
 
     async def _warm_page_caches() -> None:
         """After a restart (every deploy), pre-compute what /terminal asks for first so the first visit is instant."""
@@ -10987,6 +10987,54 @@ def _forward_stats(root: str, horizon: str, days: int = 30) -> dict[str, Any]:
             "avg_r": round(sum(rs) / len(rs), 3) if rs else None, "basis": "gross R, before costs"}
 
 
+_CONF_CACHE: dict[str, tuple[str, dict[str, Any]]] = {}
+
+
+def _plan_confluence(p: dict[str, Any], s: Any, chain: dict[str, Any] | None, root: str) -> dict[str, Any] | None:
+    """Cross-check a published plan against everything else the app reads: 17 indicators, back-tested candlestick patterns, chart patterns and
+    the option chain (OI walls, PCR, max pain). It never changes the score or the levels; it says whether the rest of the data agrees, and
+    stores the lean with the plan so the weekly review can test whether agreement actually predicted outcomes."""
+    try:
+        n = len(s)
+        if n < 60:
+            return None
+        tf = p.get("timeframe") or "5m"
+        end = n - 1 if (tf == "1D" or s.t[-1] + timedelta(minutes=TRADE_PLAN.TF_MIN[tf]) <= datetime.now(IST)) else n - 2
+        stamp = f"{s.t[end].isoformat()}"
+        ck = f"{root}:{tf}"
+        hit = _CONF_CACHE.get(ck)
+        if hit and hit[0] == stamp:
+            pk = hit[1]
+        else:
+            d = {"t": [x.isoformat() for x in s.t[:end + 1]], "o": s.o[:end + 1], "h": s.h[:end + 1], "l": s.l[:end + 1], "c": s.c[:end + 1], "v": s.v[:end + 1]}
+            pk = MARKET_STRUCTURE.pack(d, chain, d["c"][-1])
+            _CONF_CACHE[ck] = (stamp, pk)
+            if len(_CONF_CACHE) > 60:
+                _CONF_CACHE.pop(next(iter(_CONF_CACHE)))
+        if not pk.get("available"):
+            return None
+        side = 1 if p.get("decision") == "BUY" else -1
+        lean = pk["lean"]
+        status = "supports" if side * lean >= 25 else "conflicts" if side * lean <= -25 else "mixed"
+        oc = pk.get("options") or {}
+        notes = []
+        entry, t2 = float(p["entry"]), float(p["target_2"])
+        wall = oc.get("call_wall") if side > 0 else oc.get("put_wall")
+        if wall and (entry < wall <= t2 if side > 0 else t2 <= wall < entry):
+            notes.append(f"The option-chain {'resistance' if side > 0 else 'support'} wall at {wall} sits between your entry and target 2: expect price to struggle there, so book profit early.")
+        if status == "conflicts":
+            notes.append("The rest of the data disagrees with this call. Smaller size, or skip it.")
+        elif status == "supports":
+            notes.append("The rest of the data (indicators, candles, patterns, option chain) agrees with this call.")
+        ind = pk.get("indicators") or {}
+        return {"lean": lean, "label": pk["lean_label"], "status": status, "reasons": pk["reasons"], "notes": notes, "pcr": oc.get("pcr_oi"), "call_wall": oc.get("call_wall"),
+                "put_wall": oc.get("put_wall"), "max_pain": oc.get("max_pain"), "indicators": {"bull": ind.get("bull"), "bear": ind.get("bear"), "neutral": ind.get("neutral")},
+                "patterns": [x["pattern"] for x in ((pk.get("candles") or {}).get("live") or []) if x["bars_ago"] <= 1][:3] + [x["pattern"] for x in ((pk.get("chart") or {}).get("patterns") or [])][:2]}
+    except Exception as exc:
+        log.debug("plan confluence %s failed: %s", root, safe_text(exc))
+        return None
+
+
 def _compute_signals(instrument: str) -> dict[str, Any]:
     root = extract_root_symbol(instrument).upper()
     mcx = get_symbol_segment(root) == "MCX"
@@ -11014,6 +11062,8 @@ def _compute_signals(instrument: str) -> dict[str, Any]:
         bt = _SIGNAL_BT.get(f"{root}:{h}")
         if bt:
             p["track_record"] = {k: bt.get(k) for k in _TRACK_KEYS}
+        if p.get("decision") in ("BUY", "SELL") and not p.get("expired") and series.get(p.get("timeframe")) is not None:
+            p["confluence"] = _plan_confluence(p, series[p["timeframe"]], chain, root)
         if p.get("available"):
             fwd = _forward_stats(root, h)
             p["forward"] = fwd
@@ -11190,7 +11240,8 @@ def _record_plans(res: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         snapshot = json.dumps({"factors": p.get("factors"), "weights": p.get("weights"), "raw_score": p.get("raw_score"),
                                "news_bias": p.get("news_bias"), "context": p.get("context"),
                                "htf": [h.get("bias") for h in (p.get("higher_timeframes") or [])],
-                               "confidence_pct": (p.get("confidence") or {}).get("pct"), "edge": (p.get("edge") or {}).get("grade")})
+                               "confidence_pct": (p.get("confidence") or {}).get("pct"), "edge": (p.get("edge") or {}).get("grade"),
+                               "confluence_lean": (p.get("confluence") or {}).get("lean"), "confluence": (p.get("confluence") or {}).get("status")})
         cols = """id, user_id, symbol, horizon, timeframe, side, score, entry_low, entry_high, stop_loss,
                    target_1, target_2, valid_until, time_stop_bars, time_stop_at_latest, option_json, instructions, created_at, status, updated_at"""
         try:
@@ -11378,10 +11429,15 @@ def _plan_reasons(p: dict[str, Any]) -> list[str]:
     for h in p.get("higher_timeframes") or []:
         if h.get("text"):
             out.append(h["text"])
+    cf = p.get("confluence") or {}
+    for n in cf.get("notes") or []:
+        out.append(n)
+    if cf.get("pcr") is not None:
+        out.append(f"Option chain: PCR {cf['pcr']}, support wall {cf.get('put_wall')}, resistance wall {cf.get('call_wall')}")
     nb = p.get("news_bias")
     if nb is not None and abs(nb) >= 20:
         out.append(f"News tone {'positive' if nb > 0 else 'negative'} ({nb:+.0f})")
-    return out[:6]
+    return out[:8]
 
 
 def _emit_new_call(symbol: str, pid: str, p: dict[str, Any]) -> None:
@@ -12041,6 +12097,39 @@ async def _news_scan_loop() -> None:
             log.debug("news scan failed: %s", safe_text(exc))
             _beat("News worker", safe_text(exc), False)
         await asyncio.sleep(600)
+
+
+async def _review_agent_loop() -> None:
+    """Prof. Meera: once a day after the close she reads the real record of every call issued, has Gemini turn the numbers into a short plain-language
+    review (what worked, what did not, what to watch), and posts it to the Office feed and Telegram. She changes nothing: failing horizons are paused
+    by the alert filter, and weights are only ever proposed by the weekly job after an out-of-sample check."""
+    await asyncio.sleep(150)
+    while True:
+        try:
+            now = datetime.now(IST)
+            d = now.date().isoformat()
+            if now.weekday() < 5 and (now.hour, now.minute) >= (16, 0) and not db_exec("SELECT 1 FROM settings WHERE user_id=1 AND key=?", [f"daily_review:{d}"], "one"):
+                summ = await asyncio.to_thread(_day_summary)
+                from backend.services import model_health as _mh
+                fwd = await asyncio.to_thread(_mh.forward_table, db_exec, 30)
+                facts = {"today": summ, "last_30_days": [{k: r.get(k) for k in ("symbol", "horizon", "issued", "closed", "hit_pct", "avg_r", "verdict")} for r in fwd][:8]}
+                text = ""
+                if summ.get("issued"):
+                    res = await asyncio.to_thread(gemini_text,
+                        "You are Prof. Meera, the review agent of a trading app. Using ONLY these numbers, write a review for a beginner trader in at most 5 short bullet points: "
+                        "what worked today, what did not, and one thing to watch tomorrow. Do not invent trades, prices or causes. If the sample is small say so. "
+                        "No promises of profit.\n" + json.dumps(facts, default=str), 4000, None, None, 25.0)
+                    text = (res.get("text") or "").strip() if res.get("available") else ""
+                if not text:
+                    text = (f"{summ['issued']} call(s) issued today, {summ['filled']} reached their entry, {summ['wins']} finished in profit, {summ['losses']} hit the stop-loss."
+                            if summ.get("issued") else "No calls were issued today, so there is nothing to review.")
+                _agent_event("Self-review", "daily review", text[:700], dedupe=f"review:{d}")
+                db_exec("INSERT OR REPLACE INTO settings(user_id,key,value_json) VALUES(1,?,?)", [f"daily_review:{d}", json.dumps({"text": text, "at": now_iso()})])
+                _beat("Self-review", "daily review posted")
+        except Exception as exc:
+            log.debug("review agent failed: %s", safe_text(exc))
+            _beat("Self-review", safe_text(exc), False)
+        await asyncio.sleep(300)
 
 
 def _rss_kb() -> float | None:

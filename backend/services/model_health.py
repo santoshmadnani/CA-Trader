@@ -110,6 +110,31 @@ def factor_report(db: Callable, days: int = 120, min_n: int = MIN_FACTOR_N) -> d
     return rep
 
 
+def confluence_report(db: Callable, days: int = 120, min_n: int = 20) -> dict[str, Any]:
+    """Did plans whose other data (indicators, patterns, option chain) agreed with them do better than plans where it disagreed?
+    Measured on graded plans only; a finding, never an automatic change."""
+    try:
+        rows = db("SELECT r, factors_json FROM signal_plans WHERE status IN ('T1','T2','SL','TIME') AND factors_json IS NOT NULL AND created_at >= ?", [_since(days)], "all") or []
+    except Exception as exc:
+        return {"n": 0, "note": f"unavailable: {exc}"}
+    groups: dict[str, list[float]] = {"supports": [], "mixed": [], "conflicts": []}
+    for r in rows:
+        try:
+            st = (json.loads(r["factors_json"]) or {}).get("confluence")
+            if st in groups and r["r"] is not None:
+                groups[st].append(float(r["r"]))
+        except Exception:
+            continue
+    out = {k: {"n": len(v), "avg_r": round(sum(v) / len(v), 3) if v else None} for k, v in groups.items()}
+    n = sum(g["n"] for g in out.values())
+    note = f"{n} graded plans carry a cross-check; {min_n} are needed before drawing a conclusion."
+    if n >= min_n and out["supports"]["n"] >= 5 and out["conflicts"]["n"] >= 5:
+        d = (out["supports"]["avg_r"] or 0) - (out["conflicts"]["avg_r"] or 0)
+        note = ("Plans the other data agreed with did better than plans it disagreed with (" + f"{d:+.2f}R). Consider letting disagreement block a call." if d >= 0.1
+                else "No useful difference between agreeing and disagreeing plans yet; the cross-check stays advisory.")
+    return {"n": n, "groups": out, "note": note, "days": days}
+
+
 def append_journal(entry: dict[str, Any], path: Path = JOURNAL_PATH) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:

@@ -2420,6 +2420,19 @@ PAT.STATS = {"1D":{"h":5,"split":"2022-01-01","base_te":0.172,"p":{"doji":{"n":2
         ['Live hit rate', fw.closed ? fw.hit_pct + '% (95%: ' + fw.ci_low + '–' + fw.ci_high + '%)' : '—'], ['Live average', fw.avg_r != null ? sgnd(fw.avg_r, 2) + 'R (before costs)' : '—']]));
       c5.appendChild(foot('A horizon is only called an edge when it is positive after costs on at least 30 backtest signals and not negative in live grading. Until then it is unproven.'));
       grid.appendChild(c5);
+      var cf = p.confluence;
+      if (live && cf) {
+        var c6 = card('6 · Does the rest of the data agree?', 'Indicators, candlestick and chart patterns and the option chain are read separately and only cross-check the call. They never change its levels.', true);
+        c6.appendChild(kv([
+          ['Verdict', cf.status === 'supports' ? 'Agrees with this ' + p.decision + ' call' : cf.status === 'conflicts' ? 'Disagrees with this ' + p.decision + ' call' : 'Mixed: no strong agreement either way'],
+          ['Combined lean', cf.label + ' (' + (cf.lean > 0 ? '+' : '') + cf.lean + ' on a −100 to +100 scale)'],
+          ['Indicators', cf.indicators ? cf.indicators.bull + ' bullish · ' + cf.indicators.bear + ' bearish · ' + cf.indicators.neutral + ' neutral' : '—'],
+          ['Patterns seen', (cf.patterns && cf.patterns.length) ? cf.patterns.join(', ') : 'none right now'],
+          ['Option chain', cf.pcr != null ? 'PCR ' + cf.pcr + ' · support wall ' + cf.put_wall + ' · resistance wall ' + cf.call_wall + ' · max pain ' + cf.max_pain : 'not available for this instrument']]));
+        (cf.notes || []).forEach(function (n) { c6.appendChild(foot(n)); });
+        c6.appendChild(foot('The full tables are in the Analysis section. The weekly self-review tests whether agreement like this really predicted wins before anything is changed.'));
+        grid.appendChild(c6);
+      }
       out.appendChild(grid);
     }
 

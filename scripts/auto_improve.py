@@ -131,6 +131,7 @@ def main() -> int:
             db = make_db(dbp)
             entry["forward_30d"] = MH.forward_table(db, 30)
             entry["factors"] = MH.factor_report(db)
+            entry["confluence"] = MH.confluence_report(db)
             failing = [f"{r['symbol']} {r['horizon']}" for r in entry["forward_30d"] if r["verdict"] == "FAILING"]
             if failing:
                 entry["notes"].append("failing live: " + ", ".join(failing) + " (alerts for these horizons are paused automatically)")
