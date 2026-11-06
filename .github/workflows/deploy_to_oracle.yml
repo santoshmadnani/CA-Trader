@@ -43,6 +43,18 @@ jobs:
               ls -t backups/ca_trader_*.sqlite3 2>/dev/null | tail -n +3 | xargs -r rm -- 2>/dev/null || true
             fi
 
+            # Server hygiene (best effort, never fails the deploy): free disk and RAM on the 1 GB VM.
+            sudo -n journalctl --vacuum-size=50M >/dev/null 2>&1 || true
+            sudo -n apt-get clean >/dev/null 2>&1 || true
+            /home/ubuntu/venv/bin/pip cache purge >/dev/null 2>&1 || true
+            [ -f ca-trader.log ] && [ "$(stat -c %s ca-trader.log)" -gt 52428800 ] && tail -c 5242880 ca-trader.log > ca-trader.log.tmp && cat ca-trader.log.tmp > ca-trader.log && rm -f ca-trader.log.tmp
+            find backups -name "*.tmp" -delete 2>/dev/null || true
+            if ! swapon --show 2>/dev/null | grep -q .; then
+              sudo -n sh -c 'fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && (grep -q "^/swapfile" /etc/fstab || echo "/swapfile none swap sw 0 0" >> /etc/fstab)' >/dev/null 2>&1 || true
+            fi
+            sync && sudo -n sh -c 'echo 1 > /proc/sys/vm/drop_caches' >/dev/null 2>&1 || true
+            df -h / | tail -1; free -m | sed -n 2,3p
+
             /home/ubuntu/venv/bin/pip install -r requirements.txt --quiet
 
             sudo systemctl daemon-reload 2>/dev/null || true
