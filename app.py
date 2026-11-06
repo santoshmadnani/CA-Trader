@@ -156,6 +156,7 @@ from backend.services import trade_plan as TRADE_PLAN
 from backend.services import next_session as NEXT_SESSION
 from backend.services import alerts as ALERTS
 from backend.services import events as EVENTS
+from backend.services import news_quality as NEWS_QUALITY
 from backend.services import news_topics as NEWS_TOPICS
 from backend.services.telegram_service import (
     mask_token,
@@ -8171,7 +8172,7 @@ async def lifespan(app: FastAPI):
     # Canned Telegram feature-review prompts: replaced by the Model Lab's daily review. Set CA_SKILL_AGENT=1 to bring it back.
     skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop() if os.getenv("CA_SKILL_AGENT") == "1" else asyncio.sleep(0))
     plan_tracker_task = asyncio.create_task(_signal_plan_tracker_loop())
-    engine_tasks = [asyncio.create_task(f()) for f in (_live_engine_loop, _event_dispatcher_loop, _market_clock_loop, _housekeeping_loop, _send_samples_once)]
+    engine_tasks = [asyncio.create_task(f()) for f in (_live_engine_loop, _event_dispatcher_loop, _market_clock_loop, _housekeeping_loop, _news_scan_loop, _send_samples_once)]
 
     async def _warm_page_caches() -> None:
         """After a restart (every deploy), pre-compute what /terminal asks for first so the first visit is instant."""
@@ -10913,16 +10914,19 @@ def _news_bias(root: str, hours: float = 3.0) -> dict[str, Any]:
     """Recent material news for the instrument (and market-wide news at half weight) as a -100..+100 bias, decayed by age."""
     since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
     rows = db_exec(
-        "SELECT target, headline, summary, materiality, published_at FROM persisted_news_events "
+        "SELECT target, headline, summary, materiality, published_at, source, url FROM persisted_news_events "
         "WHERE target IN (?, 'GLOBAL') AND created_at >= ? ORDER BY created_at DESC LIMIT 60", [root, since], "all") or []
     total, weight, used = 0.0, 0.0, []
     now = datetime.now(timezone.utc)
     for r in rows:
         if not NEWS_TOPICS.is_relevant(root, r):
             continue
-        sent = _headline_sentiment(str(r.get("headline") or ""), str(r.get("summary") or ""))  # re-scored: older rows carry a biased label
+        tier = NEWS_QUALITY.source_tier(r.get("source"), r.get("url"))
+        if tier == 0:   # blogs, social posts and press-release farms never move a recommendation
+            continue
+        sent = NEWS_QUALITY.tone(str(r.get("headline") or ""), str(r.get("summary") or ""))[0]   # re-scored: older rows carry a biased label
         sign = {"Positive": 1, "Negative": -1}.get(sent, 0)
-        mat = float(r.get("materiality") or 0) / 100.0
+        mat = float(r.get("materiality") or 0) / 100.0 * NEWS_QUALITY.TRUST_W.get(tier, 0.5)
         if sign == 0 or mat <= 0:
             continue
         try:
@@ -11869,6 +11873,46 @@ async def _send_samples_once() -> None:
         db_exec("INSERT OR REPLACE INTO settings(user_id,key,value_json) VALUES(1,'telegram_samples_sent',?)", [json.dumps(now_iso())])
     except Exception as exc:
         log.debug("sample pack failed: %s", safe_text(exc))
+
+
+def _news_scan_once() -> int:
+    """Important, trusted, directional news for the indices, crude and the tracked watchlist becomes a `news` event (shown in the app and sent to Telegram)."""
+    import hashlib
+    syms = list(dict.fromkeys(["NIFTY", "BANKNIFTY", "CRUDEOIL"] + [extract_root_symbol(s).upper() for s in _tracked_symbols(True)]))[:6]
+    sent = 0
+    for sym in syms:
+        try:
+            res = _news_unified_sync(sym, 60, 1)
+        except Exception as exc:
+            log.debug("news scan %s failed: %s", sym, safe_text(exc))
+            continue
+        n = 0
+        for it in res.get("events") or []:
+            if n >= 3:
+                break
+            if it.get("impact", 0) < NEWS_QUALITY.STRONG_IMPACT or it.get("trust_tier", 3) > 2 or it.get("tone") == "Neutral" or (it.get("age_hours") or 99) > 4:
+                continue
+            head = str(it.get("headline") or it.get("event") or "")
+            key = hashlib.md5(re.sub(r"\W+", " ", head.lower()).encode()).hexdigest()[:12]
+            if _emit("news", {"symbol": sym, "headline": head, "source": it.get("source"), "source_tier": it.get("trust_label"), "why": it.get("why"), "tone": it.get("tone"),
+                              "impact": it.get("impact"), "url": it.get("url")}, symbol=sym, dedupe=f"news:{key}"):
+                sent += 1
+                n += 1
+    return sent
+
+
+async def _news_scan_loop() -> None:
+    await asyncio.sleep(90)
+    while True:
+        try:
+            now = datetime.now(IST)
+            if now.weekday() < 5 and (7, 30) <= (now.hour, now.minute) < (23, 45):
+                n = await asyncio.to_thread(_news_scan_once)
+                _beat("News worker", f"{n} important item(s)" if n else "no new important news")
+        except Exception as exc:
+            log.debug("news scan failed: %s", safe_text(exc))
+            _beat("News worker", safe_text(exc), False)
+        await asyncio.sleep(600)
 
 
 def _rss_kb() -> float | None:
@@ -17631,6 +17675,35 @@ def _newsworthy(e: dict[str, Any]) -> bool:
             return False
     return bool(str(e.get("headline") or e.get("event") or "").strip())
 
+def _news_unified_sync(sym: str, limit_val: int, uid: int) -> dict[str, Any]:
+    """Stock + global news for one symbol, classified, quality-scored and filtered (see backend/services/news_quality.py)."""
+    prof = NEWS_TOPICS.profile(sym)
+    if prof:   # commodities: their own drivers, never the Indian equity market feed
+        stock_res = news_result(prof["query"], max_results=limit_val//2, target=prof["key"], user_id=uid)
+        global_res = news_result(prof["macro_query"], max_results=limit_val//2, target=f"{prof['key']}_MACRO", user_id=uid)
+    else:
+        stock_res = news_result(_target_news_query(sym), max_results=limit_val//2, target=sym, user_id=uid)
+        global_res = news_result("global markets geopolitics rates oil inflation tariffs central banks", max_results=limit_val//2, target="GLOBAL", user_id=uid)
+    combined = []
+    seen = set()
+    for item in [*stock_res.get("events", []), *global_res.get("events", [])]:
+        k = str(item.get('url') or item.get('headline') or item.get('event') or id(item))
+        if k not in seen and _newsworthy(item) and NEWS_TOPICS.is_relevant(sym, item):
+            seen.add(k)
+            combined.append(item)
+    scored = NEWS_QUALITY.score(combined, sym)
+    return {
+        "events": scored["items"][:limit_val],
+        "symbol": sym,
+        "topic": prof["label"] if prof else None,
+        "total": len(scored["items"]),
+        "hidden": scored["hidden"],
+        "hidden_total": scored["hidden_total"],
+        "net": NEWS_QUALITY.summary_line(scored["items"]),
+        "timestamp": now_iso()
+    }
+
+
 @app.get("/api/news/unified")
 async def news_unified(symbol: str = Query("NIFTY"), limit: int = Query(150, ge=10, le=500), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     sym = (symbol or "NIFTY").upper().strip()
@@ -17639,28 +17712,7 @@ async def news_unified(symbol: str = Query("NIFTY"), limit: int = Query(150, ge=
         limit_val = int(raw_limit) if raw_limit is not None else 150
     except Exception:
         limit_val = 150
-    prof = NEWS_TOPICS.profile(sym)
-    if prof:   # commodities: their own drivers, never the Indian equity market feed
-        stock_res = news_result(prof["query"], max_results=limit_val//2, target=prof["key"], user_id=user["id"])
-        global_res = news_result(prof["macro_query"], max_results=limit_val//2, target=f"{prof['key']}_MACRO", user_id=user["id"])
-    else:
-        stock_res = news_result(_target_news_query(sym), max_results=limit_val//2, target=sym, user_id=user["id"])
-        global_res = news_result("global markets geopolitics rates oil inflation tariffs central banks", max_results=limit_val//2, target="GLOBAL", user_id=user["id"])
-    combined = []
-    seen = set()
-    for item in [*stock_res.get("events", []), *global_res.get("events", [])]:
-        k = str(item.get('url') or item.get('headline') or item.get('event') or id(item))
-        if k not in seen and _newsworthy(item) and NEWS_TOPICS.is_relevant(sym, item):
-            seen.add(k)
-            combined.append(item)
-    combined.sort(key=lambda x: (_parse_news_datetime(str(x.get("published_at") or "")).timestamp() if _parse_news_datetime(str(x.get("published_at") or "")) else 0), reverse=True)
-    return {
-        "events": combined[:limit_val],
-        "symbol": sym,
-        "topic": prof["label"] if prof else None,
-        "total": len(combined),
-        "timestamp": now_iso()
-    }
+    return await asyncio.to_thread(_news_unified_sync, sym, limit_val, user["id"])
 
 
 @app.get("/api/ai/dashboard")
