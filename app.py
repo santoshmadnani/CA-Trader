@@ -155,6 +155,7 @@ from backend.services import signal_model as SIGNAL_MODEL
 from backend.services import trade_plan as TRADE_PLAN
 from backend.services import next_session as NEXT_SESSION
 from backend.services import alerts as ALERTS
+from backend.services import events as EVENTS
 from backend.services import news_topics as NEWS_TOPICS
 from backend.services.telegram_service import (
     mask_token,
@@ -1662,6 +1663,10 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE recommendations ADD COLUMN status TEXT DEFAULT 'NEW'")
             if "order_id" not in rec_cols:
                 conn.execute("ALTER TABLE recommendations ADD COLUMN order_id TEXT")
+            # honest lifecycle: a call only counts once price really touched its entry (see _grade_recommendations)
+            for _c, _t in (("fill_price", "REAL"), ("filled_at", "TEXT"), ("exit_price", "REAL"), ("closed_at", "TEXT"), ("valid_until", "TEXT"), ("grade", "TEXT")):
+                if _c not in rec_cols:
+                    conn.execute(f"ALTER TABLE recommendations ADD COLUMN {_c} {_t}")
             member_cols = {row[1] for row in conn.execute("PRAGMA table_info(watchlist_members)").fetchall()}
             if "position" not in member_cols:
                 conn.execute("ALTER TABLE watchlist_members ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
@@ -2803,7 +2808,10 @@ class UpstoxAdapter:
         fb = get_live_fallback_quote(instrument)
         if fb and fb.get("ltp") is not None:
             return {"instrument": instrument, "instrument_key": key, "ltp": float(fb["ltp"]), "timestamp": now_iso(), "provider": fb.get("provider", "yfinance"), "fresh": True, "metadata": meta}
-        prev = self._previous_session_close(key) or 100.0
+        prev = self._previous_session_close(key)
+        if not prev:
+            # never invent a price: callers treat ltp=None as "no data"
+            return {"instrument": instrument, "instrument_key": key, "ltp": None, "timestamp": now_iso(), "provider": "unavailable", "fresh": False, "metadata": meta}
         return {"instrument": instrument, "instrument_key": key, "ltp": float(prev), "timestamp": now_iso(), "provider": "close_fallback", "fresh": False, "metadata": meta}
 
     def _normalize_candle_timestamp(self, value: Any) -> str | None:
@@ -8158,10 +8166,12 @@ async def lifespan(app: FastAPI):
     news_task = asyncio.create_task(_auto_news_worker_loop())
     tg_bot_task = asyncio.create_task(_telegram_bot_service_loop())
     sm_telethon_task = asyncio.create_task(_stockmantra_live_telethon_loop())
-    reco_sender_task = asyncio.create_task(_recommendation_sender_agent_loop())
+    # the legacy pre-market / market-open consolidated card is replaced by the event stream (brief at 08:50, calls as they are issued)
+    reco_sender_task = asyncio.create_task(asyncio.sleep(0))
     # Canned Telegram feature-review prompts: replaced by the Model Lab's daily review. Set CA_SKILL_AGENT=1 to bring it back.
     skill_agent_task = asyncio.create_task(_skill_discovery_agent_loop() if os.getenv("CA_SKILL_AGENT") == "1" else asyncio.sleep(0))
     plan_tracker_task = asyncio.create_task(_signal_plan_tracker_loop())
+    engine_tasks = [asyncio.create_task(f()) for f in (_live_engine_loop, _event_dispatcher_loop, _market_clock_loop, _housekeeping_loop, _send_samples_once)]
 
     async def _warm_page_caches() -> None:
         """After a restart (every deploy), pre-compute what /terminal asks for first so the first visit is instant."""
@@ -8208,6 +8218,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         cache_task.cancel(); auto_task.cancel(); risk_task.cancel(); reco_task.cancel(); news_task.cancel(); tg_bot_task.cancel(); sm_telethon_task.cancel(); reco_sender_task.cancel(); skill_agent_task.cancel(); plan_tracker_task.cancel()
+        for _t in engine_tasks:
+            _t.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await cache_task
         with contextlib.suppress(asyncio.CancelledError):
@@ -11200,6 +11212,7 @@ def _evaluate_open_plans() -> list[dict[str, Any]]:
             continue
         for r in plans:
             out = TRADE_PLAN.evaluate_live(r, one, now)
+            _emit_plan_events(r, out)
             if out.get("status") != r["status"] or out.get("fill_price") != r.get("fill_price"):
                 db_exec("UPDATE signal_plans SET status=?, fill_price=?, filled_at=?, exit_price=?, closed_at=?, r=?, updated_at=? WHERE id=?",
                         [out.get("status"), out.get("fill_price"), out.get("filled_at"), out.get("exit_price"), out.get("closed_at"),
@@ -11237,6 +11250,8 @@ async def _dispatch_signal_alerts(symbol: str, new_plans: list[tuple[str, dict[s
     """Alert only the new plans that pass every high-conviction filter (see backend/services/alerts.py)."""
     if not new_plans:
         return
+    for pid, p in new_plans:
+        _emit_new_call(symbol, pid, p)
     cfg = ALERTS.get_config(db_exec)
     if not cfg.get("enabled"):
         return
@@ -11251,7 +11266,7 @@ async def _dispatch_signal_alerts(symbol: str, new_plans: list[tuple[str, dict[s
             log.info("signal alert skipped %s %s: %s", symbol, p.get("horizon"), "; ".join(reasons))
             continue
         msg = ALERTS.build_alert(symbol, p, reasons)
-        res = await _send_alert(cfg, msg, ALERTS.telegram_html(msg))
+        res = await _send_alert({**cfg, "telegram": False}, msg, ALERTS.telegram_html(msg))   # Telegram is sent by the event stream
         db_exec("UPDATE signal_plans SET alerted=1 WHERE id=?", [pid])
         log.info("signal alert sent %s %s: %s", symbol, p.get("horizon"), res)
 
@@ -11265,7 +11280,7 @@ async def _dispatch_outcome_alerts(rows: list[dict[str, Any]]) -> None:
     for r in rows:
         msg = ALERTS.build_outcome(r)
         if msg:
-            await _send_alert(cfg, msg, f"<b>{msg['title']}</b>\n{msg['body']}")
+            await _send_alert({**cfg, "telegram": False}, msg, f"<b>{msg['title']}</b>\n{msg['body']}")   # Telegram is sent by the event stream
 
 
 def _tracked_symbols(nse: bool = True) -> list[str]:
@@ -11296,10 +11311,596 @@ async def _signal_plan_tracker_loop() -> None:
                         await _dispatch_signal_alerts(res.get("root") or sym.upper(), new_plans)
                     except Exception as exc:
                         log.debug("plan tracker %s failed: %s", sym, safe_text(exc))
-            await _dispatch_outcome_alerts(await asyncio.to_thread(_evaluate_open_plans))
+            _beat("Plan tracker", "recorded new plans")
         except Exception as exc:
             log.warning("signal plan tracker failed: %s", safe_text(exc))
         await asyncio.sleep(120)
+
+
+# ---------------------------------------------------------------------------
+# Event stream: every new call, honest fill and exit, live P&L, bullish/bearish run, agent action and market status is stored
+# in `app_events` (shown in the app) and sent to Telegram by one dispatcher that respects market hours (backend/services/events.py).
+# ---------------------------------------------------------------------------
+EVENTS.ensure_tables(db_exec)
+_INDEX_ROOTS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"}
+_PAPER_RISK_RUPEES = float(os.getenv("CA_PAPER_RISK_RUPEES", "2000"))
+_AGENT_BEATS: dict[str, dict[str, Any]] = {}
+_AGENT_INFO = {
+    "Plan tracker": "Builds the scalp / intraday / swing plans, records each call and grades it against real 1-minute candles",
+    "Live P&L watcher": "Marks every filled call to the live price and reports open profit or loss",
+    "Run detector": "Spots bullish and bearish runs as they form",
+    "Market clock": "Market open/close notices, the pre-market brief and the day summary",
+    "Telegram dispatcher": "Sends each event to Telegram, respecting market hours, quiet hours and a flood limit",
+    "News worker": "Keeps the news cache fresh for the indices, crude, global and the watchlist",
+    "Recommendation recorder": "Saves the older 5-minute recommendations and grades them honestly",
+    "Housekeeper": "Clears caches and old logs, keeps RAM and disk healthy",
+    "Self-review": "Weekly: grades every plan the app issued, pauses failing horizons, re-tests settings on unseen data",
+}
+
+
+def _beat(name: str, note: str = "", ok: bool = True) -> None:
+    _AGENT_BEATS[name] = {"at": now_iso(), "note": note, "ok": ok}
+
+
+def _emit(kind: str, data: dict[str, Any], **kw: Any) -> int | None:
+    return EVENTS.emit(db_exec, kind, data, **kw)
+
+
+def _agent_event(agent: str, action: str, detail: str, dedupe: str | None = None) -> None:
+    _emit("agent", {"agent": agent, "action": action, "detail": detail}, dedupe=dedupe)
+
+
+def _qty_for(root: str, risk_pts: float) -> tuple[int, str]:
+    """Quantity used to express a call in rupees: one lot for index/F&O/MCX, otherwise sized so a stop-out costs about the paper risk."""
+    try:
+        if root in _INDEX_ROOTS or get_symbol_segment(root) == "MCX":
+            return max(1, int(resolve_lot_size(root, 1))), "1 lot"
+    except Exception:
+        pass
+    q = max(1, int(_PAPER_RISK_RUPEES / risk_pts)) if risk_pts and risk_pts > 0 else 1
+    return q, f"sized so a stop-out costs about ₹{_PAPER_RISK_RUPEES:,.0f}"
+
+
+_FACTOR_NAMES = {"trend": "Trend", "vwap": "Price vs VWAP", "momentum": "Momentum", "structure": "Price structure"}
+
+
+def _plan_reasons(p: dict[str, Any]) -> list[str]:
+    out: list[str] = []
+    for k, v in (p.get("factors") or {}).items():
+        if abs(v) >= 25:
+            out.append(f"{_FACTOR_NAMES.get(k, k)} {'bullish' if v > 0 else 'bearish'} ({v:+.0f}/100)")
+    for h in p.get("higher_timeframes") or []:
+        if h.get("text"):
+            out.append(h["text"])
+    nb = p.get("news_bias")
+    if nb is not None and abs(nb) >= 20:
+        out.append(f"News tone {'positive' if nb > 0 else 'negative'} ({nb:+.0f})")
+    return out[:6]
+
+
+def _emit_new_call(symbol: str, pid: str, p: dict[str, Any]) -> None:
+    cf = p.get("confidence") or {}
+    edge = p.get("edge") or {}
+    _emit("call_new", {
+        "symbol": symbol, "side": p.get("decision"), "horizon": p.get("horizon"), "label": p.get("label"), "entry": p.get("entry"),
+        "entry_low": p.get("entry_low"), "entry_high": p.get("entry_high"), "target_1": p.get("target_1"), "target_2": p.get("target_2"),
+        "stop_loss": p.get("stop_loss"), "risk": p.get("risk"), "rr": p.get("rr_t1"), "valid_until": p.get("valid_until"),
+        "confidence_pct": cf.get("pct") if cf.get("available") else None, "confidence_n": cf.get("n"),
+        "edge": edge.get("label"), "reasons": _plan_reasons(p), "plan_id": pid, "score": p.get("score")},
+        symbol=symbol, dedupe=f"plan:{pid}:new")
+
+
+def _plan_event_base(r: dict[str, Any], out: dict[str, Any]) -> dict[str, Any]:
+    fill = out.get("fill_price", r.get("fill_price"))
+    mid = (float(r["entry_low"]) + float(r["entry_high"])) / 2
+    risk = abs((fill or mid) - float(r["stop_loss"])) or 1e-6
+    qty, note = _qty_for(r["symbol"], risk)
+    return {"symbol": r["symbol"], "side": r["side"], "horizon": r["horizon"], "fill_price": fill,
+            "filled_at": out.get("filled_at", r.get("filled_at")), "stop_loss": r["stop_loss"], "target_1": r["target_1"],
+            "target_2": r["target_2"], "qty": qty, "qty_note": note, "risk_pts": risk, "plan_id": r["id"]}
+
+
+def _emit_plan_events(r: dict[str, Any], out: dict[str, Any]) -> None:
+    """Turn a real status change of a graded plan into events (each is de-duplicated by plan id and stage)."""
+    try:
+        st, prev, pid = out.get("status"), r.get("status"), r["id"]
+        if st in (None, "PENDING"):
+            return
+        base = _plan_event_base(r, out)
+        sym = r["symbol"]
+        if out.get("fill_price") is not None and prev == "PENDING":
+            _emit("call_filled", base, symbol=sym, dedupe=f"plan:{pid}:fill")
+        if out.get("t1_at") and out.get("fill_price") is not None:
+            part = abs(float(r["target_1"]) - out["fill_price"]) / base["risk_pts"]
+            d = {**base, "exit_price": r["target_1"], "closed_at": out["t1_at"], "r": round(0.5 * part, 2)}
+            d["pnl_rupees"] = round(d["r"] * base["risk_pts"] * base["qty"], 0)
+            _emit("call_t1", d, symbol=sym, dedupe=f"plan:{pid}:t1")
+        if st in ("T1", "T2", "SL", "TIME") and prev in ("PENDING", "OPEN"):
+            kind = {"T2": "call_target", "SL": "call_sl", "TIME": "call_time", "T1": "call_partial"}[st]
+            d = {**base, "exit_price": out.get("exit_price"), "closed_at": out.get("closed_at"), "r": out.get("r")}
+            if out.get("r") is not None:
+                d["pnl_rupees"] = round(float(out["r"]) * base["risk_pts"] * base["qty"], 0)
+            _emit(kind, d, symbol=sym, dedupe=f"plan:{pid}:final", severity="warning" if st == "SL" else "info")
+        elif st == "EXPIRED" and prev == "PENDING":
+            _emit("call_expired", {"symbol": sym, "side": r["side"], "horizon": r["horizon"]}, symbol=sym, dedupe=f"plan:{pid}:exp")
+    except Exception as exc:
+        log.debug("plan event failed: %s", safe_text(exc))
+
+
+_PNL_LAST: dict[str, tuple[float, float]] = {}
+
+
+def _live_pnl_tick() -> int:
+    """Mark every filled (open) plan to the live price; report at most every 10 minutes unless the result moved by 0.35R."""
+    rows = db_exec("SELECT * FROM signal_plans WHERE status='OPEN'", [], "all") or []
+    sent = 0
+    for r in rows:
+        root = r["symbol"]
+        seg = "MCX" if get_symbol_segment(root) == "MCX" else "NSE_EQ"
+        if not market_session(seg).get("active") or r.get("fill_price") is None:
+            continue
+        try:
+            q = UPSTOX.ltp(root)
+        except Exception:
+            continue
+        ltp = q.get("ltp")
+        if ltp is None or not q.get("fresh") or q.get("provider") in ("close_fallback", "unavailable"):
+            continue
+        fill, buy = float(r["fill_price"]), r["side"] == "BUY"
+        pts = (ltp - fill) if buy else (fill - ltp)
+        risk = abs(fill - float(r["stop_loss"])) or 1e-6
+        rr = pts / risk
+        last, now_ts = _PNL_LAST.get(r["id"]), time.time()
+        if last and now_ts - last[0] < 600 and abs(rr - last[1]) < 0.35:
+            continue
+        _PNL_LAST[r["id"]] = (now_ts, rr)
+        qty, note = _qty_for(root, risk)
+        frac = pts / (abs(float(r["target_1"]) - fill) or 1e-6)
+        hint = ("Price is close to your stop. Do nothing: the stop is there to protect you." if rr <= -0.7
+                else "Almost at target 1. Be ready to book half." if frac >= 0.8
+                else "Past halfway to target 1. Keep the stop where it is." if frac > 0.5
+                else "In progress. No action needed.")
+        _emit("call_pnl", {"symbol": root, "side": r["side"], "fill_price": fill, "filled_at": r.get("filled_at"), "ltp": ltp, "pts": round(pts, 2), "r": round(rr, 2),
+                           "pnl_rupees": round(pts * qty, 0), "qty": qty, "qty_note": note, "stop_loss": r["stop_loss"], "target_1": r["target_1"], "hint": hint},
+              symbol=root, dedupe=f"plan:{r['id']}:pnl:{int(now_ts // 60)}")
+        sent += 1
+    return sent
+
+
+def _detect_run(sym: str, tf: str = "5m") -> dict[str, Any] | None:
+    """A bullish/bearish run: at least 5 of the last 6 closed candles in one direction, the move at least 2x the normal candle range,
+    no big giveback, and (where volume exists) rising volume. Uses only closed candles."""
+    c = analysis_candles_robust(sym, tf, 2) or []
+    s = TRADE_PLAN.Series(c, tf)
+    n = len(s)
+    if n < 30:
+        return None
+    now, step = datetime.now(IST), timedelta(minutes=TRADE_PLAN.TF_MIN[tf])
+    end = n - 1 if s.t[-1] + step <= now else n - 2
+    look = 6
+    if end < 25 or s.t[end].date() != now.date():
+        return None
+    a = end - look + 1
+    net = s.c[end] - s.o[a]
+    atr = s.atr[a - 1]
+    up = net > 0
+    same = sum(1 for i in range(a, end + 1) if (s.c[i] > s.o[i]) == up)
+    mult = abs(net) / atr
+    run_hi, run_lo = max(s.h[a:end + 1]), min(s.l[a:end + 1])
+    span = (run_hi - run_lo) or 1e-6
+    giveback = ((run_hi - s.c[end]) if up else (s.c[end] - run_lo)) / span
+    vx = None
+    if sum(s.v[end - 22:end + 1]) > 0:
+        base = sum(s.v[end - 22:end - 2]) / 20
+        vx = round((sum(s.v[end - 2:end + 1]) / 3) / base, 2) if base > 0 else None
+    if same < 5 or mult < 2.0 or giveback > 0.4 or (vx is not None and vx < 1.2) or (s.c[end] > s.o[end]) != up:
+        return None
+    reasons: list[str] = []
+    day_idx = [i for i in range(n) if s.t[i].date() == now.date() and i < a]
+    if day_idx:
+        if up and s.c[end] > max(s.h[i] for i in day_idx):
+            reasons.append(f"Broke the day's high {max(s.h[i] for i in day_idx):,.2f}")
+        if not up and s.c[end] < min(s.l[i] for i in day_idx):
+            reasons.append(f"Broke the day's low {min(s.l[i] for i in day_idx):,.2f}")
+    reasons.append(f"{'Above' if s.c[end] > s.vwap[end] else 'Below'} the day's average price (VWAP {s.vwap[end]:,.2f})")
+    reasons.append(f"RSI {s.rsi[end]:.0f}")
+    return {"symbol": sym, "direction": "up" if up else "down", "move_pct": round(net / s.o[a] * 100, 2), "minutes": look * TRADE_PLAN.TF_MIN[tf],
+            "candles": same, "timeframe": tf, "from_price": s.o[a], "to_price": s.c[end], "atr_multiple": round(mult, 1), "volume_x": vx, "reasons": reasons,
+            "bucket": int(time.time() // 1800)}
+
+
+def _run_scan() -> int:
+    syms = list(_tracked_symbols(bool(market_session("NSE_EQ").get("active"))))
+    if market_session("MCX").get("active") and "CRUDEOIL" not in syms:
+        syms.append("CRUDEOIL")
+    found = 0
+    for sym in syms[:8]:
+        seg = "MCX" if get_symbol_segment(extract_root_symbol(sym).upper()) == "MCX" else "NSE_EQ"
+        if not market_session(seg).get("active"):
+            continue
+        try:
+            d = _detect_run(sym)
+        except Exception as exc:
+            log.debug("run scan %s failed: %s", sym, safe_text(exc))
+            continue
+        if d and _emit("run", d, symbol=sym, dedupe=f"run:{sym}:{d['direction']}:{d['bucket']}"):
+            found += 1
+    return found
+
+
+def _day_summary(day: date | None = None) -> dict[str, Any]:
+    day = day or datetime.now(IST).date()
+    start = datetime(day.year, day.month, day.day, tzinfo=IST).astimezone(timezone.utc).isoformat()
+    end = (datetime(day.year, day.month, day.day, tzinfo=IST) + timedelta(days=1)).astimezone(timezone.utc).isoformat()
+    rows = db_exec("SELECT symbol, horizon, side, status, r, entry_low, entry_high, stop_loss FROM signal_plans WHERE created_at >= ? AND created_at < ?", [start, end], "all") or []
+    closed = [x for x in rows if x["status"] in ("T1", "T2", "SL", "TIME")]
+    total_r = sum(float(x.get("r") or 0) for x in closed)
+    rupees = 0.0
+    for x in closed:
+        risk = abs((float(x["entry_low"]) + float(x["entry_high"])) / 2 - float(x["stop_loss"])) or 1e-6
+        rupees += float(x.get("r") or 0) * risk * _qty_for(x["symbol"], risk)[0]
+    best = max(closed, key=lambda x: float(x.get("r") or 0), default=None)
+    notes = [f"Best: {best['symbol']} {best['horizon']} {float(best['r']):+.2f}R"] if best and float(best.get("r") or 0) > 0 else []
+    still_open = sum(1 for x in rows if x["status"] in ("PENDING", "OPEN"))
+    if still_open:
+        notes.append(f"{still_open} call(s) still open or waiting; they are not counted yet")
+    return {"date": day.strftime("%a %d %b"), "issued": len(rows), "filled": sum(1 for x in rows if x["status"] not in ("PENDING", "EXPIRED")),
+            "unfilled": sum(1 for x in rows if x["status"] == "EXPIRED"), "wins": sum(1 for x in closed if float(x.get("r") or 0) > 0),
+            "losses": sum(1 for x in closed if x["status"] == "SL"), "time_exits": sum(1 for x in closed if x["status"] == "TIME"),
+            "total_r": round(total_r, 2), "pnl_rupees": round(rupees, 0) if closed else None, "notes": notes}
+
+
+def _quote_line(sym: str, label: str) -> str | None:
+    try:
+        q = UPSTOX.quote(sym)
+        if q.get("ltp") is None or q.get("fresh") is False:
+            return None
+        return f"{label} {q['ltp']:,.2f} ({q.get('change_pct', 0) or 0:+.2f}%)"
+    except Exception:
+        return None
+
+
+def _morning_brief() -> list[str]:
+    lines = ["NSE opens at 09:15. No calls are made before the first candles settle."]
+    got = [x for x in (_quote_line("NIFTY", "NIFTY"), _quote_line("BANKNIFTY", "BANKNIFTY"), _quote_line("NSE_INDEX|India VIX", "India VIX")) if x]
+    if got:
+        lines.append("Last prices: " + " · ".join(got))
+    try:
+        news = _cached_headlines(3)
+        for h in news:
+            lines.append(f"• {h}")
+    except Exception:
+        pass
+    lines.append("Rule of the day: act only on a published call, only inside its entry zone, always with the stop-loss.")
+    return lines
+
+
+def _cached_headlines(n: int = 3) -> list[str]:
+    ev = CACHE.get("news:NIFTY") or {}
+    items = (ev.get("events") if isinstance(ev, dict) else None) or []
+    out = []
+    for e in items:
+        if e.get("classification") in ("MARKET_UPDATE", "ANALYSIS") or not e.get("title"):
+            continue
+        out.append(str(e["title"])[:120])
+        if len(out) >= n:
+            break
+    return out
+
+
+async def _market_clock_loop() -> None:
+    """Market open/close notices, the 08:50 brief and the day summaries. Silent on weekends and exchange holidays."""
+    await asyncio.sleep(30)
+    while True:
+        try:
+            now = datetime.now(IST)
+            d, hm = now.date().isoformat(), (now.hour, now.minute)
+            if now.weekday() < 5:
+                nse_holiday = bool(get_market_holiday_info(now.date(), "NSE_EQ")[0])
+                if not nse_holiday:
+                    if hm == (8, 50):
+                        _emit("brief", {"title": "Pre-market brief · 08:50", "lines": _morning_brief()}, dedupe=f"brief:{d}")
+                    if hm == (9, 15):
+                        _emit("market", {"title": "NSE market open", "detail": "Regular session 09:15–15:30 IST. Calls begin after the first candles settle."}, dedupe=f"nse-open:{d}")
+                    if hm == (15, 30):
+                        _emit("market", {"title": "NSE market closed", "detail": "No new calls today. Open calls are graded on what the market really did."}, dedupe=f"nse-close:{d}")
+                    if hm == (15, 45):
+                        _emit("summary", _day_summary(), dedupe=f"summary:{d}")
+                if not get_market_holiday_info(now.date(), "MCX")[0]:
+                    if hm == (9, 0):
+                        _emit("market", {"title": "MCX commodities open", "detail": "Crude, gold, silver and others trade until 23:30 IST."}, dedupe=f"mcx-open:{d}")
+                    if hm == (23, 30):
+                        _emit("market", {"title": "MCX closed for the day", "detail": "Commodity calls are graded on what the market really did."}, dedupe=f"mcx-close:{d}")
+            _beat("Market clock", f"{now.strftime('%H:%M')} IST")
+        except Exception as exc:
+            log.debug("market clock failed: %s", safe_text(exc))
+            _beat("Market clock", safe_text(exc), False)
+        await asyncio.sleep(max(1.0, 60 - datetime.now(IST).second))
+
+
+_TG_SENT_TIMES: collections.deque = collections.deque(maxlen=200)
+
+
+def _tg_event_cfg() -> dict[str, Any] | None:
+    cfg = get_user_telegram_config(db_exec, 1)
+    if cfg.get("bot_token") and cfg.get("chat_id"):
+        return cfg
+    return _alert_telegram_cfg()
+
+
+_TG_KIND_FLAG = {"news": "notify_news", "risk": "notify_risk"}
+
+
+async def _dispatch_events_once() -> int:
+    rows = db_exec("SELECT id, ts, kind, severity, symbol, title, body FROM app_events WHERE tg='QUEUED' ORDER BY id LIMIT 25", [], "all") or []
+    if not rows:
+        return 0
+    cfg = _tg_event_cfg()
+    sent = 0
+    now = datetime.now(timezone.utc)
+    for r in rows:
+        if not cfg:
+            db_exec("UPDATE app_events SET tg='SKIPPED', tg_note=? WHERE id=?", ["Telegram is not set up", r["id"]])
+            continue
+        flag = _TG_KIND_FLAG.get(r["kind"])
+        if flag and cfg.get(flag) is False:
+            db_exec("UPDATE app_events SET tg='SKIPPED', tg_note=? WHERE id=?", ["turned off in Telegram settings", r["id"]])
+            continue
+        root = extract_root_symbol(r["symbol"]).upper() if r.get("symbol") else ""
+        seg = "MCX" if root and get_symbol_segment(root) == "MCX" else "NSE_EQ"
+        is_open = bool(market_session(seg).get("active"))
+        age = (now - datetime.fromisoformat(r["ts"])).total_seconds()
+        ok, why = EVENTS.decide(r["kind"], r["severity"], age, is_open)
+        if not ok:
+            db_exec("UPDATE app_events SET tg='SKIPPED', tg_note=? WHERE id=?", [why, r["id"]])
+            continue
+        t = time.time()
+        while _TG_SENT_TIMES and t - _TG_SENT_TIMES[0] > 60:
+            _TG_SENT_TIMES.popleft()
+        if len(_TG_SENT_TIMES) >= EVENTS.MAX_PER_MINUTE:
+            break   # flood guard: the rest stay queued for the next pass
+        stamp = datetime.fromisoformat(r["ts"]).astimezone(IST).strftime("%H:%M:%S")
+        text = f"<b>{r['title']}</b>\n{r['body'] or ''}\n<i>{stamp} IST · CA Trader</i>"
+        okk, err = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], text, "HTML")
+        _TG_SENT_TIMES.append(t)
+        db_exec("UPDATE app_events SET tg=?, tg_note=?, tg_at=? WHERE id=?", ["SENT" if okk else "FAILED", None if okk else str(err)[:200], now_iso(), r["id"]])
+        sent += int(okk)
+    return sent
+
+
+async def _event_dispatcher_loop() -> None:
+    await asyncio.sleep(10)
+    while True:
+        try:
+            n = await _dispatch_events_once()
+            _beat("Telegram dispatcher", f"sent {n}" if n else "idle")
+        except Exception as exc:
+            log.debug("event dispatcher failed: %s", safe_text(exc))
+            _beat("Telegram dispatcher", safe_text(exc), False)
+        await asyncio.sleep(4)
+
+
+async def _live_engine_loop() -> None:
+    """Every 30 s while a market is open: grade open plans on real candles (fills, targets, stops), mark open calls to the live price and look for runs."""
+    await asyncio.sleep(45)
+    tick = 0
+    while True:
+        try:
+            nse, mcx = bool(market_session("NSE_EQ").get("active")), bool(market_session("MCX").get("active"))
+            if nse or mcx:
+                done = await asyncio.to_thread(_evaluate_open_plans)
+                await _dispatch_outcome_alerts(done)
+                _beat("Plan tracker", "graded open plans")
+                n = await asyncio.to_thread(_live_pnl_tick)
+                _beat("Live P&L watcher", f"{n} update(s)" if n else "watching open calls")
+                if tick % 2 == 0:
+                    f = await asyncio.to_thread(_run_scan)
+                    _beat("Run detector", f"{f} new run(s)" if f else "scanning")
+                await asyncio.to_thread(_grade_recommendations)
+                _beat("Recommendation recorder", "graded saved recommendations")
+        except Exception as exc:
+            log.warning("live engine failed: %s", safe_text(exc))
+            _beat("Plan tracker", safe_text(exc), False)
+        tick += 1
+        await asyncio.sleep(30)
+
+
+def _utc_from_sqlite(s: str) -> datetime:
+    try:
+        d = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except Exception:
+        d = datetime.now(timezone.utc)
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def _grade_recommendations() -> int:
+    """Older 5-minute recommendations: they count only after price really touched their entry (within 0.04%), and exit on real candle highs/lows.
+    Options rows are not graded here (their entry is a premium, not an index price) and say so instead of showing a profit."""
+    rows = db_exec(
+        "SELECT id, symbol, underlying, recommendation, entry, target, stop_loss, created_at, status, instrument_kind, grade FROM recommendations "
+        "WHERE status IN ('ACTIVE','PRE_MARKET','FILLED') AND created_at >= datetime('now','-3 day') AND (grade IS NULL OR grade IN ('PENDING','OPEN')) "
+        "ORDER BY created_at DESC LIMIT 60", [], "all") or []
+    changed = 0
+    now = datetime.now(IST)
+    for r in rows:
+        try:
+            side = str(r.get("recommendation") or "").upper()
+            entry, tgt, sl = float(r.get("entry") or 0), float(r.get("target") or 0), float(r.get("stop_loss") or 0)
+            if side not in ("BUY", "SELL") or entry <= 0 or tgt <= 0 or sl <= 0:
+                continue
+            if str(r.get("instrument_kind") or "").upper() == "OPTION" or re.search(r"\b(CE|PE)\b|\d(CE|PE)$", str(r.get("symbol") or "")):
+                db_exec("UPDATE recommendations SET grade='NOT_TRACKED', outcome='NOT_TRACKED', exit_reason='Option premium: not graded against the index price', final_pnl=NULL, success=NULL WHERE id=?", [r["id"]])
+                changed += 1
+                continue
+            root = str(r.get("underlying") or r.get("symbol") or "").upper()
+            created = _utc_from_sqlite(r["created_at"]).astimezone(IST)
+            start = created
+            if created.hour < 9 or (created.hour == 9 and created.minute < 15):
+                start = created.replace(hour=9, minute=15, second=0, microsecond=0)
+            valid_until = start + timedelta(minutes=30)
+            plan = {"side": side, "created_at": start.isoformat(), "valid_until": valid_until.isoformat(), "timeframe": "5m", "entry_low": entry * 0.9996, "entry_high": entry * 1.0004,
+                    "stop_loss": sl, "target_1": tgt, "target_2": tgt, "time_stop_bars": 12,
+                    "time_stop_at_latest": start.replace(hour=15, minute=25, second=0, microsecond=0).isoformat()}
+            one = TRADE_PLAN.Series(analysis_candles_robust(root, "1m", 3) or [], "1m")
+            out = TRADE_PLAN.evaluate_live(plan, one, now)
+            st = out.get("status")
+            grade = {"PENDING": "PENDING", "OPEN": "OPEN", "EXPIRED": "EXPIRED"}.get(st, "CLOSED")
+            if grade == r.get("grade") and st in ("PENDING", "OPEN"):
+                continue
+            label = {"PENDING": "Waiting for entry price", "OPEN": "Filled · running", "EXPIRED": "Never reached entry", "T1": "Target hit", "T2": "Target hit", "SL": "Stop-loss hit", "TIME": "Time exit"}.get(st, st)
+            code = {"PENDING": None, "OPEN": None, "EXPIRED": "NEVER_FILLED", "T1": "TARGET_HIT", "T2": "TARGET_HIT", "SL": "STOP_LOSS_HIT", "TIME": "TIME_EXIT"}.get(st)
+            pnl = None
+            if out.get("fill_price") is not None and out.get("exit_price") is not None:
+                qty = _qty_for(root, abs(out["fill_price"] - sl))[0]
+                pnl = round(((out["exit_price"] - out["fill_price"]) if side == "BUY" else (out["fill_price"] - out["exit_price"])) * qty, 2)
+            db_exec("UPDATE recommendations SET grade=?, status=?, outcome=?, exit_reason=?, fill_price=?, filled_at=?, exit_price=?, closed_at=?, valid_until=?, final_pnl=?, success=? WHERE id=?",
+                    [grade, {"PENDING": r["status"], "OPEN": "FILLED", "EXPIRED": "EXPIRED"}.get(st, "CLOSED"), code, label, out.get("fill_price"), out.get("filled_at"), out.get("exit_price"),
+                     out.get("closed_at"), valid_until.isoformat(), pnl, (None if pnl is None else int(pnl > 0)), r["id"]])
+            changed += 1
+        except Exception as exc:
+            log.debug("grade recommendation %s failed: %s", r.get("id"), safe_text(exc))
+    return changed
+
+
+@app.get("/api/events")
+async def api_events(since_id: int = 0, limit: int = 60, kind: str = "", symbol: str = "", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    kinds = [k for k in kind.split(",") if k in EVENTS.KINDS] or None
+    items = await asyncio.to_thread(EVENTS.recent, db_exec, limit, since_id, kinds, symbol.upper() or None)
+    return {"events": items, "kinds": {k: {"icon": v[0], "label": v[1]} for k, v in EVENTS.KINDS.items()}, "timestamp": now_iso()}
+
+
+@app.get("/api/agents")
+async def api_agents(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    out = []
+    for name, what in _AGENT_INFO.items():
+        b = _AGENT_BEATS.get(name)
+        age = (now - datetime.fromisoformat(b["at"])).total_seconds() if b else None
+        out.append({"name": name, "does": what, "last": b["at"] if b else None, "note": b["note"] if b else "waiting for the next market session", "ok": (b["ok"] if b else True),
+                    "state": "idle" if not b else ("error" if not b["ok"] else "running" if age is not None and age < 180 else "idle")})
+    return {"agents": out, "nse": market_session("NSE_EQ"), "mcx": market_session("MCX"), "timestamp": now_iso()}
+
+
+@app.post("/api/telegram/samples")
+async def api_telegram_samples(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Send one labelled sample of every Telegram message type to the configured chat."""
+    if not is_admin(user):
+        raise HTTPException(403, "Admin only")
+    cfg = _tg_event_cfg()
+    if not cfg:
+        raise HTTPException(400, "Telegram is not set up (bot token and chat id)")
+    sent, failed = 0, []
+    for kind, title, body in EVENTS.render_samples():
+        ok, err = await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], f"<b>{title}</b>\n{body}", "HTML")
+        sent += int(ok)
+        if not ok:
+            failed.append({"kind": kind, "error": str(err)[:120]})
+        await asyncio.sleep(1.2)
+    return {"sent": sent, "total": len(EVENTS.KINDS), "failed": failed}
+
+
+async def _send_samples_once() -> None:
+    """After the first deploy of this feature, send the sample pack once so the owner sees every message type."""
+    await asyncio.sleep(25)
+    try:
+        row = db_exec("SELECT value_json FROM settings WHERE user_id=1 AND key='telegram_samples_sent'", [], "one")
+        cfg = _tg_event_cfg()
+        if row or not cfg:
+            return
+        await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], "🧪 <b>Sample messages</b> follow: one of every type you will receive. The numbers are examples, not trades.", "HTML")
+        for _kind, title, body in EVENTS.render_samples():
+            await send_telegram_msg(cfg["bot_token"], cfg["chat_id"], f"<b>{title}</b>\n{body}", "HTML")
+            await asyncio.sleep(1.2)
+        db_exec("INSERT OR REPLACE INTO settings(user_id,key,value_json) VALUES(1,'telegram_samples_sent',?)", [json.dumps(now_iso())])
+    except Exception as exc:
+        log.debug("sample pack failed: %s", safe_text(exc))
+
+
+def _rss_kb() -> float | None:
+    try:
+        for line in Path("/proc/self/status").read_text().splitlines():
+            if line.startswith("VmRSS:"):
+                return float(line.split()[1])
+    except Exception:
+        pass
+    return None
+
+
+def _housekeeping_pass() -> dict[str, Any]:
+    """Keeps the 1 GB VM healthy: old events, transient tables, WAL file, caches, oversized log and cache files, RAM and disk warnings."""
+    import gc
+    import shutil
+    freed_mb, notes = 0.0, []
+    notes.append(f"{EVENTS.prune(db_exec)} old events removed")
+    try:
+        prune_transient_cache(3)
+    except Exception:
+        pass
+    try:
+        with _DB_LOCK:
+            conn = db_conn()
+            try:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                conn.execute("PRAGMA optimize")
+            finally:
+                conn.close()
+    except Exception as exc:
+        notes.append(f"db maintenance skipped: {safe_text(exc)}")
+    for name, cap_mb in (("ca-trader.log", 50), (os.path.join("data", "candles_cache.json"), 40)):
+        fp = Path(BASE_DIR) / name
+        try:
+            if fp.exists() and fp.stat().st_size > cap_mb * 1e6:
+                size = fp.stat().st_size
+                if name.endswith(".log"):
+                    with fp.open("rb") as fh:
+                        fh.seek(-5_000_000, 2)
+                        tail = fh.read()
+                    fp.write_bytes(tail)
+                else:
+                    fp.unlink()
+                freed_mb += (size - (fp.stat().st_size if fp.exists() else 0)) / 1e6
+                notes.append(f"trimmed {name}")
+        except Exception:
+            pass
+    rss = _rss_kb()
+    if rss and rss > 650_000:
+        CACHE.clear()
+        _RSS_ITEMS.clear()
+        notes.append(f"memory was {rss / 1024:.0f} MB: caches cleared")
+    gc.collect()
+    try:
+        du = shutil.disk_usage(str(BASE_DIR))
+        free_pct = du.free / du.total * 100
+    except Exception:
+        free_pct = None
+    if free_pct is not None and free_pct < 15:
+        notes.append(f"disk is {100 - free_pct:.0f}% full")
+        _emit("risk", {"title": "Server disk is almost full", "detail": f"Only {free_pct:.0f}% free. Old data was trimmed; check backups and logs."}, severity="critical", dedupe=f"disk:{datetime.now(IST).date()}")
+    return {"freed_mb": round(freed_mb, 1), "rss_mb": round(rss / 1024) if rss else None, "disk_free_pct": round(free_pct) if free_pct is not None else None, "notes": notes}
+
+
+async def _housekeeping_loop() -> None:
+    await asyncio.sleep(120)
+    last_journal = None
+    while True:
+        try:
+            res = await asyncio.to_thread(_housekeeping_pass)
+            _beat("Housekeeper", f"RAM {res['rss_mb']} MB · disk free {res['disk_free_pct']}%")
+            try:
+                from backend.services import model_health as _mh
+                j = _mh.latest_journal()
+                if j and j.get("ts") != last_journal:
+                    if last_journal is not None or not db_exec("SELECT 1 FROM app_events WHERE kind='agent' AND dedupe=? LIMIT 1", [f"journal:{j['ts']}"], "one"):
+                        fl = [n for n in (j.get("notes") or [])]
+                        tn = (j.get("tuner") or {})
+                        _agent_event("Self-review", "weekly review finished", "; ".join(fl + [f"tuner: {tn.get('reason') or ('ran' if tn.get('ran') else 'skipped')}"])[:400], dedupe=f"journal:{j['ts']}")
+                    last_journal = j.get("ts")
+            except Exception:
+                pass
+        except Exception as exc:
+            log.debug("housekeeping failed: %s", safe_text(exc))
+            _beat("Housekeeper", safe_text(exc), False)
+        await asyncio.sleep(3 * 3600)
 
 
 @app.get("/api/alerts/config")
@@ -13831,7 +14432,9 @@ async def portfolio_panic_exit(request: Request, user: dict[str, Any] = Depends(
             except Exception:
                 pass
             if exit_price <= 0:
-                exit_price = float(p.get("avg_price") or 100.0)
+                exit_price = float(p.get("avg_price") or 0.0)
+            if exit_price <= 0:
+                continue   # no real price: leave the position open rather than close it at an invented one
             side = str(p.get("side") or "BUY").upper()
             close_side = "SELL" if side == "BUY" else "BUY"
             qty = int(p.get("quantity") or 0)
